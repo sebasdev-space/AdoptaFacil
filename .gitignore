@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# Turborepo
+.turbo/
+
+# Test / coverage
+coverage/
+*.lcov
+
+# Environment (NEVER commit real secrets — only .env.example is tracked)
+.env
+.env.*
+!.env.example
+
+# Prisma generated client
+prisma/generated/
+**/generated/prisma/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+logs/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# Local caches
+.eslintcache
+.vite/

@@ -1,0 +1,15 @@
+// AdoptaFácil — Prisma datasource + generator (split-schema root).
+// The schema is split across this folder (prismaSchemaFolder): one file per
+// module so each owner edits only their own file without merge conflicts.
+// Business models arrive in later waves; Sprint 0 ships only the tenant anchor
+// and the RLS reference table.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["prismaSchemaFolder"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}

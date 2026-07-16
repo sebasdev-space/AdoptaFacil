@@ -1,0 +1,8 @@
+**/dist/**
+**/build/**
+**/node_modules/**
+**/.turbo/**
+**/coverage/**
+**/generated/**
+pnpm-lock.yaml
+CHANGELOG.md

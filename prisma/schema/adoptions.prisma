@@ -1,0 +1,3 @@
+// Module: adoptions · Owner: @fabian (Ola 0)
+// TODO: models defined by @fabian. Every business model MUST carry
+// organization_id and enable RLS following the _rls_probe reference in org.prisma.

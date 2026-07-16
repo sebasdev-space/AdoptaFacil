@@ -1,0 +1,10 @@
+/* App-level tweaks layered on top of @adoptafacil/ui/styles.css (Tailwind base). */
+:root {
+  color-scheme: light dark;
+}
+
+html,
+body,
+#root {
+  min-height: 100vh;
+}

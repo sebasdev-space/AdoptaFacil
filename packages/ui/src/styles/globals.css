@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --muted: 142 20% 96%;
+    --muted-foreground: 240 4% 46%;
+    --primary: 142 72% 29%; /* AdoptaFácil green — primary action */
+    --primary-foreground: 0 0% 100%;
+    --accent: 142 40% 94%;
+    --accent-foreground: 142 72% 20%;
+    --input: 240 6% 90%;
+    --ring: 142 72% 29%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
+    --primary: 142 65% 45%;
+    --primary-foreground: 240 10% 3.9%;
+    --accent: 142 30% 18%;
+    --accent-foreground: 0 0% 98%;
+    --input: 240 4% 22%;
+    --ring: 142 65% 45%;
+  }
+
+  * {
+    border-color: hsl(var(--input));
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+}
