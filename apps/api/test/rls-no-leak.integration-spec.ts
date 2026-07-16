@@ -12,7 +12,7 @@ import { Prisma, PrismaClient } from '@prisma/client';
  */
 const APP_DATABASE_URL =
   process.env.DATABASE_URL_APP ??
-  'postgresql://adoptafacil_app:adoptafacil_app@localhost:5432/adoptafacil?schema=public';
+  'postgresql://adoptafacil_app:adoptafacil_app@localhost:5433/adoptafacil?schema=public';
 
 type ProbeRow = { organization_id: string; payload: string };
 

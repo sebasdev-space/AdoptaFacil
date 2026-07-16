@@ -39,3 +39,4 @@ Thumbs.db
 # Local caches
 .eslintcache
 .vite/
+*.timestamp-*.mjs

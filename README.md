@@ -27,11 +27,14 @@ con todos los gates (incluido el de no-filtración entre organizaciones, RNF03).
 git clone <repo> && cd AdoptaFacil
 pnpm install
 
-# 2. Variables de entorno (no hay secretos reales; valores de ejemplo)
-cp .env.example .env            # PowerShell: Copy-Item .env.example .env
+# 2. Variables de entorno (crea .env en UTF-8 sin BOM; NO uses `>`/Out-File)
+pnpm setup:env                  # copia .env.example -> .env de forma segura
 
 # 3. Levantar infraestructura local (Postgres 16 + Redis 7)
 docker compose up -d            # espera a que ambos estén "healthy"
+# Nota: el contenedor publica Postgres en el puerto 5433 del host (no 5432),
+# para no chocar con una instalación nativa de PostgreSQL. DATABASE_URL ya
+# apunta a 5433 en .env.example.
 
 # 4. Migrar la base de datos (crea tablas, policy RLS y rol de aplicación)
 pnpm prisma migrate dev
@@ -80,6 +83,20 @@ canónico está probado sobre la tabla `_rls_probe` y el test
 `apps/api/test/rls-no-leak.integration-spec.ts` verifica que una organización
 **nunca** ve filas de otra (en ambos sentidos). Es un **gate obligatorio de CI**.
 Detalles en [`prisma/README.md`](./prisma/README.md).
+
+## Solución de problemas
+
+- **Prisma `P1000` / `Environment variable not found: DATABASE_URL`** aunque el
+  `.env` existe: casi siempre el `.env` quedó en **UTF-16/BOM** (lo genera
+  PowerShell con `>`, `Out-File` o `Set-Content`). Prisma lo "carga" pero no
+  puede leer las variables. Recrea el archivo con `pnpm setup:env` (UTF-8 sin
+  BOM). `.gitattributes` y `.editorconfig` mantienen el resto del repo correcto.
+- **Prisma `P1000` autenticación fallida** contra `localhost`: tienes un
+  PostgreSQL nativo ocupando el `5432` del host. Este proyecto usa el **5433**
+  para el contenedor (ver `POSTGRES_PORT` y `DATABASE_URL` en `.env.example`), así
+  que no deberías chocar; si cambiaste el puerto, mantén `DATABASE_URL` alineado.
+- **El test `rls-no-leak` requiere Postgres arriba** y usa el rol no-superusuario
+  `adoptafacil_app` (los superusuarios saltan RLS). Lo crea la migración inicial.
 
 ## Documentación
 

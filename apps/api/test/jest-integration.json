@@ -8,6 +8,7 @@
   "moduleNameMapper": {
     "^@adoptafacil/contracts$": "<rootDir>/../../packages/contracts/src/index.ts"
   },
+  "setupFiles": ["<rootDir>/test/load-env.ts"],
   "testEnvironment": "node",
   "testTimeout": 30000
 }

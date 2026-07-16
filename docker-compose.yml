@@ -1,4 +1,4 @@
-# Local development infrastructure for AdoptaFácil.
+# Local development infrastructure for AdoptaFacil.
 # Only backing services live here — no application containers in Sprint 0.
 #   docker compose up -d
 # Postgres and Redis expose healthchecks so `depends_on: condition: service_healthy`

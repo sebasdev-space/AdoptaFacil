@@ -18,6 +18,7 @@
     "dev": "turbo run dev",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,cjs,mjs,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,cjs,mjs,json,md,yml,yaml}\"",
+    "setup:env": "node scripts/setup-env.mjs",
     "prepare": "husky"
   },
   "dependencies": {
