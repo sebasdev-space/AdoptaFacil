@@ -1,0 +1,4 @@
+// Module: payments · Owner: @fabian (Ola 2)
+// TODO: models defined by @fabian. The real PaymentPort/Wompi integration is
+// Ola 2 and lives behind a port/adapter. Every business model MUST carry
+// organization_id and enable RLS following the _rls_probe reference in org.prisma.

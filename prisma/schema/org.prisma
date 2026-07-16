@@ -1,0 +1,26 @@
+// Module: org (tenant foundation) · Owner: @sebastian (Ola 0)
+// Ships the minimal tenant anchor and the canonical RLS reference table.
+
+/// Global tenant registry. Intentionally NOT under RLS — it is the platform-level
+/// catalog of organizations. Every future business table carries organization_id
+/// referencing this table and MUST enable RLS (see _rls_probe as the reference).
+model Organization {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("organizations")
+}
+
+/// Canonical Row-Level Security reference — HARNESS ONLY, not a business table.
+/// The cross-org no-leak gate (RNF03) runs against this table, and every module
+/// owner replicates the same organization_id + RLS pattern for their own tables.
+/// RLS policy, FORCE, the app role and grants are added by the initial migration.
+model RlsProbe {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  payload        String
+
+  @@map("_rls_probe")
+}

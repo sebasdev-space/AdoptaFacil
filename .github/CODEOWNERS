@@ -1,0 +1,62 @@
+# AdoptaFácil — code ownership map (metodología de desarrollo).
+# Last matching pattern wins; a PR requires review from the matched owner(s).
+#
+# NOTE: @sebastian and @fabian are placeholders — replace them with the real
+# GitHub usernames (or @org/team handles) before enabling branch protection,
+# otherwise GitHub cannot request reviews.
+
+# Default: bootstrap/root scaffolding reviewed by both leads.
+*                                    @sebastian @fabian
+
+# --- Backend core & module ownership (apps/api) --------------------------
+/apps/api/src/core/                  @sebastian
+/apps/api/src/modules/org/           @sebastian
+/apps/api/src/modules/animals/       @sebastian
+/apps/api/src/modules/campaigns/     @sebastian
+/apps/api/src/modules/sponsorships/  @sebastian
+/apps/api/src/modules/volunteering/  @sebastian
+/apps/api/src/modules/reputation/    @sebastian
+/apps/api/src/modules/dashboards/    @sebastian
+/apps/api/src/modules/adoptions/     @fabian
+/apps/api/src/modules/portals/       @fabian
+/apps/api/src/modules/payments/      @fabian
+/apps/api/src/modules/donations/     @fabian
+/apps/api/src/modules/resources/     @fabian
+/apps/api/src/modules/marketplace/   @fabian
+/apps/api/src/modules/community/     @fabian
+
+# --- Frontend shell & shared UI library ----------------------------------
+/apps/web/src/shell/                 @fabian
+/packages/ui/                        @fabian
+
+# --- Prisma schema (per module owner) ------------------------------------
+/prisma/schema/org.prisma            @sebastian
+/prisma/schema/animals.prisma        @sebastian
+/prisma/schema/campaigns.prisma      @sebastian
+/prisma/schema/sponsorships.prisma   @sebastian
+/prisma/schema/volunteering.prisma   @sebastian
+/prisma/schema/reputation.prisma     @sebastian
+/prisma/schema/dashboards.prisma     @sebastian
+/prisma/schema/adoptions.prisma      @fabian
+/prisma/schema/portals.prisma        @fabian
+/prisma/schema/payments.prisma       @fabian
+/prisma/schema/donations.prisma      @fabian
+/prisma/schema/resources.prisma      @fabian
+/prisma/schema/marketplace.prisma    @fabian
+/prisma/schema/community.prisma      @fabian
+
+# --- Contracts (per module owner) ----------------------------------------
+/packages/contracts/src/org.ts           @sebastian
+/packages/contracts/src/animals.ts       @sebastian
+/packages/contracts/src/campaigns.ts     @sebastian
+/packages/contracts/src/sponsorships.ts  @sebastian
+/packages/contracts/src/volunteering.ts  @sebastian
+/packages/contracts/src/reputation.ts    @sebastian
+/packages/contracts/src/dashboards.ts    @sebastian
+/packages/contracts/src/adoptions.ts     @fabian
+/packages/contracts/src/portals.ts       @fabian
+/packages/contracts/src/payments.ts      @fabian
+/packages/contracts/src/donations.ts     @fabian
+/packages/contracts/src/resources.ts     @fabian
+/packages/contracts/src/marketplace.ts   @fabian
+/packages/contracts/src/community.ts     @fabian

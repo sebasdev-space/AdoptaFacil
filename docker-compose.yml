@@ -1,0 +1,47 @@
+# Local development infrastructure for AdoptaFacil.
+# Only backing services live here — no application containers in Sprint 0.
+#   docker compose up -d
+# Postgres and Redis expose healthchecks so `depends_on: condition: service_healthy`
+# and CI can wait for readiness deterministically.
+services:
+  postgres:
+    image: postgres:16
+    container_name: adoptafacil-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-adoptafacil}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-adoptafacil}
+      POSTGRES_DB: ${POSTGRES_DB:-adoptafacil}
+    ports:
+      - '${POSTGRES_PORT:-5432}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-adoptafacil} -d ${POSTGRES_DB:-adoptafacil}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  redis:
+    image: redis:7
+    container_name: adoptafacil-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+volumes:
+  postgres_data:
+    name: adoptafacil_postgres_data
+  redis_data:
+    name: adoptafacil_redis_data
