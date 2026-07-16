@@ -3,9 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "description": "AdoptaFácil V2.0 — monorepo (walking skeleton)",
-  "packageManager": "pnpm@11.13.1",
+  "packageManager": "pnpm@9.15.9",
   "engines": {
-    "node": ">=20"
+    "node": ">=20",
+    "pnpm": ">=9 <10"
   },
   "prisma": {
     "schema": "prisma/schema"
