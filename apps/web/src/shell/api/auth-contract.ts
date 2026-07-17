@@ -47,3 +47,45 @@ export interface LoginResponse {
 export interface RefreshResponse {
   tokens: AuthTokens;
 }
+
+/** Kind of account being created (§13: two account types). */
+export type AccountType = 'organization' | 'person';
+
+/** Registration payload for an Organization account (§M02, §13). */
+export interface RegisterOrganizationRequest {
+  accountType: 'organization';
+  organizationName: string;
+  /** Colombian tax id (NIT). */
+  nit: string;
+  /** Legal representative / primary contact. */
+  contactName: string;
+  email: string;
+  password: string;
+  phone?: string;
+}
+
+/** Registration payload for a Person account (§M02, §13). */
+export interface RegisterPersonRequest {
+  accountType: 'person';
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  phone?: string;
+}
+
+/** Discriminated union — the `accountType` tag keeps Org and Person fields apart. */
+export type RegisterRequest = RegisterOrganizationRequest | RegisterPersonRequest;
+
+/** Registration establishes a session, so it returns the same shape as login. */
+export type RegisterResponse = LoginResponse;
+
+/** Payload for `POST /auth/forgot-password`. */
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+/** Response for a password-reset request — deliberately generic (no enumeration). */
+export interface ForgotPasswordResponse {
+  message: string;
+}

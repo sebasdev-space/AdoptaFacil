@@ -73,7 +73,10 @@ describe('routing — public vs protected', () => {
     );
     expect(screen.getByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Entrar (demo)' }));
+    // Fill the demo credentials seeded by the mock auth service and sign in.
+    await user.type(screen.getByLabelText('Correo electrónico'), 'demo@adoptafacil.org');
+    await user.type(screen.getByLabelText('Contraseña'), 'demo');
+    await user.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
 
     // Returned to the protected origin, now rendered inside the shell.
     expect(await screen.findByRole('heading', { name: 'Adopciones' })).toBeInTheDocument();
