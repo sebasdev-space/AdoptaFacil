@@ -2,40 +2,120 @@
 @tailwind components;
 @tailwind utilities;
 
+/**
+ * AdoptaFácil design tokens (§M14 — personalización por tokens CSS).
+ *
+ * Every visual decision in @adoptafacil/ui resolves to one of these CSS custom
+ * properties. Nothing in the component library hardcodes a color, radius, or
+ * font — restyle the whole system (or a single tenant) by overriding these vars,
+ * no component changes required.
+ *
+ * Colors are stored as bare HSL channels ("H S% L%") so Tailwind can compose
+ * them with an alpha value: `hsl(var(--primary) / 0.9)`. Dark mode toggles with
+ * the `.dark` class on <html> (see apps/web/src/shell/theme).
+ *
+ * Brand direction: green as the primary action, a warm and trustworthy tone,
+ * first-class dark mode.
+ */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --muted: 142 20% 96%;
-    --muted-foreground: 240 4% 46%;
-    --primary: 142 72% 29%; /* AdoptaFácil green — primary action */
+    /* Surfaces */
+    --background: 40 33% 99%; /* warm off-white, not clinical pure white */
+    --foreground: 150 15% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 150 15% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 150 15% 12%;
+
+    /* Primary — AdoptaFácil green (call to action) */
+    --primary: 142 72% 29%;
     --primary-foreground: 0 0% 100%;
+
+    /* Secondary — warm sand, for supporting actions */
+    --secondary: 36 38% 94%;
+    --secondary-foreground: 30 25% 22%;
+
+    /* Muted — low-emphasis surfaces and text */
+    --muted: 142 20% 96%;
+    --muted-foreground: 150 8% 42%;
+
+    /* Accent — subtle green tint for hover/highlight */
     --accent: 142 40% 94%;
     --accent-foreground: 142 72% 20%;
-    --input: 240 6% 90%;
+
+    /* Semantic status */
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 66% 34%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 45%;
+    --warning-foreground: 40 60% 12%;
+    --info: 205 78% 40%;
+    --info-foreground: 0 0% 100%;
+
+    /* Lines & form controls */
+    --border: 150 12% 88%;
+    --input: 150 12% 86%;
     --ring: 142 72% 29%;
-    --radius: 0.5rem;
+
+    /* Typography */
+    --font-sans:
+      'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+      sans-serif;
+    --font-display: var(--font-sans);
+    --font-mono:
+      ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+
+    /* Radii */
+    --radius: 0.625rem;
+
+    /* Focus ring geometry (shared by every focusable control) */
+    --ring-offset: 2px;
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 65%;
+    --background: 150 18% 7%;
+    --foreground: 40 20% 96%;
+    --card: 150 15% 10%;
+    --card-foreground: 40 20% 96%;
+    --popover: 150 15% 10%;
+    --popover-foreground: 40 20% 96%;
+
     --primary: 142 65% 45%;
-    --primary-foreground: 240 10% 3.9%;
-    --accent: 142 30% 18%;
-    --accent-foreground: 0 0% 98%;
-    --input: 240 4% 22%;
+    --primary-foreground: 150 30% 8%;
+
+    --secondary: 150 10% 18%;
+    --secondary-foreground: 40 20% 92%;
+
+    --muted: 150 10% 16%;
+    --muted-foreground: 150 8% 62%;
+
+    --accent: 142 30% 20%;
+    --accent-foreground: 40 20% 96%;
+
+    --destructive: 0 62% 52%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 60% 48%;
+    --success-foreground: 150 30% 8%;
+    --warning: 38 88% 55%;
+    --warning-foreground: 40 60% 10%;
+    --info: 205 70% 55%;
+    --info-foreground: 150 30% 8%;
+
+    --border: 150 8% 22%;
+    --input: 150 8% 24%;
     --ring: 142 65% 45%;
   }
 
   * {
-    border-color: hsl(var(--input));
+    border-color: hsl(var(--border));
   }
 
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 }
