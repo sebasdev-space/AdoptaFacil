@@ -12,7 +12,7 @@ function Consumer() {
       <p data-testid="status">{status}</p>
       <p data-testid="user">{user?.name ?? '—'}</p>
       <button onClick={() => void signIn()}>demo-signin</button>
-      <button onClick={() => void signIn({ email: 'a@b.co', password: 'secret' })}>
+      <button onClick={() => void signIn({ email: 'demo@adoptafacil.org', password: 'demo' })}>
         creds-signin
       </button>
       <button onClick={() => void signOut()}>signout</button>
@@ -64,6 +64,7 @@ describe('SessionProvider — session state without browser storage', () => {
   });
 
   it('passes real credentials through to the auth service', async () => {
+    // The mock seeds a demo account; sign in with those exact credentials.
     const authApi = new MockAuthApi();
     const loginSpy = vi.spyOn(authApi, 'login');
     const user = userEvent.setup();
@@ -75,7 +76,7 @@ describe('SessionProvider — session state without browser storage', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'creds-signin' }));
-    expect(loginSpy).toHaveBeenCalledWith({ email: 'a@b.co', password: 'secret' });
+    expect(loginSpy).toHaveBeenCalledWith({ email: 'demo@adoptafacil.org', password: 'demo' });
     expect(screen.getByTestId('status')).toHaveTextContent('authenticated');
   });
 });

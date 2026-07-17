@@ -30,8 +30,22 @@ Estado:   Backlog | En curso | En revisión | Hecho
 
 ## Registro
 
-| ID    | Título                                    | Módulo | Ola | Dueño | Estado      |
-| ----- | ----------------------------------------- | ------ | --- | ----- | ----------- |
-| T-000 | Bootstrap del monorepo (walking skeleton) | infra  | 0   | lead  | En revisión |
+| ID    | Título                                       | Módulo    | Ola | Dueño   | Estado      |
+| ----- | -------------------------------------------- | --------- | --- | ------- | ----------- |
+| T-000 | Bootstrap del monorepo (walking skeleton)    | infra     | 0   | lead    | En revisión |
+| T-021 | Shell del portal (layout, routing, §M14)     | web/shell | 0   | @fabian | En revisión |
+| T-022 | Cliente API tipado + sesión (refresh)        | web/shell | 0   | @fabian | En revisión |
+| T-023 | Pantallas de auth (login/registro/recuperar) | M02       | 0   | @fabian | En curso    |
+| T-024 | Integración auth real (bloqueada por T-011)  | M02       | 0   | @fabian | Backlog     |
 
 > Añade una fila por tarea. Convierte fechas relativas a absolutas al registrar.
+
+## Deuda de integración
+
+- **T-024 · Integración auth real (bloqueada por T-011).** Hoy el frontend (T-022/T-023)
+  funciona contra un mock local del contrato auth (`auth-contract.ts` y `mock-auth-api.ts` en
+  `apps/web/src/shell/api`). Cuando @sebastian publique `packages/contracts/auth.ts` (T-011) y
+  los endpoints `/auth/*` reales, hay que: (a) hacer el swap de una línea en `auth-contract.ts`
+  a `export * from '@adoptafacil/contracts'`; (b) apuntar el cliente al backend real (modo
+  `http` en `createShellApi`); (c) validar login/registro/refresh end-to-end. Bloqueada por
+  T-011.

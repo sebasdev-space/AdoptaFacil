@@ -1,12 +1,13 @@
 import { Route, Routes } from 'react-router-dom';
 import { RequireAuth } from '../auth';
 import { AppLayout } from '../layout';
-import { HomePage, LoginPage, NotFoundPage, PlaceholderPage } from '../../features/_layout';
+import { HomePage, NotFoundPage, PlaceholderPage } from '../../features/_layout';
+import { ForgotPasswordPage, LoginPage, RegisterPage } from '../../features/auth';
 
 /**
  * Route tree for the shell.
  *
- *   /login                     → public
+ *   /login, /register, /forgot → public (auth screens, M02 / T-023)
  *   everything else            → protected by <RequireAuth>, rendered inside the
  *                                <AppLayout> shell (sidebar + header + indicator)
  *
@@ -19,8 +20,10 @@ import { HomePage, LoginPage, NotFoundPage, PlaceholderPage } from '../../featur
 export function AppRoutes() {
   return (
     <Routes>
-      {/* Public */}
+      {/* Public auth screens */}
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/forgot" element={<ForgotPasswordPage />} />
 
       {/* Protected — guard first, then the shell layout */}
       <Route element={<RequireAuth />}>

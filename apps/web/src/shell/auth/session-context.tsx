@@ -5,7 +5,11 @@ import {
   tokensFromContract,
   type AuthApi,
   type AuthUser,
+  type ForgotPasswordRequest,
+  type ForgotPasswordResponse,
   type LoginRequest,
+  type LoginResponse,
+  type RegisterRequest,
   type ShellApi,
 } from '../api';
 
@@ -41,6 +45,10 @@ export interface SessionContextValue {
    * them, uses a demo login (Ola 0 convenience against the mock auth service).
    */
   signIn: (credentials?: LoginRequest) => Promise<void>;
+  /** Create an account (Organization or Person) and establish its session. */
+  register: (request: RegisterRequest) => Promise<void>;
+  /** Request a password reset (no session change; resolves generically). */
+  requestPasswordReset: (request: ForgotPasswordRequest) => Promise<ForgotPasswordResponse>;
   /** Tear down the session (clears in-memory tokens; best-effort server logout). */
   signOut: () => Promise<void>;
 }
@@ -114,13 +122,33 @@ export function SessionProvider({
     }),
   );
 
-  const signIn = useCallback(
-    async (credentials?: LoginRequest) => {
-      const { user: authUser, tokens } = await api.authApi.login(credentials ?? DEMO_CREDENTIALS);
-      api.tokenStore.set(tokensFromContract(tokens));
-      setUser(toSessionUser(authUser));
+  // Store tokens in memory and flip the session to authenticated.
+  const establish = useCallback(
+    (response: LoginResponse) => {
+      api.tokenStore.set(tokensFromContract(response.tokens));
+      setUser(toSessionUser(response.user));
       setStatus('authenticated');
     },
+    [api],
+  );
+
+  const signIn = useCallback(
+    async (credentials?: LoginRequest) => {
+      establish(await api.authApi.login(credentials ?? DEMO_CREDENTIALS));
+    },
+    [api, establish],
+  );
+
+  const register = useCallback(
+    async (request: RegisterRequest) => {
+      establish(await api.authApi.register(request));
+    },
+    [api, establish],
+  );
+
+  const requestPasswordReset = useCallback(
+    (request: ForgotPasswordRequest): Promise<ForgotPasswordResponse> =>
+      api.authApi.requestPasswordReset(request),
     [api],
   );
 
@@ -140,9 +168,11 @@ export function SessionProvider({
       user,
       isAuthenticated: status === 'authenticated',
       signIn,
+      register,
+      requestPasswordReset,
       signOut,
     }),
-    [status, user, signIn, signOut],
+    [status, user, signIn, register, requestPasswordReset, signOut],
   );
 
   return (

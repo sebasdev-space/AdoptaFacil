@@ -29,4 +29,11 @@ export type {
   RefreshResponse,
   AuthTokens,
   AuthUser,
+  AccountType,
+  RegisterRequest,
+  RegisterOrganizationRequest,
+  RegisterPersonRequest,
+  RegisterResponse,
+  ForgotPasswordRequest,
+  ForgotPasswordResponse,
 } from './auth-contract';
