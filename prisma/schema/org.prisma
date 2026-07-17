@@ -10,7 +10,31 @@ model Organization {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  members OrgMember[]
+
   @@map("organizations")
+}
+
+/// First REAL business table (module: org) protected by Row-Level Security
+/// (RNF03). Every row carries organization_id; the T-010 migration ENABLEs and
+/// FORCEs RLS and adds the tenant_isolation policy + grants to adoptafacil_app.
+/// Access it only through PrismaService.withTenant() so app.current_org_id is
+/// set for the transaction — RLS then filters automatically and, if the code
+/// ever forgets, still yields zero rows.
+model OrgMember {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  email          String
+  displayName    String   @map("display_name")
+  role           String   @default("member")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, email])
+  @@index([organizationId])
+  @@map("org_members")
 }
 
 /// Canonical Row-Level Security reference — HARNESS ONLY, not a business table.
