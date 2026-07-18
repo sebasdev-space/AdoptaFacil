@@ -11,8 +11,90 @@ model Organization {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   members OrgMember[]
+  users   User[]
 
   @@map("organizations")
+}
+
+/// Tenant-scoped user PROFILE (module: M02). Protected by Row-Level Security
+/// (RNF03): every row carries organization_id and the T-011 migration ENABLEs +
+/// FORCEs RLS with tenant_isolation, so a request only ever sees users of its
+/// own organization. Authentication does NOT read this table (see AuthCredential
+/// — a global identity index): login happens before any tenant context exists.
+model User {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  accountType    String   @map("account_type")
+  email          String
+  displayName    String   @map("display_name")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  credential          AuthCredential?
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@unique([organizationId, email])
+  @@index([organizationId])
+  @@map("users")
+}
+
+/// Global identity/credential index (module: M02). Intentionally NOT under RLS —
+/// like `organizations`, it is a platform-level directory: login looks a user up
+/// by email BEFORE any tenant context exists. Stores only the password HASH,
+/// never the plaintext. Carries organization_id + account_type so tokens can be
+/// issued without reading the RLS-protected `users` table.
+model AuthCredential {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @unique @map("user_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  accountType    String   @map("account_type")
+  email          String   @unique
+  passwordHash   String   @map("password_hash")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("auth_credentials")
+}
+
+/// Refresh-token store (module: M02) for rotation + revocation. NOT under RLS
+/// (auth infrastructure, keyed by user). Only the SHA-256 HASH of the opaque
+/// refresh token is stored — never the token itself. Rotation revokes the old
+/// row and links it to its replacement for reuse detection.
+model RefreshToken {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  tokenHash    String    @unique @map("token_hash")
+  expiresAt    DateTime  @map("expires_at")
+  revokedAt    DateTime? @map("revoked_at")
+  replacedById String?   @map("replaced_by_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+/// Password-reset token store (module: M02). NOT under RLS. Stores only the
+/// SHA-256 HASH of the reset token; delivery goes through the simulable
+/// NotificationPort. `usedAt` makes tokens single-use.
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
 }
 
 /// First REAL business table (module: org) protected by Row-Level Security
