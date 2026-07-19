@@ -6,14 +6,15 @@ import {
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
-import type {
-  AccountType,
-  AuthenticatedUser,
-  AuthSession,
-  AuthTokens,
-  LoginDto,
-  RegisterOrganizationDto,
-  RegisterPersonDto,
+import {
+  type AccountType,
+  type AuthenticatedUser,
+  type AuthSession,
+  type AuthTokens,
+  type LoginDto,
+  type RegisterOrganizationDto,
+  type RegisterPersonDto,
+  Role,
 } from '@adoptafacil/contracts';
 import { NOTIFICATION_PORT, type NotificationPort } from '../../notifications/notification.port';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -81,6 +82,16 @@ export class AuthService {
       await tx.authCredential.create({
         data: { userId, organizationId, accountType, email: normalizedEmail, passwordHash },
       });
+      if (accountType === 'organization') {
+        // The registrant is the legal representative → Owner of the new org, the
+        // organization's top authority. Written in the SAME transaction (under the
+        // new org's RLS context) so a failure rolls back org + user + credential:
+        // an organization is never left without an Owner. A Person keeps its
+        // personal organization without a role (unchanged from T-011).
+        await tx.userRole.create({
+          data: { organizationId, userId, role: Role.Owner },
+        });
+      }
     });
 
     const user: AuthenticatedUser = {
