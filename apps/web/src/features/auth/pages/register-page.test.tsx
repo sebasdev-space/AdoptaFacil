@@ -26,7 +26,7 @@ describe('RegisterPage — Organization vs Person', () => {
 
     // Organization tab: org-specific fields present, person-specific absent.
     expect(screen.getByLabelText('Nombre de la organización')).toBeInTheDocument();
-    expect(screen.getByLabelText('NIT')).toBeInTheDocument();
+    expect(screen.getByLabelText('Nombre de contacto')).toBeInTheDocument();
     expect(screen.queryByLabelText('Apellido')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: 'Persona' }));
@@ -34,7 +34,7 @@ describe('RegisterPage — Organization vs Person', () => {
     // Person tab: person fields present, org-specific fields gone (no mixing).
     expect(screen.getByLabelText('Nombre')).toBeInTheDocument();
     expect(screen.getByLabelText('Apellido')).toBeInTheDocument();
-    expect(screen.queryByLabelText('NIT')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Nombre de contacto')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Nombre de la organización')).not.toBeInTheDocument();
   });
 
@@ -45,7 +45,7 @@ describe('RegisterPage — Organization vs Person', () => {
     await user.click(screen.getByRole('button', { name: 'Crear cuenta de organización' }));
 
     expect(await screen.findByText('El nombre de la organización es obligatorio.')).toBeVisible();
-    expect(screen.getByText('El NIT es obligatorio.')).toBeInTheDocument();
+    expect(screen.getByText('El nombre de contacto es obligatorio.')).toBeInTheDocument();
     // Still on the registration screen (no navigation on invalid input).
     expect(screen.getByRole('heading', { name: 'Crear cuenta' })).toBeInTheDocument();
   });
@@ -56,7 +56,6 @@ describe('RegisterPage — Organization vs Person', () => {
     renderShell({ route: '/register', session: { initialStatus: 'unauthenticated' } });
 
     await user.type(screen.getByLabelText('Nombre de la organización'), 'Fundación Patitas');
-    await user.type(screen.getByLabelText('NIT'), '900123456');
     await user.type(screen.getByLabelText('Nombre de contacto'), 'Ana Ruiz');
     await user.type(screen.getByLabelText('Correo electrónico'), 'org@patitas.org');
     await user.type(screen.getByLabelText('Contraseña'), 'supersecret');

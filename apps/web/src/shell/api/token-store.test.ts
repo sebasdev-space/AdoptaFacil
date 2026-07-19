@@ -35,14 +35,17 @@ describe('InMemoryTokenStore', () => {
 
   it('converts contract tokens to an absolute expiry', () => {
     const stored = tokensFromContract(
-      { accessToken: 'a', refreshToken: 'r', expiresIn: 60 },
+      { accessToken: 'a', refreshToken: 'r', tokenType: 'Bearer', expiresIn: 60 },
       1_000,
     );
     expect(stored).toEqual({ accessToken: 'a', refreshToken: 'r', expiresAt: 61_000 });
   });
 
   it('leaves expiry null when the contract gives no lifetime', () => {
-    const stored = tokensFromContract({ accessToken: 'a', refreshToken: 'r', expiresIn: 0 }, 1_000);
+    const stored = tokensFromContract(
+      { accessToken: 'a', refreshToken: 'r', tokenType: 'Bearer', expiresIn: 0 },
+      1_000,
+    );
     expect(stored.expiresAt).toBeNull();
   });
 });

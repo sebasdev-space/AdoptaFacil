@@ -1,8 +1,7 @@
 import type {
   AuthTokens,
-  AuthUser,
+  AuthenticatedUser,
   ForgotPasswordRequest,
-  ForgotPasswordResponse,
   LoginRequest,
   LoginResponse,
   RegisterRequest,
@@ -11,11 +10,11 @@ import type {
 import { ApiError } from './api-error';
 import type { AuthApi } from './auth-api';
 
-const DEMO_USER: AuthUser = {
+const DEMO_USER: AuthenticatedUser = {
   id: 'usr_mock_1',
   email: 'demo@adoptafacil.org',
   displayName: 'Equipo AdoptaFácil',
-  roles: ['admin'],
+  accountType: 'organization',
   organizationId: 'org_mock_1',
 };
 
@@ -23,14 +22,14 @@ const DEMO_PASSWORD = 'demo';
 
 interface MockAccount {
   password: string;
-  user: AuthUser;
+  user: AuthenticatedUser;
 }
 
 export interface MockAuthApiOptions {
   /** Access-token lifetime in seconds (short by default to exercise refresh). */
   accessTtlSeconds?: number;
   /** Override the seeded demo user. */
-  user?: AuthUser;
+  user?: AuthenticatedUser;
 }
 
 function normalizeEmail(email: string): string {
@@ -38,13 +37,14 @@ function normalizeEmail(email: string): string {
 }
 
 /**
- * In-memory {@link AuthApi} for Ola 0, before the backend exposes `/auth/*`.
- * Same shape as the real (mock) contract: it keeps an in-memory account registry
- * (seeded with a demo account), validates credentials on login, creates accounts
- * on register, rotates/validates refresh tokens, and revokes on logout. No
- * network, no browser storage.
+ * In-memory {@link AuthApi} for local dev and tests, mirroring the SHAPE of the
+ * real contract: it keeps an in-memory account registry (seeded with a demo
+ * account), validates credentials on login, creates accounts on register,
+ * rotates/validates refresh tokens, and revokes on logout. No network, no
+ * browser storage.
  *
- * Replace with {@link HttpAuthApi} (via the factory) once the backend is live.
+ * The real backend is used via {@link HttpAuthApi} (transport mode 'http'); this
+ * mock stays aligned so tests keep protecting the real request/response shapes.
  */
 export class MockAuthApi implements AuthApi {
   private readonly accessTtlSeconds: number;
@@ -70,6 +70,7 @@ export class MockAuthApi implements AuthApi {
     return {
       accessToken: `mock-access-${this.counter}`,
       refreshToken,
+      tokenType: 'Bearer',
       expiresIn: this.accessTtlSeconds,
     };
   }
@@ -98,32 +99,25 @@ export class MockAuthApi implements AuthApi {
       );
     }
 
-    const user: AuthUser =
-      request.accountType === 'organization'
-        ? {
-            id: this.nextId('usr'),
-            email: request.email,
-            displayName: request.organizationName,
-            roles: ['org_admin'],
-            organizationId: this.nextId('org'),
-          }
-        : {
-            id: this.nextId('usr'),
-            email: request.email,
-            displayName: `${request.firstName} ${request.lastName}`.trim(),
-            roles: ['person'],
-          };
+    // Both DTOs carry `displayName`; a Person also gets their own organization
+    // so multi-tenant RLS applies uniformly (mirrors the backend).
+    const user: AuthenticatedUser = {
+      id: this.nextId('usr'),
+      email: request.email,
+      displayName: request.displayName,
+      accountType: request.accountType,
+      organizationId: this.nextId('org'),
+    };
 
     this.accounts.set(email, { password: request.password, user });
     return Promise.resolve({ user, tokens: this.issueTokens() });
   }
 
-  requestPasswordReset(_request: ForgotPasswordRequest): Promise<ForgotPasswordResponse> {
-    // Always generic, regardless of whether the account exists (no enumeration).
-    return Promise.resolve({
-      message:
-        'Si el correo está registrado, enviaremos instrucciones para restablecer la contraseña.',
-    });
+  requestPasswordReset(_request: ForgotPasswordRequest): Promise<void> {
+    // Always resolves, regardless of whether the account exists (no enumeration).
+    // The real backend returns 202 with no body; the generic confirmation copy
+    // lives in the UI.
+    return Promise.resolve();
   }
 
   refresh(refreshToken: string): Promise<AuthTokens> {
@@ -141,7 +135,7 @@ export class MockAuthApi implements AuthApi {
     return Promise.resolve();
   }
 
-  me(): Promise<AuthUser> {
+  me(): Promise<AuthenticatedUser> {
     const [account] = this.accounts.values();
     return Promise.resolve(account?.user ?? DEMO_USER);
   }

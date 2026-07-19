@@ -30,20 +30,6 @@ export function validatePasswordConfirmation(password: string, confirmation: str
   return password !== confirmation ? 'Las contraseñas no coinciden.' : undefined;
 }
 
-/** Colombian NIT: 9–10 digits, optionally with a check digit (e.g. 900123456-7). */
-export function validateNit(value: string): FieldError {
-  if (value.trim().length === 0) return 'El NIT es obligatorio.';
-  return /^\d{9,10}(-?\d)?$/.test(value.trim())
-    ? undefined
-    : 'Ingresa un NIT válido (solo dígitos).';
-}
-
-/** Optional phone: when present, must look like a phone number. */
-export function validateOptionalPhone(value: string): FieldError {
-  if (value.trim().length === 0) return undefined;
-  return /^[\d\s()+-]{7,15}$/.test(value.trim()) ? undefined : 'Ingresa un teléfono válido.';
-}
-
 /** Drop `undefined` entries and report whether any error remains. */
 export function collectErrors<T extends Record<string, FieldError>>(
   errors: T,

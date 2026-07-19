@@ -8,36 +8,30 @@ import { FormAlert } from '../components/form-alert';
 import {
   collectErrors,
   validateEmail,
-  validateNit,
-  validateOptionalPhone,
   validatePassword,
   validatePasswordConfirmation,
   validateRequired,
 } from '../validation';
 
 type OrgErrors = Partial<
-  Record<
-    'organizationName' | 'nit' | 'contactName' | 'email' | 'password' | 'confirm' | 'phone',
-    string
-  >
+  Record<'organizationName' | 'contactName' | 'email' | 'password' | 'confirm', string>
 >;
 
 /**
- * Registration form for an ORGANIZATION account (§13). Distinct field set from
- * the person form — organization name, NIT and legal contact are required here
- * and never mixed with person fields.
+ * Registration form for an ORGANIZATION account (§13). Registration captures
+ * only what the backend DTO needs: organization name, the legal contact (sent as
+ * the owner user's `displayName`), email and password. The NIT (and phone)
+ * belong to the M01 formalization flow (Ola 1), not to account creation.
  */
 export function RegisterOrganizationForm() {
   const { register } = useSession();
   const navigate = useNavigate();
 
   const [organizationName, setOrganizationName] = useState('');
-  const [nit, setNit] = useState('');
   const [contactName, setContactName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [phone, setPhone] = useState('');
 
   const [errors, setErrors] = useState<OrgErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -45,36 +39,24 @@ export function RegisterOrganizationForm() {
 
   const refs = {
     organizationName: useRef<HTMLInputElement>(null),
-    nit: useRef<HTMLInputElement>(null),
     contactName: useRef<HTMLInputElement>(null),
     email: useRef<HTMLInputElement>(null),
     password: useRef<HTMLInputElement>(null),
     confirm: useRef<HTMLInputElement>(null),
-    phone: useRef<HTMLInputElement>(null),
   };
 
   const handleSubmit = async () => {
     const result = collectErrors({
       organizationName: validateRequired(organizationName, 'El nombre de la organización'),
-      nit: validateNit(nit),
       contactName: validateRequired(contactName, 'El nombre de contacto'),
       email: validateEmail(email),
       password: validatePassword(password),
       confirm: validatePasswordConfirmation(password, confirm),
-      phone: validateOptionalPhone(phone),
     });
     setErrors(result.errors);
     setFormError(null);
     if (!result.isValid) {
-      const order = [
-        'organizationName',
-        'nit',
-        'contactName',
-        'email',
-        'password',
-        'confirm',
-        'phone',
-      ] as const;
+      const order = ['organizationName', 'contactName', 'email', 'password', 'confirm'] as const;
       const first = order.find((key) => result.errors[key]);
       if (first) refs[first].current?.focus();
       return;
@@ -83,11 +65,9 @@ export function RegisterOrganizationForm() {
     const request: RegisterOrganizationRequest = {
       accountType: 'organization',
       organizationName: organizationName.trim(),
-      nit: nit.trim(),
-      contactName: contactName.trim(),
+      displayName: contactName.trim(),
       email: email.trim(),
       password,
-      phone: phone.trim() || undefined,
     };
 
     setSubmitting(true);
@@ -116,17 +96,6 @@ export function RegisterOrganizationForm() {
         value={organizationName}
         onChange={setOrganizationName}
         error={errors.organizationName}
-        required
-      />
-      <Field
-        ref={refs.nit}
-        id="org-nit"
-        label="NIT"
-        inputMode="numeric"
-        hint="Número de identificación tributaria (solo dígitos)."
-        value={nit}
-        onChange={setNit}
-        error={errors.nit}
         required
       />
       <Field
@@ -171,16 +140,6 @@ export function RegisterOrganizationForm() {
         onChange={setConfirm}
         error={errors.confirm}
         required
-      />
-      <Field
-        ref={refs.phone}
-        id="org-phone"
-        label="Teléfono (opcional)"
-        type="tel"
-        autoComplete="tel"
-        value={phone}
-        onChange={setPhone}
-        error={errors.phone}
       />
 
       <Button

@@ -4,11 +4,10 @@ import {
   createShellApi,
   tokensFromContract,
   type AuthApi,
-  type AuthUser,
+  type AuthSession,
+  type AuthenticatedUser,
   type ForgotPasswordRequest,
-  type ForgotPasswordResponse,
   type LoginRequest,
-  type LoginResponse,
   type RegisterRequest,
   type ShellApi,
 } from '../api';
@@ -48,7 +47,7 @@ export interface SessionContextValue {
   /** Create an account (Organization or Person) and establish its session. */
   register: (request: RegisterRequest) => Promise<void>;
   /** Request a password reset (no session change; resolves generically). */
-  requestPasswordReset: (request: ForgotPasswordRequest) => Promise<ForgotPasswordResponse>;
+  requestPasswordReset: (request: ForgotPasswordRequest) => Promise<void>;
   /** Tear down the session (clears in-memory tokens; best-effort server logout). */
   signOut: () => Promise<void>;
 }
@@ -66,16 +65,22 @@ const MOCK_USER: SessionUser = {
   id: 'usr_mock_1',
   name: 'Equipo AdoptaFácil',
   email: 'equipo@adoptafacil.org',
-  roles: ['admin'],
+  roles: [],
   organizationId: 'org_mock_1',
 };
 
-function toSessionUser(user: AuthUser): SessionUser {
+/**
+ * Map the auth principal to the app-facing session user. Roles are intentionally
+ * EMPTY for now: `AuthenticatedUser` no longer carries them, and wiring them from
+ * the RBAC endpoint (`GET /rbac/my-roles`, T-012) is deferred to T-025. No UI
+ * gates on roles yet, so an empty list is safe until then.
+ */
+function toSessionUser(user: AuthenticatedUser): SessionUser {
   return {
     id: user.id,
     name: user.displayName,
     email: user.email,
-    roles: user.roles,
+    roles: [],
     organizationId: user.organizationId,
   };
 }
@@ -92,6 +97,12 @@ export interface SessionProviderProps {
   initialUser?: SessionUser;
   /** Inject an auth service (real impl, or a fake in tests). Defaults to the mock. */
   authApi?: AuthApi;
+  /**
+   * Transport mode forwarded to the API layer: 'http' talks to the real
+   * `/auth/*` endpoints, 'mock' uses the in-memory service. Omitted in tests
+   * (the API layer then defaults to the mock).
+   */
+  mode?: 'mock' | 'http';
   /** Injectable fetch, forwarded to the client (tests). */
   fetchFn?: typeof fetch;
 }
@@ -101,6 +112,7 @@ export function SessionProvider({
   initialStatus = 'unauthenticated',
   initialUser = MOCK_USER,
   authApi,
+  mode,
   fetchFn,
 }: SessionProviderProps) {
   const [status, setStatus] = useState<SessionStatus>(initialStatus);
@@ -114,6 +126,7 @@ export function SessionProvider({
   const [api] = useState<ShellApi>(() =>
     createShellApi({
       authApi,
+      mode,
       fetchFn,
       onSessionExpired: () => {
         setUser(null);
@@ -124,7 +137,7 @@ export function SessionProvider({
 
   // Store tokens in memory and flip the session to authenticated.
   const establish = useCallback(
-    (response: LoginResponse) => {
+    (response: AuthSession) => {
       api.tokenStore.set(tokensFromContract(response.tokens));
       setUser(toSessionUser(response.user));
       setStatus('authenticated');
@@ -147,8 +160,7 @@ export function SessionProvider({
   );
 
   const requestPasswordReset = useCallback(
-    (request: ForgotPasswordRequest): Promise<ForgotPasswordResponse> =>
-      api.authApi.requestPasswordReset(request),
+    (request: ForgotPasswordRequest): Promise<void> => api.authApi.requestPasswordReset(request),
     [api],
   );
 

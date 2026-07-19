@@ -22,18 +22,17 @@ export {
 } from './create-shell-api';
 export { ApiClientProvider, useApiClient, type ApiClientProviderProps } from './api-context';
 
-// Auth contract (local mock — swap for @adoptafacil/contracts when published).
+// Auth contract (real, from @adoptafacil/contracts, adapted in auth-contract).
 export type {
+  AccountType,
+  AuthTokens,
+  AuthenticatedUser,
+  AuthSession,
   LoginRequest,
   LoginResponse,
-  RefreshResponse,
-  AuthTokens,
-  AuthUser,
-  AccountType,
   RegisterRequest,
   RegisterOrganizationRequest,
   RegisterPersonRequest,
   RegisterResponse,
   ForgotPasswordRequest,
-  ForgotPasswordResponse,
 } from './auth-contract';
