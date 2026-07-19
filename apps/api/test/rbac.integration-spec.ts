@@ -52,14 +52,10 @@ describe('RBAC endpoints (role gating + tenant-scoped authority)', () => {
       .expect(201);
     ownerToken = orgReg.body.tokens.accessToken;
     ownerOrgId = orgReg.body.user.organizationId;
-    const ownerId = orgReg.body.user.id;
     createdOrgIds.push(ownerOrgId);
 
-    await withOrgContext(appDb, ownerOrgId, (tx) =>
-      tx.userRole.create({
-        data: { organizationId: ownerOrgId, userId: ownerId, role: Role.Owner },
-      }),
-    );
+    // The registrant is granted the Owner role automatically at registration
+    // (T-012b), so no manual seeding is needed here.
 
     // A second user in the SAME org (assignment target), seeded directly.
     const second = await withOrgContext(appDb, ownerOrgId, (tx) =>
