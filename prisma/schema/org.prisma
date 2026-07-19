@@ -13,8 +13,34 @@ model Organization {
   members         OrgMember[]
   users           User[]
   roleAssignments UserRole[]
+  auditLogs       AuditLog[]
 
   @@map("organizations")
+}
+
+/// Append-only audit log (RNF04, §8/§14). Immutable: the T-013 migration ENABLEs
+/// + FORCEs RLS (tenant_isolation), grants the app role only SELECT+INSERT, and
+/// installs BEFORE UPDATE/DELETE/TRUNCATE triggers that reject any mutation —
+/// so records cannot be altered even by a privileged role via the normal path.
+/// `created_at` is UTC (retention is computed from it; no purge job in Ola 0).
+/// Never store secrets in `metadata` (passwords, tokens…); AuditService redacts
+/// known-sensitive keys as a defense. Kept in org.prisma (owned by @sebastian)
+/// to avoid an unowned schema file in CODEOWNERS.
+model AuditLog {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  actorUserId    String?  @map("actor_user_id") @db.Uuid
+  action         String
+  entityType     String   @map("entity_type")
+  entityId       String?  @map("entity_id")
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([organizationId, entityType, entityId])
+  @@map("audit_logs")
 }
 
 /// Tenant-scoped user PROFILE (module: M02). Protected by Row-Level Security
