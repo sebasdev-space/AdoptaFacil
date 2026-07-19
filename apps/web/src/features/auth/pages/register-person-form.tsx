@@ -8,19 +8,19 @@ import { FormAlert } from '../components/form-alert';
 import {
   collectErrors,
   validateEmail,
-  validateOptionalPhone,
   validatePassword,
   validatePasswordConfirmation,
   validateRequired,
 } from '../validation';
 
 type PersonErrors = Partial<
-  Record<'firstName' | 'lastName' | 'email' | 'password' | 'confirm' | 'phone', string>
+  Record<'firstName' | 'lastName' | 'email' | 'password' | 'confirm', string>
 >;
 
 /**
- * Registration form for a PERSON account (§13). Distinct field set from the
- * organization form — first/last name only; no organization name, NIT or contact.
+ * Registration form for a PERSON account (§13). Registration captures only what
+ * the backend DTO needs; first and last name are combined into the required
+ * `displayName`. Phone is not part of account creation (see M01, Ola 1).
  */
 export function RegisterPersonForm() {
   const { register } = useSession();
@@ -31,7 +31,6 @@ export function RegisterPersonForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [phone, setPhone] = useState('');
 
   const [errors, setErrors] = useState<PersonErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -43,7 +42,6 @@ export function RegisterPersonForm() {
     email: useRef<HTMLInputElement>(null),
     password: useRef<HTMLInputElement>(null),
     confirm: useRef<HTMLInputElement>(null),
-    phone: useRef<HTMLInputElement>(null),
   };
 
   const handleSubmit = async () => {
@@ -53,12 +51,11 @@ export function RegisterPersonForm() {
       email: validateEmail(email),
       password: validatePassword(password),
       confirm: validatePasswordConfirmation(password, confirm),
-      phone: validateOptionalPhone(phone),
     });
     setErrors(result.errors);
     setFormError(null);
     if (!result.isValid) {
-      const order = ['firstName', 'lastName', 'email', 'password', 'confirm', 'phone'] as const;
+      const order = ['firstName', 'lastName', 'email', 'password', 'confirm'] as const;
       const first = order.find((key) => result.errors[key]);
       if (first) refs[first].current?.focus();
       return;
@@ -66,11 +63,9 @@ export function RegisterPersonForm() {
 
     const request: RegisterPersonRequest = {
       accountType: 'person',
-      firstName: firstName.trim(),
-      lastName: lastName.trim(),
+      displayName: `${firstName.trim()} ${lastName.trim()}`.trim(),
       email: email.trim(),
       password,
-      phone: phone.trim() || undefined,
     };
 
     setSubmitting(true);
@@ -145,16 +140,6 @@ export function RegisterPersonForm() {
         onChange={setConfirm}
         error={errors.confirm}
         required
-      />
-      <Field
-        ref={refs.phone}
-        id="person-phone"
-        label="Teléfono (opcional)"
-        type="tel"
-        autoComplete="tel"
-        value={phone}
-        onChange={setPhone}
-        error={errors.phone}
       />
 
       <Button

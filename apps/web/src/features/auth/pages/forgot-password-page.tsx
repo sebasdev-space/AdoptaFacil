@@ -8,9 +8,16 @@ import { FormAlert } from '../components/form-alert';
 import { validateEmail } from '../validation';
 
 /**
- * Password-recovery request. Sends the request via useSession (mock in Ola 0;
- * the reset email is a stub) and shows a generic confirmation that never reveals
- * whether the account exists.
+ * Generic confirmation shown after any valid request. The backend returns 202
+ * with no body (it never reveals whether the account exists), so the copy lives
+ * here on the client.
+ */
+const GENERIC_CONFIRMATION =
+  'Si el correo está registrado, enviaremos instrucciones para restablecer la contraseña.';
+
+/**
+ * Password-recovery request. Sends the request via useSession and shows a
+ * generic confirmation that never reveals whether the account exists.
  */
 export function ForgotPasswordPage() {
   const { requestPasswordReset } = useSession();
@@ -33,8 +40,8 @@ export function ForgotPasswordPage() {
 
     setSubmitting(true);
     try {
-      const response = await requestPasswordReset({ email: email.trim() });
-      setConfirmation(response.message);
+      await requestPasswordReset({ email: email.trim() });
+      setConfirmation(GENERIC_CONFIRMATION);
     } catch {
       setFormError('No pudimos procesar la solicitud. Inténtalo de nuevo.');
       setSubmitting(false);

@@ -1,91 +1,58 @@
 /**
- * Auth contract — LOCAL MOCK (T-022).
+ * Auth contract — thin adapter over the published `@adoptafacil/contracts` (T-024).
  *
- * The real contract is owned by @sebastian and will be published at
- * `packages/contracts/auth.ts` (his T-011). It is not available yet, so per the
- * task this file mirrors its expected shape (§M02 auth, contract-first).
- *
- * ⚠️ SWAP WHEN PUBLISHED: replace the interface bodies below with
- *   `export * from '@adoptafacil/contracts';`  // auth types
- * (or re-export the specific auth types). Every consumer imports auth DTOs from
- * this module, so the swap is a single-file change and no DTOs are redefined by
- * hand anywhere else.
+ * Since T-011/T-012 the real contract is published, so this module no longer
+ * defines DTOs by hand. It RE-EXPORTS the real types under the names the web
+ * already uses, and adds the one thing the backend does not model: a single
+ * registration input union (the backend splits registration into two endpoints,
+ * so the HTTP layer reads `accountType`, strips it, and routes accordingly).
  */
+import type {
+  AuthSession,
+  LoginDto,
+  PasswordResetRequestDto,
+  RegisterOrganizationDto,
+  RegisterPersonDto,
+} from '@adoptafacil/contracts';
+
+// Real contract types consumed across the web auth layer.
+export type {
+  AccountType,
+  AuthTokens,
+  AuthenticatedUser,
+  AuthSession,
+  LoginDto,
+  RegisterOrganizationDto,
+  RegisterPersonDto,
+  PasswordResetRequestDto,
+  RefreshDto,
+  LogoutDto,
+} from '@adoptafacil/contracts';
+
+// --- Web-boundary aliases (the names the web components already use) ---------
 
 /** Credentials submitted to `POST /auth/login`. */
-export interface LoginRequest {
-  email: string;
-  password: string;
-}
+export type LoginRequest = LoginDto;
 
-/** The authenticated principal. */
-export interface AuthUser {
-  id: string;
-  email: string;
-  displayName: string;
-  /** Coarse RBAC roles. */
-  roles: string[];
-  /** Tenant the session is scoped to, when applicable (RNF03 multi-tenant). */
-  organizationId?: string;
-}
+/** Response of login/register: the authenticated user plus a fresh token pair. */
+export type LoginResponse = AuthSession;
+export type RegisterResponse = AuthSession;
 
-/** Token pair returned by login and refresh. Never persisted to browser storage. */
-export interface AuthTokens {
-  accessToken: string;
-  refreshToken: string;
-  /** Seconds until the access token expires (relative, as issued by the server). */
-  expiresIn: number;
-}
+/** Payload for the password-reset request. */
+export type ForgotPasswordRequest = PasswordResetRequestDto;
 
-/** Response body of `POST /auth/login`. */
-export interface LoginResponse {
-  user: AuthUser;
-  tokens: AuthTokens;
-}
+// --- Web-only registration input model ---------------------------------------
+// The backend exposes `/auth/register/organization` and `/auth/register/person`
+// with DTOs that carry NO discriminant. The web keeps a single discriminated
+// union at the form boundary; `HttpAuthApi.register` reads `accountType`, strips
+// it, and POSTs the exact DTO to the matching endpoint.
 
-/** Response body of `POST /auth/refresh`. */
-export interface RefreshResponse {
-  tokens: AuthTokens;
-}
-
-/** Kind of account being created (§13: two account types). */
-export type AccountType = 'organization' | 'person';
-
-/** Registration payload for an Organization account (§M02, §13). */
-export interface RegisterOrganizationRequest {
+export interface RegisterOrganizationRequest extends RegisterOrganizationDto {
   accountType: 'organization';
-  organizationName: string;
-  /** Colombian tax id (NIT). */
-  nit: string;
-  /** Legal representative / primary contact. */
-  contactName: string;
-  email: string;
-  password: string;
-  phone?: string;
 }
 
-/** Registration payload for a Person account (§M02, §13). */
-export interface RegisterPersonRequest {
+export interface RegisterPersonRequest extends RegisterPersonDto {
   accountType: 'person';
-  firstName: string;
-  lastName: string;
-  email: string;
-  password: string;
-  phone?: string;
 }
 
-/** Discriminated union — the `accountType` tag keeps Org and Person fields apart. */
 export type RegisterRequest = RegisterOrganizationRequest | RegisterPersonRequest;
-
-/** Registration establishes a session, so it returns the same shape as login. */
-export type RegisterResponse = LoginResponse;
-
-/** Payload for `POST /auth/forgot-password`. */
-export interface ForgotPasswordRequest {
-  email: string;
-}
-
-/** Response for a password-reset request — deliberately generic (no enumeration). */
-export interface ForgotPasswordResponse {
-  message: string;
-}

@@ -1,11 +1,9 @@
 import type {
   AuthTokens,
-  AuthUser,
+  AuthenticatedUser,
   ForgotPasswordRequest,
-  ForgotPasswordResponse,
   LoginRequest,
   LoginResponse,
-  RefreshResponse,
   RegisterRequest,
   RegisterResponse,
 } from './auth-contract';
@@ -15,20 +13,21 @@ import { toApiError } from './api-error';
 
 /**
  * Typed auth service consumed by the session layer. Method shapes come straight
- * from the (mock, soon real) contract — no DTOs are redefined here.
+ * from the real `@adoptafacil/contracts` (re-exported via `auth-contract`) — no
+ * DTOs are redefined here.
  */
 export interface AuthApi {
   login(credentials: LoginRequest): Promise<LoginResponse>;
   /** Create an account (Organization or Person) and return a session. */
   register(request: RegisterRequest): Promise<RegisterResponse>;
-  /** Request a password-reset email. Resolves generically (no account enumeration). */
-  requestPasswordReset(request: ForgotPasswordRequest): Promise<ForgotPasswordResponse>;
+  /** Request a password reset. Resolves with no body (202); never enumerates. */
+  requestPasswordReset(request: ForgotPasswordRequest): Promise<void>;
   /** Exchange a refresh token for a fresh pair (no access token required). */
   refresh(refreshToken: string): Promise<AuthTokens>;
   /** Best-effort server-side revocation; must not throw for the caller. */
   logout(refreshToken: string | null): Promise<void>;
   /** The current principal (authenticated request). */
-  me(): Promise<AuthUser>;
+  me(): Promise<AuthenticatedUser>;
 }
 
 function endpoint(baseUrl: string, path: string): string {
@@ -38,7 +37,8 @@ function endpoint(baseUrl: string, path: string): string {
 /**
  * Standalone refresh call — a PLAIN fetch that never routes through ApiClient,
  * so the interceptor cannot recurse into itself. This same function backs both
- * {@link HttpAuthApi.refresh} and the client's `refreshTokens` hook.
+ * {@link HttpAuthApi.refresh} and the client's `refreshTokens` hook. The backend
+ * returns the token pair DIRECTLY (no envelope).
  */
 export async function requestRefresh(
   baseUrl: string,
@@ -49,8 +49,7 @@ export async function requestRefresh(
     endpoint(baseUrl, '/auth/refresh'),
     jsonRequestInit('POST', { refreshToken }),
   );
-  const body = await parseJsonResponse<RefreshResponse>(response);
-  return body.tokens;
+  return parseJsonResponse<AuthTokens>(response);
 }
 
 export interface HttpAuthApiConfig {
@@ -81,19 +80,22 @@ export class HttpAuthApi implements AuthApi {
   }
 
   async register(request: RegisterRequest): Promise<RegisterResponse> {
-    const response = await this.fetchFn(
-      endpoint(this.baseUrl, '/auth/register'),
-      jsonRequestInit('POST', request),
-    );
+    // The backend splits registration by account type; the discriminator is a
+    // web-only routing tag, so strip it and POST the exact DTO it expects.
+    const { accountType, ...dto } = request;
+    const path =
+      accountType === 'organization' ? '/auth/register/organization' : '/auth/register/person';
+    const response = await this.fetchFn(endpoint(this.baseUrl, path), jsonRequestInit('POST', dto));
     return parseJsonResponse<RegisterResponse>(response);
   }
 
-  async requestPasswordReset(request: ForgotPasswordRequest): Promise<ForgotPasswordResponse> {
+  async requestPasswordReset(request: ForgotPasswordRequest): Promise<void> {
     const response = await this.fetchFn(
-      endpoint(this.baseUrl, '/auth/forgot-password'),
+      endpoint(this.baseUrl, '/auth/password-reset'),
       jsonRequestInit('POST', request),
     );
-    return parseJsonResponse<ForgotPasswordResponse>(response);
+    // 202 Accepted with no body; parseJsonResponse throws on non-2xx.
+    await parseJsonResponse<void>(response);
   }
 
   refresh(refreshToken: string): Promise<AuthTokens> {
@@ -112,8 +114,8 @@ export class HttpAuthApi implements AuthApi {
     }
   }
 
-  me(): Promise<AuthUser> {
-    return this.client.request<AuthUser>('/auth/me').catch((error) => {
+  me(): Promise<AuthenticatedUser> {
+    return this.client.request<AuthenticatedUser>('/auth/me').catch((error) => {
       throw toApiError(error);
     });
   }

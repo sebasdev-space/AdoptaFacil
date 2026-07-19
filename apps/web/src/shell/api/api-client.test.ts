@@ -7,6 +7,7 @@ import { InMemoryTokenStore } from './token-store';
 const NEW_TOKENS: AuthTokens = {
   accessToken: 'new-access',
   refreshToken: 'new-refresh',
+  tokenType: 'Bearer',
   expiresIn: 900,
 };
 
