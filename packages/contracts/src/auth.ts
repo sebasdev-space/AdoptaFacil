@@ -81,3 +81,64 @@ export interface AccessTokenClaims {
   typ: AccountType;
   email: string;
 }
+
+// ============================================================================
+// RBAC (§13) — roles & authority. Role assignment is per-user WITHIN an
+// organization; authorization is always evaluated together with the tenant
+// context (an Administrator of Org A has no authority over Org B). The role
+// names are the DOCUMENT-BASE names (not the wireframe labels).
+// ============================================================================
+
+/**
+ * The roles from the base document (§13). Organization-internal roles plus the
+ * two platform-level roles. String values are stable — do not rename.
+ */
+export enum Role {
+  /** propietario / representante legal */
+  Owner = 'owner',
+  /** administrador */
+  Administrator = 'administrator',
+  /** operador */
+  Operator = 'operator',
+  /** voluntario */
+  Volunteer = 'volunteer',
+  /** colaborador temporal */
+  TemporaryCollaborator = 'temporary_collaborator',
+  /** veterinario */
+  Veterinarian = 'veterinarian',
+  /** auditor de solo lectura */
+  ReadOnlyAuditor = 'read_only_auditor',
+  /** Admin de plataforma */
+  PlatformAdmin = 'platform_admin',
+  /** SuperAdmin de plataforma */
+  PlatformSuperAdmin = 'platform_super_admin',
+}
+
+/** Roles internal to an organization (§13). */
+export const ORG_ROLES: readonly Role[] = [
+  Role.Owner,
+  Role.Administrator,
+  Role.Operator,
+  Role.Volunteer,
+  Role.TemporaryCollaborator,
+  Role.Veterinarian,
+  Role.ReadOnlyAuditor,
+];
+
+/** Platform-level roles (§13). */
+export const PLATFORM_ROLES: readonly Role[] = [Role.PlatformAdmin, Role.PlatformSuperAdmin];
+
+/** A role held by a user within an organization. */
+export interface RoleAssignment {
+  userId: string;
+  role: Role;
+  organizationId: string;
+  /** ISO-8601 UTC. */
+  createdAt: string;
+}
+
+/** Assign a role to a user in the caller's organization. */
+export interface AssignRoleDto {
+  userId: string;
+  role: Role;
+}
