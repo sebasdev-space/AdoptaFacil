@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import type { UserRole as UserRoleRow } from '@prisma/client';
 import type { Role, RoleAssignment } from '@adoptafacil/contracts';
+import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../tenant/tenant-context.service';
 
@@ -23,6 +24,7 @@ export class RbacService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenant: TenantContextService,
+    private readonly audit: AuditService,
   ) {}
 
   /** Roles held by a user in the caller's organization. */
@@ -37,8 +39,9 @@ export class RbacService {
     return rows.map(toRoleAssignment);
   }
 
-  /** Grant a role to a user of the caller's organization (idempotent). */
-  async assignRole(userId: string, role: Role): Promise<RoleAssignment> {
+  /** Grant a role to a user of the caller's organization (idempotent). Records
+   *  an append-only audit event in the SAME transaction as the assignment. */
+  async assignRole(actorUserId: string, userId: string, role: Role): Promise<RoleAssignment> {
     const organizationId = this.tenant.getOrganizationId();
     if (!organizationId) {
       throw new ForbiddenException('Missing tenant context');
@@ -54,6 +57,14 @@ export class RbacService {
         where: { organizationId_userId_role: { organizationId, userId, role } },
         create: { organizationId, userId, role },
         update: {},
+      });
+      await this.audit.recordWithTx(tx, {
+        organizationId,
+        actorUserId,
+        action: 'role.assigned',
+        entityType: 'user',
+        entityId: userId,
+        metadata: { role },
       });
       return toRoleAssignment(row);
     });

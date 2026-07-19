@@ -5,6 +5,7 @@ import { Prisma, PrismaClient } from '@prisma/client';
 import { Role } from '@adoptafacil/contracts';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { purgeOrganizations } from './support/cleanup';
 
 /**
  * T-012b: registering an organization must automatically grant the registrant
@@ -68,9 +69,7 @@ describe('Owner granted on organization registration (T-012b)', () => {
   });
 
   afterAll(async () => {
-    if (createdOrgIds.length > 0) {
-      await admin.organization.deleteMany({ where: { id: { in: createdOrgIds } } });
-    }
+    await purgeOrganizations(admin, createdOrgIds);
     await appDb.$disconnect();
     await admin.$disconnect();
     await app?.close();

@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { validateEnv } from './config/env.validation';
+import { AuditModule } from './core/audit/audit.module';
 import { AuthModule } from './core/auth/auth.module';
 import { RbacModule } from './core/rbac/rbac.module';
 import { TenantModule } from './core/tenant/tenant.module';
@@ -25,6 +26,7 @@ import { RedisModule } from './redis/redis.module';
     // tenant. TenantModule is in turn before PrismaModule so its global
     // TenantContextService is available for PrismaService injection.
     AuthModule,
+    AuditModule,
     RbacModule,
     TenantModule,
     PrismaModule,

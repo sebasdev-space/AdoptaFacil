@@ -4,6 +4,7 @@ export * from './shared';
 
 export * from './org';
 export * from './auth';
+export * from './audit';
 export * from './animals';
 export * from './adoptions';
 export * from './donations';

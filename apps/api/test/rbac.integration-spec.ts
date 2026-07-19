@@ -5,6 +5,7 @@ import { Prisma, PrismaClient } from '@prisma/client';
 import { Role } from '@adoptafacil/contracts';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { purgeOrganizations } from './support/cleanup';
 
 /**
  * RBAC over HTTP: an endpoint gated by @Roles returns 200 for a user holding the
@@ -80,9 +81,7 @@ describe('RBAC endpoints (role gating + tenant-scoped authority)', () => {
   });
 
   afterAll(async () => {
-    if (createdOrgIds.length > 0) {
-      await admin.organization.deleteMany({ where: { id: { in: createdOrgIds } } });
-    }
+    await purgeOrganizations(admin, createdOrgIds);
     await appDb.$disconnect();
     await admin.$disconnect();
     await app?.close();

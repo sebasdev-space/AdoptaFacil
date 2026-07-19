@@ -38,9 +38,10 @@ export class RbacController {
   @UseGuards(RolesGuard)
   @Roles(Role.Owner, Role.Administrator)
   assign(
+    @CurrentUser() actor: RequestUser,
     @Body(new ZodValidationPipe(assignRoleSchema)) dto: AssignRoleDto,
   ): Promise<RoleAssignment> {
-    return this.rbac.assignRole(dto.userId, dto.role);
+    return this.rbac.assignRole(actor.id, dto.userId, dto.role);
   }
 
   /** Revoke a role from a user of the caller's organization. */
