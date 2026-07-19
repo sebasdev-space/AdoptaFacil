@@ -10,8 +10,9 @@ model Organization {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  members OrgMember[]
-  users   User[]
+  members         OrgMember[]
+  users           User[]
+  roleAssignments UserRole[]
 
   @@map("organizations")
 }
@@ -34,10 +35,32 @@ model User {
   credential          AuthCredential?
   refreshTokens       RefreshToken[]
   passwordResetTokens PasswordResetToken[]
+  roleAssignments     UserRole[]
 
   @@unique([organizationId, email])
   @@index([organizationId])
   @@map("users")
+}
+
+/// RBAC role assignment (§13): a role a user holds WITHIN an organization.
+/// Tenant-scoped and protected by Row-Level Security (RLS ENABLE+FORCE), so
+/// authority never leaks across organizations — an Administrator of Org A is
+/// invisible (and powerless) under Org B's context. Roles are the document-base
+/// names; the string mirrors the `Role` enum in @adoptafacil/contracts.
+model UserRole {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  role           String
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId, role])
+  @@index([organizationId])
+  @@index([userId])
+  @@map("user_roles")
 }
 
 /// Global identity/credential index (module: M02). Intentionally NOT under RLS —
