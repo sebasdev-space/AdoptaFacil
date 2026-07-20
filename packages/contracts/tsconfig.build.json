@@ -1,0 +1,21 @@
+{
+  // Emit config for the published package. Compiles src/ -> dist/ as CommonJS
+  // with type declarations and maps. CommonJS + classic node resolution keeps
+  // extensionless internal imports (`./org`, `./auth`, …) working at runtime on
+  // any supported Node (>=20), and is consumed cleanly by the API (CJS require)
+  // and by the web app (type-only imports, bundled by Vite). Type-checking uses
+  // the sibling tsconfig.json (noEmit).
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "noEmit": false
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

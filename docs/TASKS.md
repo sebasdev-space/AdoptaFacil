@@ -30,21 +30,22 @@ Estado:   Backlog | En curso | En revisión | Hecho
 
 ## Registro
 
-| ID     | Título                                        | Módulo    | Ola | Dueño      | Estado  |
-| ------ | --------------------------------------------- | --------- | --- | ---------- | ------- |
-| T-000  | Bootstrap del monorepo (walking skeleton)     | infra     | 0   | lead       | Hecho   |
-| T-010  | Tenant context por request + RLS efectiva     | core      | 0   | @sebastian | Hecho   |
-| T-011  | Auth: registro, login, JWT + refresh rotativo | M02       | 0   | @sebastian | Hecho   |
-| T-012  | RBAC: roles + matriz, guards por tenant       | M02       | 0   | @sebastian | Hecho   |
-| T-012b | Otorgar rol Owner al registrar organización   | M02       | 0   | @sebastian | Hecho   |
-| T-013  | Audit log append-only inmutable (RNF04)       | core      | 0   | @sebastian | Hecho   |
-| T-014  | Automatizar `prisma generate` (postinstall)   | infra     | 0   | @sebastian | Backlog |
-| T-020  | Design system (tokens + librería base)        | web/ui    | 0   | @fabian    | Hecho   |
-| T-021  | Shell del portal (layout, routing, §M14)      | web/shell | 0   | @fabian    | Hecho   |
-| T-022  | Cliente API tipado + sesión (refresh)         | web/shell | 0   | @fabian    | Hecho   |
-| T-023  | Pantallas de auth (login/registro/recuperar)  | M02       | 0   | @fabian    | Hecho   |
-| T-024  | Integración auth real (contra `/auth/*`)      | M02       | 0   | @fabian    | Hecho   |
-| T-025  | Roles en frontend (consumir `/rbac/my-roles`) | M02       | 1   | @fabian    | Backlog |
+| ID     | Título                                        | Módulo    | Ola | Dueño      | Estado      |
+| ------ | --------------------------------------------- | --------- | --- | ---------- | ----------- |
+| T-000  | Bootstrap del monorepo (walking skeleton)     | infra     | 0   | lead       | Hecho       |
+| T-010  | Tenant context por request + RLS efectiva     | core      | 0   | @sebastian | Hecho       |
+| T-011  | Auth: registro, login, JWT + refresh rotativo | M02       | 0   | @sebastian | Hecho       |
+| T-012  | RBAC: roles + matriz, guards por tenant       | M02       | 0   | @sebastian | Hecho       |
+| T-012b | Otorgar rol Owner al registrar organización   | M02       | 0   | @sebastian | Hecho       |
+| T-013  | Audit log append-only inmutable (RNF04)       | core      | 0   | @sebastian | Hecho       |
+| T-014  | Automatizar `prisma generate` (postinstall)   | infra     | 0   | @sebastian | Backlog     |
+| T-015  | Contracts como paquete compilado (`dist`)     | infra     | 0   | @sebastian | En revisión |
+| T-020  | Design system (tokens + librería base)        | web/ui    | 0   | @fabian    | Hecho       |
+| T-021  | Shell del portal (layout, routing, §M14)      | web/shell | 0   | @fabian    | Hecho       |
+| T-022  | Cliente API tipado + sesión (refresh)         | web/shell | 0   | @fabian    | Hecho       |
+| T-023  | Pantallas de auth (login/registro/recuperar)  | M02       | 0   | @fabian    | Hecho       |
+| T-024  | Integración auth real (contra `/auth/*`)      | M02       | 0   | @fabian    | Hecho       |
+| T-025  | Roles en frontend (consumir `/rbac/my-roles`) | M02       | 1   | @fabian    | Backlog     |
 
 > Añade una fila por tarea. Convierte fechas relativas a absolutas al registrar.
 > Reconciliado con `origin/main` el 2026-07-20: PRs #1–#11 mergeados; sin PRs abiertos.
@@ -79,14 +80,18 @@ Estado:   Backlog | En curso | En revisión | Hecho
 Reconciliados contra `origin/main` el 2026-07-20. T-024 (PR#11) es el commit más reciente;
 ningún merge posterior los toca.
 
-- **[INFRA · alta] La API no arranca con `node`/`nest start` planos bajo Node 24.**
-  _Vigente._ `@adoptafacil/contracts` se sigue publicando como **TypeScript crudo**
-  (`main`/`types`/`exports` → `./src/index.ts`, sin build a `dist`) con imports relativos
-  **sin extensión** (`export * from './shared'`). El CI ya fija Node 20 LTS
-  (`.github/workflows/ci.yml`) y `.nvmrc`=20, lo que evita el fallo en CI, pero el arranque
-  local con Node 24 sigue roto (`ERR_MODULE_NOT_FOUND`). Solución de fondo (a decidir por
-  @sebastian/infra): compilar `contracts` a JS con `exports` a `dist`, usar imports con
-  extensión explícita, o hacer efectivo Node 20 en el entorno de ejecución.
+- **[INFRA · alta] La API no arranca con `node`/`nest start` planos bajo Node moderno.**
+  _Resuelto (T-015)._ `@adoptafacil/contracts` ahora se **compila a `dist/`** (CommonJS +
+  `.d.ts` + source/declaration maps vía `tsconfig.build.json`), con `main`/`types`/`exports`
+  apuntando a `dist` y `files: ["dist"]`. CommonJS mantiene los imports internos sin extensión
+  funcionando en runtime sin tocar el source. Un script `prepare` recompila `dist` en cada
+  `pnpm install`, y el build del monorepo ya construye `contracts` antes que `api`
+  (`turbo build dependsOn ^build`). Verificado: `pnpm install` → `pnpm --filter api dev`
+  arranca (`/health` 200) sin ts-node ni parches, y el paquete resuelve tanto en **Node 20**
+  como en **Node 21** (independiente de la versión). Al desenmascarar el arranque, aparece un
+  bug preexistente de T-011 corregido en el mismo PR: `DATABASE_URL_APP` se añadió al esquema
+  de `env.validation` (antes lo descartaba la validación y no llegaba a `process.env`, por lo
+  que `PrismaService` fallaba).
 
 - **[T-014 · media] `prisma generate` en postinstall.** _Parcial._ El CI ya genera el
   cliente (`ci.yml`, paso "Generate Prisma client", heredado de T-010/PR#2), así que CI está
