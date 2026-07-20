@@ -108,6 +108,9 @@ describe('Auth endpoints (register/login/refresh/logout)', () => {
       .expect(200);
     expect(me.body.email).toBe(personEmail);
     expect(me.body.accountType).toBe('person');
+    // displayName is the real profile name (read from the DB), not the email.
+    expect(me.body.displayName).toBe('Persona Uno');
+    expect(me.body.displayName).not.toBe(personEmail);
   });
 
   it('rejects /auth/me without a token (401)', async () => {

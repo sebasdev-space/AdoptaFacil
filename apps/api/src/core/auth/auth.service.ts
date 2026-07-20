@@ -18,6 +18,7 @@ import {
 } from '@adoptafacil/contracts';
 import { NOTIFICATION_PORT, type NotificationPort } from '../../notifications/notification.port';
 import { PrismaService } from '../../prisma/prisma.service';
+import type { RequestUser } from './auth.types';
 import { PasswordService } from './password.service';
 import { TokenService } from './token.service';
 
@@ -146,6 +147,26 @@ export class AuthService {
       email: credential.email,
     });
     return { user, tokens };
+  }
+
+  /**
+   * Resolve the full authenticated principal for `GET /auth/me`. The access
+   * token carries no display name, so it is read from the tenant-scoped `users`
+   * profile under the principal's own organization context (RLS-safe — only the
+   * caller's own org is visible). Falls back to the email if the profile row is
+   * missing, so the AuthenticatedUser contract shape is always satisfied.
+   */
+  async getAuthenticatedUser(principal: RequestUser): Promise<AuthenticatedUser> {
+    const profile = await this.prisma.withOrgContext(principal.organizationId, (tx) =>
+      tx.user.findUnique({ where: { id: principal.id } }),
+    );
+    return {
+      id: principal.id,
+      email: principal.email,
+      displayName: profile?.displayName ?? principal.email,
+      accountType: principal.accountType,
+      organizationId: principal.organizationId,
+    };
   }
 
   async refresh(refreshToken: string): Promise<AuthTokens> {
