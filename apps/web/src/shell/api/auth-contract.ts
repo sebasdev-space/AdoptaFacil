@@ -29,6 +29,11 @@ export type {
   LogoutDto,
 } from '@adoptafacil/contracts';
 
+// `Role` is an ENUM (a runtime value, not just a type): RBAC gating compares
+// against `Role.Owner` etc., never against loose strings. Re-exported here so the
+// web keeps a single contract-boundary module (T-025 consumes `GET /rbac/my-roles`).
+export { Role } from '@adoptafacil/contracts';
+
 // --- Web-boundary aliases (the names the web components already use) ---------
 
 /** Credentials submitted to `POST /auth/login`. */

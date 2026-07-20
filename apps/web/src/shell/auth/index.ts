@@ -3,6 +3,7 @@ export {
   SessionProvider,
   useSession,
   type SessionStatus,
+  type RolesStatus,
   type SessionUser,
   type SessionContextValue,
   type SessionProviderProps,

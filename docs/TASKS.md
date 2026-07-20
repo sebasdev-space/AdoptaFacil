@@ -44,7 +44,7 @@ Estado:   Backlog | En curso | En revisión | Hecho
 | T-022  | Cliente API tipado + sesión (refresh)         | web/shell | 0   | @fabian    | Hecho   |
 | T-023  | Pantallas de auth (login/registro/recuperar)  | M02       | 0   | @fabian    | Hecho   |
 | T-024  | Integración auth real (contra `/auth/*`)      | M02       | 0   | @fabian    | Hecho   |
-| T-025  | Roles en frontend (consumir `/rbac/my-roles`) | M02       | 1   | @fabian    | Backlog |
+| T-025  | Roles en frontend (consumir `/rbac/my-roles`) | M02       | 1   | @fabian    | Hecho   |
 
 > Añade una fila por tarea. Convierte fechas relativas a absolutas al registrar.
 > Reconciliado con `origin/main` el 2026-07-20: PRs #1–#11 mergeados; sin PRs abiertos.
@@ -69,10 +69,17 @@ Estado:   Backlog | En curso | En revisión | Hecho
   organización y pertenece al flujo de formalización de M01; hay que capturarlo (y persistirlo)
   ahí. Los validadores `validateNit`/`validateOptionalPhone` se eliminaron; recupéralos del
   historial de git si M01 los reutiliza.
-- **T-025 · Roles en frontend (Ola 1).** `AuthenticatedUser` no trae roles; el backend los
-  expone en `GET /rbac/my-roles` (T-012). En T-024 `SessionUser.roles` queda como `[]` (stub);
-  T-025 debe consumir ese endpoint tras login/registro y poblar los roles con el enum `Role`.
-  A confirmar con @sebastian: timing del fetch y comportamiento ante fallo de `/rbac/my-roles`.
+- **T-025 · Roles en frontend (Ola 1).** _Hecho._ `AuthenticatedUser` no trae roles; el backend
+  los expone en `GET /rbac/my-roles` (T-012). El shell ahora consume ese endpoint **dentro de
+  `establish()`** (login/registro) y puebla `SessionUser.roles` con el enum `Role` del contrato
+  (`@adoptafacil/contracts`), más helpers `hasRole`/`hasAnyRole` para gating de UI. Decisión de
+  diseño (fundamentada en el documento base §13, **deny-by-default**): (a) **timing** — la carga
+  de roles es un único round-trip en el establecimiento; la sesión no pasa a `authenticated`
+  hasta que los roles resuelven (estado `loading` mientras tanto); (b) **error** — si
+  `/rbac/my-roles` falla, la sesión queda **autenticada pero sin autoridad** (`roles: []`,
+  `rolesStatus: 'degraded'`) con opción de **reintentar** sin re-login; nunca se asumen permisos
+  ante un fallo. Sin browser storage (roles en memoria/contexto). Informado a @sebastian: la
+  decisión de timing/error se tomó por el documento base (informativo, no negociable).
 
 ## Pendientes para @sebastian (detectados en T-024)
 
@@ -99,8 +106,9 @@ ningún merge posterior los toca.
   `RequestUser` del JWT no carga el nombre. Enriquecer `/auth/me` con el `displayName` real;
   asociar a T-025.
 
-- **[T-025 / RBAC · baja] Contrato de `GET /rbac/my-roles`.** _Estable._ Endpoint en `main`
-  (`rbac.controller.ts`, `@Get('my-roles')` bajo `JwtAuthGuard`, devuelve `Role[]`), con
-  cobertura de integración; enum `Role` estable en el contrato. Queda por acordar solo el
-  comportamiento de cliente en T-025: timing del fetch (¿bloquea el render hasta tener roles,
-  o hidrata después?) y manejo de error si `/rbac/my-roles` falla.
+- **[T-025 / RBAC · baja] Contrato de `GET /rbac/my-roles`.** _Resuelto (lado web)._ Endpoint
+  estable en `main` (`rbac.controller.ts`, `@Get('my-roles')` bajo `JwtAuthGuard`, devuelve
+  `Role[]`), con cobertura de integración; enum `Role` estable en el contrato. El comportamiento
+  de cliente ya quedó decidido e implementado en T-025 según el documento base (§13,
+  deny-by-default): fetch dentro de `establish()` (bloquea el paso a `authenticated`) y, ante
+  fallo, sesión autenticada sin autoridad + reintento. Comunicado a @sebastian como informativo.
