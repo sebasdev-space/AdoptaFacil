@@ -6,6 +6,7 @@ import type {
   LoginResponse,
   RegisterRequest,
   RegisterResponse,
+  Role,
 } from './auth-contract';
 import type { ApiClient } from './api-client';
 import { jsonRequestInit, parseJsonResponse } from './http';
@@ -28,6 +29,12 @@ export interface AuthApi {
   logout(refreshToken: string | null): Promise<void>;
   /** The current principal (authenticated request). */
   me(): Promise<AuthenticatedUser>;
+  /**
+   * The caller's own RBAC roles (authenticated request → `GET /rbac/my-roles`,
+   * T-012). Returns the real {@link Role} enum values from the contract. May
+   * reject; the session layer treats a failure as deny-by-default (no authority).
+   */
+  myRoles(): Promise<Role[]>;
 }
 
 function endpoint(baseUrl: string, path: string): string {
@@ -116,6 +123,13 @@ export class HttpAuthApi implements AuthApi {
 
   me(): Promise<AuthenticatedUser> {
     return this.client.request<AuthenticatedUser>('/auth/me').catch((error) => {
+      throw toApiError(error);
+    });
+  }
+
+  myRoles(): Promise<Role[]> {
+    // Authenticated: routes through the client so the refresh interceptor applies.
+    return this.client.request<Role[]>('/rbac/my-roles').catch((error) => {
       throw toApiError(error);
     });
   }

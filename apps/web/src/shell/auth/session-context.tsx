@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import {
   ApiClientProvider,
   createShellApi,
+  Role,
   tokensFromContract,
   type AuthApi,
   type AuthSession,
@@ -26,12 +27,23 @@ import {
  */
 export type SessionStatus = 'loading' | 'authenticated' | 'unauthenticated';
 
+/**
+ * Loading state of the RBAC roles WITHIN an authenticated session (T-025):
+ *   - 'loading'  → roles are being fetched (during session establishment)
+ *   - 'ready'    → roles loaded from `GET /rbac/my-roles`
+ *   - 'degraded' → the roles fetch failed; the session stays authenticated but
+ *                  with NO authority (roles: []) — deny-by-default — and offers
+ *                  a retry without forcing a re-login.
+ */
+export type RolesStatus = 'loading' | 'ready' | 'degraded';
+
 /** App-facing user shape, decoupled from the auth contract's {@link AuthUser}. */
 export interface SessionUser {
   id: string;
   name: string;
   email: string;
-  roles: string[];
+  /** Real RBAC roles from the contract enum (never loose strings). */
+  roles: Role[];
   organizationId?: string;
 }
 
@@ -39,6 +51,12 @@ export interface SessionContextValue {
   status: SessionStatus;
   user: SessionUser | null;
   isAuthenticated: boolean;
+  /**
+   * Loading state of the session's RBAC roles. 'degraded' means the roles fetch
+   * failed and the user currently has no authority (deny-by-default); call
+   * {@link retryRoles} to try again.
+   */
+  rolesStatus: RolesStatus;
   /**
    * Establish a session. With credentials, performs the real login; without
    * them, uses a demo login (Ola 0 convenience against the mock auth service).
@@ -50,6 +68,21 @@ export interface SessionContextValue {
   requestPasswordReset: (request: ForgotPasswordRequest) => Promise<void>;
   /** Tear down the session (clears in-memory tokens; best-effort server logout). */
   signOut: () => Promise<void>;
+  /**
+   * Re-attempt loading the RBAC roles after a 'degraded' state, WITHOUT a
+   * re-login. Resolves once the attempt settles (roles populated or still empty).
+   */
+  retryRoles: () => Promise<void>;
+  /**
+   * Deny-by-default role check. Returns true only if the session user explicitly
+   * holds `role`; false for an absent role, empty roles, or no session.
+   */
+  hasRole: (role: Role) => boolean;
+  /**
+   * Deny-by-default check for ANY of the given roles. Returns false when none
+   * match, when `roles` is empty, or when there is no session.
+   */
+  hasAnyRole: (...roles: Role[]) => boolean;
 }
 
 const SessionContext = createContext<SessionContextValue | undefined>(undefined);
@@ -70,10 +103,10 @@ const MOCK_USER: SessionUser = {
 };
 
 /**
- * Map the auth principal to the app-facing session user. Roles are intentionally
- * EMPTY for now: `AuthenticatedUser` no longer carries them, and wiring them from
- * the RBAC endpoint (`GET /rbac/my-roles`, T-012) is deferred to T-025. No UI
- * gates on roles yet, so an empty list is safe until then.
+ * Map the auth principal to the app-facing session user. Roles start EMPTY:
+ * `AuthenticatedUser` does not carry them (they come from `GET /rbac/my-roles`),
+ * so `establish()` populates them right after, before the session is exposed as
+ * authenticated. An empty list means no authority (deny-by-default).
  */
 function toSessionUser(user: AuthenticatedUser): SessionUser {
   return {
@@ -119,6 +152,9 @@ export function SessionProvider({
   const [user, setUser] = useState<SessionUser | null>(
     initialStatus === 'authenticated' ? initialUser : null,
   );
+  // Roles load WITHIN establishment; a bootstrapped session (tests) is already
+  // 'ready' with whatever roles its initial user carries.
+  const [rolesStatus, setRolesStatus] = useState<RolesStatus>('ready');
 
   // Build the API layer once. `onSessionExpired` fires when a refresh fails or
   // is impossible — dropping the session so protected routes redirect. setState
@@ -131,32 +167,65 @@ export function SessionProvider({
       onSessionExpired: () => {
         setUser(null);
         setStatus('unauthenticated');
+        setRolesStatus('ready');
       },
     }),
   );
 
-  // Store tokens in memory and flip the session to authenticated.
+  // Load the caller's RBAC roles (T-025). Deny-by-default on failure: keep the
+  // session authenticated but with NO roles, and surface a 'degraded' state that
+  // the UI can retry. Only touches roles/rolesStatus — never the session status,
+  // so it is safe to call both during establishment and on a later retry.
+  const loadRoles = useCallback(async () => {
+    setRolesStatus('loading');
+    try {
+      const roles = await api.authApi.myRoles();
+      setUser((prev) => (prev ? { ...prev, roles } : prev));
+      setRolesStatus('ready');
+    } catch {
+      // Never assume authority on failure. Roles are cleared, not preserved.
+      setUser((prev) => (prev ? { ...prev, roles: [] } : prev));
+      setRolesStatus('degraded');
+    }
+  }, [api]);
+
+  // Store tokens in memory, then load roles BEFORE exposing the session as
+  // authenticated. A single round-trip at establishment (not per navigation);
+  // the session stays 'loading' until the roles fetch settles either way.
   const establish = useCallback(
-    (response: AuthSession) => {
+    async (response: AuthSession) => {
       api.tokenStore.set(tokensFromContract(response.tokens));
       setUser(toSessionUser(response.user));
+      setStatus('loading');
+      await loadRoles();
       setStatus('authenticated');
     },
-    [api],
+    [api, loadRoles],
   );
 
   const signIn = useCallback(
     async (credentials?: LoginRequest) => {
-      establish(await api.authApi.login(credentials ?? DEMO_CREDENTIALS));
+      await establish(await api.authApi.login(credentials ?? DEMO_CREDENTIALS));
     },
     [api, establish],
   );
 
   const register = useCallback(
     async (request: RegisterRequest) => {
-      establish(await api.authApi.register(request));
+      await establish(await api.authApi.register(request));
     },
     [api, establish],
+  );
+
+  // Retry after a 'degraded' roles load, without re-login. The session is already
+  // authenticated, so status is left untouched — only rolesStatus/roles change.
+  const retryRoles = useCallback(() => loadRoles(), [loadRoles]);
+
+  const hasRole = useCallback((role: Role) => user?.roles.includes(role) ?? false, [user]);
+
+  const hasAnyRole = useCallback(
+    (...roles: Role[]) => roles.some((role) => user?.roles.includes(role) ?? false),
+    [user],
   );
 
   const requestPasswordReset = useCallback(
@@ -171,6 +240,7 @@ export function SessionProvider({
     api.tokenStore.clear();
     setUser(null);
     setStatus('unauthenticated');
+    setRolesStatus('ready');
     await api.authApi.logout(refreshToken);
   }, [api]);
 
@@ -179,12 +249,27 @@ export function SessionProvider({
       status,
       user,
       isAuthenticated: status === 'authenticated',
+      rolesStatus,
       signIn,
       register,
       requestPasswordReset,
       signOut,
+      retryRoles,
+      hasRole,
+      hasAnyRole,
     }),
-    [status, user, signIn, register, requestPasswordReset, signOut],
+    [
+      status,
+      user,
+      rolesStatus,
+      signIn,
+      register,
+      requestPasswordReset,
+      signOut,
+      retryRoles,
+      hasRole,
+      hasAnyRole,
+    ],
   );
 
   return (

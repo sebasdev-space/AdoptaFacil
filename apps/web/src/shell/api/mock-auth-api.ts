@@ -7,6 +7,7 @@ import type {
   RegisterRequest,
   RegisterResponse,
 } from './auth-contract';
+import { Role } from './auth-contract';
 import { ApiError } from './api-error';
 import type { AuthApi } from './auth-api';
 
@@ -30,6 +31,11 @@ export interface MockAuthApiOptions {
   accessTtlSeconds?: number;
   /** Override the seeded demo user. */
   user?: AuthenticatedUser;
+  /**
+   * Roles returned by {@link MockAuthApi.myRoles}. Defaults to `[Role.Owner]`,
+   * mirroring the backend granting Owner to an organization's first user (T-012b).
+   */
+  roles?: Role[];
 }
 
 function normalizeEmail(email: string): string {
@@ -51,9 +57,11 @@ export class MockAuthApi implements AuthApi {
   private counter = 0;
   private readonly accounts = new Map<string, MockAccount>();
   private readonly validRefreshTokens = new Set<string>();
+  private readonly roles: Role[];
 
   constructor(options: MockAuthApiOptions = {}) {
     this.accessTtlSeconds = options.accessTtlSeconds ?? 900;
+    this.roles = options.roles ?? [Role.Owner];
     const demoUser = options.user ?? DEMO_USER;
     this.accounts.set(normalizeEmail(demoUser.email), {
       password: DEMO_PASSWORD,
@@ -138,5 +146,10 @@ export class MockAuthApi implements AuthApi {
   me(): Promise<AuthenticatedUser> {
     const [account] = this.accounts.values();
     return Promise.resolve(account?.user ?? DEMO_USER);
+  }
+
+  myRoles(): Promise<Role[]> {
+    // Fresh copy so callers can't mutate the mock's internal list.
+    return Promise.resolve([...this.roles]);
   }
 }
