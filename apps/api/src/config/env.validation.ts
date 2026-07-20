@@ -11,6 +11,12 @@ export const envSchema = z.object({
   // Comma-separated list of allowed CORS origins.
   API_CORS_ORIGIN: z.string().min(1).default('http://localhost:5173'),
   DATABASE_URL: z.string().url(),
+  // Non-superuser application role connection (RLS is enforced against it).
+  // Must be part of the validated schema: @nestjs/config only assigns the
+  // VALIDATED keys back to process.env, and PrismaService reads
+  // process.env.DATABASE_URL_APP at construction — omitting it here would strip
+  // it from process.env and break `pnpm --filter api dev`.
+  DATABASE_URL_APP: z.string().url(),
   REDIS_URL: z.string().url(),
   NOTIFICATION_DRIVER: z.enum(['log']).default('log'),
 });
