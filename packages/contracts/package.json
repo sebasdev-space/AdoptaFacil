@@ -3,20 +3,27 @@
   "version": "0.0.0",
   "private": true,
   "description": "Shared DTOs and module interface contracts (one file per module).",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/cjs/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.ts",
+        "default": "./dist/cjs/index.js"
+      }
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "prepare": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.cjs.json && tsc -p tsconfig.build.esm.json && node scripts/write-dist-pkg.mjs",
+    "prepare": "tsc -p tsconfig.build.cjs.json && tsc -p tsconfig.build.esm.json && node scripts/write-dist-pkg.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

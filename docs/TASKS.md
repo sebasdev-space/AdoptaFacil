@@ -30,22 +30,23 @@ Estado:   Backlog | En curso | En revisión | Hecho
 
 ## Registro
 
-| ID     | Título                                        | Módulo    | Ola | Dueño      | Estado      |
-| ------ | --------------------------------------------- | --------- | --- | ---------- | ----------- |
-| T-000  | Bootstrap del monorepo (walking skeleton)     | infra     | 0   | lead       | Hecho       |
-| T-010  | Tenant context por request + RLS efectiva     | core      | 0   | @sebastian | Hecho       |
-| T-011  | Auth: registro, login, JWT + refresh rotativo | M02       | 0   | @sebastian | Hecho       |
-| T-012  | RBAC: roles + matriz, guards por tenant       | M02       | 0   | @sebastian | Hecho       |
-| T-012b | Otorgar rol Owner al registrar organización   | M02       | 0   | @sebastian | Hecho       |
-| T-013  | Audit log append-only inmutable (RNF04)       | core      | 0   | @sebastian | Hecho       |
-| T-014  | Automatizar `prisma generate` (postinstall)   | infra     | 0   | @sebastian | Backlog     |
-| T-015  | Contracts como paquete compilado (`dist`)     | infra     | 0   | @sebastian | En revisión |
-| T-020  | Design system (tokens + librería base)        | web/ui    | 0   | @fabian    | Hecho       |
-| T-021  | Shell del portal (layout, routing, §M14)      | web/shell | 0   | @fabian    | Hecho       |
-| T-022  | Cliente API tipado + sesión (refresh)         | web/shell | 0   | @fabian    | Hecho       |
-| T-023  | Pantallas de auth (login/registro/recuperar)  | M02       | 0   | @fabian    | Hecho       |
-| T-024  | Integración auth real (contra `/auth/*`)      | M02       | 0   | @fabian    | Hecho       |
-| T-025  | Roles en frontend (consumir `/rbac/my-roles`) | M02       | 1   | @fabian    | Backlog     |
+| ID     | Título                                         | Módulo    | Ola | Dueño      | Estado      |
+| ------ | ---------------------------------------------- | --------- | --- | ---------- | ----------- |
+| T-000  | Bootstrap del monorepo (walking skeleton)      | infra     | 0   | lead       | Hecho       |
+| T-010  | Tenant context por request + RLS efectiva      | core      | 0   | @sebastian | Hecho       |
+| T-011  | Auth: registro, login, JWT + refresh rotativo  | M02       | 0   | @sebastian | Hecho       |
+| T-012  | RBAC: roles + matriz, guards por tenant        | M02       | 0   | @sebastian | Hecho       |
+| T-012b | Otorgar rol Owner al registrar organización    | M02       | 0   | @sebastian | Hecho       |
+| T-013  | Audit log append-only inmutable (RNF04)        | core      | 0   | @sebastian | Hecho       |
+| T-014  | Automatizar `prisma generate` (postinstall)    | infra     | 0   | @sebastian | Backlog     |
+| T-015  | Contracts como paquete compilado (`dist`)      | infra     | 0   | @sebastian | En revisión |
+| T-016  | Contracts dual ESM+CJS (desbloquear web:build) | infra     | 0   | @sebastian | En revisión |
+| T-020  | Design system (tokens + librería base)         | web/ui    | 0   | @fabian    | Hecho       |
+| T-021  | Shell del portal (layout, routing, §M14)       | web/shell | 0   | @fabian    | Hecho       |
+| T-022  | Cliente API tipado + sesión (refresh)          | web/shell | 0   | @fabian    | Hecho       |
+| T-023  | Pantallas de auth (login/registro/recuperar)   | M02       | 0   | @fabian    | Hecho       |
+| T-024  | Integración auth real (contra `/auth/*`)       | M02       | 0   | @fabian    | Hecho       |
+| T-025  | Roles en frontend (consumir `/rbac/my-roles`)  | M02       | 1   | @fabian    | Backlog     |
 
 > Añade una fila por tarea. Convierte fechas relativas a absolutas al registrar.
 > Reconciliado con `origin/main` el 2026-07-20: PRs #1–#11 mergeados; sin PRs abiertos.
@@ -99,6 +100,19 @@ ningún merge posterior los toca.
   bug preexistente de T-011 corregido en el mismo PR: `DATABASE_URL_APP` se añadió al esquema
   de `env.validation` (antes lo descartaba la validación y no llegaba a `process.env`, por lo
   que `PrismaService` fallaba).
+
+- **[INFRA · alta] `pnpm turbo build` (web) roto por named export CJS.** _Resuelto (T-016)._
+  T-025 (`0c1031e`) re-exporta el **valor** `Role` (`export { Role } from '@adoptafacil/contracts'`
+  en `apps/web/.../auth-contract.ts`), pero contracts (T-015) compilaba **solo a CommonJS**; su
+  `dist/index.js` re-exporta con `__exportStar`, que rollup (build de producción de Vite) no
+  analiza estáticamente → `"Role" is not exported`. **Fix (T-016):** contracts ahora emite
+  **dual ESM + CJS** con `exports` condicionales — `import` → `dist/esm` (ESM con `export *`
+  estático, así rollup resuelve `Role`), `require` → `dist/cjs` (la api sigue arrancando en CJS
+  como hoy), `types` por condición. `package.json` anidados (`{"type":"module"}` en `dist/esm`,
+  `{"type":"commonjs"}` en `dist/cjs`) mantienen la clasificación correcta. Verificado en frío:
+  `pnpm turbo run build` verde **incluyendo `@adoptafacil/web#build`**; `pnpm --filter api dev`
+  arranca (`/health` 200, sin ts-node); barrido 14/14 + `test:rls`; resuelve en Node 20 y 21. Sin
+  tocar `apps/web` ni la superficie pública del contrato.
 
 - **[T-014 · media] `prisma generate` en postinstall.** _Parcial._ El CI ya genera el
   cliente (`ci.yml`, paso "Generate Prisma client", heredado de T-010/PR#2), así que CI está
