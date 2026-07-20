@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockAuthApi } from '../api';
@@ -50,7 +50,8 @@ describe('SessionProvider — session state without browser storage', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'demo-signin' }));
-    expect(screen.getByTestId('status')).toHaveTextContent('authenticated');
+    // establish() now awaits the roles round-trip before flipping to authenticated.
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('authenticated'));
     expect(screen.getByTestId('user')).toHaveTextContent('Equipo AdoptaFácil');
 
     await user.click(screen.getByRole('button', { name: 'signout' }));
@@ -77,7 +78,7 @@ describe('SessionProvider — session state without browser storage', () => {
 
     await user.click(screen.getByRole('button', { name: 'creds-signin' }));
     expect(loginSpy).toHaveBeenCalledWith({ email: 'demo@adoptafacil.org', password: 'demo' });
-    expect(screen.getByTestId('status')).toHaveTextContent('authenticated');
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('authenticated'));
   });
 });
 
