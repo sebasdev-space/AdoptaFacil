@@ -47,6 +47,7 @@ Estado:   Backlog | En curso | En revisión | Hecho
 | T-023  | Pantallas de auth (login/registro/recuperar)  | M02       | 0   | @fabian    | Hecho       |
 | T-024  | Integración auth real (contra `/auth/*`)      | M02       | 0   | @fabian    | Hecho       |
 | T-025  | Roles en frontend (consumir `/rbac/my-roles`) | M02       | 1   | @fabian    | Backlog     |
+| T-101a | Publicar contrato `Animal` (contract-first)   | M03       | 1   | @sebastian | En revisión |
 
 > Añade una fila por tarea. Convierte fechas relativas a absolutas al registrar.
 > Reconciliado con `origin/main` el 2026-07-20: PRs #1–#11 mergeados; sin PRs abiertos.
