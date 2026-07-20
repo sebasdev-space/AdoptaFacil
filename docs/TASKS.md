@@ -30,21 +30,28 @@ Estado:   Backlog | En curso | En revisión | Hecho
 
 ## Registro
 
-| ID    | Título                                         | Módulo    | Ola | Dueño      | Estado      |
-| ----- | ---------------------------------------------- | --------- | --- | ---------- | ----------- |
-| T-000 | Bootstrap del monorepo (walking skeleton)      | infra     | 0   | lead       | En revisión |
-| T-021 | Shell del portal (layout, routing, §M14)       | web/shell | 0   | @fabian    | En revisión |
-| T-022 | Cliente API tipado + sesión (refresh)          | web/shell | 0   | @fabian    | En revisión |
-| T-023 | Pantallas de auth (login/registro/recuperar)   | M02       | 0   | @fabian    | Hecho       |
-| T-024 | Integración auth real (contra `/auth/*`)       | M02       | 0   | @fabian    | En revisión |
-| T-025 | Roles en frontend (consumir `/rbac/my-roles`)  | M02       | 1   | @fabian    | Backlog     |
-| T-014 | Automatizar `prisma generate` (CI/postinstall) | infra     | 0   | @sebastian | Backlog     |
+| ID     | Título                                        | Módulo    | Ola | Dueño      | Estado  |
+| ------ | --------------------------------------------- | --------- | --- | ---------- | ------- |
+| T-000  | Bootstrap del monorepo (walking skeleton)     | infra     | 0   | lead       | Hecho   |
+| T-010  | Tenant context por request + RLS efectiva     | core      | 0   | @sebastian | Hecho   |
+| T-011  | Auth: registro, login, JWT + refresh rotativo | M02       | 0   | @sebastian | Hecho   |
+| T-012  | RBAC: roles + matriz, guards por tenant       | M02       | 0   | @sebastian | Hecho   |
+| T-012b | Otorgar rol Owner al registrar organización   | M02       | 0   | @sebastian | Hecho   |
+| T-013  | Audit log append-only inmutable (RNF04)       | core      | 0   | @sebastian | Hecho   |
+| T-014  | Automatizar `prisma generate` (postinstall)   | infra     | 0   | @sebastian | Backlog |
+| T-020  | Design system (tokens + librería base)        | web/ui    | 0   | @fabian    | Hecho   |
+| T-021  | Shell del portal (layout, routing, §M14)      | web/shell | 0   | @fabian    | Hecho   |
+| T-022  | Cliente API tipado + sesión (refresh)         | web/shell | 0   | @fabian    | Hecho   |
+| T-023  | Pantallas de auth (login/registro/recuperar)  | M02       | 0   | @fabian    | Hecho   |
+| T-024  | Integración auth real (contra `/auth/*`)      | M02       | 0   | @fabian    | Hecho   |
+| T-025  | Roles en frontend (consumir `/rbac/my-roles`) | M02       | 1   | @fabian    | Backlog |
 
 > Añade una fila por tarea. Convierte fechas relativas a absolutas al registrar.
+> Reconciliado con `origin/main` el 2026-07-20: PRs #1–#11 mergeados; sin PRs abiertos.
 
 ## Deuda de integración
 
-- **T-024 · Integración auth real (contra `/auth/*`).** _En curso._ Con T-011 (auth) y T-012
+- **T-024 · Integración auth real (contra `/auth/*`).** _Hecho._ Con T-011 (auth) y T-012
   (RBAC) ya en `main`, el frontend deja el mock y habla con el backend real. El "swap" resultó
   **más que una línea**: los nombres/formas del contrato real difieren del mock, así que
   `auth-contract.ts` re-exporta `@adoptafacil/contracts` **con alias de borde** y una unión de
@@ -69,31 +76,31 @@ Estado:   Backlog | En curso | En revisión | Hecho
 
 ## Pendientes para @sebastian (detectados en T-024)
 
-Surgieron al levantar el backend real y validar el humo end-to-end de T-024. Ninguno bloquea
-el frontend de T-024 (ya validado en vivo), pero quedan rastreables para su dominio.
+Reconciliados contra `origin/main` el 2026-07-20. T-024 (PR#11) es el commit más reciente;
+ningún merge posterior los toca.
 
 - **[INFRA · alta] La API no arranca con `node`/`nest start` planos bajo Node 24.**
-  `@adoptafacil/contracts` se publica como **TypeScript crudo** (`main: ./src/index.ts`) con
-  imports relativos **sin extensión** (`export * from './shared'`). Bajo Node 24 (ESM +
-  type-stripping) eso falla con `ERR_MODULE_NOT_FOUND`; el `dist` compilado (`node dist/main.js`)
-  falla igual por el `require('@adoptafacil/contracts')` del enum `Role`. En T-024 se sorteó
-  arrancando la API con `ts-node` (compila ese TS con metadata de decoradores), pero es un
-  parche local. Solución de fondo (a decidir por @sebastian/infra): compilar `contracts` a JS
-  con `exports` a `dist`, o usar imports con extensión explícita, o fijar Node 20 LTS en el
-  entorno de ejecución (el `.nvmrc` ya dice 20; falta hacerlo efectivo).
+  _Vigente._ `@adoptafacil/contracts` se sigue publicando como **TypeScript crudo**
+  (`main`/`types`/`exports` → `./src/index.ts`, sin build a `dist`) con imports relativos
+  **sin extensión** (`export * from './shared'`). El CI ya fija Node 20 LTS
+  (`.github/workflows/ci.yml`) y `.nvmrc`=20, lo que evita el fallo en CI, pero el arranque
+  local con Node 24 sigue roto (`ERR_MODULE_NOT_FOUND`). Solución de fondo (a decidir por
+  @sebastian/infra): compilar `contracts` a JS con `exports` a `dist`, usar imports con
+  extensión explícita, o hacer efectivo Node 20 en el entorno de ejecución.
 
-- **[T-014 · alta] Confirmar automatización de `prisma generate`.** Sin el cliente Prisma
-  generado, el `typecheck`/arranque del `api` falla en local (hay que correr `prisma generate`
-  a mano). Confirmar si T-014 ya lo automatiza (postinstall / paso de CI); mientras no esté en
-  `main`, documentar el `generate` manual como prerrequisito.
+- **[T-014 · media] `prisma generate` en postinstall.** _Parcial._ El CI ya genera el
+  cliente (`ci.yml`, paso "Generate Prisma client", heredado de T-010/PR#2), así que CI está
+  cubierto. Falta la parte de T-014: no hay hook `postinstall` (raíz ni `apps/api`; solo el
+  script manual `db:generate`), por lo que en local sigue siendo manual. T-014 continúa en
+  Backlog.
 
-- **[/auth/me · media] `GET /auth/me` devuelve `displayName = email`.** El `RequestUser` del JWT
-  no carga el nombre, así que `me` degrada `displayName` al email. Hoy no afecta a T-024 (el
-  `establish()` usa el `displayName` real del login), pero al rehidratar identidad vía `/auth/me`
-  el nombre caería a email. Enriquecer `/auth/me` con el `displayName` real; asociar a T-025.
+- **[/auth/me · media] `GET /auth/me` devuelve `displayName = email`.** _Vigente._
+  `apps/api/src/core/auth/auth.controller.ts` degrada `displayName` al email porque el
+  `RequestUser` del JWT no carga el nombre. Enriquecer `/auth/me` con el `displayName` real;
+  asociar a T-025.
 
-- **[T-025 / RBAC · media] Estabilidad y contrato de `GET /rbac/my-roles`.** Antes de cablear
-  roles en el frontend (T-025), confirmar con @sebastian: (a) estabilidad del contrato del
-  endpoint; (b) timing acordado (¿bloquea el render hasta tener roles, o hidrata después?);
-  (c) manejo de error si `/rbac/my-roles` falla. El gating de UI migrará del string `'admin'`
-  del mock al enum `Role` real del contrato.
+- **[T-025 / RBAC · baja] Contrato de `GET /rbac/my-roles`.** _Estable._ Endpoint en `main`
+  (`rbac.controller.ts`, `@Get('my-roles')` bajo `JwtAuthGuard`, devuelve `Role[]`), con
+  cobertura de integración; enum `Role` estable en el contrato. Queda por acordar solo el
+  comportamiento de cliente en T-025: timing del fetch (¿bloquea el render hasta tener roles,
+  o hidrata después?) y manejo de error si `/rbac/my-roles` falla.
