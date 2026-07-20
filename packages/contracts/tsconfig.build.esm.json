@@ -1,0 +1,21 @@
+{
+  // ES module emit -> dist/esm. Consumed by the web app (Vite/rollup) via
+  // `exports.import`. Real ESM `export *` is statically analyzable, so value
+  // named exports (e.g. the `Role` enum) resolve — which the CJS build cannot
+  // offer to rollup (it re-exports through `__exportStar`). A `{"type":"module"}`
+  // package.json is written into dist/esm at build time so Node/bundlers treat
+  // these .js files as ESM.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "outDir": "./dist/esm",
+    "rootDir": "./src",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "noEmit": false
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

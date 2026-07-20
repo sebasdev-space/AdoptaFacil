@@ -1,0 +1,18 @@
+{
+  // CommonJS emit -> dist/cjs. Consumed by the API via `require` (exports.require)
+  // and by tooling using classic node resolution (main/types). CommonJS keeps the
+  // extensionless internal imports working at runtime.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "outDir": "./dist/cjs",
+    "rootDir": "./src",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "noEmit": false
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
