@@ -38,7 +38,7 @@ Estado:   Backlog | En curso | En revisión | Hecho
 | T-012  | RBAC: roles + matriz, guards por tenant       | M02       | 0   | @sebastian | Hecho       |
 | T-012b | Otorgar rol Owner al registrar organización   | M02       | 0   | @sebastian | Hecho       |
 | T-013  | Audit log append-only inmutable (RNF04)       | core      | 0   | @sebastian | Hecho       |
-| T-014  | Automatizar `prisma generate` (postinstall)   | infra     | 0   | @sebastian | Backlog     |
+| T-014  | Automatizar `prisma generate` (postinstall)   | infra     | 0   | @sebastian | En revisión |
 | T-015  | Contracts como paquete compilado (`dist`)     | infra     | 0   | @sebastian | En revisión |
 | T-020  | Design system (tokens + librería base)        | web/ui    | 0   | @fabian    | Hecho       |
 | T-021  | Shell del portal (layout, routing, §M14)      | web/shell | 0   | @fabian    | Hecho       |
@@ -100,11 +100,25 @@ ningún merge posterior los toca.
   de `env.validation` (antes lo descartaba la validación y no llegaba a `process.env`, por lo
   que `PrismaService` fallaba).
 
-- **[T-014 · media] `prisma generate` en postinstall.** _Parcial._ El CI ya genera el
-  cliente (`ci.yml`, paso "Generate Prisma client", heredado de T-010/PR#2), así que CI está
-  cubierto. Falta la parte de T-014: no hay hook `postinstall` (raíz ni `apps/api`; solo el
-  script manual `db:generate`), por lo que en local sigue siendo manual. T-014 continúa en
-  Backlog.
+- **[T-014 · media] `prisma generate` en postinstall.** _Resuelto (T-014)._ Se añadió un
+  `postinstall: "prisma generate"` en el `package.json` **raíz** (usa el `prisma.schema` raíz)
+  como **única fuente de verdad**: un clon limpio + `pnpm install` deja el cliente generado y
+  `pnpm turbo typecheck` pasa sin generar a mano. Se consolidó la duplicación: se quitó el
+  script `db:generate` de `apps/api` y su prefijo en `test:integration`/`test:rls` (T-010-fix).
+  Compatible con `--frozen-lockfile`; el `pnpm prisma generate` del CI (quality job) queda como
+  respaldo redundante e idempotente.
+
+- **[INFRA · alta] `pnpm turbo build` (web) roto por named export CJS.** _Vigente (defecto
+  pre-existente en `main`, destapado al reinstalar en T-014)._ T-025 (`0c1031e`) añadió en
+  `apps/web/src/shell/api/auth-contract.ts` un **re-export de VALOR** `export { Role } from
+'@adoptafacil/contracts'`, pero contracts (T-015) se compila **solo a CommonJS**; su
+  `dist/index.js` re-exporta con `__exportStar`, que rollup (build de producción de Vite) no
+  analiza estáticamente → `"Role" is not exported by contracts/dist/index.js`. `web:build`
+  falla en frío (estaba enmascarado por la caché de turbo). No lo causa T-014 (que no toca web
+  ni contracts). **Solución de fondo (PR aparte de contracts, revisión de Fabián):** emitir
+  contracts como **dual ESM+CJS** (`exports.import` → ESM para que rollup resuelva los named
+  exports; `exports.require` → CJS para la api). Alternativa temporal: que web use `import type`
+  - una constante local, pero el arreglo correcto es el dual-build de contracts.
 
 - **[/auth/me · media] `GET /auth/me` devuelve `displayName = email`.** _Vigente._
   `apps/api/src/core/auth/auth.controller.ts` degrada `displayName` al email porque el
