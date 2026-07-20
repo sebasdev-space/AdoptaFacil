@@ -30,23 +30,22 @@ Estado:   Backlog | En curso | En revisión | Hecho
 
 ## Registro
 
-| ID     | Título                                         | Módulo    | Ola | Dueño      | Estado      |
-| ------ | ---------------------------------------------- | --------- | --- | ---------- | ----------- |
-| T-000  | Bootstrap del monorepo (walking skeleton)      | infra     | 0   | lead       | Hecho       |
-| T-010  | Tenant context por request + RLS efectiva      | core      | 0   | @sebastian | Hecho       |
-| T-011  | Auth: registro, login, JWT + refresh rotativo  | M02       | 0   | @sebastian | Hecho       |
-| T-012  | RBAC: roles + matriz, guards por tenant        | M02       | 0   | @sebastian | Hecho       |
-| T-012b | Otorgar rol Owner al registrar organización    | M02       | 0   | @sebastian | Hecho       |
-| T-013  | Audit log append-only inmutable (RNF04)        | core      | 0   | @sebastian | Hecho       |
-| T-014  | Automatizar `prisma generate` (postinstall)    | infra     | 0   | @sebastian | Backlog     |
-| T-015  | Contracts como paquete compilado (`dist`)      | infra     | 0   | @sebastian | En revisión |
-| T-016  | Contracts dual ESM+CJS (desbloquear web:build) | infra     | 0   | @sebastian | En revisión |
-| T-020  | Design system (tokens + librería base)         | web/ui    | 0   | @fabian    | Hecho       |
-| T-021  | Shell del portal (layout, routing, §M14)       | web/shell | 0   | @fabian    | Hecho       |
-| T-022  | Cliente API tipado + sesión (refresh)          | web/shell | 0   | @fabian    | Hecho       |
-| T-023  | Pantallas de auth (login/registro/recuperar)   | M02       | 0   | @fabian    | Hecho       |
-| T-024  | Integración auth real (contra `/auth/*`)       | M02       | 0   | @fabian    | Hecho       |
-| T-025  | Roles en frontend (consumir `/rbac/my-roles`)  | M02       | 1   | @fabian    | Backlog     |
+| ID     | Título                                        | Módulo    | Ola | Dueño      | Estado      |
+| ------ | --------------------------------------------- | --------- | --- | ---------- | ----------- |
+| T-000  | Bootstrap del monorepo (walking skeleton)     | infra     | 0   | lead       | Hecho       |
+| T-010  | Tenant context por request + RLS efectiva     | core      | 0   | @sebastian | Hecho       |
+| T-011  | Auth: registro, login, JWT + refresh rotativo | M02       | 0   | @sebastian | Hecho       |
+| T-012  | RBAC: roles + matriz, guards por tenant       | M02       | 0   | @sebastian | Hecho       |
+| T-012b | Otorgar rol Owner al registrar organización   | M02       | 0   | @sebastian | Hecho       |
+| T-013  | Audit log append-only inmutable (RNF04)       | core      | 0   | @sebastian | Hecho       |
+| T-014  | Automatizar `prisma generate` (postinstall)   | infra     | 0   | @sebastian | En revisión |
+| T-015  | Contracts como paquete compilado (`dist`)     | infra     | 0   | @sebastian | En revisión |
+| T-020  | Design system (tokens + librería base)        | web/ui    | 0   | @fabian    | Hecho       |
+| T-021  | Shell del portal (layout, routing, §M14)      | web/shell | 0   | @fabian    | Hecho       |
+| T-022  | Cliente API tipado + sesión (refresh)         | web/shell | 0   | @fabian    | Hecho       |
+| T-023  | Pantallas de auth (login/registro/recuperar)  | M02       | 0   | @fabian    | Hecho       |
+| T-024  | Integración auth real (contra `/auth/*`)      | M02       | 0   | @fabian    | Hecho       |
+| T-025  | Roles en frontend (consumir `/rbac/my-roles`) | M02       | 1   | @fabian    | Backlog     |
 
 > Añade una fila por tarea. Convierte fechas relativas a absolutas al registrar.
 > Reconciliado con `origin/main` el 2026-07-20: PRs #1–#11 mergeados; sin PRs abiertos.
@@ -101,24 +100,25 @@ ningún merge posterior los toca.
   de `env.validation` (antes lo descartaba la validación y no llegaba a `process.env`, por lo
   que `PrismaService` fallaba).
 
-- **[INFRA · alta] `pnpm turbo build` (web) roto por named export CJS.** _Resuelto (T-016)._
-  T-025 (`0c1031e`) re-exporta el **valor** `Role` (`export { Role } from '@adoptafacil/contracts'`
-  en `apps/web/.../auth-contract.ts`), pero contracts (T-015) compilaba **solo a CommonJS**; su
-  `dist/index.js` re-exporta con `__exportStar`, que rollup (build de producción de Vite) no
-  analiza estáticamente → `"Role" is not exported`. **Fix (T-016):** contracts ahora emite
-  **dual ESM + CJS** con `exports` condicionales — `import` → `dist/esm` (ESM con `export *`
-  estático, así rollup resuelve `Role`), `require` → `dist/cjs` (la api sigue arrancando en CJS
-  como hoy), `types` por condición. `package.json` anidados (`{"type":"module"}` en `dist/esm`,
-  `{"type":"commonjs"}` en `dist/cjs`) mantienen la clasificación correcta. Verificado en frío:
-  `pnpm turbo run build` verde **incluyendo `@adoptafacil/web#build`**; `pnpm --filter api dev`
-  arranca (`/health` 200, sin ts-node); barrido 14/14 + `test:rls`; resuelve en Node 20 y 21. Sin
-  tocar `apps/web` ni la superficie pública del contrato.
+- **[T-014 · media] `prisma generate` en postinstall.** _Resuelto (T-014)._ Se añadió un
+  `postinstall: "prisma generate"` en el `package.json` **raíz** (usa el `prisma.schema` raíz)
+  como **única fuente de verdad**: un clon limpio + `pnpm install` deja el cliente generado y
+  `pnpm turbo typecheck` pasa sin generar a mano. Se consolidó la duplicación: se quitó el
+  script `db:generate` de `apps/api` y su prefijo en `test:integration`/`test:rls` (T-010-fix).
+  Compatible con `--frozen-lockfile`; el `pnpm prisma generate` del CI (quality job) queda como
+  respaldo redundante e idempotente.
 
-- **[T-014 · media] `prisma generate` en postinstall.** _Parcial._ El CI ya genera el
-  cliente (`ci.yml`, paso "Generate Prisma client", heredado de T-010/PR#2), así que CI está
-  cubierto. Falta la parte de T-014: no hay hook `postinstall` (raíz ni `apps/api`; solo el
-  script manual `db:generate`), por lo que en local sigue siendo manual. T-014 continúa en
-  Backlog.
+- **[INFRA · alta] `pnpm turbo build` (web) roto por named export CJS.** _Vigente (defecto
+  pre-existente en `main`, destapado al reinstalar en T-014)._ T-025 (`0c1031e`) añadió en
+  `apps/web/src/shell/api/auth-contract.ts` un **re-export de VALOR** `export { Role } from
+'@adoptafacil/contracts'`, pero contracts (T-015) se compila **solo a CommonJS**; su
+  `dist/index.js` re-exporta con `__exportStar`, que rollup (build de producción de Vite) no
+  analiza estáticamente → `"Role" is not exported by contracts/dist/index.js`. `web:build`
+  falla en frío (estaba enmascarado por la caché de turbo). No lo causa T-014 (que no toca web
+  ni contracts). **Solución de fondo (PR aparte de contracts, revisión de Fabián):** emitir
+  contracts como **dual ESM+CJS** (`exports.import` → ESM para que rollup resuelva los named
+  exports; `exports.require` → CJS para la api). Alternativa temporal: que web use `import type`
+  - una constante local, pero el arreglo correcto es el dual-build de contracts.
 
 - **[/auth/me · media] `GET /auth/me` devuelve `displayName = email`.** _Vigente._
   `apps/api/src/core/auth/auth.controller.ts` degrada `displayName` al email porque el

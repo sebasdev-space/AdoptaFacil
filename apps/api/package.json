@@ -11,9 +11,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "jest",
-    "db:generate": "prisma generate --schema=../../prisma/schema",
-    "test:integration": "pnpm run db:generate && jest --config test/jest-integration.json --runInBand",
-    "test:rls": "pnpm run db:generate && jest --config test/jest-integration.json --runInBand -t \"no-leak\""
+    "test:integration": "jest --config test/jest-integration.json --runInBand",
+    "test:rls": "jest --config test/jest-integration.json --runInBand -t \"no-leak\""
   },
   "dependencies": {
     "@adoptafacil/contracts": "workspace:*",
