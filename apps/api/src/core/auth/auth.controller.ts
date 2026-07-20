@@ -82,13 +82,7 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
-  me(@CurrentUser() user: RequestUser): AuthenticatedUser {
-    return {
-      id: user.id,
-      email: user.email,
-      displayName: user.email,
-      accountType: user.accountType,
-      organizationId: user.organizationId,
-    };
+  me(@CurrentUser() user: RequestUser): Promise<AuthenticatedUser> {
+    return this.auth.getAuthenticatedUser(user);
   }
 }

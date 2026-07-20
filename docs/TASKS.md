@@ -40,6 +40,7 @@ Estado:   Backlog | En curso | En revisión | Hecho
 | T-013  | Audit log append-only inmutable (RNF04)       | core      | 0   | @sebastian | Hecho       |
 | T-014  | Automatizar `prisma generate` (postinstall)   | infra     | 0   | @sebastian | En revisión |
 | T-015  | Contracts como paquete compilado (`dist`)     | infra     | 0   | @sebastian | En revisión |
+| T-017  | Fix `/auth/me` devuelve `displayName` real    | core/auth | 0   | @sebastian | En revisión |
 | T-020  | Design system (tokens + librería base)        | web/ui    | 0   | @fabian    | Hecho       |
 | T-021  | Shell del portal (layout, routing, §M14)      | web/shell | 0   | @fabian    | Hecho       |
 | T-022  | Cliente API tipado + sesión (refresh)         | web/shell | 0   | @fabian    | Hecho       |
@@ -120,10 +121,12 @@ ningún merge posterior los toca.
   exports; `exports.require` → CJS para la api). Alternativa temporal: que web use `import type`
   - una constante local, pero el arreglo correcto es el dual-build de contracts.
 
-- **[/auth/me · media] `GET /auth/me` devuelve `displayName = email`.** _Vigente._
-  `apps/api/src/core/auth/auth.controller.ts` degrada `displayName` al email porque el
-  `RequestUser` del JWT no carga el nombre. Enriquecer `/auth/me` con el `displayName` real;
-  asociar a T-025.
+- **[/auth/me · media] `GET /auth/me` devuelve `displayName = email`.** _Resuelto (T-017)._
+  El controller ya no degrada `displayName` al email: `AuthService.getAuthenticatedUser` lee el
+  perfil `users` bajo el contexto de tenant del principal (`withOrgContext`, RLS-safe) y devuelve
+  el `displayName` real; si faltara el perfil, cae al email (fallback documentado) para no romper
+  el contrato `AuthenticatedUser` (forma intacta). Cubierto por integración (`/auth/me` devuelve
+  el nombre real tras registro/login) y barrido verde + `test:rls`.
 
 - **[T-025 / RBAC · baja] Contrato de `GET /rbac/my-roles`.** _Resuelto (lado web)._ Endpoint
   estable en `main` (`rbac.controller.ts`, `@Get('my-roles')` bajo `JwtAuthGuard`, devuelve
