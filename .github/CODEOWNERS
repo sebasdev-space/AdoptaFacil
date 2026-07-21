@@ -29,6 +29,10 @@
 /apps/web/src/shell/                 @fabian
 /packages/ui/                        @fabian
 
+# --- Frontend por dominio (M01 perfil/formalización vs M14 portales) ------
+/apps/web/src/features/org/          @sebastian
+/apps/web/src/features/portals/      @fabian
+
 # --- Prisma schema (per module owner) ------------------------------------
 /prisma/schema/org.prisma            @sebastian
 /prisma/schema/animals.prisma        @sebastian
