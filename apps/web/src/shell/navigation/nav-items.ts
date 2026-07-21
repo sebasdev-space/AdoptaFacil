@@ -25,4 +25,7 @@ export const navItems: NavItem[] = [
   { path: '/donaciones', label: 'Donaciones', icon: HeartIcon },
   { path: '/campanas', label: 'Campañas', icon: MegaphoneIcon },
   { path: '/transparencia', label: 'Transparencia', icon: ShieldIcon },
+  // M01 · organization profile (my line, appended). Reuses ShieldIcon — a
+  // dedicated "organization/building" icon is a reported gap in shell/icons.
+  { path: '/organizacion', label: 'Mi organización', icon: ShieldIcon },
 ];
