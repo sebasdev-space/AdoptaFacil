@@ -1,29 +1,32 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import type { OrganizationPublic } from '@adoptafacil/contracts';
-import {
-  Badge,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  EmptyState,
-  Skeleton,
-} from '@adoptafacil/ui';
+import type { OrganizationPublic, PortalView } from '@adoptafacil/contracts';
+import { EmptyState, Skeleton } from '@adoptafacil/ui';
+import { buildPortalView } from '../model/portal-view';
+import { PortalProfileSection } from '../components/portal-profile-section';
+import { PortalPlaceholderSection } from '../components/portal-placeholder-section';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
 type LoadState = 'loading' | 'ready' | 'not-found' | 'error';
 
 /**
- * PUBLIC organization portal at `/o/:slug` (§M14). Rendered OUTSIDE the app
- * shell and WITHOUT authentication: it fetches the public projection directly
- * (no token), so it only ever shows public fields the backend chooses to expose
- * (never phone/legalName; NIT only once formalized).
+ * PUBLIC organization PORTAL at `/o/:slug` (§M14). Rendered OUTSIDE the app shell
+ * and WITHOUT authentication: it fetches the public projection directly (no token),
+ * so it only ever shows public fields the backend chooses to expose (never
+ * phone/legalName; NIT only once formalized).
+ *
+ * The portal is a rich, multi-section page:
+ *  - "perfil" — the organization's real public identity, read straight from the
+ *    `OrganizationPublic` contract (inherits any public-field change by contract),
+ *    including the reserved org-type badge slot.
+ *  - aggregated sections (mascotas / campaña / necesita hoy / transparencia) —
+ *    structured PLACEHOLDERS with their integration point, wired when their owning
+ *    modules exist (see docs/TASKS.md · deuda de cableado M14).
  */
 export function OrgPublicPage() {
   const { slug } = useParams<{ slug: string }>();
-  const [org, setOrg] = useState<OrganizationPublic | null>(null);
+  const [view, setView] = useState<PortalView | null>(null);
   const [state, setState] = useState<LoadState>('loading');
 
   useEffect(() => {
@@ -40,7 +43,7 @@ export function OrgPublicPage() {
       })
       .then((data) => {
         if (active) {
-          setOrg(data);
+          setView(buildPortalView(data));
           setState('ready');
         }
       })
@@ -65,61 +68,13 @@ export function OrgPublicPage() {
       {state === 'error' && (
         <EmptyState title="No se pudo cargar" description="Inténtalo de nuevo más tarde." />
       )}
-      {state === 'ready' && org && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex flex-wrap items-center gap-2">
-              {org.name}
-              {org.rteVigente && <Badge>RTE vigente</Badge>}
-              {org.verificationLevel && (
-                <Badge variant="secondary">Verificación nivel {org.verificationLevel.level}</Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {org.description && <p className="text-sm text-foreground">{org.description}</p>}
-            <dl className="grid gap-4 sm:grid-cols-2">
-              {org.location?.city && (
-                <div>
-                  <dt className="text-xs uppercase text-muted-foreground">Ubicación</dt>
-                  <dd className="text-sm">
-                    {[org.location.city, org.location.department, org.location.country]
-                      .filter(Boolean)
-                      .join(', ')}
-                  </dd>
-                </div>
-              )}
-              {org.contactEmail && (
-                <div>
-                  <dt className="text-xs uppercase text-muted-foreground">Correo</dt>
-                  <dd className="text-sm">{org.contactEmail}</dd>
-                </div>
-              )}
-              {org.whatsapp && (
-                <div>
-                  <dt className="text-xs uppercase text-muted-foreground">WhatsApp</dt>
-                  <dd className="text-sm">{org.whatsapp}</dd>
-                </div>
-              )}
-              {org.nit && (
-                <div>
-                  <dt className="text-xs uppercase text-muted-foreground">NIT</dt>
-                  <dd className="text-sm">{org.nit}</dd>
-                </div>
-              )}
-            </dl>
-            {org.socialLinks?.website && (
-              <a
-                href={org.socialLinks.website}
-                className="text-sm font-medium text-primary hover:underline"
-                rel="noreferrer"
-                target="_blank"
-              >
-                Sitio web
-              </a>
-            )}
-          </CardContent>
-        </Card>
+      {state === 'ready' && view && (
+        <div className="space-y-8">
+          <PortalProfileSection profile={view.profile} />
+          {view.sections.map((section) => (
+            <PortalPlaceholderSection key={section.kind} section={section} />
+          ))}
+        </div>
       )}
     </main>
   );
