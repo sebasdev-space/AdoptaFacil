@@ -3,7 +3,8 @@ import { RequireAuth } from '../auth';
 import { AppLayout } from '../layout';
 import { HomePage, NotFoundPage, PlaceholderPage } from '../../features/_layout';
 import { ForgotPasswordPage, LoginPage, RegisterPage } from '../../features/auth';
-import { OrgFormalizationPage, OrgProfilePage, OrgPublicPage } from '../../features/org';
+import { OrgFormalizationPage, OrgProfilePage } from '../../features/org';
+import { OrgPublicPage } from '../../features/portals';
 
 /**
  * Route tree for the shell.
