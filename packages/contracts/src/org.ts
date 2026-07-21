@@ -7,14 +7,50 @@
  * A tenant organization: the platform-level account that owns every piece of
  * business data. Mirrors the `organizations` registry table (which is itself
  * NOT under RLS — it is the global catalog every business table references).
+ *
+ * ENRICHMENT NOTE (T-101b, M01/§14): the four base fields below are STABLE and
+ * in use since Ola 0 (consumed by core/auth) — they are never changed. Every
+ * profile/formalization field added afterwards is OPTIONAL and additive, so
+ * existing records and consumers keep working.
  */
 export interface Organization {
+  // --- Stable base (Ola 0 — do NOT change) -----------------------------------
   id: string;
   name: string;
   /** ISO-8601 UTC. */
   createdAt: string;
   /** ISO-8601 UTC. */
   updatedAt: string;
+
+  // --- Institutional profile (M01, additive — all optional) ------------------
+  /** Colombian tax id (NIT). */
+  nit?: string;
+  /** Legal/registered name (razón social), when it differs from `name`. */
+  legalName?: string;
+  description?: string;
+  logoUrl?: string;
+  /** Cover/banner photo URLs for the public portal. */
+  coverPhotos?: string[];
+  /** Contact channels. */
+  whatsapp?: string;
+  contactEmail?: string;
+  phone?: string;
+  location?: OrganizationLocation;
+  socialLinks?: OrganizationSocialLinks;
+
+  // --- Public portal (M14, additive) -----------------------------------------
+  /** Subdomain for the org portal, e.g. `patitaspeludas` in
+   *  patitaspeludas.adoptafacil.com. */
+  subdomain?: string;
+  /** URL slug for the path-based portal route `/o/<slug>`. */
+  slug?: string;
+
+  // --- Formalization & verification (M01/§14, additive) ----------------------
+  formalizationState?: FormalizationState;
+  /** Whether the ESAL's RTE (Régimen Tributario Especial) registration is
+   *  current — relevant for tax-deductible donations. */
+  rteVigente?: boolean;
+  verificationLevel?: VerificationLevel;
 }
 
 /**
@@ -46,4 +82,89 @@ export interface OrgMember {
   createdAt: string;
   /** ISO-8601 UTC. */
   updatedAt: string;
+}
+
+// ============================================================================
+// M01 organization profile & formalization (T-101b, §14). Contract-first,
+// additive: published ahead of the M01 implementation for the public portal
+// (M14, @fabian). Types only — no logic.
+// ============================================================================
+
+/** Physical location of the organization. All parts optional. */
+export interface OrganizationLocation {
+  country?: string;
+  department?: string;
+  city?: string;
+  address?: string;
+}
+
+/** Social / web presence links. */
+export interface OrganizationSocialLinks {
+  instagram?: string;
+  facebook?: string;
+  tiktok?: string;
+  website?: string;
+}
+
+/**
+ * Formalization state of an organization (§14). Uses the DOCUMENT-BASE names
+ * (not wireframe labels). String values are stable — do not rename.
+ * - `Informal`     — sin formalizar
+ * - `EnProceso`    — formalización en curso
+ * - `Formalizada`  — formalizada (persona jurídica)
+ * - `ESAL`         — Entidad Sin Ánimo de Lucro
+ * - `ESAL_RTE`     — ESAL en Régimen Tributario Especial (donaciones deducibles)
+ */
+export enum FormalizationState {
+  Informal = 'informal',
+  EnProceso = 'en_proceso',
+  Formalizada = 'formalizada',
+  ESAL = 'esal',
+  ESAL_RTE = 'esal_rte',
+}
+
+/**
+ * Verification tier of an organization (§14): a numeric level plus the criteria
+ * met to reach it. The concrete tiers/criteria are defined by M01; this is the
+ * stable shape consumers render (e.g. a "verified" badge on the portal).
+ */
+export interface VerificationLevel {
+  /** Numeric tier, higher = more verified (e.g. 0 = none). */
+  level: number;
+  /** Optional human-readable label of the tier. */
+  label?: string;
+  /** Criteria satisfied to reach this level. */
+  criteria: string[];
+}
+
+/**
+ * Public-facing projection of an organization for the portal (M14). Excludes
+ * sensitive/internal fields (NIT, legal name, phone, audit timestamps); exposes
+ * only what a visitor/donor sees. All enrichment fields remain optional.
+ */
+export interface OrganizationPublic {
+  id: string;
+  name: string;
+  slug?: string;
+  subdomain?: string;
+  description?: string;
+  logoUrl?: string;
+  coverPhotos?: string[];
+  location?: OrganizationLocation;
+  socialLinks?: OrganizationSocialLinks;
+  whatsapp?: string;
+  contactEmail?: string;
+  formalizationState?: FormalizationState;
+  rteVigente?: boolean;
+  verificationLevel?: VerificationLevel;
+}
+
+/** Minimal projection for organization directory lists/cards on the portal. */
+export interface OrganizationSummary {
+  id: string;
+  name: string;
+  slug?: string;
+  logoUrl?: string;
+  city?: string;
+  verificationLevel?: VerificationLevel;
 }
