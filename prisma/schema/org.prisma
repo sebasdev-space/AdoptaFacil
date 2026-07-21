@@ -10,13 +10,36 @@ model Organization {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  members         OrgMember[]
-  users           User[]
-  roleAssignments UserRole[]
-  auditLogs       AuditLog[]
-  profile         OrganizationProfile?
+  members                  OrgMember[]
+  users                    User[]
+  roleAssignments          UserRole[]
+  auditLogs                AuditLog[]
+  profile                  OrganizationProfile?
+  formalizationTransitions FormalizationTransition[]
 
   @@map("organizations")
+}
+
+/// Append-only history of formalization state changes (M01, RF02). Tenant-scoped
+/// (RLS ENABLE+FORCE + tenant_isolation) AND immutable: the T-102 migration
+/// grants the app role only SELECT+INSERT and installs triggers that reject any
+/// UPDATE/DELETE/TRUNCATE — the business record of every transition, kept
+/// forever. `created_at` is UTC. The current state itself lives on
+/// organization_profiles.formalization_state; this table is its audit trail.
+model FormalizationTransition {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  fromState      String   @map("from_state")
+  toState        String   @map("to_state")
+  actorUserId    String?  @map("actor_user_id") @db.Uuid
+  reason         String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([organizationId, createdAt])
+  @@map("formalization_transitions")
 }
 
 /// Organization institutional PROFILE (M01, §14). Tenant-scoped business data:
