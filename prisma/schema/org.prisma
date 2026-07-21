@@ -14,8 +14,46 @@ model Organization {
   users           User[]
   roleAssignments UserRole[]
   auditLogs       AuditLog[]
+  profile         OrganizationProfile?
 
   @@map("organizations")
+}
+
+/// Organization institutional PROFILE (M01, §14). Tenant-scoped business data:
+/// carries organization_id and is protected by Row-Level Security (RLS
+/// ENABLE+FORCE + tenant_isolation), so an org only ever reads/edits its own
+/// profile. The PUBLIC portal view does NOT read this table directly — it goes
+/// through the `organization_public(slug)` SECURITY DEFINER function, which
+/// returns only public columns (so RLS is never evaded by a raw select). One
+/// profile per organization (1:1).
+model OrganizationProfile {
+  id                 String   @id @default(uuid()) @db.Uuid
+  organizationId     String   @unique @map("organization_id") @db.Uuid
+  nit                String?
+  legalName          String?  @map("legal_name")
+  description        String?
+  logoUrl            String?  @map("logo_url")
+  coverPhotos        String[] @map("cover_photos")
+  whatsapp           String?
+  contactEmail       String?  @map("contact_email")
+  phone              String?
+  /// { country, department, city, address } — OrganizationLocation contract.
+  location           Json?
+  /// { instagram, facebook, tiktok, website } — OrganizationSocialLinks.
+  socialLinks        Json?    @map("social_links")
+  subdomain          String?  @unique
+  slug               String?  @unique
+  formalizationState String   @default("informal") @map("formalization_state")
+  rteVigente         Boolean  @default(false) @map("rte_vigente")
+  /// { level, label?, criteria[] } — VerificationLevel contract.
+  verificationLevel  Json?    @map("verification_level")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("organization_profiles")
 }
 
 /// Append-only audit log (RNF04, §8/§14). Immutable: the T-013 migration ENABLEs

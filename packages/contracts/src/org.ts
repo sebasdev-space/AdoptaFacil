@@ -157,6 +157,13 @@ export interface OrganizationPublic {
   formalizationState?: FormalizationState;
   rteVigente?: boolean;
   verificationLevel?: VerificationLevel;
+  /**
+   * NIT — public transparency datum for formalized ESALs in Colombia (team
+   * decision, T-101). Exposed ONLY once the organization is formalized
+   * (Formalizada or higher); omitted otherwise. Never `phone`/`legalName`
+   * (legalName public exposure is still TODO pending client definition).
+   */
+  nit?: string;
 }
 
 /** Minimal projection for organization directory lists/cards on the portal. */
@@ -167,4 +174,27 @@ export interface OrganizationSummary {
   logoUrl?: string;
   city?: string;
   verificationLevel?: VerificationLevel;
+}
+
+/**
+ * Editable profile fields (M01 CRUD). Owner/Administrator only. All optional —
+ * a partial update patches just the provided fields. Formalization/verification
+ * fields are intentionally excluded here: `formalizationState` defaults to
+ * `Informal` and is driven by the M01 state machine (T-102), not free edits.
+ */
+export interface UpdateOrganizationProfileInput {
+  /** Organization display name (on the organizations registry). */
+  name?: string;
+  nit?: string;
+  legalName?: string;
+  description?: string;
+  logoUrl?: string;
+  coverPhotos?: string[];
+  whatsapp?: string;
+  contactEmail?: string;
+  phone?: string;
+  location?: OrganizationLocation;
+  socialLinks?: OrganizationSocialLinks;
+  subdomain?: string;
+  slug?: string;
 }

@@ -3,6 +3,7 @@ import { RequireAuth } from '../auth';
 import { AppLayout } from '../layout';
 import { HomePage, NotFoundPage, PlaceholderPage } from '../../features/_layout';
 import { ForgotPasswordPage, LoginPage, RegisterPage } from '../../features/auth';
+import { OrgProfilePage, OrgPublicPage } from '../../features/org';
 
 /**
  * Route tree for the shell.
@@ -24,6 +25,8 @@ export function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot" element={<ForgotPasswordPage />} />
+      {/* Public organization portal (M01/§M14) — no auth, public fields only. */}
+      <Route path="/o/:slug" element={<OrgPublicPage />} />
 
       {/* Protected — guard first, then the shell layout */}
       <Route element={<RequireAuth />}>
@@ -56,6 +59,8 @@ export function AppRoutes() {
               />
             }
           />
+          {/* M01 · organization profile (my line, appended before the catch-all). */}
+          <Route path="organizacion" element={<OrgProfilePage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Route>
