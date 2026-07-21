@@ -51,12 +51,37 @@ Estado:   Backlog | En curso | En revisión | Hecho
 | T-101b | Enriquecer contrato `Organization` (aditivo)  | M01       | 1   | @sebastian | En revisión |
 | T-101  | M01 · perfil de organización: CRUD + público  | M01       | 1   | @sebastian | En revisión |
 | T-102  | M01 · máquina de estados de formalización     | M01       | 1   | @sebastian | En revisión |
+| T-026  | M14 · portal público rico (`/o/:slug`)        | M14       | 1   | @fabian    | En revisión |
 
 > Añade una fila por tarea. Convierte fechas relativas a absolutas al registrar.
 > Reconciliado con `origin/main` el 2026-07-20: PRs #1–#11 mergeados; sin PRs abiertos.
 
 ## Deuda de integración
 
+- **T-026 · Cableado de secciones del portal rico (M14).** _Vigente._ La pantalla pública
+  `/o/:slug` se extendió a un portal rico: la sección **perfil** es real (consume
+  `OrganizationPublic` por contrato, sin reproyectar) e incluye el **hueco reservado del badge
+  de tipo de organización**; las secciones agregadas se entregan como **placeholders
+  estructurados** (view-model publicado en `packages/contracts/src/portals.ts`) con su punto de
+  integración documentado. Pendiente de cablear cuando existan sus módulos dueños:
+  - **Mascotas en adopción** → `M03 animales · GET /public/organizations/:slug/animals`.
+  - **Campaña activa** → `M-campañas · GET /public/organizations/:slug/campaigns/active`.
+  - **Necesita hoy** → `M-necesidades · GET /public/organizations/:slug/needs`.
+  - **Transparencia / libro público** → `M-transparencia · GET /public/organizations/:slug/ledger`.
+    No se añadió endpoint de agregación en la API (los módulos fuente aún no existen), por lo que
+    **M14 no introduce ninguna superficie pública nueva ni riesgo de fuga entre organizaciones**;
+    la prueba de no-filtración se debe al módulo que cablee cada sección (endpoints públicos =
+    sólo datos públicos; datos de negocio = multi-tenant + RLS). El punto de integración de cada
+    sección viaja en el contrato (`PortalSection.integrationPoint`) y como `data-integration-point`
+    en el DOM.
+- **T-026 / coordinar-@sebastian · `OrganizationType` (badge de tipo de organización).**
+  _Vigente._ El perfil reserva y renderiza el badge de tipo de organización, pero el **enum
+  canónico y sus valores son de @sebastian** (módulo `org`) y aún no existen en el contrato
+  público. M14 lo tipa laxamente (`PortalOrganizationType = string`) y lo lee de forma
+  defensiva de `OrganizationPublic`; hoy el badge muestra su **hueco reservado**. Cuando `org`
+  publique el campo en su proyección pública, el portal lo hereda por contrato: basta apuntar
+  `PortalOrganizationType` al `OrganizationType` de `org` y quitar el cast en
+  `apps/web/src/features/portals/model/portal-view.ts`.
 - **T-024 · Integración auth real (contra `/auth/*`).** _Hecho._ Con T-011 (auth) y T-012
   (RBAC) ya en `main`, el frontend deja el mock y habla con el backend real. El "swap" resultó
   **más que una línea**: los nombres/formas del contrato real difieren del mock, así que

@@ -26,7 +26,8 @@ export function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot" element={<ForgotPasswordPage />} />
-      {/* Public organization portal (M01/§M14) — no auth, public fields only. */}
+      {/* Public rich organization portal (§M14, T-026) — no auth, public fields
+          only: real profile + placeholder sections wired per docs/TASKS.md. */}
       <Route path="/o/:slug" element={<OrgPublicPage />} />
 
       {/* Protected — guard first, then the shell layout */}
