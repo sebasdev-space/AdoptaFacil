@@ -124,6 +124,49 @@ export enum FormalizationState {
 }
 
 /**
+ * Ordered formalization sequence (RF02): Informal → EnProceso → Formalizada →
+ * ESAL → ESAL_RTE. The state machine advances one step forward along this order
+ * (and, by team decision, one step back with a reason). Adjacency is defined by
+ * this array's indices.
+ */
+export const FORMALIZATION_SEQUENCE: readonly FormalizationState[] = [
+  FormalizationState.Informal,
+  FormalizationState.EnProceso,
+  FormalizationState.Formalizada,
+  FormalizationState.ESAL,
+  FormalizationState.ESAL_RTE,
+];
+
+/** Current formalization status of an organization. */
+export interface FormalizationStatus {
+  state: FormalizationState;
+  /** True iff `state === ESAL_RTE` (RTE registration current). */
+  rteVigente: boolean;
+}
+
+/**
+ * One entry of the append-only formalization history: who moved the org from
+ * `fromState` to `toState`, when (UTC), and why. Immutable once written.
+ */
+export interface FormalizationTransition {
+  id: string;
+  organizationId: string;
+  fromState: FormalizationState;
+  toState: FormalizationState;
+  actorUserId: string | null;
+  reason: string | null;
+  /** ISO-8601 UTC. */
+  createdAt: string;
+}
+
+/** Request to move the organization to `targetState`. `reason` is required for a
+ *  backward move (and recommended for any transition). */
+export interface RequestFormalizationTransitionInput {
+  targetState: FormalizationState;
+  reason?: string;
+}
+
+/**
  * Verification tier of an organization (§14): a numeric level plus the criteria
  * met to reach it. The concrete tiers/criteria are defined by M01; this is the
  * stable shape consumers render (e.g. a "verified" badge on the portal).

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Role, type Organization } from '@adoptafacil/contracts';
 import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@adoptafacil/ui';
 import { PageContainer, PageHeader } from '../../_layout';
@@ -79,6 +80,14 @@ export function OrgProfilePage() {
       <PageHeader
         title="Mi organización"
         description="Perfil institucional de tu organización (M01)."
+        actions={
+          <Link
+            to="/organizacion/formalizacion"
+            className="text-sm font-medium text-primary hover:underline"
+          >
+            Formalización →
+          </Link>
+        }
       />
       {loading && <Skeleton className="h-64 w-full" />}
       {error && !loading && <p className="text-sm text-destructive">{error}</p>}

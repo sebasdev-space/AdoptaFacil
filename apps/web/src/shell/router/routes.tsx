@@ -3,7 +3,7 @@ import { RequireAuth } from '../auth';
 import { AppLayout } from '../layout';
 import { HomePage, NotFoundPage, PlaceholderPage } from '../../features/_layout';
 import { ForgotPasswordPage, LoginPage, RegisterPage } from '../../features/auth';
-import { OrgProfilePage, OrgPublicPage } from '../../features/org';
+import { OrgFormalizationPage, OrgProfilePage, OrgPublicPage } from '../../features/org';
 
 /**
  * Route tree for the shell.
@@ -59,8 +59,9 @@ export function AppRoutes() {
               />
             }
           />
-          {/* M01 · organization profile (my line, appended before the catch-all). */}
+          {/* M01 · organization profile + formalization (my lines, before catch-all). */}
           <Route path="organizacion" element={<OrgProfilePage />} />
+          <Route path="organizacion/formalizacion" element={<OrgFormalizationPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Route>
