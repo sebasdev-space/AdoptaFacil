@@ -4,7 +4,7 @@ import { AppLayout } from '../layout';
 import { HomePage, NotFoundPage, PlaceholderPage } from '../../features/_layout';
 import { ForgotPasswordPage, LoginPage, RegisterPage } from '../../features/auth';
 import { OrgFormalizationPage, OrgProfilePage } from '../../features/org';
-import { OrgPublicPage } from '../../features/portals';
+import { OrgPublicPage, PortalThemePage } from '../../features/portals';
 
 /**
  * Route tree for the shell.
@@ -64,6 +64,8 @@ export function AppRoutes() {
           {/* M01 · organization profile + formalization (my lines, before catch-all). */}
           <Route path="organizacion" element={<OrgProfilePage />} />
           <Route path="organizacion/formalizacion" element={<OrgFormalizationPage />} />
+          {/* M14 · portal personalization by tokens (T-027, Owner/Admin gated). */}
+          <Route path="organizacion/portal" element={<PortalThemePage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Route>

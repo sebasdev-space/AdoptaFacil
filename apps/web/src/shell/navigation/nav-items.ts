@@ -28,4 +28,6 @@ export const navItems: NavItem[] = [
   // M01 · organization profile (my line, appended). Reuses ShieldIcon — a
   // dedicated "organization/building" icon is a reported gap in shell/icons.
   { path: '/organizacion', label: 'Mi organización', icon: ShieldIcon },
+  // M14 · portal personalization by tokens (T-027). Owner/Admin gate the editing.
+  { path: '/organizacion/portal', label: 'Personalización', icon: ShieldIcon },
 ];

@@ -3,8 +3,12 @@ export {
   TransparencyProvider,
   useTransparency,
   ACCOUNTABILITY_LABELS,
+  ACCOUNTABILITY_INTEGRATION_POINT,
+  deriveFormalizationPct,
+  deriveTransparency,
   type TransparencyData,
   type TransparencyStatus,
+  type TransparencySource,
   type AccountabilityState,
   type TransparencyProviderProps,
 } from './transparency-context';

@@ -8,6 +8,7 @@ import { RbacModule } from './core/rbac/rbac.module';
 import { TenantModule } from './core/tenant/tenant.module';
 import { HealthModule } from './health/health.module';
 import { OrgModule } from './modules/org/org.module';
+import { PortalsModule } from './modules/portals/portals.module';
 import { NotificationModule } from './notifications/notification.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { QueueModule } from './queues/queue.module';
@@ -35,8 +36,10 @@ import { RedisModule } from './redis/redis.module';
     QueueModule,
     NotificationModule,
     HealthModule,
-    // M01 feature module (registered last; core modules above are unchanged).
+    // Feature modules (registered last; core modules above are unchanged).
     OrgModule,
+    // M14 · portal personalization by tokens + public theme read (T-027).
+    PortalsModule,
   ],
 })
 export class AppModule {}

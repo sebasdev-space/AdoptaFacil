@@ -1,11 +1,12 @@
 import { screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { OrganizationPublic } from '@adoptafacil/contracts';
+import { FormalizationState, type OrganizationPublic } from '@adoptafacil/contracts';
 import { renderShell } from '../../../test-utils';
 
 /**
- * Public rich portal `/o/:slug` (§M14, T-026). The page fetches the org public
- * projection with a bare `fetch` (no auth), so tests stub `fetch` per case.
+ * Public rich portal `/o/:slug` (§M14, T-026/T-027). The page fetches the org
+ * public projection AND its brand theme with bare `fetch` (no auth); tests stub
+ * `fetch` per case, routing by URL (the theme endpoint ends with `/theme`).
  */
 
 const ORG: OrganizationPublic = {
@@ -18,17 +19,27 @@ const ORG: OrganizationPublic = {
   location: { city: 'Bogotá', department: 'Cundinamarca', country: 'Colombia' },
   socialLinks: { website: 'https://patitas.org' },
   rteVigente: true,
+  formalizationState: FormalizationState.Formalizada,
   verificationLevel: { level: 2, criteria: ['identidad'] },
   nit: '900123456-7',
 };
 
-function stubFetch(response: { status: number; ok: boolean; body?: unknown }) {
+interface StubOptions {
+  org?: unknown;
+  orgStatus?: number;
+  orgOk?: boolean;
+  theme?: Record<string, unknown>;
+}
+
+function stubFetch({ org = ORG, orgStatus = 200, orgOk = true, theme = {} }: StubOptions = {}) {
   vi.stubGlobal(
     'fetch',
-    vi.fn().mockResolvedValue({
-      ok: response.ok,
-      status: response.status,
-      json: async () => response.body ?? {},
+    vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/theme')) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ tokens: theme }) });
+      }
+      return Promise.resolve({ ok: orgOk, status: orgStatus, json: async () => org });
     }),
   );
 }
@@ -36,8 +47,8 @@ function stubFetch(response: { status: number; ok: boolean; body?: unknown }) {
 const PUBLIC_SESSION = { session: { initialStatus: 'unauthenticated' as const } };
 
 beforeEach(() => {
-  // Default: a valid org. Individual tests override for 404 / error cases.
-  stubFetch({ status: 200, ok: true, body: ORG });
+  // Default: a valid org. Individual tests override for 404 / error / theme cases.
+  stubFetch();
 });
 
 afterEach(() => {
@@ -50,7 +61,6 @@ describe('OrgPublicPage — rich public portal', () => {
 
     // Profile identity + badges.
     expect(await screen.findByRole('heading', { name: /Refugio Patitas/ })).toBeInTheDocument();
-    // Org-type badge slot is reserved and rendered even though `org` has no type yet.
     const typeBadge = screen.getByTestId('org-type-badge');
     expect(typeBadge).toHaveTextContent('Tipo de organización');
     expect(typeBadge).toHaveAttribute('data-reserved', 'true');
@@ -71,18 +81,43 @@ describe('OrgPublicPage — rich public portal', () => {
       const heading = screen.getByRole('heading', { name: title });
       const section = heading.closest('section');
       expect(section).not.toBeNull();
-      // Each placeholder section shows an empty state (announced as role="status").
       expect(within(section as HTMLElement).getByRole('status')).toBeInTheDocument();
-      // Its integration point is recorded for the module that will wire it.
       expect(section).toHaveAttribute('data-integration-point');
     }
+  });
+
+  it('shows the transparency indicator with REAL derived data (§M14, T-027)', async () => {
+    renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+    await screen.findByRole('heading', { name: /Refugio Patitas/ });
+
+    const indicator = screen.getByTestId('transparency-indicator');
+    // Nivel real (verificationLevel.level = 2).
+    expect(indicator).toHaveTextContent('Nivel');
+    expect(indicator).toHaveTextContent('2');
+    // % derivado de FORMALIZATION_SEQUENCE: Formalizada = índice 2 / 4 = 50%.
+    expect(indicator).toHaveTextContent('50%');
+    // Rendición: placeholder honesto hasta M05/M06.
+    expect(indicator).toHaveTextContent('No disponible');
+    expect(screen.getByText(/Rendición de cuentas: disponible cuando/)).toBeInTheDocument();
+  });
+
+  it('applies the org brand tokens at runtime, scoped and safe-subset only', async () => {
+    stubFetch({ theme: { primary: '24 90% 45%', radius: '0.5rem', 'font-sans': 'url(evil)' } });
+    renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+    await screen.findByRole('heading', { name: /Refugio Patitas/ });
+
+    const main = screen.getByRole('main');
+    // Safe tokens are applied as scoped CSS custom properties…
+    expect(main.style.getPropertyValue('--primary')).toBe('24 90% 45%');
+    expect(main.style.getPropertyValue('--radius')).toBe('0.5rem');
+    // …but a token outside the safe subset is filtered out (never applied).
+    expect(main.style.getPropertyValue('--font-sans')).toBe('');
   });
 
   it('reflects the public contract fields without a duplicated projection', async () => {
     renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
     await screen.findByRole('heading', { name: /Refugio Patitas/ });
 
-    // Whatever public fields the contract returns are surfaced by the profile.
     expect(screen.getByText('hola@patitas.org')).toBeInTheDocument();
     expect(screen.getByText('900123456-7')).toBeInTheDocument();
     expect(screen.getByText('Bogotá, Cundinamarca, Colombia')).toBeInTheDocument();
@@ -94,24 +129,22 @@ describe('OrgPublicPage — rich public portal', () => {
 
   it('omits fields the contract does not expose (e.g. NIT hidden while informal)', async () => {
     const { nit: _nit, socialLinks: _socialLinks, ...informal } = ORG;
-    stubFetch({ status: 200, ok: true, body: informal });
+    stubFetch({ org: informal });
 
     renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
     await screen.findByRole('heading', { name: /Refugio Patitas/ });
 
     expect(screen.queryByText('900123456-7')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Sitio web' })).not.toBeInTheDocument();
-    // Profile still renders (inherits the projection shape from the contract).
     expect(screen.getByText('hola@patitas.org')).toBeInTheDocument();
   });
 
   it('shows a clear public 404 for an unknown slug', async () => {
-    stubFetch({ status: 404, ok: false });
+    stubFetch({ orgStatus: 404, orgOk: false });
 
     renderShell({ route: '/o/no-existe', ...PUBLIC_SESSION });
 
     expect(await screen.findByText('Organización no encontrada')).toBeInTheDocument();
-    // No profile / sections leak through on a 404.
     expect(screen.queryByRole('heading', { name: /Refugio Patitas/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Mascotas en adopción' })).not.toBeInTheDocument();
   });
