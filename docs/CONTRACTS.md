@@ -36,22 +36,22 @@ cambio coordinado (avisar a los consumidores, incl. Fabián).
 
 ## Contratos por módulo (semilla T-000)
 
-| Módulo       | Archivo               | Dueño      | Ola | Estado                                |
-| ------------ | --------------------- | ---------- | --- | ------------------------------------- |
-| org          | `src/org.ts`          | @sebastian | 0   | Publicado (T-010/011/012, ver arriba) |
-| animals      | `src/animals.ts`      | @sebastian | 0   | Stub                                  |
-| campaigns    | `src/campaigns.ts`    | @sebastian | 0   | Stub                                  |
-| sponsorships | `src/sponsorships.ts` | @sebastian | 0   | Stub                                  |
-| volunteering | `src/volunteering.ts` | @sebastian | 0   | Stub                                  |
-| reputation   | `src/reputation.ts`   | @sebastian | 0   | Stub                                  |
-| dashboards   | `src/dashboards.ts`   | @sebastian | 0   | Stub                                  |
-| adoptions    | `src/adoptions.ts`    | @fabian    | 0   | Stub                                  |
-| portals      | `src/portals.ts`      | @fabian    | 0   | Stub                                  |
-| payments     | `src/payments.ts`     | @fabian    | 2   | Stub (PaymentPort real en Ola 2)      |
-| donations    | `src/donations.ts`    | @fabian    | 0   | Stub                                  |
-| resources    | `src/resources.ts`    | @fabian    | 0   | Stub                                  |
-| marketplace  | `src/marketplace.ts`  | @fabian    | 0   | Stub                                  |
-| community    | `src/community.ts`    | @fabian    | 0   | Stub                                  |
+| Módulo       | Archivo               | Dueño      | Ola | Estado                                                               |
+| ------------ | --------------------- | ---------- | --- | -------------------------------------------------------------------- |
+| org          | `src/org.ts`          | @sebastian | 0   | Publicado (T-010/011/012, ver arriba)                                |
+| animals      | `src/animals.ts`      | @sebastian | 0   | Stub                                                                 |
+| campaigns    | `src/campaigns.ts`    | @sebastian | 0   | Stub                                                                 |
+| sponsorships | `src/sponsorships.ts` | @sebastian | 0   | Stub                                                                 |
+| volunteering | `src/volunteering.ts` | @sebastian | 0   | Stub                                                                 |
+| reputation   | `src/reputation.ts`   | @sebastian | 0   | Stub                                                                 |
+| dashboards   | `src/dashboards.ts`   | @sebastian | 0   | Stub                                                                 |
+| adoptions    | `src/adoptions.ts`    | @fabian    | 0   | Stub                                                                 |
+| portals      | `src/portals.ts`      | @fabian    | 1   | Publicado (T-026 PortalView; T-027 PortalTheme + PortalTransparency) |
+| payments     | `src/payments.ts`     | @fabian    | 2   | Stub (PaymentPort real en Ola 2)                                     |
+| donations    | `src/donations.ts`    | @fabian    | 0   | Stub                                                                 |
+| resources    | `src/resources.ts`    | @fabian    | 0   | Stub                                                                 |
+| marketplace  | `src/marketplace.ts`  | @fabian    | 0   | Stub                                                                 |
+| community    | `src/community.ts`    | @fabian    | 0   | Stub                                                                 |
 
 > Al publicar un contrato: cambia su estado a **Publicado**, anota el PR y avisa a
 > los consumidores.

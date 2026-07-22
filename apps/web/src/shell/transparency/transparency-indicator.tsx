@@ -9,6 +9,8 @@ const ACCOUNTABILITY_VARIANT: Record<AccountabilityState, BadgeProps['variant']>
   'al-dia': 'success',
   pendiente: 'warning',
   atrasada: 'destructive',
+  // Placeholder honesto (§M14): aún no hay dato de rendición → neutro, no un juicio.
+  'no-disponible': 'outline',
 };
 
 export interface TransparencyIndicatorProps {

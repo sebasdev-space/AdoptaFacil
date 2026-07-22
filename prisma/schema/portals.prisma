@@ -1,3 +1,30 @@
-// Module: portals · Owner: @fabian (Ola 0)
-// TODO: models defined by @fabian. Every business model MUST carry
-// organization_id and enable RLS following the _rls_probe reference in org.prisma.
+// Module: portals · Owner: @fabian
+//
+// M14 — personalización por tokens (T-027). Cada organización guarda su tema de
+// marca (subconjunto SEGURO de tokens ya validados). Tenant-scoped business data:
+// lleva organization_id y está protegida por Row-Level Security (RLS ENABLE+FORCE
+// + tenant_isolation), igual que el patrón de _rls_probe (org.prisma). El portal
+// PÚBLICO no lee esta tabla directamente: pasa por la función SECURITY DEFINER
+// `organization_portal_theme(slug)`, que devuelve sólo los tokens (públicos por
+// naturaleza) sin evadir RLS.
+//
+// NOTA DE FRONTERA (M14→M01): NO se declara aquí la relación Prisma con
+// `Organization` (vive en org.prisma, propiedad de @sebastian) para no editar su
+// archivo. La integridad referencial (FK + ON DELETE CASCADE) se añade en el SQL
+// de la migración T-027, del mismo modo que Prisma no modela la RLS y ésta se
+// añade a mano en la migración.
+
+/// Tema de marca por organización (1:1). `tokens` guarda SÓLO el subconjunto
+/// seguro (colores en canales HSL + `radius`), ya validado en la API antes de
+/// escribir. Un tema vacío ⇒ el portal usa el tema por defecto del design system.
+model PortalTheme {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @unique @map("organization_id") @db.Uuid
+  /// PortalTheme (contrato): Partial<Record<PortalThemeToken, string>>.
+  tokens         Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([organizationId])
+  @@map("portal_themes")
+}

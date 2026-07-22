@@ -52,6 +52,7 @@ Estado:   Backlog | En curso | En revisión | Hecho
 | T-101  | M01 · perfil de organización: CRUD + público  | M01       | 1   | @sebastian | En revisión |
 | T-102  | M01 · máquina de estados de formalización     | M01       | 1   | @sebastian | En revisión |
 | T-026  | M14 · portal público rico (`/o/:slug`)        | M14       | 1   | @fabian    | En revisión |
+| T-027  | M14 · personalización por tokens + transp.    | M14       | 1   | @fabian    | En revisión |
 
 > Añade una fila por tarea. Convierte fechas relativas a absolutas al registrar.
 > Reconciliado con `origin/main` el 2026-07-20: PRs #1–#11 mergeados; sin PRs abiertos.
@@ -74,6 +75,39 @@ Estado:   Backlog | En curso | En revisión | Hecho
     sólo datos públicos; datos de negocio = multi-tenant + RLS). El punto de integración de cada
     sección viaja en el contrato (`PortalSection.integrationPoint`) y como `data-integration-point`
     en el DOM.
+- **T-027 · Personalización por tokens + indicador de transparencia real (M14).** _Vigente._
+  - **Personalización SÓLO por tokens (sin CSS/HTML libre).** Cada organización guarda un
+    subconjunto SEGURO de tokens de marca (colores en canales HSL + `radius`) en
+    `portal_themes` (multi-tenant + RLS ENABLE+FORCE, patrón `_rls_probe`). El backend
+    (`apps/api/src/modules/portals`) es la AUTORIDAD de validación: formato, rango y
+    **contraste mínimo** (WCAG AA 4.5:1 entre cada color y su `-foreground`), con
+    `.strict()` para rechazar claves desconocidas → evita inyección. El portal público
+    aplica los tokens en runtime como custom properties en un wrapper **con alcance**
+    (no en `<html>`), reusando `brandTokensToStyle` (T-020). Lectura pública sin evadir RLS
+    vía la función `organization_portal_theme(slug)` SECURITY DEFINER (igual patrón que
+    `organization_public`). Edición gated Owner/Administrador (deny-by-default: RolesGuard
+    en API + `hasAnyRole` en la UI `/organizacion/portal`).
+  - **DECISIÓN — % de formalización (documento base, REVISABLE).** El `formalizationPct`
+    del indicador de transparencia se DERIVA de la POSICIÓN del estado en
+    `FORMALIZATION_SEQUENCE` (contrato de @sebastian): `índice / (total − 1) · 100`, de modo
+    que `Informal = 0%` … `ESAL_RTE = 100%`. NO es una métrica nueva inventada; sigue la
+    secuencia canónica y la hereda por contrato. Vive en `shell/transparency`
+    (`deriveTransparency`). Revisable si el documento base fija otra fórmula (p. ej. contar
+    ítems de un checklist de formalización cuando exista).
+  - **Rendición de cuentas = PLACEHOLDER tipado.** No se calcula con datos inventados:
+    `accountability: 'no-disponible'` hasta que existan campañas/donaciones. Punto de
+    integración listo: `PortalAccountability.integrationPoint` (contrato) y
+    `ACCOUNTABILITY_INTEGRATION_POINT` (shell) → **M05 campañas / M06 donaciones**.
+  - **Frontera M14→M01 (Prisma).** `portal_themes` NO declara la relación Prisma con
+    `Organization` (vive en `org.prisma`, de @sebastian) para no editar su archivo; la FK +
+    `ON DELETE CASCADE` se añade en el SQL de la migración `T-027`, igual que la RLS se
+    añade a mano (Prisma no la modela).
+  - **Indicador del shell autenticado.** Sigue en placeholder (T-021): el cableado con datos
+    reales se demuestra en el portal público (donde `OrganizationPublic` ya trae
+    `verificationLevel`/`formalizationState`). Cuando el contexto de organización del shell
+    exponga esos campos en sesión, basta pasar un `TransparencySource` derivado al provider
+    (`deriveTransparency`) sin tocar consumidores; no se hace aquí para no meter un fetch por
+    request en el shell ni editar `shell/layout` (fuera del alcance de M14).
 - **T-026 / coordinar-@sebastian · `OrganizationType` (badge de tipo de organización).**
   _Vigente._ El perfil reserva y renderiza el badge de tipo de organización, pero el **enum
   canónico y sus valores son de @sebastian** (módulo `org`) y aún no existen en el contrato

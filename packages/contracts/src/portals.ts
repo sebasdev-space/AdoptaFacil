@@ -71,3 +71,104 @@ export interface PortalView {
   profile: PortalProfile;
   sections: PortalSection[];
 }
+
+// ============================================================================
+// M14 — PERSONALIZACIÓN POR TOKENS (T-027)
+//
+// Cada organización personaliza su portal SÓLO mediante un subconjunto SEGURO de
+// tokens de marca (NO CSS/HTML arbitrario): así se evita la inyección. El backend
+// valida formato y contraste antes de persistir; el portal público los aplica en
+// runtime (vía `brandTokensToStyle`/`applyBrandTokens` del design system, T-020).
+//
+// SÓLO TIPOS (ver nota CJS arriba): la LISTA de tokens editables y las expresiones
+// de validación son VALORES y viven en el backend (`apps/api/.../portals`) y en la
+// feature web; aquí sólo se declara la forma del contrato.
+// ============================================================================
+
+/**
+ * Tokens de COLOR que una organización puede personalizar (subconjunto seguro de
+ * los tokens del design system). Cada valor es un canal HSL "crudo" `"H S% L%"`
+ * (p. ej. `"142 72% 29%"`), idéntico al formato que consume `@adoptafacil/ui`.
+ * Se excluyen a propósito tokens de tipografía/estructura (fuentes, offsets),
+ * que abren superficie de inyección o rompen la maqueta.
+ */
+export type PortalColorToken =
+  | 'primary'
+  | 'primary-foreground'
+  | 'secondary'
+  | 'secondary-foreground'
+  | 'accent'
+  | 'accent-foreground'
+  | 'ring';
+
+/**
+ * Tokens ESCALARES personalizables. Sólo `radius` (una longitud CSS acotada); no
+ * se exponen fuentes ni offsets para no permitir valores arbitrarios peligrosos.
+ */
+export type PortalScalarToken = 'radius';
+
+/** Unión de todos los tokens que la organización puede sobrescribir. */
+export type PortalThemeToken = PortalColorToken | PortalScalarToken;
+
+/**
+ * Tema de marca de una organización: mapa PARCIAL de token → valor. Sólo se
+ * almacenan/aplican tokens del subconjunto seguro y ya VALIDADOS (formato +
+ * contraste). Un tema vacío significa "usar el tema por defecto del design system".
+ */
+export type PortalTheme = Partial<Record<PortalThemeToken, string>>;
+
+/** Respuesta de lectura del tema (propio o público). */
+export interface PortalThemeConfig {
+  tokens: PortalTheme;
+}
+
+/** Entrada para crear/actualizar el tema (Owner/Admin). */
+export interface UpdatePortalThemeInput {
+  tokens: PortalTheme;
+}
+
+// ----------------------------------------------------------------------------
+// Indicador de transparencia con datos reales (§M14)
+//
+// "Nivel · % formalización · rendición". Consume el contrato de `org`:
+//   - nivel            ← VerificationLevel.level
+//   - % formalización  ← DERIVADO de la posición del estado en
+//                        FORMALIZATION_SEQUENCE (índice/total). Es DECISIÓN del
+//                        documento base, REVISABLE: no es una métrica nueva.
+//   - rendición        ← PLACEHOLDER tipado hasta que existan campañas/donaciones
+//                        (M05/M06). NO se calcula con datos inventados.
+// ----------------------------------------------------------------------------
+
+/**
+ * Estado de la rendición de cuentas. `'no-disponible'` es el PLACEHOLDER honesto
+ * de hoy: aún no hay fuente de datos, así que no se afirma ni al-día ni atrasada.
+ * Los otros valores quedan reservados para cuando M05/M06 alimenten el dato.
+ */
+export type PortalAccountabilityStatus = 'al-dia' | 'pendiente' | 'atrasada' | 'no-disponible';
+
+/**
+ * Rendición de cuentas — PLACEHOLDER tipado. Hoy `status: 'no-disponible'`; el
+ * `integrationPoint` documenta el módulo/endpoint que la alimentará. NO se calcula
+ * con datos inventados: es el punto de integración listo para M05/M06.
+ */
+export interface PortalAccountability {
+  status: PortalAccountabilityStatus;
+  /** Módulo/endpoint que alimentará la rendición cuando exista. */
+  integrationPoint: string;
+}
+
+/**
+ * Datos del indicador de transparencia (§M14). `level` y `formalizationPct` son
+ * REALES (derivados del contrato de `org`); `accountability` es un placeholder
+ * tipado hasta M05/M06.
+ */
+export interface PortalTransparency {
+  /** Nivel de verificación (contrato `org.VerificationLevel.level`). */
+  level: number;
+  /**
+   * % de formalización DERIVADO de la posición del estado en
+   * FORMALIZATION_SEQUENCE (0–100). Decisión del documento base — revisable.
+   */
+  formalizationPct: number;
+  accountability: PortalAccountability;
+}
