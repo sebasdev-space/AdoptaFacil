@@ -11,7 +11,7 @@ import {
 import { AuditService } from '../../core/audit/audit.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../core/tenant/tenant-context.service';
-import { STORAGE_PORT, type StoragePort } from './storage/storage.port';
+import { STORAGE_PORT, type StoragePort } from '../../core/storage/storage.port';
 import {
   VERIFICATION_LEVELS,
   computeVerificationLevel,

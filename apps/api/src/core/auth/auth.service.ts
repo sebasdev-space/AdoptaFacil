@@ -16,7 +16,7 @@ import {
   type RegisterPersonDto,
   Role,
 } from '@adoptafacil/contracts';
-import { NOTIFICATION_PORT, type NotificationPort } from '../../notifications/notification.port';
+import { NOTIFICATION_PORT, type NotificationPort } from '../notifications/notification.port';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { RequestUser } from './auth.types';
 import { PasswordService } from './password.service';

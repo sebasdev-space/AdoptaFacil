@@ -14,10 +14,10 @@ function safeName(filename: string): string {
 }
 
 /**
- * Simulable storage adapter (Ola 1): returns a deterministic-looking stub URL
+ * Simulable storage adapter (local-dev): returns a deterministic-looking stub URL
  * under a non-routable host, scoped by organization. No real provider, no bytes
- * transferred — it only demonstrates the ports/adapters seam so M01 can store
- * logo/photo URLs today and swap in a real backend later.
+ * transferred — it demonstrates the ports/adapters seam. The single stub for the
+ * whole API (T-107); a real adapter replaces it behind STORAGE_PORT.
  */
 @Injectable()
 export class LocalStubStorageAdapter implements StoragePort {
@@ -25,6 +25,10 @@ export class LocalStubStorageAdapter implements StoragePort {
 
   async createUploadTarget(input: CreateUploadInput): Promise<StoredObject> {
     const key = `orgs/${input.organizationId}/${randomUUID()}-${safeName(input.filename)}`;
-    return { key, url: `${this.baseUrl}/${key}` };
+    return { key, url: this.resolvePublicUrl(key) };
+  }
+
+  resolvePublicUrl(key: string): string {
+    return `${this.baseUrl}/${key}`;
   }
 }

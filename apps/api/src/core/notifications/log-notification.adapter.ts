@@ -2,9 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { NotificationMessage, NotificationPort } from './notification.port';
 
 /**
- * Simulable adapter: writes notifications to the log instead of contacting a
- * real provider. Selected when NOTIFICATION_DRIVER=log (the only driver in
- * Sprint 0). Demonstrates the ports/adapters seam without external integrations.
+ * Simulable adapter (local-dev): writes notifications to the log instead of
+ * contacting a real provider. Selected when NOTIFICATION_DRIVER=log (the only
+ * driver in Ola 1). The single stub for the whole API (T-107).
  */
 @Injectable()
 export class LogNotificationAdapter implements NotificationPort {

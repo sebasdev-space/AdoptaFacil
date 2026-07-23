@@ -29,7 +29,7 @@ import { AuditService } from '../../core/audit/audit.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../core/tenant/tenant-context.service';
 import { computeAge } from './animal-age';
-import { ANIMAL_STORAGE_PORT, type StoragePort } from './storage/storage.port';
+import { STORAGE_PORT, type StoragePort } from '../../core/storage/storage.port';
 
 type AnimalWithRelations = AnimalRow & { photos: PhotoRow[]; breed: BreedRow | null };
 
@@ -39,7 +39,7 @@ export class AnimalsService {
     private readonly prisma: PrismaService,
     private readonly tenant: TenantContextService,
     private readonly audit: AuditService,
-    @Inject(ANIMAL_STORAGE_PORT) private readonly storage: StoragePort,
+    @Inject(STORAGE_PORT) private readonly storage: StoragePort,
   ) {}
 
   private requireOrgId(): string {

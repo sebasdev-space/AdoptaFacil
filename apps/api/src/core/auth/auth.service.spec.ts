@@ -1,4 +1,4 @@
-import type { NotificationPort } from '../../notifications/notification.port';
+import type { NotificationPort } from '../notifications/notification.port';
 import type { PrismaService } from '../../prisma/prisma.service';
 import { AuthService } from './auth.service';
 import type { PasswordService } from './password.service';
@@ -37,14 +37,12 @@ function makeService(tx: TxMock): { service: AuthService; withOrgContext: jest.M
   } as unknown as PrismaService;
   const passwords = { hash: jest.fn().mockResolvedValue('hashed') } as unknown as PasswordService;
   const tokens = {
-    issueTokens: jest
-      .fn()
-      .mockResolvedValue({
-        accessToken: 'a',
-        refreshToken: 'r',
-        tokenType: 'Bearer',
-        expiresIn: 900,
-      }),
+    issueTokens: jest.fn().mockResolvedValue({
+      accessToken: 'a',
+      refreshToken: 'r',
+      tokenType: 'Bearer',
+      expiresIn: 900,
+    }),
   } as unknown as TokenService;
   const notifications = { send: jest.fn() } as unknown as NotificationPort;
   return { service: new AuthService(prisma, passwords, tokens, notifications), withOrgContext };

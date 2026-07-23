@@ -17,7 +17,10 @@ import { AuditService } from '../../core/audit/audit.service';
 import type { Env } from '../../config/env.validation';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../core/tenant/tenant-context.service';
-import { NOTIFICATION_PORT, type NotificationPort } from '../../notifications/notification.port';
+import {
+  NOTIFICATION_PORT,
+  type NotificationPort,
+} from '../../core/notifications/notification.port';
 import { canResolve, statusForResolution } from './reminders.window';
 
 /** Row returned by the SECURITY DEFINER cross-tenant due scan. */
