@@ -16,10 +16,15 @@ import type { PrismaClient } from '@prisma/client';
 // also blocks the org cascade — so it is purged here under replica mode too.
 // animals is soft-delete only (DELETE/TRUNCATE triggers reject removal), same
 // deal; its animal_photos cascade once the animal rows are gone.
+// clinical_event_attachments before clinical_events (child first); both are
+// append-only (immutability triggers reject removal for every role). Replica mode
+// in the purge tx disables the triggers so these org-scoped deletes go through.
 const APPEND_ONLY_TABLES = [
   'audit_logs',
   'formalization_transitions',
   'organization_documents',
+  'clinical_event_attachments',
+  'clinical_events',
   'animals',
 ];
 

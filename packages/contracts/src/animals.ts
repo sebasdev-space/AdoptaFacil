@@ -213,3 +213,102 @@ export interface AnimalPhotoUploadResult {
     key: string;
   };
 }
+
+// ============================================================================
+// M03 CLINICAL RECORD (T-105, RF08, §9/§10/§14, RNF05, Ley 1774). Additive.
+// Typed clinical events with date(s), attachments, author and VERSIONING:
+// editing creates a NEW immutable version and preserves earlier ones. Reminders
+// for the next vaccine are NOT scheduled here (RF09/T-106) — only `nextDueDate`
+// is persisted for T-106 to consume. All timestamps are ISO-8601 UTC.
+// ============================================================================
+
+/**
+ * Clinical event type — the list from the base document (§10). EXTENSIBLE (add
+ * members additively); this is NOT an invented catalog. Values are stable.
+ */
+export enum ClinicalEventType {
+  Vaccine = 'vaccine',
+  Treatment = 'treatment',
+  Surgery = 'surgery',
+  Sterilization = 'sterilization',
+  Allergy = 'allergy',
+  Disability = 'disability',
+  Medication = 'medication',
+  Diagnosis = 'diagnosis',
+}
+
+/** Attachment of a clinical event version (RF08). Only METADATA is persisted
+ *  (storage ref + order); the bytes and real compression live behind the same
+ *  animals StoragePort. `url` is resolved for presentation, not stored. */
+export interface ClinicalAttachment {
+  id: string;
+  storageRef: string;
+  order: number;
+  url: string;
+}
+
+/** Free-form clinical detail. Kept OPEN on purpose (no invented medical schema;
+ *  the concrete fields per type are a client/vet decision). NEVER written to the
+ *  audit log in clear (Ley 1581/1774). */
+export type ClinicalEventDetails = Record<string, unknown>;
+
+/**
+ * One VERSION of a clinical event (RF08). `eventId` groups all versions of the
+ * same logical event; `version` is 1-based. Editing creates a new version (a new
+ * row with the next `version`, a new `id`, and the editor as `authorUserId`) and
+ * leaves earlier versions IMMUTABLE — each keeps its ORIGINAL author and time.
+ * The current state of an event is its highest-`version` row.
+ */
+export interface ClinicalEvent {
+  /** This version's unique id. */
+  id: string;
+  /** Logical event id shared by every version of this event. */
+  eventId: string;
+  organizationId: string;
+  animalId: string;
+  type: ClinicalEventType;
+  /** When the clinical event occurred (UTC). */
+  occurredAt: string;
+  /** Next-due date for a follow-up (e.g. next vaccine). Persisted for T-106 to
+   *  consume; NO reminder is scheduled here. */
+  nextDueDate?: string;
+  details: ClinicalEventDetails;
+  /** 1-based version number. */
+  version: number;
+  /** User who authored THIS version. */
+  authorUserId: string;
+  attachments: ClinicalAttachment[];
+  /** ISO-8601 UTC. */
+  createdAt: string;
+}
+
+/** Reserve an attachment for a clinical event version (metadata only). */
+export interface ClinicalAttachmentInput {
+  filename: string;
+  contentType?: string;
+  order?: number;
+}
+
+/** Create a clinical event (version 1). Veterinarian only. */
+export interface CreateClinicalEventInput {
+  type: ClinicalEventType;
+  /** ISO-8601 UTC. */
+  occurredAt: string;
+  /** ISO-8601 UTC (e.g. next vaccine). */
+  nextDueDate?: string;
+  details?: ClinicalEventDetails;
+  attachments?: ClinicalAttachmentInput[];
+}
+
+/**
+ * Edit a clinical event → creates the NEXT version. Provided fields override the
+ * latest version; omitted fields carry forward. Any `attachments` here are added
+ * on top of the carried-forward set. Veterinarian only.
+ */
+export interface EditClinicalEventInput {
+  type?: ClinicalEventType;
+  occurredAt?: string;
+  nextDueDate?: string;
+  details?: ClinicalEventDetails;
+  attachments?: ClinicalAttachmentInput[];
+}
