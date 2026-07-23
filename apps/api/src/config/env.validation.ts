@@ -19,6 +19,13 @@ export const envSchema = z.object({
   DATABASE_URL_APP: z.string().url(),
   REDIS_URL: z.string().url(),
   NOTIFICATION_DRIVER: z.enum(['log']).default('log'),
+  // T-106 (M03/RF09): interval of the repeatable clinical-reminders scan job.
+  // Configurable for dev/test; defaults to daily. Kept in the validated schema so
+  // it survives @nestjs/config (which only re-exposes validated keys).
+  REMINDERS_SCAN_INTERVAL_MS: z.coerce.number().int().positive().default(86_400_000),
+  // Look-ahead window (days) for the scan: events due within this many days
+  // (or already overdue) generate a reminder.
+  REMINDERS_WINDOW_DAYS: z.coerce.number().int().min(0).max(365).default(30),
 });
 
 export type Env = z.infer<typeof envSchema>;
