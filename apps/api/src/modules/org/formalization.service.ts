@@ -9,6 +9,7 @@ import {
 import { AuditService } from '../../core/audit/audit.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../core/tenant/tenant-context.service';
+import { DocumentsService } from './documents.service';
 import { checkTransition, rteVigenteFor } from './formalization.machine';
 
 function toTransition(row: TransitionRow): FormalizationTransition {
@@ -34,6 +35,7 @@ export class FormalizationService {
     private readonly prisma: PrismaService,
     private readonly tenant: TenantContextService,
     private readonly audit: AuditService,
+    private readonly documents: DocumentsService,
   ) {}
 
   private requireOrgId(): string {
@@ -84,7 +86,11 @@ export class FormalizationService {
       const from =
         (profile?.formalizationState as FormalizationState) ?? FormalizationState.Informal;
 
-      const check = checkTransition(from, input.targetState);
+      // Parametrizable document gate (T-103): a forward step may require certain
+      // documents to be Approved & current. The catalog is empty by default
+      // (TODO(client) in TRANSITION_REQUIREMENTS), so this is a no-op until seeded.
+      const satisfiedDocuments = await this.documents.satisfiedTypesInTx(tx, organizationId);
+      const check = checkTransition(from, input.targetState, { satisfiedDocuments });
       if (!check.allowed) {
         throw new BadRequestException(check.error);
       }

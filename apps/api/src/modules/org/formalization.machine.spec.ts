@@ -1,4 +1,4 @@
-import { FormalizationState } from '@adoptafacil/contracts';
+import { DocumentType, FormalizationState } from '@adoptafacil/contracts';
 import { checkTransition, rteVigenteFor } from './formalization.machine';
 
 describe('formalization state machine', () => {
@@ -46,5 +46,43 @@ describe('formalization state machine', () => {
     expect(rteVigenteFor(FormalizationState.ESAL)).toBe(false);
     expect(rteVigenteFor(FormalizationState.Formalizada)).toBe(false);
     expect(rteVigenteFor(FormalizationState.Informal)).toBe(false);
+  });
+
+  describe('parametrizable document gate (T-103)', () => {
+    // A TEST requirements map (production is empty — TODO(client)). Gates the
+    // forward step INTO EnProceso on an approved & current RUT.
+    const requirements = { [FormalizationState.EnProceso]: [DocumentType.Rut] };
+
+    it('blocks a forward step when a required document is missing/expired', () => {
+      const check = checkTransition(FormalizationState.Informal, FormalizationState.EnProceso, {
+        requirements,
+        satisfiedDocuments: [],
+      });
+      expect(check.allowed).toBe(false);
+      expect(check.error).toMatch(/approved and current|vigente/i);
+    });
+
+    it('allows the forward step once the required document is satisfied', () => {
+      const check = checkTransition(FormalizationState.Informal, FormalizationState.EnProceso, {
+        requirements,
+        satisfiedDocuments: [DocumentType.Rut],
+      });
+      expect(check).toMatchObject({ allowed: true, kind: 'forward' });
+    });
+
+    it('does not gate backward steps', () => {
+      const check = checkTransition(FormalizationState.EnProceso, FormalizationState.Informal, {
+        requirements,
+        satisfiedDocuments: [],
+      });
+      expect(check.allowed).toBe(true);
+      expect(check.kind).toBe('backward');
+    });
+
+    it('applies NO gate by default (empty catalog → T-102 behavior preserved)', () => {
+      expect(
+        checkTransition(FormalizationState.Informal, FormalizationState.EnProceso).allowed,
+      ).toBe(true);
+    });
   });
 });

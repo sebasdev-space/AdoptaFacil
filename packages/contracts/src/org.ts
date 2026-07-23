@@ -178,6 +178,12 @@ export interface VerificationLevel {
   label?: string;
   /** Criteria satisfied to reach this level. */
   criteria: string[];
+  // --- T-103 enrichment (additive, optional) ---------------------------------
+  /** The next tier's numeric level, if the ladder has one above `level`. */
+  nextLevel?: number;
+  /** Document types still required for the next tier (missing OR expired) — the
+   *  reason the org is not yet at `nextLevel`. Empty at the top of the ladder. */
+  blockedBy?: string[];
 }
 
 /**
@@ -240,4 +246,124 @@ export interface UpdateOrganizationProfileInput {
   socialLinks?: OrganizationSocialLinks;
   subdomain?: string;
   slug?: string;
+}
+
+// ============================================================================
+// M01 organization DOCUMENTS & verification review (T-103, §9/§10/§14, RNF05).
+// Additive: documentary management with versioning + expiry, a platform review
+// flow (observe/approve/reject with a mandatory reason), and verification levels
+// COMPUTED from approved & current documents. All timestamps are ISO-8601 UTC.
+// ============================================================================
+
+/**
+ * Lifecycle status of an organization document version. Stored statuses move
+ * `Pending → (UnderReview) → Observed | Approved | Rejected`. `Expired` is a
+ * COMPUTED status (never stored): an `Approved` document whose `expiresAt` is in
+ * the past is presented as `Expired` and stops counting toward any verification
+ * level until a new, current version is approved. Values are stable — do not rename.
+ */
+export enum DocumentStatus {
+  Pending = 'pending',
+  UnderReview = 'under_review',
+  Observed = 'observed',
+  Approved = 'approved',
+  Rejected = 'rejected',
+  Expired = 'expired',
+}
+
+/**
+ * Type/category of an organization document. PARAMETRIZABLE — TODO(client): the
+ * authoritative catalog (§9/§10) is a business decision the base document does
+ * NOT fix. This is a MINIMAL, EXTENSIBLE starter set; add members additively as
+ * the client confirms them. WHICH types (if any) gate a verification level or a
+ * formalization step is a SEPARATE parametrizable decision (see the API's
+ * verification/transition config), intentionally left unset so no requirement
+ * is invented here.
+ */
+export enum DocumentType {
+  ExistenceRepresentationCertificate = 'existence_representation_certificate',
+  Rut = 'rut',
+  LegalRepresentativeId = 'legal_representative_id',
+  Other = 'other',
+}
+
+/**
+ * One versioned organization document. A new upload of the same `type` gets the
+ * next `version`; older versions are NEVER overwritten (the history is kept).
+ * Review metadata is immutable once the version is decided.
+ */
+export interface OrganizationDocument {
+  id: string;
+  organizationId: string;
+  type: DocumentType;
+  /** Opaque storage key/ref (StoragePort) — never the document bytes. */
+  storageRef: string;
+  /** 1-based version number, unique per (organization, type). */
+  version: number;
+  /** When the document was issued (UTC), if known. */
+  issuedAt?: string;
+  /** Expiry instant (UTC), if the document expires. Past ⇒ Expired on read. */
+  expiresAt?: string;
+  /** Effective status (may be `Expired`, which is computed from `expiresAt`). */
+  status: DocumentStatus;
+  /** Reviewer note (motivo) — REQUIRED for `Observed`/`Rejected`. */
+  reviewNote?: string;
+  reviewedByUserId?: string;
+  /** ISO-8601 UTC. */
+  reviewedAt?: string;
+  /** ISO-8601 UTC. */
+  createdAt: string;
+  /** ISO-8601 UTC. */
+  updatedAt: string;
+}
+
+/** Upload a new document version (Owner/Administrator). The server assigns the
+ *  next `version` for the (org, type) and sets status `Pending`. */
+export interface UploadOrganizationDocumentInput {
+  type: DocumentType;
+  filename: string;
+  contentType?: string;
+  /** ISO-8601 UTC. */
+  issuedAt?: string;
+  /** ISO-8601 UTC. */
+  expiresAt?: string;
+}
+
+/** Result of an upload: the created document + a simulable storage target the
+ *  client PUTs the bytes to (StoragePort seam). */
+export interface UploadOrganizationDocumentResult {
+  document: OrganizationDocument;
+  upload: {
+    url: string;
+    key: string;
+  };
+}
+
+/** Platform reviewer decision verb. */
+export type DocumentReviewDecision = 'observe' | 'approve' | 'reject';
+
+/** A platform reviewer's decision on a document version. `note` (motivo) is
+ *  REQUIRED for `observe` and `reject` (the API rejects with 400 otherwise). */
+export interface ReviewOrganizationDocumentInput {
+  decision: DocumentReviewDecision;
+  note?: string;
+}
+
+/** One entry of the cross-tenant platform review queue (Pending/UnderReview
+ *  documents across organizations). Exposes ONLY what the reviewer needs — never
+ *  private org data. Served through a bounded SECURITY DEFINER function. */
+export interface DocumentReviewQueueItem {
+  id: string;
+  organizationId: string;
+  organizationName: string;
+  type: DocumentType;
+  version: number;
+  status: DocumentStatus;
+  storageRef: string;
+  /** ISO-8601 UTC. */
+  issuedAt?: string;
+  /** ISO-8601 UTC. */
+  expiresAt?: string;
+  /** ISO-8601 UTC. */
+  createdAt: string;
 }

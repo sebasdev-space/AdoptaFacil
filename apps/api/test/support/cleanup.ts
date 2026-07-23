@@ -11,7 +11,10 @@ import type { PrismaClient } from '@prisma/client';
  *
  * `admin` MUST be a PrismaClient connected with the superuser DATABASE_URL.
  */
-const APPEND_ONLY_TABLES = ['audit_logs', 'formalization_transitions'];
+// organization_documents is not fully append-only (one decision UPDATE is
+// allowed) but its DELETE/TRUNCATE triggers reject removal for every role, which
+// also blocks the org cascade — so it is purged here under replica mode too.
+const APPEND_ONLY_TABLES = ['audit_logs', 'formalization_transitions', 'organization_documents'];
 
 export async function purgeOrganizations(
   admin: PrismaClient,
