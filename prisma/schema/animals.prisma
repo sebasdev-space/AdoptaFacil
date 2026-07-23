@@ -1,3 +1,78 @@
-// Module: animals · Owner: @sebastian (Ola 0)
-// TODO: models defined by @sebastian. Every business model MUST carry
-// organization_id and enable RLS following the _rls_probe reference in org.prisma.
+// Module: animals (M03) · Owner: @sebastian
+// Animal record (expediente, RF07): attributes, status, custom breeds, photos
+// (metadata only) and soft activation. Every business model carries
+// organization_id and is protected by RLS (ENABLE+FORCE + tenant_isolation),
+// mirroring the _rls_probe reference in org.prisma.
+//
+// NOTE (module boundary): the FK to `organizations` is intentionally NOT modeled
+// as a Prisma @relation here — that would require adding a back-relation field to
+// the Organization model in org.prisma (another owner's file). Instead
+// `organizationId` is a plain scalar and the FK (ON DELETE CASCADE) is declared
+// in the T-104 migration SQL. Intra-module relations (photos, breed) ARE modeled.
+
+/// Animal record (expediente, RF07, §14). Tenant-scoped (organization_id + RLS
+/// ENABLE+FORCE + tenant_isolation). Soft activation only: `is_active` toggles
+/// visibility; the record is NEVER physically deleted (the T-104 migration
+/// REVOKEs DELETE from the app role and installs triggers rejecting DELETE/
+/// TRUNCATE for every role). Age is DERIVED in the API from `birth_date` /
+/// `approximate_age_months` — never stored. `created_at`/`birth_date` are UTC.
+model Animal {
+  id                   String    @id @default(uuid()) @db.Uuid
+  organizationId       String    @map("organization_id") @db.Uuid
+  name                 String
+  species              String
+  sex                  String    @default("unknown")
+  size                 String    @default("medium")
+  status               String    @default("available")
+  breedId              String?   @map("breed_id") @db.Uuid
+  customBreed          String?   @map("custom_breed")
+  birthDate            DateTime? @map("birth_date")
+  approximateAgeMonths Int?      @map("approximate_age_months")
+  description          String?
+  isActive             Boolean   @default(true) @map("is_active")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  breed  AnimalBreed?  @relation(fields: [breedId], references: [id])
+  photos AnimalPhoto[]
+
+  @@index([organizationId])
+  @@index([organizationId, isActive])
+  @@map("animals")
+}
+
+/// Photo attached to an animal (RF07). Tenant-scoped (RLS). Only METADATA is
+/// persisted (storage_ref + order); the bytes and real compression live behind
+/// the StoragePort adapter (TODO(compresión)). Deleted physically only when a
+/// photo is replaced/removed; cascades if the (soft-only) animal row is ever
+/// removed via a privileged path.
+model AnimalPhoto {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  animalId       String   @map("animal_id") @db.Uuid
+  storageRef     String   @map("storage_ref")
+  order          Int      @default(0)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  animal Animal @relation(fields: [animalId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([animalId])
+  @@map("animal_photos")
+}
+
+/// Tenant-scoped, user-extensible breed catalog (raza, RF07). No closed catalog:
+/// the seed starts empty and each org creates its own. Tenant-scoped (RLS).
+model AnimalBreed {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  species        String
+  name           String
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  animals Animal[]
+
+  @@unique([organizationId, species, name])
+  @@index([organizationId])
+  @@map("animal_breeds")
+}

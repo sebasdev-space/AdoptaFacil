@@ -7,6 +7,7 @@ import { AuthModule } from './core/auth/auth.module';
 import { RbacModule } from './core/rbac/rbac.module';
 import { TenantModule } from './core/tenant/tenant.module';
 import { HealthModule } from './health/health.module';
+import { AnimalsModule } from './modules/animals/animals.module';
 import { OrgModule } from './modules/org/org.module';
 import { PortalsModule } from './modules/portals/portals.module';
 import { NotificationModule } from './notifications/notification.module';
@@ -40,6 +41,8 @@ import { RedisModule } from './redis/redis.module';
     OrgModule,
     // M14 · portal personalization by tokens + public theme read (T-027).
     PortalsModule,
+    // M03 · animal record (expediente, RF07 / T-104).
+    AnimalsModule,
   ],
 })
 export class AppModule {}

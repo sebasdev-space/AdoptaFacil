@@ -60,7 +60,9 @@ export interface Animal {
   updatedAt: string;
 
   // --- Optional / future base attributes (additive; may be absent) -----------
-  /** Breed, or a free-text custom breed when not from a catalog (raza). */
+  /** Breed, or a free-text custom breed when not from a catalog (raza). Kept
+   *  populated (T-104) with the EFFECTIVE breed name — the catalog breed's name
+   *  or `customBreed` — so legacy/portal consumers still get a string. */
   breed?: string;
   /** Date of birth, ISO-8601 (UTC). Preferred over `approximateAgeMonths`. */
   birthDate?: string;
@@ -68,6 +70,67 @@ export interface Animal {
   approximateAgeMonths?: number;
   /** Free-text description (descripción). */
   description?: string;
+
+  // --- M03 implementation enrichment (T-104, RF07, additive; may be absent) --
+  /** Reference to a tenant breed-catalog entry (raza) when chosen from the org's
+   *  list; `customBreed` is used otherwise. `breed` above stays the effective name. */
+  breedId?: string;
+  /** Free-text custom breed when not chosen from the catalog. */
+  customBreed?: string;
+  /** DERIVED age, computed in the API from `birthDate`/`approximateAgeMonths`.
+   *  Never persisted; absent when the age is unknown. */
+  computedAge?: ComputedAge;
+  /** Soft-activation flag (RF07). `false` = deactivated/hidden; the record is
+   *  NEVER physically deleted. Absent is treated as active by consumers. */
+  isActive?: boolean;
+  /** Full photo metadata (ref + order + resolved url). `photos` above stays the
+   *  ordered URL list for legacy/portal consumers. */
+  photoRecords?: AnimalPhoto[];
+}
+
+/**
+ * A photo attached to an animal record (RF07). Only METADATA is persisted
+ * (storage ref + order); the image bytes and the real compression live behind
+ * the StoragePort adapter. `url` is resolved for presentation, not stored.
+ */
+export interface AnimalPhoto {
+  id: string;
+  /** Opaque storage key/ref (StoragePort) — never the image bytes. */
+  storageRef: string;
+  /** 0-based display order; the first is the primary photo. */
+  order: number;
+  /** Resolved public URL for display (derived, not persisted). */
+  url: string;
+}
+
+/**
+ * A tenant-scoped, user-EXTENSIBLE breed (raza). No closed catalog is imposed:
+ * each organization builds its own list (the seed starts empty), and an operator
+ * may create a custom breed and assign it.
+ */
+export interface AnimalBreed {
+  id: string;
+  organizationId: string;
+  species: AnimalSpecies;
+  name: string;
+  /** ISO-8601 UTC. */
+  createdAt: string;
+}
+
+/**
+ * DERIVED age of an animal (RF07), computed in the API from `birthDate`
+ * (preferred) or `approximateAgeMonths`. NEVER persisted. Absent when the age is
+ * unknown (no birth date and no approximate age).
+ */
+export interface ComputedAge {
+  /** Whole years. */
+  years: number;
+  /** Remaining whole months after `years` (0–11). */
+  months: number;
+  /** Total age in whole months. */
+  totalMonths: number;
+  /** True when derived from an approximate age (unknown exact birth date). */
+  approximate: boolean;
 }
 
 /**
@@ -84,4 +147,69 @@ export interface AnimalSummary {
   status: AnimalStatus;
   /** Primary photo URL, if any. */
   photoUrl?: string;
+  /** Soft-activation flag (T-104). */
+  isActive?: boolean;
+}
+
+// ============================================================================
+// M03 write DTOs (T-104, RF07). Owner/Administrator/Operator/Veterinarian write;
+// ReadOnlyAuditor may only read. All timestamps are ISO-8601 UTC.
+// ============================================================================
+
+/** Reserve a photo for an animal. Only metadata is stored; the client PUTs the
+ *  bytes to the returned StoragePort target (compression is the adapter's job). */
+export interface AnimalPhotoInput {
+  filename: string;
+  contentType?: string;
+  /** Explicit 0-based order; defaults to appended at the end. */
+  order?: number;
+}
+
+/** Create an animal record (expediente). At least one photo is expected (§10).
+ *  `status` defaults to `available`; the record starts active. */
+export interface CreateAnimalInput {
+  name: string;
+  species: AnimalSpecies;
+  sex: AnimalSex;
+  size: AnimalSize;
+  status?: AnimalStatus;
+  breedId?: string;
+  customBreed?: string;
+  /** ISO-8601 UTC date of birth (preferred for age). */
+  birthDate?: string;
+  /** Approximate age in months when the birth date is unknown. */
+  approximateAgeMonths?: number;
+  description?: string;
+  photos?: AnimalPhotoInput[];
+}
+
+/** Patch an animal record. All fields optional; only provided fields change.
+ *  Activation is toggled through the dedicated activate/deactivate actions. */
+export interface UpdateAnimalInput {
+  name?: string;
+  species?: AnimalSpecies;
+  sex?: AnimalSex;
+  size?: AnimalSize;
+  status?: AnimalStatus;
+  breedId?: string;
+  customBreed?: string;
+  birthDate?: string;
+  approximateAgeMonths?: number;
+  description?: string;
+}
+
+/** Create a tenant-scoped custom breed (raza). */
+export interface CreateAnimalBreedInput {
+  species: AnimalSpecies;
+  name: string;
+}
+
+/** Result of reserving an animal photo: the stored metadata + the simulable
+ *  storage target the client PUTs the bytes to. */
+export interface AnimalPhotoUploadResult {
+  photo: AnimalPhoto;
+  upload: {
+    url: string;
+    key: string;
+  };
 }
