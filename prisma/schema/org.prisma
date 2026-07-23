@@ -16,6 +16,7 @@ model Organization {
   auditLogs                AuditLog[]
   profile                  OrganizationProfile?
   formalizationTransitions FormalizationTransition[]
+  documents                OrganizationDocument[]
 
   @@map("organizations")
 }
@@ -77,6 +78,40 @@ model OrganizationProfile {
 
   @@index([organizationId])
   @@map("organization_profiles")
+}
+
+/// Versioned organization DOCUMENTS (M01, RF03, §9/§10/§14, RNF05). Tenant-scoped
+/// business data: carries organization_id, RLS ENABLE+FORCE + tenant_isolation,
+/// so an org only ever reads/inserts its OWN documents. The app role gets only
+/// SELECT+INSERT — a new upload of the same `type` is a NEW row (next `version`);
+/// older versions are never overwritten (history kept forever). The single review
+/// decision (Pending/UnderReview → Observed|Approved|Rejected) is applied by the
+/// `platform_document_decide()` SECURITY DEFINER function (cross-tenant platform
+/// review), and DB triggers then FREEZE the row: any UPDATE after a decision and
+/// any DELETE/TRUNCATE are rejected for EVERY role (review metadata immutable,
+/// RNF05). Expiry is NOT stored: `expiresAt < now` on an Approved doc is presented
+/// as Expired at read time. `created_at`/`expires_at`/… are UTC.
+model OrganizationDocument {
+  id               String    @id @default(uuid()) @db.Uuid
+  organizationId   String    @map("organization_id") @db.Uuid
+  type             String
+  storageRef       String    @map("storage_ref")
+  version          Int
+  issuedAt         DateTime? @map("issued_at")
+  expiresAt        DateTime? @map("expires_at")
+  status           String    @default("pending")
+  reviewNote       String?   @map("review_note")
+  reviewedByUserId String?   @map("reviewed_by_user_id") @db.Uuid
+  reviewedAt       DateTime? @map("reviewed_at")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, type, version])
+  @@index([organizationId])
+  @@index([status])
+  @@map("organization_documents")
 }
 
 /// Append-only audit log (RNF04, §8/§14). Immutable: the T-013 migration ENABLEs
