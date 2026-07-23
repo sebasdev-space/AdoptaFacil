@@ -33,8 +33,9 @@ model Animal {
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 
-  breed  AnimalBreed?  @relation(fields: [breedId], references: [id])
-  photos AnimalPhoto[]
+  breed          AnimalBreed?    @relation(fields: [breedId], references: [id])
+  photos         AnimalPhoto[]
+  clinicalEvents ClinicalEvent[]
 
   @@index([organizationId])
   @@index([organizationId, isActive])
@@ -75,4 +76,57 @@ model AnimalBreed {
   @@unique([organizationId, species, name])
   @@index([organizationId])
   @@map("animal_breeds")
+}
+
+/// One VERSION of a clinical event (expediente clínico, RF08, §14, RNF05).
+/// Tenant-scoped (RLS ENABLE+FORCE + tenant_isolation) AND append-only/immutable:
+/// the T-105 migration grants the app role only SELECT+INSERT and installs
+/// triggers rejecting UPDATE/DELETE/TRUNCATE for EVERY role. Editing an event
+/// INSERTs a new row sharing `event_id` with the next `version`; older versions
+/// are preserved with their ORIGINAL `author_user_id`/`created_at` (UTC). The
+/// current state of an event is its highest-`version` row. `next_due_date` is
+/// stored for T-106 (reminders) to consume — no scheduler is wired here.
+/// `author_user_id` is a plain UUID with NO FK (mirrors audit_logs.actor_user_id:
+/// FK-checking the RLS-FORCEd users table from the app role is unsafe).
+model ClinicalEvent {
+  id             String    @id @default(uuid()) @db.Uuid
+  eventId        String    @map("event_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  animalId       String    @map("animal_id") @db.Uuid
+  type           String
+  occurredAt     DateTime  @map("occurred_at")
+  nextDueDate    DateTime? @map("next_due_date")
+  details        Json      @default("{}")
+  version        Int
+  authorUserId   String    @map("author_user_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  animal      Animal                    @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  attachments ClinicalEventAttachment[]
+
+  @@unique([eventId, version])
+  @@index([organizationId])
+  @@index([animalId])
+  @@index([eventId])
+  @@map("clinical_events")
+}
+
+/// Attachment of a clinical event version (RF08). Tenant-scoped (RLS) and
+/// append-only (SELECT+INSERT only + triggers): only METADATA is persisted
+/// (storage_ref + order); bytes/compression live behind the animals StoragePort
+/// (TODO(compresión)). Tied to a specific version row, so each version is a
+/// self-contained immutable snapshot.
+model ClinicalEventAttachment {
+  id              String   @id @default(uuid()) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  clinicalEventId String   @map("clinical_event_id") @db.Uuid
+  storageRef      String   @map("storage_ref")
+  order           Int      @default(0)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  clinicalEvent ClinicalEvent @relation(fields: [clinicalEventId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([clinicalEventId])
+  @@map("clinical_event_attachments")
 }
