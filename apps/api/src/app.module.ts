@@ -4,13 +4,14 @@ import { ConfigModule } from '@nestjs/config';
 import { validateEnv } from './config/env.validation';
 import { AuditModule } from './core/audit/audit.module';
 import { AuthModule } from './core/auth/auth.module';
+import { NotificationModule } from './core/notifications/notification.module';
 import { RbacModule } from './core/rbac/rbac.module';
+import { StorageModule } from './core/storage/storage.module';
 import { TenantModule } from './core/tenant/tenant.module';
 import { HealthModule } from './health/health.module';
 import { AnimalsModule } from './modules/animals/animals.module';
 import { OrgModule } from './modules/org/org.module';
 import { PortalsModule } from './modules/portals/portals.module';
-import { NotificationModule } from './notifications/notification.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { QueueModule } from './queues/queue.module';
 import { RedisModule } from './redis/redis.module';
@@ -36,6 +37,8 @@ import { RedisModule } from './redis/redis.module';
     RedisModule,
     QueueModule,
     NotificationModule,
+    // Shared infra ports (T-107): single StoragePort provider, global.
+    StorageModule,
     HealthModule,
     // Feature modules (registered last; core modules above are unchanged).
     OrgModule,

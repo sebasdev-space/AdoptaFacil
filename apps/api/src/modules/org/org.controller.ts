@@ -23,7 +23,7 @@ import { Roles } from '../../core/rbac/roles.decorator';
 import { RolesGuard } from '../../core/rbac/roles.guard';
 import { OrgProfileService } from './org-profile.service';
 import { updateOrgProfileSchema, uploadTargetSchema } from './org.schemas';
-import { STORAGE_PORT, type StoragePort, type StoredObject } from './storage/storage.port';
+import { STORAGE_PORT, type StoragePort, type StoredObject } from '../../core/storage/storage.port';
 
 interface UploadTargetDto {
   filename: string;

@@ -4,7 +4,7 @@ import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
-import { NOTIFICATION_PORT } from '../src/notifications/notification.port';
+import { NOTIFICATION_PORT } from '../src/core/notifications/notification.port';
 import { RemindersService } from '../src/modules/animals/reminders.service';
 import { purgeOrganizations } from './support/cleanup';
 

@@ -10,8 +10,6 @@ import { RemindersProcessor } from './reminders.processor';
 import { RemindersScheduler } from './reminders.scheduler';
 import { RemindersService } from './reminders.service';
 import { REMINDERS_QUEUE } from './reminders.constants';
-import { LocalStubStorageAdapter } from './storage/local-stub-storage.adapter';
-import { ANIMAL_STORAGE_PORT } from './storage/storage.port';
 
 /**
  * M03 · Animal record (RF07) + clinical record (RF08) + clinical reminders
@@ -19,8 +17,9 @@ import { ANIMAL_STORAGE_PORT } from './storage/storage.port';
  * (on the reusable global QueueModule↔Redis connection) scans due clinical events
  * and generates in-app reminders, notifying best-effort via the global
  * NotificationPort with RNF07 backoff. The queue is registered here; the
- * processor stays inside this module. Storage/NotificationPort are REUSED (no
- * extra copies). Consumes core (tenant/auth/rbac/audit) — global providers.
+ * processor stays inside this module. STORAGE_PORT / NOTIFICATION_PORT come from
+ * the shared global core modules (T-107) — no local port copies. Consumes core
+ * (tenant/auth/rbac/audit) — global providers.
  */
 @Module({
   imports: [AuthModule, BullModule.registerQueue({ name: REMINDERS_QUEUE })],
@@ -31,7 +30,6 @@ import { ANIMAL_STORAGE_PORT } from './storage/storage.port';
     RemindersService,
     RemindersProcessor,
     RemindersScheduler,
-    { provide: ANIMAL_STORAGE_PORT, useClass: LocalStubStorageAdapter },
   ],
 })
 export class AnimalsModule {}
