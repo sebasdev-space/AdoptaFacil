@@ -14,7 +14,14 @@ import type { PrismaClient } from '@prisma/client';
 // organization_documents is not fully append-only (one decision UPDATE is
 // allowed) but its DELETE/TRUNCATE triggers reject removal for every role, which
 // also blocks the org cascade — so it is purged here under replica mode too.
-const APPEND_ONLY_TABLES = ['audit_logs', 'formalization_transitions', 'organization_documents'];
+// animals is soft-delete only (DELETE/TRUNCATE triggers reject removal), same
+// deal; its animal_photos cascade once the animal rows are gone.
+const APPEND_ONLY_TABLES = [
+  'audit_logs',
+  'formalization_transitions',
+  'organization_documents',
+  'animals',
+];
 
 export async function purgeOrganizations(
   admin: PrismaClient,
