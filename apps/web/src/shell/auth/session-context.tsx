@@ -1,9 +1,15 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import type {
+  FormalizationState,
+  FormalizationStatus,
+  VerificationLevel,
+} from '@adoptafacil/contracts';
 import {
   ApiClientProvider,
   createShellApi,
   Role,
   tokensFromContract,
+  type AccountType,
   type AuthApi,
   type AuthSession,
   type AuthenticatedUser,
@@ -45,6 +51,29 @@ export interface SessionUser {
   /** Real RBAC roles from the contract enum (never loose strings). */
   roles: Role[];
   organizationId?: string;
+  /** Account kind — gates org-only features (e.g. the transparency indicator). */
+  accountType: AccountType;
+}
+
+/**
+ * Loading state of the shell transparency source (T-029). Loaded ONCE per
+ * session (at establishment or on {@link SessionContextValue.refreshTransparency}),
+ * never per render:
+ *   - 'idle'    → not applicable (no session, or a non-organization account)
+ *   - 'loading' → the org's formalization/verification is being fetched
+ *   - 'ready'   → source loaded; the indicator shows REAL derived data
+ *   - 'error'   → the fetch failed; the indicator shows an unavailable state
+ */
+export type TransparencySourceStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+/**
+ * Real inputs for the shell transparency indicator, sourced from the `org`
+ * contract (T-029). Shape-compatible with `deriveTransparency`'s argument.
+ * `accountability` is NOT here: it stays an honest placeholder (M05/M06).
+ */
+export interface OrgTransparencySource {
+  verificationLevel?: VerificationLevel;
+  formalizationState?: FormalizationState;
 }
 
 export interface SessionContextValue {
@@ -57,6 +86,19 @@ export interface SessionContextValue {
    * {@link retryRoles} to try again.
    */
   rolesStatus: RolesStatus;
+  /**
+   * Real transparency inputs for the current org session (T-029), or `null` when
+   * not loaded / not an organization account. Loaded ONCE per session, never per
+   * render. Consumers derive the indicator via `deriveTransparency`.
+   */
+  transparencySource: OrgTransparencySource | null;
+  /** Loading state of {@link transparencySource}. */
+  transparencyStatus: TransparencySourceStatus;
+  /**
+   * Reload the transparency source WITHOUT re-login — e.g. after a formalization
+   * transition changes the org's state. No-op for non-organization sessions.
+   */
+  refreshTransparency: () => Promise<void>;
   /**
    * Establish a session. With credentials, performs the real login; without
    * them, uses a demo login (Ola 0 convenience against the mock auth service).
@@ -100,6 +142,7 @@ const MOCK_USER: SessionUser = {
   email: 'equipo@adoptafacil.org',
   roles: [],
   organizationId: 'org_mock_1',
+  accountType: 'organization',
 };
 
 /**
@@ -115,6 +158,7 @@ function toSessionUser(user: AuthenticatedUser): SessionUser {
     email: user.email,
     roles: [],
     organizationId: user.organizationId,
+    accountType: user.accountType,
   };
 }
 
@@ -155,6 +199,9 @@ export function SessionProvider({
   // Roles load WITHIN establishment; a bootstrapped session (tests) is already
   // 'ready' with whatever roles its initial user carries.
   const [rolesStatus, setRolesStatus] = useState<RolesStatus>('ready');
+  // Transparency source: loaded once per session (T-029), never per render.
+  const [transparencySource, setTransparencySource] = useState<OrgTransparencySource | null>(null);
+  const [transparencyStatus, setTransparencyStatus] = useState<TransparencySourceStatus>('idle');
 
   // Build the API layer once. `onSessionExpired` fires when a refresh fails or
   // is impossible — dropping the session so protected routes redirect. setState
@@ -168,6 +215,8 @@ export function SessionProvider({
         setUser(null);
         setStatus('unauthenticated');
         setRolesStatus('ready');
+        setTransparencySource(null);
+        setTransparencyStatus('idle');
       },
     }),
   );
@@ -189,6 +238,29 @@ export function SessionProvider({
     }
   }, [api]);
 
+  // Load the REAL transparency source for the current org (T-029). Consumes the
+  // `org` contract, ONCE per session (or on an explicit refresh), never per
+  // render:
+  //   - `formalizationState` ← GET /org/formalization (any member) → drives %.
+  //   - `verificationLevel`  ← GET /org/documents/verification, which COMPUTES
+  //     the tier but is Owner/Administrator/Auditor-gated; a 403 (or any failure)
+  //     for other members degrades to no level (→ 0), never breaking the state.
+  const loadTransparency = useCallback(async () => {
+    setTransparencyStatus('loading');
+    try {
+      const [formalization, verificationLevel] = await Promise.all([
+        api.client.request<FormalizationStatus>('/org/formalization'),
+        api.client.request<VerificationLevel>('/org/documents/verification').catch(() => undefined),
+      ]);
+      setTransparencySource({ formalizationState: formalization.state, verificationLevel });
+      setTransparencyStatus('ready');
+    } catch {
+      // Never fabricate transparency data: surface an unavailable state instead.
+      setTransparencySource(null);
+      setTransparencyStatus('error');
+    }
+  }, [api]);
+
   // Store tokens in memory, then load roles BEFORE exposing the session as
   // authenticated. A single round-trip at establishment (not per navigation);
   // the session stays 'loading' until the roles fetch settles either way.
@@ -199,8 +271,18 @@ export function SessionProvider({
       setStatus('loading');
       await loadRoles();
       setStatus('authenticated');
+      // Transparency is an ORG-only indicator sourced from the REAL backend, so
+      // it loads only under the http transport (the mock service has no org
+      // endpoints). Fired after authentication (does not block app entry); the
+      // indicator shows a loading state until it settles. One fetch per session.
+      if (mode === 'http' && response.user.accountType === 'organization') {
+        void loadTransparency();
+      } else {
+        setTransparencySource(null);
+        setTransparencyStatus('idle');
+      }
     },
-    [api, loadRoles],
+    [api, mode, loadRoles, loadTransparency],
   );
 
   const signIn = useCallback(
@@ -220,6 +302,13 @@ export function SessionProvider({
   // Retry after a 'degraded' roles load, without re-login. The session is already
   // authenticated, so status is left untouched — only rolesStatus/roles change.
   const retryRoles = useCallback(() => loadRoles(), [loadRoles]);
+
+  // Reload transparency without re-login (e.g. after a formalization transition).
+  // No-op for non-organization accounts (nothing to show).
+  const refreshTransparency = useCallback(async () => {
+    if (user?.accountType !== 'organization') return;
+    await loadTransparency();
+  }, [user, loadTransparency]);
 
   const hasRole = useCallback((role: Role) => user?.roles.includes(role) ?? false, [user]);
 
@@ -241,6 +330,8 @@ export function SessionProvider({
     setUser(null);
     setStatus('unauthenticated');
     setRolesStatus('ready');
+    setTransparencySource(null);
+    setTransparencyStatus('idle');
     await api.authApi.logout(refreshToken);
   }, [api]);
 
@@ -250,6 +341,9 @@ export function SessionProvider({
       user,
       isAuthenticated: status === 'authenticated',
       rolesStatus,
+      transparencySource,
+      transparencyStatus,
+      refreshTransparency,
       signIn,
       register,
       requestPasswordReset,
@@ -262,6 +356,9 @@ export function SessionProvider({
       status,
       user,
       rolesStatus,
+      transparencySource,
+      transparencyStatus,
+      refreshTransparency,
       signIn,
       register,
       requestPasswordReset,

@@ -5,6 +5,7 @@ import {
   type PortalAccountabilityStatus,
   type VerificationLevel,
 } from '@adoptafacil/contracts';
+import { useSession } from '../auth';
 
 /**
  * Transparency indicator data (§M14 — principio de transparencia).
@@ -29,7 +30,10 @@ export interface TransparencyData {
 export type TransparencyStatus =
   | { status: 'loading' }
   | { status: 'ready'; data: TransparencyData }
-  | { status: 'error'; message: string };
+  | { status: 'error'; message: string }
+  // No indicator to show — no session, or an account with no org transparency
+  // (e.g. a person account). The indicator renders nothing (T-029).
+  | { status: 'hidden' };
 
 const TransparencyContext = createContext<TransparencyStatus | undefined>(undefined);
 
@@ -117,4 +121,50 @@ export function deriveTransparency(source: TransparencySource): TransparencyData
     // La rendición NO se inventa: placeholder explícito con punto de integración.
     accountability: 'no-disponible',
   };
+}
+
+/** Inputs the shell session exposes for the indicator (T-029). */
+export interface SessionTransparencyInput {
+  /** Whether there is an authenticated session at all. */
+  authenticated: boolean;
+  /** Loading state of the org transparency source (session-owned, once/session). */
+  sourceStatus: 'idle' | 'loading' | 'ready' | 'error';
+  /** The real source, when loaded. */
+  source: TransparencySource | null;
+}
+
+/**
+ * Map the session's transparency state to the indicator's render state (T-029).
+ * Pure (no React) so it is unit-tested directly:
+ *   - no session, or 'idle' (a non-org account) → hidden.
+ *   - 'loading' → loading; 'error' → error; 'ready' → real DERIVED data.
+ */
+export function deriveTransparencyStatus(input: SessionTransparencyInput): TransparencyStatus {
+  if (!input.authenticated || input.sourceStatus === 'idle') return { status: 'hidden' };
+  if (input.sourceStatus === 'loading') return { status: 'loading' };
+  if (input.sourceStatus === 'error') {
+    return { status: 'error', message: 'Indicador de transparencia no disponible' };
+  }
+  return { status: 'ready', data: deriveTransparency(input.source ?? {}) };
+}
+
+/**
+ * Connects the persistent indicator to REAL session data (T-029). Reads the
+ * transparency source the session loaded ONCE at establishment (never per
+ * render) and feeds the pure {@link TransparencyProvider}. The app mounts this
+ * instead of a hardcoded placeholder; tests may still mount `TransparencyProvider`
+ * with an explicit value.
+ */
+export function SessionTransparencyProvider({ children }: { children: ReactNode }) {
+  const { status, transparencyStatus, transparencySource } = useSession();
+  const value = useMemo<TransparencyStatus>(
+    () =>
+      deriveTransparencyStatus({
+        authenticated: status === 'authenticated',
+        sourceStatus: transparencyStatus,
+        source: transparencySource,
+      }),
+    [status, transparencyStatus, transparencySource],
+  );
+  return <TransparencyProvider value={value}>{children}</TransparencyProvider>;
 }

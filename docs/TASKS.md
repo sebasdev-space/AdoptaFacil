@@ -53,6 +53,7 @@ Estado:   Backlog | En curso | En revisión | Hecho
 | T-102  | M01 · máquina de estados de formalización     | M01       | 1   | @sebastian | En revisión |
 | T-026  | M14 · portal público rico (`/o/:slug`)        | M14       | 1   | @fabian    | En revisión |
 | T-027  | M14 · personalización por tokens + transp.    | M14       | 1   | @fabian    | En revisión |
+| T-029  | M14 · indicador de transparencia real (shell) | M14       | 1   | @fabian    | En revisión |
 
 > Añade una fila por tarea. Convierte fechas relativas a absolutas al registrar.
 > Reconciliado con `origin/main` el 2026-07-20: PRs #1–#11 mergeados; sin PRs abiertos.
@@ -102,12 +103,26 @@ Estado:   Backlog | En curso | En revisión | Hecho
     `Organization` (vive en `org.prisma`, de @sebastian) para no editar su archivo; la FK +
     `ON DELETE CASCADE` se añade en el SQL de la migración `T-027`, igual que la RLS se
     añade a mano (Prisma no la modela).
-  - **Indicador del shell autenticado.** Sigue en placeholder (T-021): el cableado con datos
-    reales se demuestra en el portal público (donde `OrganizationPublic` ya trae
-    `verificationLevel`/`formalizationState`). Cuando el contexto de organización del shell
-    exponga esos campos en sesión, basta pasar un `TransparencySource` derivado al provider
-    (`deriveTransparency`) sin tocar consumidores; no se hace aquí para no meter un fetch por
-    request en el shell ni editar `shell/layout` (fuera del alcance de M14).
+  - **Indicador del shell autenticado.** ~~Sigue en placeholder (T-021)~~ **RESUELTO en T-029.**
+    El `TransparencyProvider` del shell ya no usa el placeholder hardcodeado; deriva datos REALES
+    de la organización en sesión.
+- **T-029 · Indicador de transparencia real en el shell (M14).** _Hecho (en revisión)._ El shell
+  autenticado deja el placeholder (`level:3, 82%, 'al-dia'`) y muestra datos reales:
+  - **`nivel` ← `verificationLevel.level`** y **`% formalización` ← `deriveFormalizationPct`**
+    (posición en `FORMALIZATION_SEQUENCE`, decisión del documento base, revisable). `accountability`
+    permanece como **placeholder tipado** (`'no-disponible'`) hasta M05/M06.
+  - **Carga UNA sola vez por sesión** (en `establish()`, login/registro), nunca por render:
+    `GET /org/formalization` (cualquier miembro → estado) + `GET /org/documents/verification` (nivel;
+    **Owner/Administrador/Auditor**, con fallback a nivel 0 si el miembro no tiene ese rol o falla).
+    Cacheado en `shell/auth` (`transparencySource`/`transparencyStatus`), con `refreshTransparency()`
+    para recargar tras una transición **sin re-login**. Sin browser storage.
+  - **Gating.** El indicador solo con sesión autenticada de **organización**; cuentas de persona (o
+    sin sesión) → estado `hidden` (no renderiza). Deriva en `SessionTransparencyProvider`
+    (`deriveTransparencyStatus`, puro y testeado).
+  - **Pendiente (fuera de alcance de T-029, dominio de @sebastian).** Cablear la página de
+    formalización (`features/org/`) para llamar `refreshTransparency()` tras una transición: hoy el
+    indicador refleja el nuevo estado **al refrescar la sesión** (re-login) o si algo llama al
+    `refresh` expuesto. Item de daily.
 - **T-026 / coordinar-@sebastian · `OrganizationType` (badge de tipo de organización).**
   _Vigente._ El perfil reserva y renderiza el badge de tipo de organización, pero el **enum
   canónico y sus valores son de @sebastian** (módulo `org`) y aún no existen en el contrato
