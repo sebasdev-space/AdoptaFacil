@@ -9,6 +9,7 @@ import { RbacModule } from './core/rbac/rbac.module';
 import { StorageModule } from './core/storage/storage.module';
 import { TenantModule } from './core/tenant/tenant.module';
 import { HealthModule } from './health/health.module';
+import { AdoptionsModule } from './modules/adoptions/adoptions.module';
 import { AnimalsModule } from './modules/animals/animals.module';
 import { OrgModule } from './modules/org/org.module';
 import { PortalsModule } from './modules/portals/portals.module';
@@ -46,6 +47,8 @@ import { RedisModule } from './redis/redis.module';
     PortalsModule,
     // M03 · animal record (expediente, RF07 / T-104).
     AnimalsModule,
+    // M04 · adoption request + evaluation kanban (T-028a).
+    AdoptionsModule,
   ],
 })
 export class AppModule {}

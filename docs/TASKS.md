@@ -30,30 +30,31 @@ Estado:   Backlog | En curso | En revisión | Hecho
 
 ## Registro
 
-| ID     | Título                                        | Módulo    | Ola | Dueño      | Estado      |
-| ------ | --------------------------------------------- | --------- | --- | ---------- | ----------- |
-| T-000  | Bootstrap del monorepo (walking skeleton)     | infra     | 0   | lead       | Hecho       |
-| T-010  | Tenant context por request + RLS efectiva     | core      | 0   | @sebastian | Hecho       |
-| T-011  | Auth: registro, login, JWT + refresh rotativo | M02       | 0   | @sebastian | Hecho       |
-| T-012  | RBAC: roles + matriz, guards por tenant       | M02       | 0   | @sebastian | Hecho       |
-| T-012b | Otorgar rol Owner al registrar organización   | M02       | 0   | @sebastian | Hecho       |
-| T-013  | Audit log append-only inmutable (RNF04)       | core      | 0   | @sebastian | Hecho       |
-| T-014  | Automatizar `prisma generate` (postinstall)   | infra     | 0   | @sebastian | En revisión |
-| T-015  | Contracts como paquete compilado (`dist`)     | infra     | 0   | @sebastian | En revisión |
-| T-017  | Fix `/auth/me` devuelve `displayName` real    | core/auth | 0   | @sebastian | En revisión |
-| T-020  | Design system (tokens + librería base)        | web/ui    | 0   | @fabian    | Hecho       |
-| T-021  | Shell del portal (layout, routing, §M14)      | web/shell | 0   | @fabian    | Hecho       |
-| T-022  | Cliente API tipado + sesión (refresh)         | web/shell | 0   | @fabian    | Hecho       |
-| T-023  | Pantallas de auth (login/registro/recuperar)  | M02       | 0   | @fabian    | Hecho       |
-| T-024  | Integración auth real (contra `/auth/*`)      | M02       | 0   | @fabian    | Hecho       |
-| T-025  | Roles en frontend (consumir `/rbac/my-roles`) | M02       | 1   | @fabian    | Backlog     |
-| T-101a | Publicar contrato `Animal` (contract-first)   | M03       | 1   | @sebastian | En revisión |
-| T-101b | Enriquecer contrato `Organization` (aditivo)  | M01       | 1   | @sebastian | En revisión |
-| T-101  | M01 · perfil de organización: CRUD + público  | M01       | 1   | @sebastian | En revisión |
-| T-102  | M01 · máquina de estados de formalización     | M01       | 1   | @sebastian | En revisión |
-| T-026  | M14 · portal público rico (`/o/:slug`)        | M14       | 1   | @fabian    | En revisión |
-| T-027  | M14 · personalización por tokens + transp.    | M14       | 1   | @fabian    | En revisión |
-| T-029  | M14 · indicador de transparencia real (shell) | M14       | 1   | @fabian    | En revisión |
+| ID     | Título                                          | Módulo    | Ola | Dueño      | Estado      |
+| ------ | ----------------------------------------------- | --------- | --- | ---------- | ----------- |
+| T-000  | Bootstrap del monorepo (walking skeleton)       | infra     | 0   | lead       | Hecho       |
+| T-010  | Tenant context por request + RLS efectiva       | core      | 0   | @sebastian | Hecho       |
+| T-011  | Auth: registro, login, JWT + refresh rotativo   | M02       | 0   | @sebastian | Hecho       |
+| T-012  | RBAC: roles + matriz, guards por tenant         | M02       | 0   | @sebastian | Hecho       |
+| T-012b | Otorgar rol Owner al registrar organización     | M02       | 0   | @sebastian | Hecho       |
+| T-013  | Audit log append-only inmutable (RNF04)         | core      | 0   | @sebastian | Hecho       |
+| T-014  | Automatizar `prisma generate` (postinstall)     | infra     | 0   | @sebastian | En revisión |
+| T-015  | Contracts como paquete compilado (`dist`)       | infra     | 0   | @sebastian | En revisión |
+| T-017  | Fix `/auth/me` devuelve `displayName` real      | core/auth | 0   | @sebastian | En revisión |
+| T-020  | Design system (tokens + librería base)          | web/ui    | 0   | @fabian    | Hecho       |
+| T-021  | Shell del portal (layout, routing, §M14)        | web/shell | 0   | @fabian    | Hecho       |
+| T-022  | Cliente API tipado + sesión (refresh)           | web/shell | 0   | @fabian    | Hecho       |
+| T-023  | Pantallas de auth (login/registro/recuperar)    | M02       | 0   | @fabian    | Hecho       |
+| T-024  | Integración auth real (contra `/auth/*`)        | M02       | 0   | @fabian    | Hecho       |
+| T-025  | Roles en frontend (consumir `/rbac/my-roles`)   | M02       | 1   | @fabian    | Backlog     |
+| T-101a | Publicar contrato `Animal` (contract-first)     | M03       | 1   | @sebastian | En revisión |
+| T-101b | Enriquecer contrato `Organization` (aditivo)    | M01       | 1   | @sebastian | En revisión |
+| T-101  | M01 · perfil de organización: CRUD + público    | M01       | 1   | @sebastian | En revisión |
+| T-102  | M01 · máquina de estados de formalización       | M01       | 1   | @sebastian | En revisión |
+| T-026  | M14 · portal público rico (`/o/:slug`)          | M14       | 1   | @fabian    | En revisión |
+| T-027  | M14 · personalización por tokens + transp.      | M14       | 1   | @fabian    | En revisión |
+| T-029  | M14 · indicador de transparencia real (shell)   | M14       | 1   | @fabian    | En revisión |
+| T-028a | M04 · adopción: solicitud + evaluación (kanban) | M04       | 1   | @fabian    | En revisión |
 
 > Añade una fila por tarea. Convierte fechas relativas a absolutas al registrar.
 > Reconciliado con `origin/main` el 2026-07-20: PRs #1–#11 mergeados; sin PRs abiertos.
@@ -160,6 +161,41 @@ Estado:   Backlog | En curso | En revisión | Hecho
   `rolesStatus: 'degraded'`) con opción de **reintentar** sin re-login; nunca se asumen permisos
   ante un fallo. Sin browser storage (roles en memoria/contexto). Informado a @sebastian: la
   decisión de timing/error se tomó por el documento base (informativo, no negociable).
+
+## T-028a · Adopciones — solicitud + evaluación (M04). _Hecho (en revisión)._
+
+Primer corte vertical de M04: **navegación pública + postulación autenticada** (decisión
+del documento base §8/§12; no visitante anónimo). Consume el `/animals` REAL de M03 (por
+contrato, sin tocar sus tablas) y `OrganizationPublic`.
+
+- **Solicitud (Persona autenticada).** `POST /adoptions`. Reglas RF10: **mensaje ≥ 50
+  caracteres** y **una solicitud ACTIVA por (animal, usuario)** (índice único parcial
+  `adoption_requests_active_uq WHERE status IN (new,in_review)`). **Conflicto de interés
+  (§12):** un miembro no puede postular a un animal de su propia organización (403).
+- **Evaluación (organización).** Kanban `GET /adoptions` + `POST /adoptions/:id/transitions`
+  (`new → in_review → approved|rejected`), gating **Owner/Administrador/Operador**
+  (deny-by-default), transiciones **auditadas** (AuditService, UTC; hora Colombia solo en UI).
+- **Multi-tenant + RLS.** `adoption_requests` con `organization_id` (org dueña del animal),
+  RLS ENABLE+FORCE + `tenant_isolation`, cubierta por el gate `rls-no-leak`. La creación
+  cross-tenant (el adoptante no es miembro de la org destino) pasa por la función
+  `create_adoption_request(...)` **SECURITY DEFINER** (misma técnica controlada que
+  `organization_public`), no evade la RLS. Notificación al solicitante tras el puerto
+  `NotificationPort` (stub, T-107).
+- **Puntos de integración TIPADOS (no implementados en 28a):**
+  - `AdoptionRequest.contractRef` → **T-028b** (contrato/firma de adopción).
+  - `AdoptionRequest.trackingRef` → **T-028c** (seguimiento post-adopción).
+  - **Navegación pública del catálogo de adoptables** → depende de que **M03 (@sebastian)**
+    publique `GET /public/organizations/:slug/animals` (ver item de daily abajo). La pantalla
+    `/adopciones/solicitar` ya recibe el animal por `state`/query y queda lista para enchufarlo
+    sin retrabajo; hoy muestra el hueco de integración cuando no hay animal.
+
+### 📌 Item de daily — dependencia con @sebastian (M03)
+
+- **`GET /public/organizations/:slug/animals` → `AnimalSummary[]`** de animales en estado
+  adoptable, expuesto vía `SECURITY DEFINER` (patrón `organization_public`), **sin sesión**.
+  Desbloquea el catálogo público de adopción (M04) **y** la sección "Mascotas en adopción" del
+  portal (T-026). _Preguntas:_ ¿qué `AnimalStatus` cuentan como "en adopción" (`available`?),
+  y si el listado se pagina/filtra (especie/tamaño).
 
 ## Pendientes para @sebastian (detectados en T-024)
 
