@@ -9,3 +9,4 @@ export {
   type SessionProviderProps,
 } from './session-context';
 export { RequireAuth, type RequireAuthProps } from './require-auth';
+export { RequireRoles, type RequireRolesProps } from './require-roles';
