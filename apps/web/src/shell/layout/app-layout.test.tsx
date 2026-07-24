@@ -17,7 +17,18 @@ describe('AppLayout', () => {
   });
 
   it('shows the persistent transparency indicator in the header (§M14)', () => {
-    renderShell({ route: '/adopciones', session: { initialStatus: 'authenticated' } });
+    // Pin an explicit indicator value; the derivation-from-session path is
+    // covered in transparency/session-transparency.test.tsx (T-029).
+    renderShell({
+      route: '/adopciones',
+      session: { initialStatus: 'authenticated' },
+      transparency: {
+        value: {
+          status: 'ready',
+          data: { level: 3, formalizationPct: 75, accountability: 'no-disponible' },
+        },
+      },
+    });
 
     const header = screen.getByRole('banner');
     const indicator = within(header).getByTestId('transparency-indicator');
@@ -25,12 +36,21 @@ describe('AppLayout', () => {
     // Nivel · % formalización · rendición.
     expect(indicator).toHaveTextContent('Nivel');
     expect(indicator).toHaveTextContent('3');
-    expect(indicator).toHaveTextContent('82%');
-    expect(indicator).toHaveTextContent('Al día');
+    expect(indicator).toHaveTextContent('75%');
+    expect(indicator).toHaveTextContent('No disponible');
   });
 
   it('keeps the transparency indicator present on every module', () => {
-    renderShell({ route: '/transparencia', session: { initialStatus: 'authenticated' } });
+    renderShell({
+      route: '/transparencia',
+      session: { initialStatus: 'authenticated' },
+      transparency: {
+        value: {
+          status: 'ready',
+          data: { level: 2, formalizationPct: 50, accountability: 'no-disponible' },
+        },
+      },
+    });
     const header = screen.getByRole('banner');
     expect(within(header).getByTestId('transparency-indicator')).toBeInTheDocument();
   });

@@ -2,7 +2,11 @@ import type { ReactNode } from 'react';
 import { SessionProvider, type SessionProviderProps } from './auth';
 import { NavProvider } from './navigation';
 import { ThemeProvider, type ThemeProviderProps } from './theme';
-import { TransparencyProvider, type TransparencyProviderProps } from './transparency';
+import {
+  SessionTransparencyProvider,
+  TransparencyProvider,
+  type TransparencyProviderProps,
+} from './transparency';
 
 export interface AppProvidersProps {
   children: ReactNode;
@@ -19,12 +23,17 @@ export interface AppProvidersProps {
  * and <MemoryRouter> (tests).
  */
 export function AppProviders({ children, theme, session, transparency }: AppProvidersProps) {
+  // By default the indicator derives from REAL session data (T-029). Tests may
+  // still pin an explicit value via the `transparency` prop.
+  const nav = <NavProvider>{children}</NavProvider>;
   return (
     <ThemeProvider {...theme}>
       <SessionProvider {...session}>
-        <TransparencyProvider {...transparency}>
-          <NavProvider>{children}</NavProvider>
-        </TransparencyProvider>
+        {transparency ? (
+          <TransparencyProvider {...transparency}>{nav}</TransparencyProvider>
+        ) : (
+          <SessionTransparencyProvider>{nav}</SessionTransparencyProvider>
+        )}
       </SessionProvider>
     </ThemeProvider>
   );

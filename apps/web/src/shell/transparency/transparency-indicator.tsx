@@ -27,6 +27,11 @@ export interface TransparencyIndicatorProps {
 export function TransparencyIndicator({ className }: TransparencyIndicatorProps) {
   const state = useTransparency();
 
+  // No session / no org transparency (e.g. a person account) → render nothing.
+  if (state.status === 'hidden') {
+    return null;
+  }
+
   if (state.status === 'loading') {
     return (
       <div

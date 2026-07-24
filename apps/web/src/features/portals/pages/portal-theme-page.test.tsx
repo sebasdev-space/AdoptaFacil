@@ -19,6 +19,7 @@ function sessionWith(roles: Role[]) {
         email: 'duena@patitas.org',
         roles,
         organizationId: 'org-1',
+        accountType: 'organization' as const,
       },
     },
   };
