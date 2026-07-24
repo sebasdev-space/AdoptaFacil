@@ -40,3 +40,46 @@ model AdoptionRequest {
   @@index([applicantUserId])
   @@map("adoption_requests")
 }
+
+/// T-028b — CONTRATO de adopción (RF11) generado tras aprobar una solicitud.
+/// Dato de negocio tenant-scoped: lleva organization_id (org dueña del animal) y
+/// RLS ENABLE+FORCE + tenant_isolation, como adoption_requests.
+///
+/// Estados: draft → pending_signatures → signed (TERMINAL, inmutable) ; cancel
+/// desde draft/pending. Firmantes DINÁMICOS y sus firmas viven en `signers` (Json).
+/// Al completarse todas las firmas se calcula el hash SHA-256 del `payload`
+/// canónico y se sella (`content_hash` + `signed_at`), quedando INMUTABLE — además
+/// del trigger `adoption_contract_freeze` que aborta UPDATE/DELETE de filas signed
+/// para CUALQUIER rol (RNF05, versionamiento documental).
+///
+/// FRONTERAS: sin relaciones Prisma con org.prisma/animals.prisma (de @sebastian);
+/// las FK a organizations y a adoption_requests + ON DELETE CASCADE se añaden a
+/// mano en el SQL de la migración (igual que la RLS). La firma del ADOPTANTE, que
+/// es cross-tenant, se aplica vía funciones SECURITY DEFINER de la migración.
+model AdoptionContract {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  /// Solicitud aprobada que originó el contrato (seam contractRef de T-028a).
+  requestId      String   @map("request_id") @db.Uuid
+  /// Referencia al animal en M03 (sin FK cross-módulo).
+  animalId       String   @map("animal_id") @db.Uuid
+  /// Versión documental (RNF05); 1 en el primer corte.
+  version        Int      @default(1)
+  /// AdoptionContractStatus como texto (sin enum en runtime; nota CJS del contrato).
+  status         String   @default("draft")
+  /// Firmantes dinámicos + estado de cada firma (AdoptionContractSigner[]).
+  signers        Json
+  /// Contenido canónico versionable (AdoptionContractPayload); fuente del hash.
+  payload        Json
+  /// SHA-256 hex del payload canónico; NULL hasta el sellado (signed).
+  contentHash    String?  @map("content_hash")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  /// UTC del sellado (NULL hasta signed).
+  signedAt       DateTime? @map("signed_at")
+
+  @@unique([requestId, version])
+  @@index([organizationId])
+  @@index([status])
+  @@map("adoption_contracts")
+}
