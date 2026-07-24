@@ -75,7 +75,11 @@ export class HttpAuthApi implements AuthApi {
   constructor(config: HttpAuthApiConfig) {
     this.baseUrl = config.baseUrl;
     this.client = config.client;
-    this.fetchFn = config.fetchFn ?? globalThis.fetch;
+    // Bind the default `fetch` to its global receiver: stored on `this` and
+    // invoked as `this.fetchFn(...)`, an unbound global fetch is called with the
+    // wrong `this` and browsers throw "Illegal invocation". Injected fetches
+    // (tests) are used as-is.
+    this.fetchFn = config.fetchFn ?? globalThis.fetch.bind(globalThis);
   }
 
   async login(credentials: LoginRequest): Promise<LoginResponse> {

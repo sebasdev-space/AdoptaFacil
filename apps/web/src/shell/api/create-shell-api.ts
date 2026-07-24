@@ -41,7 +41,11 @@ export interface CreateShellApiConfig {
  */
 export function createShellApi(config: CreateShellApiConfig = {}): ShellApi {
   const baseUrl = config.baseUrl ?? DEFAULT_BASE_URL;
-  const fetchFn = config.fetchFn ?? globalThis.fetch;
+  // Bind the default `fetch` to its global receiver. A bare `globalThis.fetch`
+  // reference, once stored on an object and invoked as a method, is called with
+  // the wrong `this` and browsers throw "Illegal invocation" (the request never
+  // leaves). Binding only the default keeps injected test fetches untouched.
+  const fetchFn = config.fetchFn ?? globalThis.fetch.bind(globalThis);
   const tokenStore = new InMemoryTokenStore();
 
   const shared = {

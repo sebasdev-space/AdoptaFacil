@@ -48,7 +48,11 @@ export class ApiClient {
   constructor(private readonly config: ApiClientConfig) {}
 
   private get fetchFn(): typeof fetch {
-    return this.config.fetchFn ?? globalThis.fetch;
+    // Bind the default `fetch` to its global receiver: invoked as
+    // `this.fetchFn(...)`, an unbound global fetch is called with the wrong
+    // `this` and browsers throw "Illegal invocation". Injected fetches (tests)
+    // are used as-is.
+    return this.config.fetchFn ?? globalThis.fetch.bind(globalThis);
   }
 
   private now(): number {
