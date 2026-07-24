@@ -1,10 +1,18 @@
 import { Route, Routes } from 'react-router-dom';
-import { RequireAuth } from '../auth';
+import { RequireAuth, RequireRoles } from '../auth';
 import { AppLayout } from '../layout';
+import { ANIMAL_VIEW_ROLES, ORG_DOCUMENTS_ROLES, PLATFORM_DOCUMENTS_ROLES } from '../navigation';
+import { AnimalDetailPage } from '../pages/animal-detail-page';
 import { HomePage, NotFoundPage, PlaceholderPage } from '../../features/_layout';
 import { ForgotPasswordPage, LoginPage, RegisterPage } from '../../features/auth';
-import { OrgFormalizationPage, OrgProfilePage } from '../../features/org';
+import {
+  OrgDocumentsPage,
+  OrgFormalizationPage,
+  OrgProfilePage,
+  PlatformDocumentsReviewPage,
+} from '../../features/org';
 import { OrgPublicPage, PortalThemePage } from '../../features/portals';
+import { AnimalsPage, RemindersInboxPage } from '../../features/animals';
 import { AdoptionRequestPage, AdoptionsKanbanPage } from '../../features/adoptions';
 
 /**
@@ -38,6 +46,34 @@ export function AppRoutes() {
           {/* M04 · adopciones (T-028a): tablero de evaluación (org) + solicitud (persona). */}
           <Route path="adopciones" element={<AdoptionsKanbanPage />} />
           <Route path="adopciones/solicitar" element={<AdoptionRequestPage />} />
+          {/* M03 · animales + expediente clínico + recordatorios (T-031, wires
+              T-104/T-105/T-106). Cada ruta exige los MISMOS @Roles que su endpoint
+              (deny-by-default). El panel clínico es EMBEBIBLE por animalId → vive
+              en el detalle /animales/:animalId, no como ruta top-level. */}
+          <Route
+            path="animales"
+            element={
+              <RequireRoles roles={ANIMAL_VIEW_ROLES}>
+                <AnimalsPage />
+              </RequireRoles>
+            }
+          />
+          <Route
+            path="animales/:animalId"
+            element={
+              <RequireRoles roles={ANIMAL_VIEW_ROLES}>
+                <AnimalDetailPage />
+              </RequireRoles>
+            }
+          />
+          <Route
+            path="recordatorios"
+            element={
+              <RequireRoles roles={ANIMAL_VIEW_ROLES}>
+                <RemindersInboxPage />
+              </RequireRoles>
+            }
+          />
           <Route
             path="donaciones"
             element={
@@ -62,8 +98,27 @@ export function AppRoutes() {
           {/* M01 · organization profile + formalization (my lines, before catch-all). */}
           <Route path="organizacion" element={<OrgProfilePage />} />
           <Route path="organizacion/formalizacion" element={<OrgFormalizationPage />} />
+          {/* M01 · gestión documental de la org (T-031, wires T-103, RF03). */}
+          <Route
+            path="organizacion/documentos"
+            element={
+              <RequireRoles roles={ORG_DOCUMENTS_ROLES}>
+                <OrgDocumentsPage />
+              </RequireRoles>
+            }
+          />
           {/* M14 · portal personalization by tokens (T-027, Owner/Admin gated). */}
           <Route path="organizacion/portal" element={<PortalThemePage />} />
+          {/* M01 · revisión documental cross-tenant (T-031, wires T-103, RF03).
+              Audiencia de PLATAFORMA — denegada a roles de organización. */}
+          <Route
+            path="plataforma/documentos"
+            element={
+              <RequireRoles roles={PLATFORM_DOCUMENTS_ROLES}>
+                <PlatformDocumentsReviewPage />
+              </RequireRoles>
+            }
+          />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Route>

@@ -4,13 +4,24 @@ import { Button, cn } from '@adoptafacil/ui';
 import { CloseIcon } from '../icons';
 import { navItems } from '../navigation';
 import { useNav } from '../navigation/nav-context';
+import { useSession } from '../auth';
 import { Brand } from './brand';
 
-/** The navigation link list, shared by the persistent sidebar and the drawer. */
+/**
+ * The navigation link list, shared by the persistent sidebar and the drawer.
+ *
+ * Role-gated entries are filtered out unless the session `hasAnyRole(...roles)`
+ * — the FIRST barrier of the double-barrier UX (the route's <RequireRoles> is
+ * the second). Deny-by-default: entries with no roles show for everyone; entries
+ * with roles stay hidden while roles are absent (e.g. a degraded roles fetch).
+ */
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
+  const { hasAnyRole } = useSession();
+  const items = navItems.filter((item) => !item.roles || hasAnyRole(...item.roles));
+
   return (
     <nav aria-label="Navegación principal" className="flex-1 space-y-1 px-3 py-4">
-      {navItems.map(({ path, label, icon: Icon, end }) => (
+      {items.map(({ path, label, icon: Icon, end }) => (
         <NavLink
           key={path}
           to={path}
