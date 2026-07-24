@@ -5,6 +5,7 @@ import { PageContainer, PageHeader } from '../../_layout';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
 import { listAdoptionRequests, transitionAdoptionRequest } from '../api/adoptions-api';
+import { AdoptionContractPanel } from '../components/adoption-contract-panel';
 import {
   ADOPTION_COLUMNS,
   ADOPTION_NEXT_STATUSES,
@@ -123,6 +124,10 @@ export function AdoptionsKanbanPage() {
                           </Button>
                         ))}
                       </div>
+                      {/* T-028b · contrato + firma (solo sobre solicitudes aprobadas). */}
+                      {request.status === 'approved' && (
+                        <AdoptionContractPanel requestId={request.id} canManage={canEvaluate} />
+                      )}
                     </CardContent>
                   </Card>
                 ))

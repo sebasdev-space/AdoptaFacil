@@ -121,3 +121,190 @@ export interface TransitionAdoptionRequestInput {
   /** Motivo (recomendado; útil para rechazo). Nunca datos sensibles. */
   reason?: string;
 }
+
+// ============================================================================
+// T-028b · Contrato de adopción + firma electrónica (§M04, RF11)
+//
+// Materializa el seam `contractRef` de T-028a: tras APROBAR una solicitud, la
+// organización genera un contrato con firmantes DINÁMICOS, cada firmante firma
+// su parte vía un puerto SIMULABLE (`SignaturePort`), y al completarse todas las
+// firmas se calcula el hash del payload canónico y el contrato se sella INMUTABLE
+// (versionamiento documental, RNF05). El seguimiento post-adopción es T-028c.
+//
+// Marco legal declarado (RNF10): Ley 527/1999 (validez de la firma electrónica y
+// del comercio electrónico) y Ley 1581/2012 (protección de datos personales).
+// Tiempos ISO-8601 en UTC (RNF11); la hora Colombia es solo de presentación.
+// ============================================================================
+
+/**
+ * Ley aplicable DECLARADA en todo contrato de adopción (RNF10): validez de la
+ * firma electrónica (Ley 527/1999) y protección de datos personales (Ley
+ * 1581/2012). Forma parte del payload canónico que se sella por hash.
+ */
+export const ADOPTION_CONTRACT_APPLICABLE_LAWS = ['Ley 527/1999', 'Ley 1581/2012'] as const;
+export type AdoptionContractLaw = (typeof ADOPTION_CONTRACT_APPLICABLE_LAWS)[number];
+
+/**
+ * Estado del contrato (§M04, RF11):
+ *   `draft` → `pending_signatures` → `signed` (TERMINAL, inmutable).
+ *   `draft` | `pending_signatures` → `cancelled` (nunca desde `signed`).
+ */
+export type AdoptionContractStatus = 'draft' | 'pending_signatures' | 'signed' | 'cancelled';
+
+export const ADOPTION_CONTRACT_STATUSES: readonly AdoptionContractStatus[] = [
+  'draft',
+  'pending_signatures',
+  'signed',
+  'cancelled',
+];
+
+/**
+ * Rol de un firmante. Firmantes DINÁMICOS: como mínimo el representante de la
+ * organización y el adoptante; se pueden añadir testigos u otros.
+ */
+export type AdoptionSignerRole = 'organization_representative' | 'adopter' | 'witness';
+
+/**
+ * Un firmante del contrato (parte de la lista dinámica). `signedAt`/`signatureId`
+ * se rellenan cuando esa parte firma (vía {@link SignaturePort}).
+ */
+export interface AdoptionContractSigner {
+  /** Id estable del firmante dentro del contrato. */
+  id: string;
+  role: AdoptionSignerRole;
+  /** Dato personal (Ley 1581): nunca se registra en claro en auditoría. */
+  fullName: string;
+  email: string;
+  /** Usuario autenticado que firma esta parte (adoptante = `applicantUserId`). */
+  userId?: string;
+  /** ISO-8601 UTC en que firmó (ausente si pendiente). */
+  signedAt?: string;
+  /** Id de la firma emitido por el {@link SignaturePort} (ausente si pendiente). */
+  signatureId?: string;
+}
+
+/** Firmante propuesto al generar (sin estado de firma todavía). */
+export interface AdoptionContractSignerInput {
+  role: AdoptionSignerRole;
+  fullName: string;
+  email: string;
+  userId?: string;
+}
+
+/**
+ * Contenido CANÓNICO y versionable del contrato: es exactamente lo que se serializa
+ * de forma determinista y se sella por hash (RNF05). No incluye el estado de las
+ * firmas (esas se acumulan aparte); sellar congela este contenido.
+ */
+export interface AdoptionContractPayload {
+  requestId: string;
+  organizationId: string;
+  animalId: string;
+  animal: AdoptionAnimalSnapshot;
+  /** Dato personal del adoptante (Ley 1581). */
+  applicant: AdoptionApplicant;
+  /** Ley aplicable declarada (RNF10). */
+  applicableLaws: readonly AdoptionContractLaw[];
+  /** Cláusulas del contrato (parametrizable por el cliente; TODO(client)). */
+  terms: string;
+}
+
+/**
+ * Contrato de adopción (§M04, RF11). Vive en el tenant de la organización dueña
+ * del animal (multi-tenant + RLS). Se genera desde una solicitud `approved`;
+ * inmutable tras `signed` (payload sellado por {@link AdoptionContract.contentHash}).
+ */
+export interface AdoptionContract {
+  id: string;
+  /** Organización dueña del animal (ancla de tenant). */
+  organizationId: string;
+  /** Solicitud aprobada que originó el contrato (seam `contractRef` de T-028a). */
+  requestId: string;
+  animalId: string;
+  /** Versión documental (RNF05); `1` en el primer corte. */
+  version: number;
+  status: AdoptionContractStatus;
+  /** Firmantes dinámicos (≥ representante de la org + adoptante). */
+  signers: AdoptionContractSigner[];
+  /** Contenido canónico (fuente del hash). */
+  payload: AdoptionContractPayload;
+  /** SHA-256 hex del payload canónico; presente SOLO cuando `signed`. */
+  contentHash?: string;
+  /** ISO-8601 UTC. */
+  createdAt: string;
+  /** ISO-8601 UTC. */
+  updatedAt: string;
+  /** ISO-8601 UTC del sellado (presente cuando `signed`). */
+  signedAt?: string;
+}
+
+/** Proyección mínima para listar/mostrar contratos junto al kanban. */
+export interface AdoptionContractSummary {
+  id: string;
+  requestId: string;
+  animalId: string;
+  status: AdoptionContractStatus;
+  version: number;
+  /** Nº de firmantes que ya firmaron / total. */
+  signedCount: number;
+  signerCount: number;
+  contentHash?: string;
+  /** ISO-8601 UTC. */
+  createdAt: string;
+}
+
+/**
+ * Entrada para GENERAR el contrato de una solicitud aprobada. El representante de
+ * la organización y el adoptante se derivan del actor y de la solicitud; aquí solo
+ * se pueden añadir firmantes extra (p. ej. testigos) y las cláusulas.
+ */
+export interface GenerateAdoptionContractInput {
+  /** Solicitud APROBADA para la que se genera el contrato. */
+  requestId: string;
+  additionalSigners?: AdoptionContractSignerInput[];
+  /** Cláusulas del contrato (parametrizable; TODO(client)). */
+  terms?: string;
+}
+
+/** Entrada para mover el contrato entre los estados que gestiona la organización. */
+export interface TransitionAdoptionContractInput {
+  targetStatus: Extract<AdoptionContractStatus, 'pending_signatures' | 'cancelled'>;
+  /** Motivo (recomendado para cancelación). Nunca datos sensibles. */
+  reason?: string;
+}
+
+/** Entrada para firmar una parte: el firmante identificado por `signerId`. */
+export interface SignAdoptionContractInput {
+  signerId: string;
+}
+
+// --- SignaturePort (puerto SIMULABLE; interfaz publicada, wiring en la api) ---
+
+/**
+ * Petición de firma electrónica (Ley 527/1999) enviada al {@link SignaturePort}.
+ * `documentHash` es el hash del payload canónico que el firmante atestigua.
+ */
+export interface AdoptionSignatureRequest {
+  contractId: string;
+  signerId: string;
+  signerRole: AdoptionSignerRole;
+  documentHash: string;
+}
+
+/** Resultado de una firma electrónica emitida por el {@link SignaturePort}. */
+export interface AdoptionSignatureResult {
+  signatureId: string;
+  /** ISO-8601 UTC. */
+  signedAt: string;
+  /** Adaptador que emitió la firma (p. ej. `'fake-local'` en Ola 1). */
+  provider: string;
+}
+
+/**
+ * Puerto SIMULABLE de firma electrónica (hexagonal), LOCAL al módulo de adopciones
+ * (no vive en core/). Ola 1: adaptador fake determinista; los proveedores reales
+ * (Ley 527/1999) llegan detrás de esta MISMA interfaz sin tocar a los consumidores.
+ */
+export interface SignaturePort {
+  sign(request: AdoptionSignatureRequest): Promise<AdoptionSignatureResult>;
+}
