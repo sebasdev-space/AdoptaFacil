@@ -1,3 +1,42 @@
-// Module: adoptions · Owner: @fabian (Ola 0)
-// TODO: models defined by @fabian. Every business model MUST carry
-// organization_id and enable RLS following the _rls_probe reference in org.prisma.
+// Module: adoptions (M04) · Owner: @fabian
+//
+// T-028a — solicitud de adopción + evaluación. Dato de negocio tenant-scoped:
+// lleva organization_id (org dueña del animal) y está protegido por Row-Level
+// Security (RLS ENABLE+FORCE + tenant_isolation), como el patrón _rls_probe.
+//
+// FRONTERAS:
+//   - NO se declara la relación Prisma con `Organization` (org.prisma, de
+//     @sebastian) ni con `Animal` (animals.prisma, de @sebastian): el animal se
+//     referencia por `animalId` (uuid) y su snapshot; la FK a organizations +
+//     ON DELETE CASCADE se añade a mano en el SQL de la migración (igual que la
+//     RLS, que Prisma no modela). Así M04 no toca los esquemas de M01/M03.
+//   - La creación por una persona que NO pertenece a la org destino necesita
+//     escribir en otro tenant sin evadir RLS: se hace vía la función
+//     `create_adoption_request(...)` SECURITY DEFINER de la migración.
+
+/// Estados: new → in_review → approved | rejected (contrato AdoptionStatus).
+model AdoptionRequest {
+  id              String   @id @default(uuid()) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  /// Referencia al animal en M03 (sin FK cross-módulo).
+  animalId        String   @map("animal_id") @db.Uuid
+  /// Snapshot mínimo del animal (AdoptionAnimalSnapshot); fuente de verdad = M03.
+  animalSnapshot  Json     @map("animal_snapshot")
+  /// Persona autenticada que postuló (fijado por el backend desde el JWT).
+  applicantUserId String   @map("applicant_user_id") @db.Uuid
+  /// Contacto del solicitante (AdoptionApplicant; dato personal Ley 1581).
+  applicant       Json
+  message         String
+  /// AdoptionStatus como texto (sin enum en runtime; ver nota CJS del contrato).
+  status          String   @default("new")
+  /// Puntos de integración tipados (T-028b / T-028c); nulos en este corte.
+  contractRef     String?  @map("contract_ref")
+  trackingRef     String?  @map("tracking_ref")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([organizationId])
+  @@index([animalId])
+  @@index([applicantUserId])
+  @@map("adoption_requests")
+}

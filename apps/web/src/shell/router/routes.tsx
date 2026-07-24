@@ -5,6 +5,7 @@ import { HomePage, NotFoundPage, PlaceholderPage } from '../../features/_layout'
 import { ForgotPasswordPage, LoginPage, RegisterPage } from '../../features/auth';
 import { OrgFormalizationPage, OrgProfilePage } from '../../features/org';
 import { OrgPublicPage, PortalThemePage } from '../../features/portals';
+import { AdoptionRequestPage, AdoptionsKanbanPage } from '../../features/adoptions';
 
 /**
  * Route tree for the shell.
@@ -34,12 +35,9 @@ export function AppRoutes() {
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>
           <Route index element={<HomePage />} />
-          <Route
-            path="adopciones"
-            element={
-              <PlaceholderPage title="Adopciones" description="Gestión de adopciones del portal." />
-            }
-          />
+          {/* M04 · adopciones (T-028a): tablero de evaluación (org) + solicitud (persona). */}
+          <Route path="adopciones" element={<AdoptionsKanbanPage />} />
+          <Route path="adopciones/solicitar" element={<AdoptionRequestPage />} />
           <Route
             path="donaciones"
             element={
