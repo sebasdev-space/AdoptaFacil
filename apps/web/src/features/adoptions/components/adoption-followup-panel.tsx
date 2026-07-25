@@ -33,7 +33,9 @@ export function AdoptionFollowUpPanel({ contractId, canManage }: AdoptionFollowU
 
   const load = useCallback(() => {
     listFollowUpsForContract(client, contractId)
-      .then(setMilestones)
+      // Normalize at the data edge: the panel ALWAYS holds an array. Guards against
+      // a non-array/empty response so the first render (and `.map`) never throws.
+      .then((data) => setMilestones(Array.isArray(data) ? data : []))
       .catch(() => setMilestones([]));
   }, [client, contractId]);
 

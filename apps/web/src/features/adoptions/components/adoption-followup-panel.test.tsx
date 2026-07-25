@@ -80,4 +80,14 @@ describe('AdoptionFollowUpPanel', () => {
     expect(await screen.findByText('Sin hitos programados.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Programar hito' })).not.toBeInTheDocument();
   });
+
+  it('renders the empty state (no throw) when the response is not an array', async () => {
+    // The regression: a non-array/empty body (e.g. {}) must NOT crash the panel —
+    // it normalizes to [] at the data edge and shows the empty state.
+    stubFetch({});
+    render(providers([Role.Owner], <AdoptionFollowUpPanel contractId="c1" canManage />));
+    expect(await screen.findByText('Sin hitos programados.')).toBeInTheDocument();
+    // Managing controls still render (no exception tore the tree down).
+    expect(screen.getByRole('button', { name: 'Programar hito' })).toBeInTheDocument();
+  });
 });
