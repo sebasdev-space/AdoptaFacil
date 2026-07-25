@@ -1,9 +1,12 @@
 import type {
   AdoptionContract,
+  AdoptionFollowUpMilestone,
   AdoptionRequest,
   CreateAdoptionRequestInput,
   GenerateAdoptionContractInput,
+  ScheduleFollowUpMilestoneInput,
   SignAdoptionContractInput,
+  SubmitFollowUpInput,
   TransitionAdoptionContractInput,
   TransitionAdoptionRequestInput,
 } from '@adoptafacil/contracts';
@@ -95,5 +98,55 @@ export function signAdoptionContract(
   return client.request<AdoptionContract>(`/adoptions/contracts/${contractId}/signatures`, {
     method: 'POST',
     json: input,
+  });
+}
+
+// --- T-028c · post-adoption follow-up ---------------------------------------
+
+/** Org schedules a follow-up milestone on a signed contract (RF12). */
+export function scheduleFollowUpMilestone(
+  client: ApiClient,
+  input: ScheduleFollowUpMilestoneInput,
+): Promise<AdoptionFollowUpMilestone> {
+  return client.request<AdoptionFollowUpMilestone>('/adoptions/followups', {
+    method: 'POST',
+    json: input,
+  });
+}
+
+/** Org lists the follow-up milestones of a contract. */
+export function listFollowUpsForContract(
+  client: ApiClient,
+  contractId: string,
+): Promise<AdoptionFollowUpMilestone[]> {
+  return client.request<AdoptionFollowUpMilestone[]>(
+    `/adoptions/followups/by-contract/${contractId}`,
+  );
+}
+
+/** The adopter's own follow-up milestones (cross-tenant, by identity). */
+export function listMyFollowUps(client: ApiClient): Promise<AdoptionFollowUpMilestone[]> {
+  return client.request<AdoptionFollowUpMilestone[]>('/adoptions/followups/mine');
+}
+
+/** The adopter responds a milestone (answers and/or a photo via StoragePort). */
+export function submitFollowUp(
+  client: ApiClient,
+  milestoneId: string,
+  input: SubmitFollowUpInput,
+): Promise<AdoptionFollowUpMilestone> {
+  return client.request<AdoptionFollowUpMilestone>(`/adoptions/followups/${milestoneId}/submit`, {
+    method: 'POST',
+    json: input,
+  });
+}
+
+/** The org closes (completes) a milestone. */
+export function completeFollowUp(
+  client: ApiClient,
+  milestoneId: string,
+): Promise<AdoptionFollowUpMilestone> {
+  return client.request<AdoptionFollowUpMilestone>(`/adoptions/followups/${milestoneId}/complete`, {
+    method: 'POST',
   });
 }
