@@ -71,6 +71,9 @@ model OrganizationProfile {
   rteVigente         Boolean  @default(false) @map("rte_vigente")
   /// { level, label?, criteria[] } — VerificationLevel contract.
   verificationLevel  Json?    @map("verification_level")
+  /// Legal/organizational type (OrganizationType contract, RF01/T-030). Public
+  /// exposure is gated by the platform `show_organization_type` policy.
+  organizationType   String?  @map("organization_type")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
@@ -78,6 +81,21 @@ model OrganizationProfile {
 
   @@index([organizationId])
   @@map("organization_profiles")
+}
+
+/// Platform-wide settings (M01/RF01, T-030). SINGLETON (single row, id='global')
+/// — a PLATFORM-level config, NOT tenant data, so it is intentionally NOT under
+/// RLS (like the organizations registry). Editable only by PlatformAdmin/
+/// PlatformSuperAdmin (enforced at the controller via RBAC); every change is
+/// audited. `show_organization_type` gates whether the public portal exposes an
+/// org's organizationType badge. `updated_at` is UTC.
+model PlatformSettings {
+  id                   String   @id @default("global")
+  showOrganizationType String   @default("formalized_only") @map("show_organization_type")
+  updatedByUserId      String?  @map("updated_by_user_id") @db.Uuid
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
 }
 
 /// Versioned organization DOCUMENTS (M01, RF03, §9/§10/§14, RNF05). Tenant-scoped

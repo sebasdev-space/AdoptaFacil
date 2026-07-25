@@ -51,6 +51,30 @@ export interface Organization {
    *  current — relevant for tax-deductible donations. */
   rteVigente?: boolean;
   verificationLevel?: VerificationLevel;
+  /** Legal/organizational type (RF01, T-030). Owner/Administrator editable. */
+  organizationType?: OrganizationType;
+}
+
+/**
+ * Legal/organizational type of an organization (RF01) — for the profile badge.
+ *
+ * TODO(client): the AUTHORITATIVE catalog of types is a business decision the
+ * base document does not enumerate exhaustively. This is a MINIMAL, EXTENSIBLE
+ * starter set of standard Colombian legal/organizational forms; add members
+ * additively as the client confirms them. String values are stable.
+ */
+export enum OrganizationType {
+  /** Fundación. */
+  Foundation = 'foundation',
+  /** Asociación. */
+  Association = 'association',
+  /** Corporación. */
+  Corporation = 'corporation',
+  /** Refugio / protectora. */
+  Shelter = 'shelter',
+  /** Persona natural (rescatista independiente). */
+  NaturalPerson = 'natural_person',
+  Other = 'other',
 }
 
 /**
@@ -213,6 +237,19 @@ export interface OrganizationPublic {
    * (legalName public exposure is still TODO pending client definition).
    */
   nit?: string;
+  /**
+   * Legal/organizational type for the profile badge (RF01, T-030). Exposed
+   * subject to the PLATFORM policy `showOrganizationType`: with `all` it is
+   * always present; with `formalized_only` (default) only when the org is
+   * Formalizada/ESAL. Absent otherwise — consumers read it defensively.
+   *
+   * The type is `OrganizationType | (string & {})`: the published enum drives
+   * intent/autocomplete, but it stays open to any string so the in-flight M14
+   * portal (which types its badge loosely as `PortalOrganizationType = string`
+   * until it unifies onto this enum) keeps compiling. The API only ever emits
+   * `OrganizationType` values.
+   */
+  organizationType?: OrganizationType | (string & {});
 }
 
 /** Minimal projection for organization directory lists/cards on the portal. */
@@ -246,6 +283,31 @@ export interface UpdateOrganizationProfileInput {
   socialLinks?: OrganizationSocialLinks;
   subdomain?: string;
   slug?: string;
+  /** Legal/organizational type for the profile badge (RF01, T-030). */
+  organizationType?: OrganizationType;
+}
+
+// ============================================================================
+// Platform-level configuration (T-030). A SINGLE global config (not per-tenant),
+// editable ONLY by PlatformAdmin/PlatformSuperAdmin. Changes are audited (UTC).
+// ============================================================================
+
+/**
+ * Policy controlling whether the public portal exposes an org's
+ * `organizationType` badge:
+ * - `all`             — always expose it.
+ * - `formalized_only` — expose it only for Formalizada/ESAL orgs (default).
+ */
+export type ShowOrganizationTypePolicy = 'all' | 'formalized_only';
+
+/** Platform-wide settings (singleton). */
+export interface PlatformSettings {
+  showOrganizationType: ShowOrganizationTypePolicy;
+}
+
+/** Update the platform settings (PlatformAdmin only). */
+export interface UpdatePlatformSettingsInput {
+  showOrganizationType: ShowOrganizationTypePolicy;
 }
 
 // ============================================================================

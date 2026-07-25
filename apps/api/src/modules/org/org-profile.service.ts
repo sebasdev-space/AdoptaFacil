@@ -7,6 +7,7 @@ import {
   type OrganizationLocation,
   type OrganizationPublic,
   type OrganizationSocialLinks,
+  type OrganizationType,
   type UpdateOrganizationProfileInput,
   type VerificationLevel,
 } from '@adoptafacil/contracts';
@@ -38,6 +39,7 @@ function toOrganization(org: OrgRow, profile: ProfileRow | null): Organization {
       (profile?.formalizationState as FormalizationState) ?? FormalizationState.Informal,
     rteVigente: profile?.rteVigente ?? false,
     verificationLevel: (profile?.verificationLevel as VerificationLevel | null) ?? undefined,
+    organizationType: (profile?.organizationType as OrganizationType | null) ?? undefined,
   };
 }
 
@@ -90,6 +92,7 @@ export class OrgProfileService {
       phone: input.phone,
       subdomain: input.subdomain,
       slug: input.slug,
+      organizationType: input.organizationType,
       ...(input.location !== undefined
         ? { location: input.location as unknown as Prisma.InputJsonValue }
         : {}),
