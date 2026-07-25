@@ -308,3 +308,123 @@ export interface AdoptionSignatureResult {
 export interface SignaturePort {
   sign(request: AdoptionSignatureRequest): Promise<AdoptionSignatureResult>;
 }
+
+// ============================================================================
+// T-028c · Seguimiento post-adopción (§M04, RF12) — CIERRE de M04
+//
+// Materializa el seam `trackingRef` de T-028a: a partir de un contrato `signed`
+// (T-028b) la organización programa HITOS de seguimiento (con fecha y cuestionario);
+// el adoptante responde el cuestionario y sube evidencias (fotos) de SU adopción; un
+// worker marca los hitos vencidos como `overdue` y emite una alerta. Sin IA de riesgo
+// de abandono (diferida) y sin canales de notificación nuevos (reusa NotificationPort).
+//
+// Evidencias/fotos: StoragePort (core, por token). Alertas: NotificationPort + la
+// cola BullMQ global. Tiempos ISO-8601 en UTC (RNF11); hora Colombia solo en UI.
+// Datos personales del adoptante (Ley 1581): tenant-scoped (RLS), sin PII en claro
+// en auditoría.
+// ============================================================================
+
+/**
+ * Estado de un hito de seguimiento (§M04, RF12):
+ *   `scheduled` → `completed` | `overdue`   (`completed` es TERMINAL).
+ * Un hito `overdue` aún puede completarse tarde (`overdue` → `completed`). La alerta
+ * se dispara al pasar a `overdue`.
+ */
+export type FollowUpMilestoneStatus = 'scheduled' | 'completed' | 'overdue';
+
+export const FOLLOWUP_MILESTONE_STATUSES: readonly FollowUpMilestoneStatus[] = [
+  'scheduled',
+  'completed',
+  'overdue',
+];
+
+/** Tipo de pregunta del cuestionario de un hito. */
+export type FollowUpQuestionKind = 'text' | 'boolean' | 'photo';
+
+export interface FollowUpQuestion {
+  id: string;
+  prompt: string;
+  kind: FollowUpQuestionKind;
+  required?: boolean;
+}
+
+/** Tipo de evidencia asociada a un hito. */
+export type FollowUpEvidenceKind = 'photo' | 'questionnaire';
+
+/**
+ * Evidencia de un hito (foto vía StoragePort y/o respuestas del cuestionario).
+ * `answers` es dato personal (Ley 1581): nunca se registra en claro en auditoría.
+ */
+export interface AdoptionFollowUpEvidence {
+  id: string;
+  milestoneId: string;
+  kind: FollowUpEvidenceKind;
+  answers?: Record<string, unknown>;
+  /** URL pública de la foto (resuelta por el StoragePort), si aplica. */
+  photoUrl?: string;
+  /** Clave opaca de almacenamiento (StoragePort), si aplica. */
+  storageRef?: string;
+  submittedByUserId: string;
+  /** ISO-8601 UTC. */
+  createdAt: string;
+}
+
+/**
+ * Hito de seguimiento post-adopción (§M04, RF12). Vive en el tenant de la
+ * organización dueña del animal (multi-tenant + RLS). Se programa a partir de un
+ * contrato `signed`; el adoptante responde/sube evidencia de SU adopción.
+ */
+export interface AdoptionFollowUpMilestone {
+  id: string;
+  organizationId: string;
+  /** Contrato firmado que habilita el seguimiento (seam `trackingRef`). */
+  contractId: string;
+  requestId: string;
+  /** Adoptante responsable (gate de identidad para responder). */
+  adopterUserId: string;
+  /** Dato personal del adoptante (Ley 1581). */
+  adopterName: string;
+  adopterEmail: string;
+  title: string;
+  questionnaire: FollowUpQuestion[];
+  /** ISO-8601 UTC del vencimiento. */
+  dueAt: string;
+  status: FollowUpMilestoneStatus;
+  /** ISO-8601 UTC (presente cuando `completed`). */
+  completedAt?: string;
+  /** ISO-8601 UTC. */
+  createdAt: string;
+  /** ISO-8601 UTC. */
+  updatedAt: string;
+  /** Evidencias asociadas (fotos/cuestionarios). */
+  evidence: AdoptionFollowUpEvidence[];
+}
+
+/** Pregunta propuesta al programar (el backend asigna `id` si falta). */
+export interface FollowUpQuestionInput {
+  id?: string;
+  prompt: string;
+  kind: FollowUpQuestionKind;
+  required?: boolean;
+}
+
+/** Entrada para PROGRAMAR un hito sobre un contrato firmado (rol de organización). */
+export interface ScheduleFollowUpMilestoneInput {
+  contractId: string;
+  title: string;
+  /** ISO-8601 UTC del vencimiento. */
+  dueAt: string;
+  questionnaire?: FollowUpQuestionInput[];
+}
+
+/**
+ * Entrada para que el ADOPTANTE responda un hito: respuestas del cuestionario y/o
+ * una foto (subida vía StoragePort). Por defecto marca el hito como completado.
+ */
+export interface SubmitFollowUpInput {
+  answers?: Record<string, unknown>;
+  /** Nombre de archivo de la foto a subir (StoragePort); opcional. */
+  photoFilename?: string;
+  /** Marcar el hito como completado (por defecto `true`). */
+  complete?: boolean;
+}

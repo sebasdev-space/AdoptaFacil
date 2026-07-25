@@ -83,3 +83,64 @@ model AdoptionContract {
   @@index([status])
   @@map("adoption_contracts")
 }
+
+/// T-028c — HITO de seguimiento post-adopción (RF12). Se programa a partir de un
+/// contrato `signed`. Dato tenant-scoped: organization_id NOT NULL + RLS
+/// ENABLE+FORCE + tenant_isolation. Estados: scheduled → completed | overdue
+/// (overdue → completed tarde). El adoptante (cross-tenant) responde/sube evidencia
+/// vía funciones SECURITY DEFINER de la migración; el worker marca overdue y alerta.
+///
+/// FRONTERAS: sin relaciones Prisma con org/animals (de @sebastian). Las FK a
+/// organizations, adoption_contracts y adoption_requests se añaden a mano en el SQL
+/// (igual que la RLS). La relación con `evidence` SÍ se modela (ambas tablas M04).
+model AdoptionFollowUpMilestone {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  contractId     String   @map("contract_id") @db.Uuid
+  requestId      String   @map("request_id") @db.Uuid
+  /// Adoptante responsable (gate de identidad para responder).
+  adopterUserId  String   @map("adopter_user_id") @db.Uuid
+  /// Dato personal del adoptante (Ley 1581) — denormalizado para alertas/UI.
+  adopterName    String   @map("adopter_name")
+  adopterEmail   String   @map("adopter_email")
+  title          String
+  /// FollowUpQuestion[] (cuestionario del hito).
+  questionnaire  Json     @default("[]")
+  dueAt          DateTime @map("due_at")
+  /// FollowUpMilestoneStatus como texto (sin enum en runtime; nota CJS del contrato).
+  status         String   @default("scheduled")
+  completedAt    DateTime? @map("completed_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  evidence AdoptionFollowUpEvidence[]
+
+  @@index([organizationId])
+  @@index([contractId])
+  @@index([adopterUserId])
+  @@index([status])
+  @@map("adoption_followup_milestones")
+}
+
+/// T-028c — EVIDENCIA de un hito (foto vía StoragePort y/o respuestas del
+/// cuestionario). Tenant-scoped (RLS). Se asocia a un hito (relación M04↔M04).
+model AdoptionFollowUpEvidence {
+  id                String   @id @default(uuid()) @db.Uuid
+  organizationId    String   @map("organization_id") @db.Uuid
+  milestoneId       String   @map("milestone_id") @db.Uuid
+  /// FollowUpEvidenceKind: 'photo' | 'questionnaire'.
+  kind              String
+  /// Respuestas del cuestionario (dato personal; nunca en claro en auditoría).
+  answers           Json?
+  /// Clave opaca y URL pública del StoragePort (foto), si aplica.
+  storageRef        String?  @map("storage_ref")
+  storageUrl        String?  @map("storage_url")
+  submittedByUserId String   @map("submitted_by_user_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  milestone AdoptionFollowUpMilestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([milestoneId])
+  @@map("adoption_followup_evidence")
+}

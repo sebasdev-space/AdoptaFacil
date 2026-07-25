@@ -17,6 +17,7 @@ import {
   shortHash,
   signatureProgress,
 } from '../model/adoptions-contract-view';
+import { AdoptionFollowUpPanel } from './adoption-followup-panel';
 
 export interface AdoptionContractPanelProps {
   requestId: string;
@@ -119,6 +120,11 @@ export function AdoptionContractPanel({ requestId, canManage }: AdoptionContract
         <p className="break-all text-muted-foreground" title={contract.contentHash}>
           Sellado · hash {shortHash(contract.contentHash)}
         </p>
+      )}
+
+      {/* T-028c · seguimiento post-adopción (disponible una vez firmado). */}
+      {contract.status === 'signed' && (
+        <AdoptionFollowUpPanel contractId={contract.id} canManage={canManage} />
       )}
 
       <div className="flex flex-wrap gap-2 pt-1">
