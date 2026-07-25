@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { OrganizationType } from '@adoptafacil/contracts';
 
 /** Runtime validation for the M01 organization-profile update. `.strict()`
  *  rejects unknown keys, so formalization/verification fields can never be set
@@ -46,6 +47,7 @@ export const updateOrgProfileSchema = z
       .optional(),
     subdomain: slug.optional(),
     slug: slug.optional(),
+    organizationType: z.nativeEnum(OrganizationType).optional(),
   })
   .strict();
 
