@@ -149,6 +149,29 @@ export interface AnimalSummary {
   photoUrl?: string;
   /** Soft-activation flag (T-104). */
   isActive?: boolean;
+
+  // --- Public catalog enrichment (T-029, additive; may be absent) ------------
+  /** Effective breed name (catalog breed or free-text custom breed). */
+  breed?: string;
+  /** DERIVED age (computed in the API); absent when unknown. Never a raw DOB. */
+  computedAge?: ComputedAge;
+  /** Opaque storage ref of the primary photo (StoragePort key). */
+  primaryPhotoRef?: string;
+}
+
+/**
+ * Paginated projection of ADOPTABLE animals for the PUBLIC portal (T-029, RF07):
+ * `GET /public/organizations/:slug/animals`. Contains only public-safe
+ * AnimalSummary fields — never the clinical record, reminders, documents, or
+ * internal/PII data. `limit`/`offset` are the effective (clamped) values.
+ */
+export interface AnimalSummaryPage {
+  items: AnimalSummary[];
+  /** Total adoptable animals matching the query (before pagination). */
+  total: number;
+  /** Effective page size (server-capped). */
+  limit: number;
+  offset: number;
 }
 
 // ============================================================================
