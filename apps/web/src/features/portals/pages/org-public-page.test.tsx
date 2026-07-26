@@ -75,6 +75,20 @@ describe('OrgPublicPage — rich public portal', () => {
     expect(screen.getByTestId('org-type-badge')).toHaveTextContent('Refugio');
   });
 
+  it('shows a public "Donar" CTA linking to the donation flow with the org resolved (T-051)', async () => {
+    // Public portal (unauthenticated): the CTA is visible and points at the donate
+    // route carrying the org by query param (the mechanism DonatePage expects). The
+    // route's own RequireAuth guard is what enforces sign-in on activation.
+    renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+    await screen.findByRole('heading', { name: /Refugio Patitas/ });
+
+    const cta = screen.getByTestId('portal-donate-cta');
+    const href = cta.getAttribute('href') ?? '';
+    expect(href).toContain('/donaciones?');
+    expect(href).toContain('organizationId=org-1');
+    expect(href).toContain('organizationName=Refugio+Patitas');
+  });
+
   it('renders all four aggregated sections as placeholders with an empty state', async () => {
     renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
     await screen.findByRole('heading', { name: /Refugio Patitas/ });
