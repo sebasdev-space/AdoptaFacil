@@ -12,17 +12,17 @@
 // re-exports CJS; ver deuda "named export CJS" / T-015 en docs/TASKS.md). Por eso
 // los estados y tipos van como uniones de string, no como enums en runtime; los
 // VALORES en runtime (plantilla de secciones) viven en la feature web.
-import type { OrganizationPublic } from './org';
+import type { OrganizationPublic, OrganizationType } from './org';
 
 /**
- * Tipo de organización mostrado en el badge del perfil. El ENUM CANÓNICO y sus
- * valores pertenecen a @sebastian (módulo `org`); M14 sólo reserva el hueco y lo
- * consume por contrato. Se tipa laxamente como `string` hasta que `org` publique
- * su `OrganizationType`; entonces este alias apuntará a ese tipo y el perfil lo
- * heredará sin reproyectar.
- * TODO(coordinar-@sebastian): reemplazar por `OrganizationType` de `org`.
+ * Tipo de organización mostrado en el badge del perfil (§M14, T-030). Anclado al
+ * ENUM CANÓNICO `OrganizationType` de @sebastian (módulo `org`), consumido por
+ * contrato (M14 no lo redefine). El `| (string & {})` reproduce EXACTAMENTE la
+ * forma de `OrganizationPublic.organizationType`, para que el perfil lo herede sin
+ * cast y para admitir valores que el cliente agregue antes de que el enum los liste
+ * (forward-compat aditiva). Sólo tipo: no emite valor (build CJS a salvo).
  */
-export type PortalOrganizationType = string;
+export type PortalOrganizationType = OrganizationType | (string & {});
 
 /** Estado de render de una sección del portal en un instante dado. */
 export type PortalSectionStatus = 'loading' | 'ready' | 'empty' | 'placeholder' | 'error';

@@ -31,10 +31,8 @@ describe('buildPortalView', () => {
     expect(buildPortalView(ORG).profile.organizationType).toBeUndefined();
   });
 
-  it('hydrates the org-type badge once the contract carries it', () => {
-    // Forward-looking: when @sebastian adds `organizationType` to the public
-    // projection, the portal picks it up by contract with no further changes.
-    const typed = { ...ORG, organizationType: 'refugio' } as OrganizationPublic;
-    expect(buildPortalView(typed).profile.organizationType).toBe('refugio');
+  it('hydrates the org-type from the public projection (no cast — it is on the contract)', () => {
+    const typed: OrganizationPublic = { ...ORG, organizationType: 'shelter' };
+    expect(buildPortalView(typed).profile.organizationType).toBe('shelter');
   });
 });

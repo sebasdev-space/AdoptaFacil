@@ -56,16 +56,23 @@ afterEach(() => {
 });
 
 describe('OrgPublicPage — rich public portal', () => {
-  it('renders the real profile (with the reserved org-type badge) for a valid slug', async () => {
+  it('renders the real profile for a valid slug; NO org-type badge when the type is absent', async () => {
     renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
 
-    // Profile identity + badges.
+    // Profile identity + badges. The projection carries no organizationType (e.g.
+    // informal org under the formalized_only policy) → deny-by-default: no badge.
     expect(await screen.findByRole('heading', { name: /Refugio Patitas/ })).toBeInTheDocument();
-    const typeBadge = screen.getByTestId('org-type-badge');
-    expect(typeBadge).toHaveTextContent('Tipo de organización');
-    expect(typeBadge).toHaveAttribute('data-reserved', 'true');
+    expect(screen.queryByTestId('org-type-badge')).not.toBeInTheDocument();
     expect(screen.getByText('RTE vigente')).toBeInTheDocument();
     expect(screen.getByText('Verificación nivel 2')).toBeInTheDocument();
+  });
+
+  it('shows the org-type badge with its label when the projection carries the type (T-030)', async () => {
+    stubFetch({ org: { ...ORG, organizationType: 'shelter' } });
+    renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+
+    await screen.findByRole('heading', { name: /Refugio Patitas/ });
+    expect(screen.getByTestId('org-type-badge')).toHaveTextContent('Refugio');
   });
 
   it('renders all four aggregated sections as placeholders with an empty state', async () => {

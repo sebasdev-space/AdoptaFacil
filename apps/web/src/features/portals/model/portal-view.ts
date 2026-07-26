@@ -42,12 +42,10 @@ export const PORTAL_SECTION_BLUEPRINT: readonly SectionBlueprint[] = [
  * secciones agregadas son estructurales (placeholders) hasta cablear sus módulos.
  */
 export function buildPortalView(organization: OrganizationPublic): PortalView {
-  // `organizationType` aún no forma parte del contrato público de `org` (el enum
-  // canónico es de @sebastian). Lo leemos de forma defensiva para poblar el badge
-  // en cuanto exista; hoy es `undefined` y el badge muestra su hueco reservado.
-  // TODO(coordinar-@sebastian): quitar el cast cuando `OrganizationPublic` exponga
-  // `organizationType`.
-  const organizationType = (organization as { organizationType?: string }).organizationType;
+  // `organizationType` es parte del contrato público de `org` (enum canónico de
+  // @sebastian, sujeto a la política `showOrganizationType`). El perfil lo hereda
+  // por contrato; el badge respeta deny-by-default (ausente ⇒ no se pinta).
+  const { organizationType } = organization;
 
   return {
     profile: { organization, organizationType },

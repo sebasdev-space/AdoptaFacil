@@ -1,28 +1,37 @@
 import { Badge } from '@adoptafacil/ui';
-import type { PortalOrganizationType } from '@adoptafacil/contracts';
+import { OrganizationType, type PortalOrganizationType } from '@adoptafacil/contracts';
+
+/** Etiquetas legibles (es-CO) por tipo de organización. */
+const ORG_TYPE_LABELS: Record<string, string> = {
+  [OrganizationType.Foundation]: 'Fundación',
+  [OrganizationType.Association]: 'Asociación',
+  [OrganizationType.Corporation]: 'Corporación',
+  [OrganizationType.Shelter]: 'Refugio',
+  [OrganizationType.NaturalPerson]: 'Persona natural',
+  [OrganizationType.Other]: 'Otro',
+};
 
 export interface OrgTypeBadgeProps {
   organizationType?: PortalOrganizationType;
 }
 
 /**
- * Badge de TIPO DE ORGANIZACIÓN del perfil. El enum canónico y sus valores son de
- * @sebastian (módulo `org`); M14 sólo RESERVA el hueco y lo renderiza desde el
- * contrato. Mientras la proyección pública no exponga el tipo, muestra el hueco
- * reservado (badge atenuado) en lugar de ocultarse, para que la maqueta del perfil
- * sea estable y el punto de integración quede visible.
+ * Badge de TIPO DE ORGANIZACIÓN del perfil (§M14, T-030). El enum canónico y la
+ * política de visibilidad (`showOrganizationType`) son de @sebastian (módulo
+ * `org`); M14 sólo lo RENDERIZA con su label legible.
+ *
+ * Deny-by-default de UI: si el tipo llega AUSENTE (p. ej. org informal bajo la
+ * política `formalized_only`, que omite el campo en la proyección pública) NO se
+ * pinta nada — nunca un badge vacío ni "undefined". Para valores fuera del enum
+ * (forward-compat) se muestra el valor crudo.
  */
 export function OrgTypeBadge({ organizationType }: OrgTypeBadgeProps) {
   if (!organizationType) {
-    return (
-      <Badge variant="outline" data-testid="org-type-badge" data-reserved="true">
-        Tipo de organización
-      </Badge>
-    );
+    return null;
   }
   return (
     <Badge variant="info" data-testid="org-type-badge">
-      {organizationType}
+      {ORG_TYPE_LABELS[organizationType] ?? organizationType}
     </Badge>
   );
 }
