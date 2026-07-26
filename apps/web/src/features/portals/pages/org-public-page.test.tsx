@@ -89,16 +89,13 @@ describe('OrgPublicPage — rich public portal', () => {
     expect(href).toContain('organizationName=Refugio+Patitas');
   });
 
-  it('renders all four aggregated sections as placeholders with an empty state', async () => {
+  it('renders the still-placeholder aggregated sections with an empty state', async () => {
     renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
     await screen.findByRole('heading', { name: /Refugio Patitas/ });
 
-    for (const title of [
-      'Mascotas en adopción',
-      'Campaña activa',
-      'Necesita hoy',
-      'Transparencia',
-    ]) {
+    // "Mascotas en adopción" (kind 'pets') is now a LIVE section (T-052), so it is
+    // no longer a placeholder — only the remaining three stay as placeholders.
+    for (const title of ['Campaña activa', 'Necesita hoy', 'Transparencia']) {
       const heading = screen.getByRole('heading', { name: title });
       const section = heading.closest('section');
       expect(section).not.toBeNull();
