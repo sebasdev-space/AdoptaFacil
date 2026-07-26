@@ -101,6 +101,46 @@ describe('routing — public vs protected', () => {
     expect(screen.getByText('Refugio Patitas')).toBeInTheDocument();
   });
 
+  // The "Solicitar adopción" CTA of the public animal detail (T-052) targets this URL.
+  const REQUEST_URL =
+    '/adopciones/solicitar?organizationId=org-1&animalId=a1&name=Firulais&species=dog';
+
+  it('lets an authenticated visitor reach the adoption-request flow for the animal (T-052)', async () => {
+    renderShell({ route: REQUEST_URL, session: { initialStatus: 'authenticated' } });
+    expect(await screen.findByRole('heading', { name: 'Solicitar adopción' })).toBeInTheDocument();
+    // Animal resolved from the query → its name is shown (not the "choose an animal" state).
+    expect(screen.getByText('Firulais')).toBeInTheDocument();
+  });
+
+  it('redirects an unauthenticated visitor from "Solicitar adopción" to login (deny-by-default, T-052)', () => {
+    renderShell({ route: REQUEST_URL, session: { initialStatus: 'unauthenticated' } });
+    expect(screen.getByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Solicitar adopción' })).not.toBeInTheDocument();
+  });
+
+  it('after signing in, returns to the adoption-request flow with the animal preserved (returnTo, T-052)', async () => {
+    const user = userEvent.setup();
+    render(
+      <AppProviders session={{ initialStatus: 'unauthenticated' }}>
+        <MemoryRouter
+          initialEntries={[REQUEST_URL]}
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
+          <AppRoutes />
+        </MemoryRouter>
+      </AppProviders>,
+    );
+    expect(screen.getByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Correo electrónico'), 'demo@adoptafacil.org');
+    await user.type(screen.getByLabelText('Contraseña'), 'demo');
+    await user.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
+
+    // Back on the request flow, the animal survived login (query preserved).
+    expect(await screen.findByRole('heading', { name: 'Solicitar adopción' })).toBeInTheDocument();
+    expect(screen.getByText('Firulais')).toBeInTheDocument();
+  });
+
   it('after signing in from /login, returns to the originally requested route', async () => {
     const user = userEvent.setup();
     // Start unauthenticated, deep-link to a protected route → bounced to /login.

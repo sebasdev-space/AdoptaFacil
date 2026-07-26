@@ -11,7 +11,7 @@ import {
   OrgProfilePage,
   PlatformDocumentsReviewPage,
 } from '../../features/org';
-import { OrgPublicPage, PortalThemePage } from '../../features/portals';
+import { OrgPublicPage, PortalThemePage, PublicAnimalDetailPage } from '../../features/portals';
 import { AnimalsPage, RemindersInboxPage } from '../../features/animals';
 import { AdoptionRequestPage, AdoptionsKanbanPage } from '../../features/adoptions';
 import { DonatePage } from '../../features/donations';
@@ -39,6 +39,10 @@ export function AppRoutes() {
       {/* Public rich organization portal (§M14, T-026) — no auth, public fields
           only: real profile + placeholder sections wired per docs/TASKS.md. */}
       <Route path="/o/:slug" element={<OrgPublicPage />} />
+      {/* Public animal detail within the org portal (§M14/M03, T-052) — public,
+          AnimalSummary fields only (no clinical data). The "Solicitar adopción"
+          button links to the /adopciones/solicitar flow, itself under RequireAuth. */}
+      <Route path="/o/:slug/animales/:animalId" element={<PublicAnimalDetailPage />} />
 
       {/* Protected — guard first, then the shell layout */}
       <Route element={<RequireAuth />}>

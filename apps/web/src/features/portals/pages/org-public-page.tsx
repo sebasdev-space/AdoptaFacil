@@ -9,6 +9,7 @@ import { PortalProfileSection } from '../components/portal-profile-section';
 import { PortalPlaceholderSection } from '../components/portal-placeholder-section';
 import { PortalTransparencyBar } from '../components/portal-transparency-bar';
 import { PortalDonateCta } from '../components/portal-donate-cta';
+import { PortalAdoptionSection } from '../components/portal-adoption-section';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
@@ -104,9 +105,16 @@ export function OrgPublicPage() {
           {/* CTA "Donar" (§M05/M14, T-051): público; el gate de sesión vive en la
               ruta /donaciones (RequireAuth), no aquí. */}
           <PortalDonateCta organization={view.profile.organization} />
-          {view.sections.map((section) => (
-            <PortalPlaceholderSection key={section.kind} section={section} />
-          ))}
+          {/* La sección "Mascotas en adopción" (kind 'pets') ya está CABLEADA al
+              catálogo público (§M14/M03, T-052); las demás siguen como placeholders
+              hasta que su módulo dueño exista. */}
+          {view.sections.map((section) =>
+            section.kind === 'pets' ? (
+              <PortalAdoptionSection key={section.kind} slug={slug as string} />
+            ) : (
+              <PortalPlaceholderSection key={section.kind} section={section} />
+            ),
+          )}
         </div>
       )}
     </main>
