@@ -58,6 +58,49 @@ describe('routing — public vs protected', () => {
     expect(screen.getByRole('heading', { name: 'Página no encontrada' })).toBeInTheDocument();
   });
 
+  it('renders the donation flow for an authenticated visitor with the org resolved by query (T-051)', async () => {
+    renderShell({
+      route: '/donaciones?organizationId=org-9&organizationName=Refugio%20Patitas',
+      session: { initialStatus: 'authenticated' },
+    });
+    expect(await screen.findByRole('heading', { name: 'Donar' })).toBeInTheDocument();
+    // Org resolved from the query → shown; NOT the "choose an org" empty state.
+    expect(screen.getByText('Refugio Patitas')).toBeInTheDocument();
+    expect(screen.queryByText('Elige una organización desde su portal')).not.toBeInTheDocument();
+  });
+
+  it('redirects an unauthenticated visitor from /donaciones to login (deny-by-default, T-051)', () => {
+    renderShell({
+      route: '/donaciones?organizationId=org-9&organizationName=Refugio%20Patitas',
+      session: { initialStatus: 'unauthenticated' },
+    });
+    expect(screen.getByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Donar' })).not.toBeInTheDocument();
+  });
+
+  it('after signing in, returns to the donation flow with the org preserved (returnTo + query, T-051)', async () => {
+    const user = userEvent.setup();
+    render(
+      <AppProviders session={{ initialStatus: 'unauthenticated' }}>
+        <MemoryRouter
+          initialEntries={['/donaciones?organizationId=org-9&organizationName=Refugio%20Patitas']}
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
+          <AppRoutes />
+        </MemoryRouter>
+      </AppProviders>,
+    );
+    expect(screen.getByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Correo electrónico'), 'demo@adoptafacil.org');
+    await user.type(screen.getByLabelText('Contraseña'), 'demo');
+    await user.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
+
+    // Back on the donate flow, org intact (the query survived login).
+    expect(await screen.findByRole('heading', { name: 'Donar' })).toBeInTheDocument();
+    expect(screen.getByText('Refugio Patitas')).toBeInTheDocument();
+  });
+
   it('after signing in from /login, returns to the originally requested route', async () => {
     const user = userEvent.setup();
     // Start unauthenticated, deep-link to a protected route → bounced to /login.

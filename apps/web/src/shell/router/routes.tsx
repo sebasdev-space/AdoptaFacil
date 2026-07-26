@@ -14,6 +14,7 @@ import {
 import { OrgPublicPage, PortalThemePage } from '../../features/portals';
 import { AnimalsPage, RemindersInboxPage } from '../../features/animals';
 import { AdoptionRequestPage, AdoptionsKanbanPage } from '../../features/adoptions';
+import { DonatePage } from '../../features/donations';
 
 /**
  * Route tree for the shell.
@@ -74,12 +75,14 @@ export function AppRoutes() {
               </RequireRoles>
             }
           />
-          <Route
-            path="donaciones"
-            element={
-              <PlaceholderPage title="Donaciones" description="Donaciones y aportes al portal." />
-            }
-          />
+          {/* M05 · donación P1 (T-050 lógica, T-051 cableado). La org llega por query
+              param (organizationId + organizationName) desde el CTA del portal público;
+              sin org, la página muestra su empty-state con el punto de integración M14.
+              SEAM (donación de invitado): el gate de sesión es este <RequireAuth> padre.
+              Si el cliente habilita checkout anónimo, mover ESTA ruta fuera del guard
+              (o envolver DonatePage en un guard más suave) — cambio localizado, sin
+              tocar la lógica de donación. */}
+          <Route path="donaciones" element={<DonatePage />} />
           <Route
             path="campanas"
             element={

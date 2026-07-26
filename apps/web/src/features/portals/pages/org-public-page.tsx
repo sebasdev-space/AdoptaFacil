@@ -8,6 +8,7 @@ import { safePortalTheme } from '../model/theme';
 import { PortalProfileSection } from '../components/portal-profile-section';
 import { PortalPlaceholderSection } from '../components/portal-placeholder-section';
 import { PortalTransparencyBar } from '../components/portal-transparency-bar';
+import { PortalDonateCta } from '../components/portal-donate-cta';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
@@ -100,6 +101,9 @@ export function OrgPublicPage() {
             <PortalTransparencyBar organization={view.profile.organization} />
           </div>
           <PortalProfileSection profile={view.profile} />
+          {/* CTA "Donar" (§M05/M14, T-051): público; el gate de sesión vive en la
+              ruta /donaciones (RequireAuth), no aquí. */}
+          <PortalDonateCta organization={view.profile.organization} />
           {view.sections.map((section) => (
             <PortalPlaceholderSection key={section.kind} section={section} />
           ))}

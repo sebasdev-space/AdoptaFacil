@@ -20,7 +20,12 @@ export function LoginPage() {
   const { signIn } = useSession();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as FromState | null)?.from?.pathname ?? '/';
+  // Return to the guarded origin PRESERVING its query string, so a deep link with
+  // params (e.g. /donaciones?organizationId=…&organizationName=… — T-051) comes back
+  // with its context intact. Same `state.from` mechanism (RequireAuth), just no longer
+  // dropping `search`.
+  const origin = (location.state as FromState | null)?.from;
+  const from = origin ? `${origin.pathname}${origin.search}` : '/';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
