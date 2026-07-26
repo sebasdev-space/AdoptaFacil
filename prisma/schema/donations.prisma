@@ -1,3 +1,85 @@
-// Module: donations · Owner: @fabian (Ola 0)
-// TODO: models defined by @fabian. Every business model MUST carry
-// organization_id and enable RLS following the _rls_probe reference in org.prisma.
+// Module: M05 donations · Owner: @fabian (Ola 2, T-050)
+//
+// P1: una Persona dona a una organización, ve el desglose transparente (motor de
+// dinero M15/PaymentPort) y al aprobarse el pago se emite un recibo automático.
+//
+// FRONTERAS:
+//   - Dato de negocio tenant-scoped: ambas tablas llevan organization_id + RLS
+//     (ENABLE+FORCE + tenant_isolation), como el patrón _rls_probe de org.prisma.
+//   - NO se declara relación Prisma con `Organization` (org.prisma, de @sebastian):
+//     la org se referencia por organization_id (uuid) y la FK + ON DELETE CASCADE se
+//     añade a mano en el SQL de la migración (igual que la RLS, que Prisma no modela).
+//   - La creación por una Persona que dona a OTRA org (cross-tenant) y la aplicación
+//     del webhook (sin contexto de tenant) usan funciones SECURITY DEFINER acotadas
+//     de la migración (misma técnica que `create_adoption_request`), no evaden RLS.
+//   - La relación donation↔receipt SÍ se modela (ambas tablas M05).
+//   - NO recalcula comisiones: el desglose se persiste tal cual lo produce
+//     `computeBreakdown` (M15). Los montos son pesos enteros COP.
+
+/// Donación (P1). Estados: pending → approved | declined (contrato DonationStatus).
+/// approved dispara el recibo automático.
+model Donation {
+  id              String   @id @default(uuid()) @db.Uuid
+  /// Organización BENEFICIARIA (dueña del recaudo).
+  organizationId  String   @map("organization_id") @db.Uuid
+  /// Persona autenticada que donó (fijada por el backend desde el JWT).
+  donorUserId     String   @map("donor_user_id") @db.Uuid
+  /// PaymentConcept.kind: 'organization' | 'animal' | 'campaign' (P1: organization).
+  conceptKind     String   @map("concept_kind")
+  /// PaymentConcept.id (org/animal/campaña atribuida); en P1 = organization_id.
+  conceptId       String   @map("concept_id") @db.Uuid
+  /// CommissionPayer: 'organization' | 'donor' (casilla "cubro la comisión").
+  commissionPayer String   @map("commission_payer")
+  /// Pesos que deben llegar a la org (objetivo neto).
+  intendedAmount  Int      @map("intended_amount")
+  /// Pesos efectivamente cobrados al donante.
+  amountCharged   Int      @map("amount_charged")
+  currency        String   @default("COP")
+  /// PaymentBreakdown itemizado y auditable (fuente: computeBreakdown de M15).
+  breakdown       Json
+  /// Id del recaudo en el PaymentPort (correlación con el webhook); único.
+  collectionId    String   @map("collection_id")
+  /// Clave idempotente del cliente (un reintento no duplica donación ni cobro).
+  idempotencyKey  String   @map("idempotency_key")
+  /// DonationStatus como texto (sin enum en runtime; nota CJS del contrato).
+  status          String   @default("pending")
+  /// Contacto del donante (DonationDonor; dato personal Ley 1581).
+  payer           Json?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  receipt DonationReceipt?
+
+  @@unique([organizationId, idempotencyKey])
+  @@unique([collectionId])
+  @@index([organizationId])
+  @@index([donorUserId])
+  @@index([status])
+  @@map("donations")
+}
+
+/// Recibo automático de una donación aprobada (P1). Documento autoconsistente:
+/// sella donante + monto pretendido + desglose. Idempotente por dedup_key (un
+/// webhook repetido NO emite un segundo recibo). Tenant-scoped (RLS).
+model DonationReceipt {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  donationId     String   @map("donation_id") @db.Uuid
+  /// Clave de deduplicación del webhook que lo emitió (único ⇒ idempotencia).
+  dedupKey       String   @map("dedup_key")
+  /// Donante sellado (DonationDonor; dato personal).
+  donor          Json
+  intendedAmount Int      @map("intended_amount")
+  /// Desglose sellado (idéntico al de la donación).
+  breakdown      Json
+  /// UTC de emisión (hora Colombia solo en presentación).
+  issuedAt       DateTime @default(now()) @map("issued_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  donation Donation @relation(fields: [donationId], references: [id], onDelete: Cascade)
+
+  @@unique([dedupKey])
+  @@unique([donationId])
+  @@index([organizationId])
+  @@map("donation_receipts")
+}

@@ -11,6 +11,7 @@ import { TenantModule } from './core/tenant/tenant.module';
 import { HealthModule } from './health/health.module';
 import { AdoptionsModule } from './modules/adoptions/adoptions.module';
 import { AnimalsModule } from './modules/animals/animals.module';
+import { DonationsModule } from './modules/donations/donations.module';
 import { OrgModule } from './modules/org/org.module';
 import { PortalsModule } from './modules/portals/portals.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -49,6 +50,8 @@ import { RedisModule } from './redis/redis.module';
     AnimalsModule,
     // M04 · adoption request + evaluation kanban (T-028a).
     AdoptionsModule,
+    // M05 · donations (P1: breakdown + "cubro la comisión" + receipt, T-050).
+    DonationsModule,
   ],
 })
 export class AppModule {}
