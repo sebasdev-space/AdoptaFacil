@@ -12,6 +12,7 @@ import {
   PlatformDocumentsReviewPage,
 } from '../../features/org';
 import { OrgPublicPage, PortalThemePage, PublicAnimalDetailPage } from '../../features/portals';
+import { PublicCampaignDetailPage, PublicCampaignsPage } from '../../features/campaigns';
 import { AnimalsPage, RemindersInboxPage } from '../../features/animals';
 import { AdoptionRequestPage, AdoptionsKanbanPage } from '../../features/adoptions';
 import { DonatePage } from '../../features/donations';
@@ -49,6 +50,12 @@ export function AppRoutes() {
           like the future public verification page. Public (no session). */}
       <Route path="/verificar" element={<CertificateVerificationPage />} />
       <Route path="/verificar/:code" element={<CertificateVerificationPage />} />
+      {/* Public campaigns portal (§M14/M06, T-055) — no auth, active campaigns from
+          /public/campaigns + public detail by id. The AUTHENTICATED org management
+          screen (features/campaigns/CampaignsPage) is a separate surface (unrouted;
+          daily item con @sebastian). */}
+      <Route path="/campanas" element={<PublicCampaignsPage />} />
+      <Route path="/campanas/:id" element={<PublicCampaignDetailPage />} />
 
       {/* Protected — guard first, then the shell layout */}
       <Route element={<RequireAuth />}>
@@ -96,12 +103,8 @@ export function AppRoutes() {
           {/* M05/RF14 · certificate EMISSION mockup (T-053). Trust-flow step 2-3,
               reached from the real donation receipt. "Vista de diseño": no backend. */}
           <Route path="certificado" element={<CertificateEmissionPage />} />
-          <Route
-            path="campanas"
-            element={
-              <PlaceholderPage title="Campañas" description="Campañas de recaudación y difusión." />
-            }
-          />
+          {/* /campanas ahora es PÚBLICO (portal de campañas, T-055) — declarado
+              arriba fuera de RequireAuth; ya no es un placeholder protegido. */}
           <Route
             path="transparencia"
             element={
