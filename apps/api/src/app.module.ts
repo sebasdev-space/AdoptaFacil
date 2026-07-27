@@ -12,6 +12,7 @@ import { TenantModule } from './core/tenant/tenant.module';
 import { HealthModule } from './health/health.module';
 import { AdoptionsModule } from './modules/adoptions/adoptions.module';
 import { AnimalsModule } from './modules/animals/animals.module';
+import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { DonationsModule } from './modules/donations/donations.module';
 import { OrgModule } from './modules/org/org.module';
 import { PortalsModule } from './modules/portals/portals.module';
@@ -55,6 +56,8 @@ import { RedisModule } from './redis/redis.module';
     AdoptionsModule,
     // M05 · donations (P1: breakdown + "cubro la comisión" + receipt, T-050).
     DonationsModule,
+    // M06 · fundraising campaigns (RF15 / T-053).
+    CampaignsModule,
   ],
 })
 export class AppModule {}
