@@ -73,6 +73,8 @@ export class OrgController {
       organizationId: actor.organizationId,
       filename: dto.filename,
       contentType: dto.contentType,
+      // Logos/cover photos are shown on the public portal (T-108).
+      visibility: 'public',
     });
   }
 

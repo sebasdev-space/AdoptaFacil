@@ -118,6 +118,8 @@ export class AnimalsService {
             organizationId,
             filename: photo.filename,
             contentType: photo.contentType,
+            // Animal photos are public (shown in the public adoption catalog, T-029).
+            visibility: 'public',
           })
         ).key,
         order: photo.order ?? index,
@@ -264,6 +266,8 @@ export class AnimalsService {
       organizationId,
       filename: input.filename,
       contentType: input.contentType,
+      // Animal photos are public (shown in the public adoption catalog, T-029).
+      visibility: 'public',
     });
     return this.prisma.withOrgContext(organizationId, async (tx) => {
       const animal = await tx.animal.findUnique({ where: { id: animalId } });

@@ -40,3 +40,7 @@ Thumbs.db
 .eslintcache
 .vite/
 *.timestamp-*.mjs
+
+# T-108: local disk storage root (runtime data; never commit)
+.storage/
+**/.storage/

@@ -26,6 +26,16 @@ export const envSchema = z.object({
   // Look-ahead window (days) for the scan: events due within this many days
   // (or already overdue) generate a reminder.
   REMINDERS_WINDOW_DAYS: z.coerce.number().int().min(0).max(365).default(30),
+  // T-108 (storage): which StoragePort adapter to bind. `disk` = real filesystem
+  // (prod on the VPS); `stub` = in-memory (tests set this via load-env). Default
+  // `disk` so production persists real bytes unless explicitly overridden.
+  STORAGE_DRIVER: z.enum(['stub', 'disk']).default('disk'),
+  // Root directory for the disk adapter (outside the webroot; per-tenant subdirs).
+  STORAGE_DISK_ROOT: z.string().min(1).default('./.storage'),
+  // Max upload size in MB (enforced by the adapter and the upload endpoint).
+  STORAGE_MAX_FILE_MB: z.coerce.number().int().positive().max(100).default(15),
+  // Base URL the API is reachable at, used to build upload/serve URLs.
+  STORAGE_PUBLIC_BASE_URL: z.string().url().default('http://localhost:3000'),
 });
 
 export type Env = z.infer<typeof envSchema>;
