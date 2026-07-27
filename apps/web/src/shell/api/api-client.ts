@@ -1,6 +1,6 @@
 import type { AuthTokens } from './auth-contract';
 import { ApiError, toApiError } from './api-error';
-import { parseJsonResponse } from './http';
+import { apiErrorFromResponse, parseJsonResponse } from './http';
 import { tokensFromContract, type TokenStore } from './token-store';
 
 /**
@@ -64,8 +64,39 @@ export class ApiClient {
     return `${this.config.baseUrl.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
   }
 
-  /** Perform a typed request, transparently refreshing an expired session. */
+  /** Perform a typed JSON request, transparently refreshing an expired session. */
   async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+    const response = await this.sendWithAuth(path, options);
+    return parseJsonResponse<T>(response);
+  }
+
+  /**
+   * Download a BINARY resource (e.g. a private document served by `/storage/
+   * private`) with the SAME auth + transparent-refresh flow as {@link request},
+   * but WITHOUT parsing JSON: resolves to a `Blob`. Non-2xx propagates the same
+   * typed {@link ApiError} as the JSON path (403/404 never become a failed parse).
+   * Additive — the JSON methods are unchanged.
+   */
+  async requestBlob(path: string, options: RequestOptions = {}): Promise<Blob> {
+    // Prefer binary; only default when the caller didn't set Accept (send keeps it).
+    const headers = new Headers(options.headers);
+    if (!headers.has('Accept')) {
+      headers.set('Accept', 'application/octet-stream, */*');
+    }
+    const response = await this.sendWithAuth(path, { ...options, headers });
+    if (!response.ok) {
+      throw await apiErrorFromResponse(response);
+    }
+    return response.blob();
+  }
+
+  /**
+   * Send with the transparent auth interceptor and return the RAW `Response`
+   * (shared by {@link request} and {@link requestBlob}): proactive refresh of a
+   * known-expired token, one reactive refresh-and-retry on 401, then session
+   * expiry if still 401. Response parsing is the caller's concern.
+   */
+  private async sendWithAuth(path: string, options: RequestOptions): Promise<Response> {
     const { tokenStore } = this.config;
 
     // Proactive: if we already know the access token is expired, refresh first
@@ -87,13 +118,17 @@ export class ApiClient {
       this.handleSessionExpired();
     }
 
-    return parseJsonResponse<T>(response);
+    return response;
   }
 
   private async send(path: string, options: RequestOptions): Promise<Response> {
     const { json, headers: providedHeaders, ...rest } = options;
     const headers = new Headers(providedHeaders);
-    headers.set('Accept', 'application/json');
+    // Default Accept to JSON, but respect an explicit Accept (e.g. binary
+    // downloads). Existing JSON callers never set it → behavior unchanged.
+    if (!headers.has('Accept')) {
+      headers.set('Accept', 'application/json');
+    }
 
     let body = options.body;
     if (json !== undefined) {

@@ -34,24 +34,33 @@ export function jsonRequestInit(method: string, json?: unknown): RequestInit {
 }
 
 /**
+ * Build a normalized `ApiError` from a non-2xx `Response`, best-effort parsing a
+ * JSON error body for `code`/`message`. Shared by JSON and binary transports so
+ * both surface the SAME typed error shape (never a raw throw or a failed parse).
+ */
+export async function apiErrorFromResponse(response: Response): Promise<ApiError> {
+  let body: ErrorBody | undefined;
+  try {
+    body = (await response.json()) as ErrorBody;
+  } catch {
+    body = undefined;
+  }
+  const code =
+    typeof body?.code === 'string' ? body.code : (STATUS_CODES[response.status] ?? 'http_error');
+  const message =
+    typeof body?.message === 'string' && body.message
+      ? body.message
+      : response.statusText || `HTTP ${response.status}`;
+  return new ApiError(response.status, code, message, body);
+}
+
+/**
  * Parse a `Response`, throwing a normalized `ApiError` on non-2xx. Returns
  * `undefined` for empty (204) bodies.
  */
 export async function parseJsonResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    let body: ErrorBody | undefined;
-    try {
-      body = (await response.json()) as ErrorBody;
-    } catch {
-      body = undefined;
-    }
-    const code =
-      typeof body?.code === 'string' ? body.code : (STATUS_CODES[response.status] ?? 'http_error');
-    const message =
-      typeof body?.message === 'string' && body.message
-        ? body.message
-        : response.statusText || `HTTP ${response.status}`;
-    throw new ApiError(response.status, code, message, body);
+    throw await apiErrorFromResponse(response);
   }
 
   if (response.status === 204 || response.headers.get('Content-Length') === '0') {
