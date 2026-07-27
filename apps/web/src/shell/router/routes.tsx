@@ -15,6 +15,7 @@ import { OrgPublicPage, PortalThemePage, PublicAnimalDetailPage } from '../../fe
 import { AnimalsPage, RemindersInboxPage } from '../../features/animals';
 import { AdoptionRequestPage, AdoptionsKanbanPage } from '../../features/adoptions';
 import { DonatePage } from '../../features/donations';
+import { CertificateEmissionPage, CertificateVerificationPage } from '../../features/certificates';
 
 /**
  * Route tree for the shell.
@@ -43,6 +44,11 @@ export function AppRoutes() {
           AnimalSummary fields only (no clinical data). The "Solicitar adopción"
           button links to the /adopciones/solicitar flow, itself under RequireAuth. */}
       <Route path="/o/:slug/animales/:animalId" element={<PublicAnimalDetailPage />} />
+      {/* Public certificate VERIFICATION — trust-flow mockup (§M05/RF14, T-053).
+          "Vista de diseño": no backend; verifies a sample code deterministically,
+          like the future public verification page. Public (no session). */}
+      <Route path="/verificar" element={<CertificateVerificationPage />} />
+      <Route path="/verificar/:code" element={<CertificateVerificationPage />} />
 
       {/* Protected — guard first, then the shell layout */}
       <Route element={<RequireAuth />}>
@@ -87,6 +93,9 @@ export function AppRoutes() {
               (o envolver DonatePage en un guard más suave) — cambio localizado, sin
               tocar la lógica de donación. */}
           <Route path="donaciones" element={<DonatePage />} />
+          {/* M05/RF14 · certificate EMISSION mockup (T-053). Trust-flow step 2-3,
+              reached from the real donation receipt. "Vista de diseño": no backend. */}
+          <Route path="certificado" element={<CertificateEmissionPage />} />
           <Route
             path="campanas"
             element={
