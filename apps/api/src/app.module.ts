@@ -5,6 +5,7 @@ import { validateEnv } from './config/env.validation';
 import { AuditModule } from './core/audit/audit.module';
 import { AuthModule } from './core/auth/auth.module';
 import { NotificationModule } from './core/notifications/notification.module';
+import { PaymentModule } from './core/payments/payment.module';
 import { RbacModule } from './core/rbac/rbac.module';
 import { StorageModule } from './core/storage/storage.module';
 import { TenantModule } from './core/tenant/tenant.module';
@@ -41,6 +42,8 @@ import { RedisModule } from './redis/redis.module';
     NotificationModule,
     // Shared infra ports (T-107): single StoragePort provider, global.
     StorageModule,
+    // Shared PaymentPort provider (T-052): binds the fake adapter, global.
+    PaymentModule,
     HealthModule,
     // Feature modules (registered last; core modules above are unchanged).
     OrgModule,

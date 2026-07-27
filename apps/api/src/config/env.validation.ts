@@ -36,6 +36,10 @@ export const envSchema = z.object({
   STORAGE_MAX_FILE_MB: z.coerce.number().int().positive().max(100).default(15),
   // Base URL the API is reachable at, used to build upload/serve URLs.
   STORAGE_PUBLIC_BASE_URL: z.string().url().default('http://localhost:3000'),
+  // T-052 (payments): which PaymentPort adapter to bind. 'fake' = deterministic
+  // dev/test double (default); 'wompi' is the real gateway wiring point (M15, not
+  // implemented yet). Swap happens in PaymentModule, no consumer changes.
+  PAYMENT_DRIVER: z.enum(['fake', 'wompi']).default('fake'),
 });
 
 export type Env = z.infer<typeof envSchema>;
