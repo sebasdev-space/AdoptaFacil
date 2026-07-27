@@ -47,6 +47,14 @@ export interface PasswordResetRequestDto {
   email: string;
 }
 
+/** Confirm a password reset: the single-use token from the emailed link plus the
+ *  new password. The token is validated (exists, not expired, not used); on
+ *  success the password is changed and the user's active sessions are revoked. */
+export interface PasswordResetConfirmDto {
+  token: string;
+  password: string;
+}
+
 /** Access + refresh tokens issued on register/login/refresh. */
 export interface AuthTokens {
   accessToken: string;

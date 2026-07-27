@@ -10,6 +10,7 @@
 import type {
   AuthSession,
   LoginDto,
+  PasswordResetConfirmDto,
   PasswordResetRequestDto,
   RegisterOrganizationDto,
   RegisterPersonDto,
@@ -25,6 +26,7 @@ export type {
   RegisterOrganizationDto,
   RegisterPersonDto,
   PasswordResetRequestDto,
+  PasswordResetConfirmDto,
   RefreshDto,
   LogoutDto,
 } from '@adoptafacil/contracts';
@@ -43,8 +45,11 @@ export type LoginRequest = LoginDto;
 export type LoginResponse = AuthSession;
 export type RegisterResponse = AuthSession;
 
-/** Payload for the password-reset request. */
+/** Payload for the password-reset request (step 1: send the link). */
 export type ForgotPasswordRequest = PasswordResetRequestDto;
+
+/** Payload to confirm a reset (step 2: token from the link + new password). */
+export type ResetPasswordRequest = PasswordResetConfirmDto;
 
 // --- Web-only registration input model ---------------------------------------
 // The backend exposes `/auth/register/organization` and `/auth/register/person`

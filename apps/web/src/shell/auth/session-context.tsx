@@ -16,6 +16,7 @@ import {
   type ForgotPasswordRequest,
   type LoginRequest,
   type RegisterRequest,
+  type ResetPasswordRequest,
   type ShellApi,
 } from '../api';
 
@@ -108,6 +109,11 @@ export interface SessionContextValue {
   register: (request: RegisterRequest) => Promise<void>;
   /** Request a password reset (no session change; resolves generically). */
   requestPasswordReset: (request: ForgotPasswordRequest) => Promise<void>;
+  /**
+   * Confirm a password reset with the token from the emailed link + the new
+   * password (no session change). Rejects if the token is invalid/expired/used.
+   */
+  confirmPasswordReset: (request: ResetPasswordRequest) => Promise<void>;
   /** Tear down the session (clears in-memory tokens; best-effort server logout). */
   signOut: () => Promise<void>;
   /**
@@ -322,6 +328,11 @@ export function SessionProvider({
     [api],
   );
 
+  const confirmPasswordReset = useCallback(
+    (request: ResetPasswordRequest): Promise<void> => api.authApi.confirmPasswordReset(request),
+    [api],
+  );
+
   const signOut = useCallback(async () => {
     const refreshToken = api.tokenStore.getRefreshToken();
     // Clear locally first so the UI can't act on a stale session even if the
@@ -347,6 +358,7 @@ export function SessionProvider({
       signIn,
       register,
       requestPasswordReset,
+      confirmPasswordReset,
       signOut,
       retryRoles,
       hasRole,
@@ -362,6 +374,7 @@ export function SessionProvider({
       signIn,
       register,
       requestPasswordReset,
+      confirmPasswordReset,
       signOut,
       retryRoles,
       hasRole,

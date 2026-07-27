@@ -35,6 +35,7 @@ export type {
   RegisterPersonRequest,
   RegisterResponse,
   ForgotPasswordRequest,
+  ResetPasswordRequest,
 } from './auth-contract';
 // `Role` enum (runtime value) — RBAC gating compares against these, not strings.
 export { Role } from './auth-contract';

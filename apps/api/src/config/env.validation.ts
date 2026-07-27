@@ -18,6 +18,11 @@ export const envSchema = z.object({
   // it from process.env and break `pnpm --filter api dev`.
   DATABASE_URL_APP: z.string().url(),
   REDIS_URL: z.string().url(),
+  // T-110 (auth/RF05): base URL of the web app, used to build the clickable
+  // password-reset link emailed to users ({WEB_BASE_URL}/reset-password?token=…).
+  // Defaults to the Vite dev server so local dev works without extra config; set
+  // it to the real public origin in production.
+  WEB_BASE_URL: z.string().url().default('http://localhost:5173'),
   // T-109 (notifications): which NotificationPort adapter to bind. `log` = stub
   // that only logs (default; tests/dev never send). `smtp` = real email via
   // SMTP. Swap happens in NotificationModule, no consumer changes. When `smtp`,

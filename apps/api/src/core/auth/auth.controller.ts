@@ -6,6 +6,7 @@ import type {
   AuthenticatedUser,
   LoginDto,
   LogoutDto,
+  PasswordResetConfirmDto,
   PasswordResetRequestDto,
   RefreshDto,
   RegisterOrganizationDto,
@@ -18,6 +19,7 @@ import type { RequestUser } from './auth.types';
 import {
   loginSchema,
   logoutSchema,
+  passwordResetConfirmSchema,
   passwordResetRequestSchema,
   refreshSchema,
   registerOrganizationSchema,
@@ -78,6 +80,18 @@ export class AuthController {
     @Body(new ZodValidationPipe(passwordResetRequestSchema)) dto: PasswordResetRequestDto,
   ): Promise<void> {
     await this.auth.requestPasswordReset(dto.email);
+  }
+
+  // Consume the single-use token from the emailed link and set the new password.
+  // Tightly throttled (like the request endpoint) to blunt brute-forcing the
+  // token. 204 on success; a bad/expired/used token → generic 400.
+  @Post('password-reset/confirm')
+  @HttpCode(204)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  async confirmPasswordReset(
+    @Body(new ZodValidationPipe(passwordResetConfirmSchema)) dto: PasswordResetConfirmDto,
+  ): Promise<void> {
+    await this.auth.confirmPasswordReset(dto.token, dto.password);
   }
 
   @Get('me')

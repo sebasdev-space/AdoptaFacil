@@ -37,3 +37,10 @@ export const logoutSchema = z.object({
 export const passwordResetRequestSchema = z.object({
   email,
 });
+
+// Same password-strength policy as registration (reuses `password` above), so a
+// reset can never set a credential weaker than what registration would accept.
+export const passwordResetConfirmSchema = z.object({
+  token: z.string().min(1).max(512),
+  password,
+});
