@@ -1,3 +1,32 @@
-// Module: campaigns · Owner: @sebastian (Ola 0)
-// TODO: models defined by @sebastian. Every business model MUST carry
-// organization_id and enable RLS following the _rls_probe reference in org.prisma.
+// Module: campaigns (M06) · Owner: @sebastian
+// Fundraising campaigns (RF15). Tenant-scoped (organization_id + RLS
+// ENABLE+FORCE + tenant_isolation), mirroring the _rls_probe reference in
+// org.prisma. Public exposure goes through a SECURITY DEFINER function (only
+// public columns), never a raw cross-tenant select.
+//
+// NOTE (module boundary): the FK to `organizations` is NOT modeled as a Prisma
+// @relation (that would edit another owner's Organization model in org.prisma).
+// `organizationId` is a plain scalar; the FK (ON DELETE CASCADE) is declared in
+// the T-053 migration SQL (same pattern as T-104/T-105).
+
+/// Fundraising campaign (RF15, §9 M06). Money in INTEGER COP pesos. `raised_amount`
+/// stays 0 until real donations land (T-055); progress is DERIVED in the API,
+/// never stored. Campaigns are soft-managed via `status` (cancelled), never
+/// physically deleted by the app role.
+model Campaign {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  title          String
+  description    String?
+  category       String
+  goalAmount     Int      @map("goal_amount")
+  raisedAmount   Int      @default(0) @map("raised_amount")
+  deadline       DateTime
+  status         String   @default("active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@map("campaigns")
+}
