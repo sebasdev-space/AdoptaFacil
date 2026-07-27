@@ -18,8 +18,25 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+function blobResponse(
+  bytes: string,
+  status = 200,
+  contentType = 'application/octet-stream',
+): Response {
+  // Pass the body as a string (not a Blob): in this test env `new Response(blob)`
+  // stringifies the Blob. `.blob()` then yields a Blob of these bytes + type.
+  return new Response(bytes, {
+    status,
+    headers: { 'Content-Type': contentType },
+  });
+}
+
 function authHeader(init: RequestInit | undefined): string | null {
   return new Headers(init?.headers).get('Authorization');
+}
+
+function acceptHeader(init: RequestInit | undefined): string | null {
+  return new Headers(init?.headers).get('Accept');
 }
 
 function seededStore() {
@@ -169,5 +186,106 @@ describe('ApiClient refresh interceptor', () => {
 
     await client.request('/public');
     expect(authHeader(fetchFn.mock.calls[0]?.[1])).toBeNull();
+  });
+
+  it('JSON requests still default the Accept header to application/json (no regression)', async () => {
+    const fetchFn = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ ok: true }, 200));
+    const client = new ApiClient({
+      baseUrl: 'http://api.test',
+      tokenStore: new InMemoryTokenStore(),
+      refreshTokens: vi.fn(),
+      fetchFn,
+    });
+    await client.request('/x');
+    expect(acceptHeader(fetchFn.mock.calls[0]?.[1])).toBe('application/json');
+  });
+});
+
+describe('ApiClient.requestBlob (authenticated binary download, T-056)', () => {
+  it('returns a Blob with the JWT attached and does NOT parse JSON', async () => {
+    const tokenStore = seededStore();
+    const fetchFn = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(blobResponse('%PDF-1.7 bytes', 200, 'application/pdf'));
+
+    const client = new ApiClient({
+      baseUrl: 'http://api.test',
+      tokenStore,
+      refreshTokens: vi.fn(),
+      fetchFn,
+    });
+
+    const blob = await client.requestBlob('/storage/private?key=doc-1');
+    // Assert "blob-idad" by PROPERTY, never `instanceof Blob`: the response Blob is
+    // from a different realm than the global Blob in CI, so instanceof is flaky
+    // (and jsdom's Blob lacks .text()/.arrayBuffer()). size/type are the universal
+    // Blob props and prove this is the served binary, not a JSON-parsed object.
+    expect(blob.size).toBe(14);
+    expect(blob.type).toBe('application/pdf');
+    // Same auth as JSON requests; binary Accept (not application/json).
+    expect(authHeader(fetchFn.mock.calls[0]?.[1])).toBe('Bearer old-access');
+    expect(acceptHeader(fetchFn.mock.calls[0]?.[1])).toContain('application/octet-stream');
+  });
+
+  it('refreshes on 401 and retries, then returns the Blob (same flow as request)', async () => {
+    const tokenStore = seededStore();
+    const fetchFn = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ error: 'expired' }, 401))
+      .mockResolvedValueOnce(blobResponse('BYTES', 200));
+    const refreshTokens = vi.fn().mockResolvedValue(NEW_TOKENS);
+
+    const client = new ApiClient({
+      baseUrl: 'http://api.test',
+      tokenStore,
+      refreshTokens,
+      fetchFn,
+    });
+
+    const blob = await client.requestBlob('/storage/private?key=doc-1');
+    expect(blob.size).toBe(5);
+    expect(blob.type).toBe('application/octet-stream');
+    expect(refreshTokens).toHaveBeenCalledTimes(1);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(authHeader(fetchFn.mock.calls[1]?.[1])).toBe('Bearer new-access');
+  });
+
+  it('propagates a typed ApiError on 403/404 (never a failed JSON.parse)', async () => {
+    const tokenStore = seededStore();
+    const fetchFn = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(jsonResponse({ code: 'forbidden', message: 'sin permiso' }, 403));
+
+    const client = new ApiClient({
+      baseUrl: 'http://api.test',
+      tokenStore,
+      refreshTokens: vi.fn(),
+      fetchFn,
+    });
+
+    await expect(client.requestBlob('/storage/private?key=doc-1')).rejects.toMatchObject({
+      status: 403,
+      code: 'forbidden',
+    });
+  });
+
+  it('uses the bound global fetch by default (no "Illegal invocation" — #31 guard)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(blobResponse('OK', 200))),
+    );
+    try {
+      const client = new ApiClient({
+        baseUrl: 'http://api.test',
+        tokenStore: new InMemoryTokenStore(),
+        refreshTokens: vi.fn(),
+        // No fetchFn → exercises globalThis.fetch.bind(globalThis).
+      });
+      const blob = await client.requestBlob('/storage/public?key=logo');
+      expect(blob.size).toBe(2);
+      expect(blob.type).toBe('application/octet-stream');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
