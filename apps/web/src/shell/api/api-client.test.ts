@@ -216,8 +216,10 @@ describe('ApiClient.requestBlob (authenticated binary download, T-056)', () => {
     });
 
     const blob = await client.requestBlob('/storage/private?key=doc-1');
-    expect(blob).toBeInstanceOf(Blob);
-    // A Blob was returned (not JSON-parsed): non-empty binary of the served type.
+    // Assert "blob-idad" by PROPERTY, never `instanceof Blob`: the response Blob is
+    // from a different realm than the global Blob in CI, so instanceof is flaky
+    // (and jsdom's Blob lacks .text()/.arrayBuffer()). size/type are the universal
+    // Blob props and prove this is the served binary, not a JSON-parsed object.
     expect(blob.size).toBe(14);
     expect(blob.type).toBe('application/pdf');
     // Same auth as JSON requests; binary Accept (not application/json).
@@ -241,8 +243,8 @@ describe('ApiClient.requestBlob (authenticated binary download, T-056)', () => {
     });
 
     const blob = await client.requestBlob('/storage/private?key=doc-1');
-    expect(blob).toBeInstanceOf(Blob);
     expect(blob.size).toBe(5);
+    expect(blob.type).toBe('application/octet-stream');
     expect(refreshTokens).toHaveBeenCalledTimes(1);
     expect(fetchFn).toHaveBeenCalledTimes(2);
     expect(authHeader(fetchFn.mock.calls[1]?.[1])).toBe('Bearer new-access');
@@ -280,8 +282,8 @@ describe('ApiClient.requestBlob (authenticated binary download, T-056)', () => {
         // No fetchFn → exercises globalThis.fetch.bind(globalThis).
       });
       const blob = await client.requestBlob('/storage/public?key=logo');
-      expect(blob).toBeInstanceOf(Blob);
       expect(blob.size).toBe(2);
+      expect(blob.type).toBe('application/octet-stream');
     } finally {
       vi.unstubAllGlobals();
     }
