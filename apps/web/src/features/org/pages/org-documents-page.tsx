@@ -21,6 +21,12 @@ import { PageContainer, PageHeader } from '../../_layout';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
 import { TextField } from '../components/profile-fields';
+import {
+  DOCUMENT_ACCEPT,
+  downloadPrivateFile,
+  uploadFileBytes,
+  validateUpload,
+} from '../lib/storage';
 
 const TYPE_LABELS: Record<DocumentType, string> = {
   [DocumentType.ExistenceRepresentationCertificate]: 'Certificado de existencia y representación',
@@ -62,9 +68,10 @@ export function OrgDocumentsPage() {
   const [verification, setVerification] = useState<VerificationLevel | null>(null);
   const [loading, setLoading] = useState(true);
   const [type, setType] = useState<DocumentType>(DocumentType.Rut);
-  const [filename, setFilename] = useState('');
+  const [file, setFile] = useState<File | null>(null);
   const [expiresAt, setExpiresAt] = useState('');
   const [saving, setSaving] = useState(false);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   const load = async (): Promise<void> => {
     const [docs, level] = await Promise.all([
@@ -98,25 +105,33 @@ export function OrgDocumentsPage() {
   }, [client]);
 
   const submit = async (): Promise<void> => {
-    if (!filename.trim()) {
+    if (!file) {
       toast({
         title: 'Archivo requerido',
-        description: 'Indica el nombre del archivo.',
+        description: 'Selecciona un archivo (PDF o imagen).',
         variant: 'warning',
       });
       return;
     }
+    const invalid = validateUpload(file, DOCUMENT_ACCEPT);
+    if (invalid) {
+      toast({ title: 'Archivo no válido', description: invalid, variant: 'warning' });
+      return;
+    }
     setSaving(true);
     try {
-      await client.request<UploadOrganizationDocumentResult>('/org/documents', {
+      // 1) Reserve the versioned document + a private storage key (T-103).
+      const reserved = await client.request<UploadOrganizationDocumentResult>('/org/documents', {
         method: 'POST',
         json: {
           type,
-          filename: filename.trim(),
+          filename: file.name,
           ...(expiresAt ? { expiresAt: new Date(expiresAt).toISOString() } : {}),
         },
       });
-      setFilename('');
+      // 2) Send the real bytes to the reserved key (T-108).
+      await uploadFileBytes(client, reserved.upload.key, file);
+      setFile(null);
       setExpiresAt('');
       await load();
       toast({ title: 'Documento subido', description: 'Nueva versión enviada a revisión.' });
@@ -128,6 +143,22 @@ export function OrgDocumentsPage() {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const download = async (doc: OrganizationDocument): Promise<void> => {
+    setDownloading(doc.id);
+    try {
+      const name = doc.storageRef.split('/').pop() ?? `${doc.type}-v${doc.version}`;
+      await downloadPrivateFile(client, doc.storageRef, name);
+    } catch (error) {
+      toast({
+        title: 'No se pudo descargar',
+        description: error instanceof Error ? error.message : 'Inténtalo de nuevo.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloading(null);
     }
   };
 
@@ -183,7 +214,18 @@ export function OrgDocumentsPage() {
                     ))}
                   </select>
                 </div>
-                <TextField id="doc-file" label="Archivo" value={filename} onChange={setFilename} />
+                <div className="space-y-1.5">
+                  <label htmlFor="doc-file" className="block text-sm font-medium text-foreground">
+                    Archivo (PDF o imagen, máx. {15} MB)
+                  </label>
+                  <input
+                    id="doc-file"
+                    type="file"
+                    accept={DOCUMENT_ACCEPT.join(',')}
+                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                    className="block w-full text-sm text-foreground file:mr-3 file:rounded-md file:border file:border-input file:bg-background file:px-3 file:py-1.5 file:text-sm"
+                  />
+                </div>
                 <TextField
                   id="doc-expires"
                   label="Vence (opcional)"
@@ -220,6 +262,14 @@ export function OrgDocumentsPage() {
                         Vence: {formatCO(doc.expiresAt)}
                         {doc.reviewNote && ` · Observación: ${doc.reviewNote}`}
                       </p>
+                      <Button
+                        variant="outline"
+                        className="mt-2"
+                        disabled={downloading === doc.id}
+                        onClick={() => void download(doc)}
+                      >
+                        Descargar
+                      </Button>
                     </li>
                   ))}
                 </ul>
