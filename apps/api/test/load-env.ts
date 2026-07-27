@@ -6,6 +6,12 @@ import { join } from 'node:path';
  * overriding variables already present (so CI-provided values win). No dotenv
  * dependency — a tiny KEY=VALUE parser that also strips surrounding quotes.
  */
+// T-108: integration tests run on the in-memory storage stub (no real files on
+// disk). The disk adapter has its own unit + integration coverage that overrides
+// STORAGE_PORT explicitly, so forcing the stub here keeps the rest of the suite
+// filesystem-free and deterministic.
+process.env.STORAGE_DRIVER = 'stub';
+
 const envPath = join(__dirname, '..', '..', '..', '.env');
 if (existsSync(envPath)) {
   for (const rawLine of readFileSync(envPath, 'utf8').split(/\r?\n/)) {
