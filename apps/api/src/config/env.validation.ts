@@ -18,7 +18,19 @@ export const envSchema = z.object({
   // it from process.env and break `pnpm --filter api dev`.
   DATABASE_URL_APP: z.string().url(),
   REDIS_URL: z.string().url(),
-  NOTIFICATION_DRIVER: z.enum(['log']).default('log'),
+  // T-109 (notifications): which NotificationPort adapter to bind. `log` = stub
+  // that only logs (default; tests/dev never send). `smtp` = real email via
+  // SMTP. Swap happens in NotificationModule, no consumer changes. When `smtp`,
+  // the SMTP_* vars below are REQUIRED (fail-fast, see the refine).
+  NOTIFICATION_DRIVER: z.enum(['log', 'smtp']).default('log'),
+  // SMTP credentials — read ONLY from env; never hardcoded, never committed.
+  // Optional at the schema level so `log` mode boots without them; the refine
+  // enforces their presence when the driver is `smtp`.
+  SMTP_HOST: z.string().min(1).optional(),
+  SMTP_PORT: z.coerce.number().int().positive().optional(),
+  SMTP_USER: z.string().min(1).optional(),
+  SMTP_PASS: z.string().min(1).optional(),
+  SMTP_FROM: z.string().min(1).optional(),
   // T-106 (M03/RF09): interval of the repeatable clinical-reminders scan job.
   // Configurable for dev/test; defaults to daily. Kept in the validated schema so
   // it survives @nestjs/config (which only re-exposes validated keys).
@@ -42,14 +54,39 @@ export const envSchema = z.object({
   PAYMENT_DRIVER: z.enum(['fake', 'wompi']).default('fake'),
 });
 
+/** Runtime config type (from the base object schema). */
 export type Env = z.infer<typeof envSchema>;
+
+/** SMTP vars required when NOTIFICATION_DRIVER=smtp (fail-fast at boot, T-109). */
+const REQUIRED_SMTP_KEYS = [
+  'SMTP_HOST',
+  'SMTP_PORT',
+  'SMTP_USER',
+  'SMTP_PASS',
+  'SMTP_FROM',
+] as const;
+
+/** The validated schema + cross-field rules (fail-fast for smtp credentials). */
+export const validatedEnvSchema = envSchema.superRefine((env, ctx) => {
+  if (env.NOTIFICATION_DRIVER === 'smtp') {
+    for (const key of REQUIRED_SMTP_KEYS) {
+      if (env[key] === undefined || env[key] === null || env[key] === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `${key} is required when NOTIFICATION_DRIVER=smtp`,
+        });
+      }
+    }
+  }
+});
 
 /**
  * @nestjs/config `validate` hook. Throws a readable error listing every
  * offending variable so a misconfigured environment fails fast and loud.
  */
 export function validateEnv(config: Record<string, unknown>): Env {
-  const parsed = envSchema.safeParse(config);
+  const parsed = validatedEnvSchema.safeParse(config);
   if (!parsed.success) {
     const issues = parsed.error.issues
       .map((issue) => `  - ${issue.path.join('.') || '(root)'}: ${issue.message}`)
