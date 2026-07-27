@@ -1,7 +1,16 @@
 import { useMemo, useState } from 'react';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import type { Donation } from '@adoptafacil/contracts';
-import { Card, CardContent, CardHeader, CardTitle, EmptyState, useToast } from '@adoptafacil/ui';
+import {
+  buttonVariants,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  cn,
+  EmptyState,
+  useToast,
+} from '@adoptafacil/ui';
 import { PageContainer, PageHeader } from '../../_layout';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
@@ -96,10 +105,28 @@ export function DonatePage() {
         </CardHeader>
         <CardContent>
           {done ? (
-            <EmptyState
-              title="¡Gracias por tu donación!"
-              description={`Registramos tu donación de ${formatCop(done.amountCharged)}. Cuando el pago se confirme, te emitiremos el recibo automáticamente.`}
-            />
+            <div className="space-y-4">
+              <EmptyState
+                title="¡Gracias por tu donación!"
+                description={`Registramos tu donación de ${formatCop(done.amountCharged)}. Cuando el pago se confirme, te emitiremos el recibo automáticamente.`}
+              />
+              {/* Empalme al recorrido del certificado (§M05/RF14, T-053). Solo un
+                  ENLACE: la lógica de donación no cambia. Lleva la donación real por
+                  nav-state para reflejar donante/monto en la maqueta del certificado. */}
+              <div className="flex flex-col items-center gap-1 text-center">
+                <Link
+                  to="/certificado"
+                  state={{ donation: done }}
+                  className={cn(buttonVariants())}
+                  data-testid="view-certificate-cta"
+                >
+                  Ver tu certificado de donación
+                </Link>
+                <p className="text-xs text-muted-foreground">
+                  Vista de diseño: anticipo del certificado verificable (RF14).
+                </p>
+              </div>
+            </div>
           ) : (
             <DonateForm
               organizationName={target.organizationName}
