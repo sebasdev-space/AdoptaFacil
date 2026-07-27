@@ -141,6 +141,16 @@ describe('routing — public vs protected', () => {
     expect(screen.getByText('Firulais')).toBeInTheDocument();
   });
 
+  it('serves /campanas as a PUBLIC campaigns portal without a session (T-055)', async () => {
+    // No redirect to login: the campaigns portal is public (like /o/:slug). The
+    // beforeEach fetch stub resolves to a non-list body → normalized empty state.
+    renderShell({ route: '/campanas', session: { initialStatus: 'unauthenticated' } });
+    expect(
+      await screen.findByRole('heading', { name: 'Campañas de recaudación' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Iniciar sesión' })).not.toBeInTheDocument();
+  });
+
   it('after signing in from /login, returns to the originally requested route', async () => {
     const user = userEvent.setup();
     // Start unauthenticated, deep-link to a protected route → bounced to /login.
