@@ -20,6 +20,7 @@ import {
 import { PageContainer, PageHeader } from '../../_layout';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
+import { PHOTO_ACCEPT, uploadFileBytes, validateUpload } from '../lib/storage';
 
 const SPECIES_LABELS: Record<AnimalSpecies, string> = {
   dog: 'Perro',
@@ -54,7 +55,7 @@ export function AnimalsPage() {
   const [name, setName] = useState('');
   const [species, setSpecies] = useState<AnimalSpecies>('dog');
   const [birthDate, setBirthDate] = useState('');
-  const [photo, setPhoto] = useState('');
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
   const load = async (): Promise<void> => {
@@ -83,6 +84,13 @@ export function AnimalsPage() {
       toast({ title: 'Nombre requerido', variant: 'warning' });
       return;
     }
+    if (photoFile) {
+      const invalid = validateUpload(photoFile);
+      if (invalid) {
+        toast({ title: 'Imagen no válida', description: invalid, variant: 'warning' });
+        return;
+      }
+    }
     setSaving(true);
     try {
       const body: CreateAnimalInput = {
@@ -91,12 +99,18 @@ export function AnimalsPage() {
         sex: 'unknown',
         size: 'medium',
         ...(birthDate ? { birthDate: new Date(birthDate).toISOString() } : {}),
-        ...(photo.trim() ? { photos: [{ filename: photo.trim() }] } : {}),
+        ...(photoFile ? { photos: [{ filename: photoFile.name }] } : {}),
       };
-      await client.request<Animal>('/animals', { method: 'POST', json: body });
+      // 1) Create the record (reserves a public storage key per photo, T-104).
+      const created = await client.request<Animal>('/animals', { method: 'POST', json: body });
+      // 2) Send the real photo bytes to the reserved key (T-108).
+      const key = created.photoRecords?.[0]?.storageRef;
+      if (photoFile && key) {
+        await uploadFileBytes(client, key, photoFile);
+      }
       setName('');
       setBirthDate('');
-      setPhoto('');
+      setPhotoFile(null);
       await load();
       toast({ title: 'Expediente creado' });
     } catch (error) {
@@ -162,11 +176,21 @@ export function AnimalsPage() {
                   value={birthDate}
                   onChange={(e) => setBirthDate(e.target.value)}
                 />
-                <Input
-                  placeholder="Foto (nombre de archivo)"
-                  value={photo}
-                  onChange={(e) => setPhoto(e.target.value)}
-                />
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="animal-photo"
+                    className="block text-sm font-medium text-foreground"
+                  >
+                    Foto (imagen, máx. {15} MB)
+                  </label>
+                  <input
+                    id="animal-photo"
+                    type="file"
+                    accept={PHOTO_ACCEPT.join(',')}
+                    onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
+                    className="block w-full text-sm text-foreground file:mr-3 file:rounded-md file:border file:border-input file:bg-background file:px-3 file:py-1.5 file:text-sm"
+                  />
+                </div>
                 <Button disabled={saving} onClick={() => void submit()}>
                   Crear expediente
                 </Button>
@@ -186,6 +210,13 @@ export function AnimalsPage() {
                   {animals.map((animal) => (
                     <li key={animal.id} className="border-b pb-2 text-sm last:border-b-0">
                       <div className="flex flex-wrap items-center gap-2">
+                        {animal.photos[0] && (
+                          <img
+                            src={animal.photos[0]}
+                            alt={animal.name}
+                            className="h-10 w-10 rounded object-cover"
+                          />
+                        )}
                         <span className="font-medium">{animal.name}</span>
                         <Badge variant="secondary">{SPECIES_LABELS[animal.species]}</Badge>
                         <Badge>{animal.status}</Badge>
