@@ -11,12 +11,13 @@ import {
   type NormalizedWebhookEvent,
   type PaymentBreakdown,
   type PaymentConcept,
+  type PaymentPort,
 } from '@adoptafacil/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../core/tenant/tenant-context.service';
 import { AuditService } from '../../core/audit/audit.service';
+import { PAYMENT_PORT } from '../../core/payments/payment.port';
 import type { RequestUser } from '../../core/auth/auth.types';
-import { PAYMENT_PORT, type PaymentPort } from './payment.token';
 
 /** Row shape returned by the SECURITY DEFINER donation functions (snake_case). */
 interface DonationRow {
