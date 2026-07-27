@@ -1,4 +1,8 @@
-import type { CampaignPublic, Paginated } from '@adoptafacil/contracts';
+import type {
+  CampaignAccountabilityReport,
+  CampaignPublic,
+  Paginated,
+} from '@adoptafacil/contracts';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
@@ -52,4 +56,29 @@ export async function getPublicCampaign(
   if (response.status === 404) return null;
   if (!response.ok) throw new Error('error');
   return (await response.json()) as CampaignPublic;
+}
+
+/**
+ * Reporte PÚBLICO de rendición de cuentas de una campaña (RF16 · T-054):
+ * `GET /public/campaigns/:id/accountability` (columnas públicas: evidencias +
+ * suma de gasto declarado). Sin token. `null` si la campaña no existe o está
+ * cancelada (404).
+ *
+ * ⚠️ Blindaje anti-regresión: SIEMPRE se normaliza `.evidences` a `[]` si no es
+ * un array, para que ningún consumidor haga `.map` sobre un no-array.
+ */
+export async function getCampaignAccountability(
+  id: string,
+  signal?: AbortSignal,
+): Promise<CampaignAccountabilityReport | null> {
+  const url = `${API_BASE}/public/campaigns/${encodeURIComponent(id)}/accountability`;
+  const response = await fetch(url, signal ? { signal } : undefined);
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error('error');
+  const body = (await response.json()) as CampaignAccountabilityReport;
+  return {
+    ...body,
+    evidences: Array.isArray(body?.evidences) ? body.evidences : [],
+    totalSpent: typeof body?.totalSpent === 'number' ? body.totalSpent : 0,
+  };
 }

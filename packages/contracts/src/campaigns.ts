@@ -121,3 +121,116 @@ export interface Paginated<T> {
   limit: number;
   offset: number;
 }
+
+// ============================================================================
+// Accountability / rendición de cuentas (RF16, §9 M06) — T-054. An organization
+// uploads spending evidences (invoices/receipts/proofs/photos) against a
+// campaign; the public accountability report shows what was spent, with the
+// evidences. Files go through StoragePort as PUBLIC objects (the donor must see
+// them). Amounts are INTEGER COP pesos. This slice does NOT wire real raised
+// amounts (that is T-055): the report shows declared spending only, never a
+// fabricated "executed %" against a still-zero raised amount.
+// ============================================================================
+
+/**
+ * Kind of spending evidence — CLOSED list (RF16 spirit). Stable string values.
+ * - `invoice` — factura
+ * - `receipt` — recibo / comprobante de pago
+ * - `proof`   — soporte / constancia
+ * - `photo`   — foto de la ejecución (may carry no amount)
+ */
+export enum CampaignEvidenceType {
+  Invoice = 'invoice',
+  Receipt = 'receipt',
+  Proof = 'proof',
+  Photo = 'photo',
+}
+
+/** Allowed evidence types, exported for validation and UI. */
+export const CAMPAIGN_EVIDENCE_TYPES: readonly CampaignEvidenceType[] = [
+  CampaignEvidenceType.Invoice,
+  CampaignEvidenceType.Receipt,
+  CampaignEvidenceType.Proof,
+  CampaignEvidenceType.Photo,
+];
+
+/**
+ * A spending evidence attached to a campaign (internal projection). `amount` is
+ * integer COP pesos and OPTIONAL (a photo may carry no monetary value).
+ * `storageRef` is the opaque public storage key; timestamps are ISO-8601 UTC.
+ */
+export interface CampaignEvidence {
+  id: string;
+  organizationId: string;
+  campaignId: string;
+  type: CampaignEvidenceType;
+  concept: string;
+  /** Declared spending in integer COP pesos (> 0); absent for e.g. photos. */
+  amount?: number;
+  /** ISO-8601 UTC date the money was spent. */
+  spentAt: string;
+  /** Opaque PUBLIC storage key of the uploaded file. */
+  storageRef: string;
+  /** Display order within the campaign's evidence list. */
+  order: number;
+  /** ISO-8601 UTC. */
+  createdAt: string;
+}
+
+/** Create a spending evidence. The file bytes are PUT to the returned upload
+ *  target afterwards (same two-step flow as animal photos). */
+export interface CreateCampaignEvidenceInput {
+  type: CampaignEvidenceType;
+  concept: string;
+  /** Integer COP pesos, > 0. Omit for a photo without a monetary value. */
+  amount?: number;
+  /** ISO-8601 UTC. */
+  spentAt: string;
+  filename: string;
+  contentType?: string;
+  order?: number;
+}
+
+/** Patch a spending evidence (business fields only; the file is immutable). */
+export interface UpdateCampaignEvidenceInput {
+  type?: CampaignEvidenceType;
+  concept?: string;
+  amount?: number;
+  spentAt?: string;
+  order?: number;
+}
+
+/** Returned on evidence creation: the row plus the target to PUT the bytes to. */
+export interface CampaignEvidenceUploadResult {
+  evidence: CampaignEvidence;
+  upload: { url: string; key: string };
+}
+
+/**
+ * Public projection of an evidence (public columns only — no internal ids beyond
+ * the evidence id). `url` resolves the public file for the donor to open.
+ */
+export interface CampaignEvidencePublic {
+  id: string;
+  type: CampaignEvidenceType;
+  concept: string;
+  amount?: number;
+  spentAt: string;
+  storageRef: string;
+  /** Public serve URL for the file. */
+  url: string;
+  order: number;
+}
+
+/**
+ * Public accountability report of a campaign (RF16): the public campaign, its
+ * public evidences, and the SUM of declared spending (integer COP). Never
+ * exposes internal data nor evidences of cancelled campaigns. It does NOT claim
+ * an "executed %" — the relation to raised funds is wired in T-055.
+ */
+export interface CampaignAccountabilityReport {
+  campaign: CampaignPublic;
+  evidences: CampaignEvidencePublic[];
+  /** Sum of declared spending across the evidences, in integer COP pesos. */
+  totalSpent: number;
+}

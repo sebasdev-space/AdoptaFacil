@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import type { CampaignPublic } from '@adoptafacil/contracts';
+import type { CampaignAccountabilityReport, CampaignPublic } from '@adoptafacil/contracts';
 import {
   Badge,
   Card,
@@ -10,10 +10,11 @@ import {
   EmptyState,
   Skeleton,
 } from '@adoptafacil/ui';
-import { getPublicCampaign } from '../api/public-campaigns';
+import { getCampaignAccountability, getPublicCampaign } from '../api/public-campaigns';
 import { CampaignProgress } from '../components/campaign-progress';
 import {
   CATEGORY_LABELS,
+  EVIDENCE_TYPE_LABELS,
   STATUS_LABELS,
   campaignStatusVariant,
   formatBogota,
@@ -40,6 +41,7 @@ export function PublicCampaignDetailPage() {
 
   const [campaign, setCampaign] = useState<CampaignPublic | null>(preloaded ?? null);
   const [state, setState] = useState<DetailState>(preloaded ? 'ready' : 'loading');
+  const [report, setReport] = useState<CampaignAccountabilityReport | null>(null);
 
   useEffect(() => {
     if (preloaded || !id) {
@@ -60,6 +62,24 @@ export function PublicCampaignDetailPage() {
       active = false;
     };
   }, [preloaded, id]);
+
+  // Accountability report (RF16) — loaded independently of the campaign detail so
+  // it works both on deep links and when the campaign came via nav-state. A
+  // failure/404 simply leaves the section empty (never breaks the page).
+  useEffect(() => {
+    if (!id) return;
+    let active = true;
+    getCampaignAccountability(id)
+      .then((found) => {
+        if (active) setReport(found);
+      })
+      .catch(() => {
+        if (active) setReport(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [id]);
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
@@ -109,6 +129,60 @@ export function PublicCampaignDetailPage() {
                   <dd className="text-sm">{formatBogota(campaign.deadline)}</dd>
                 </div>
               </dl>
+
+              {/* Rendición de cuentas (RF16 · T-054): evidencias públicas de gasto
+                  + suma declarada. NO se muestra "% ejecutado" (el recaudo real
+                  llega en T-055); solo lo cargado y su total. */}
+              <section aria-labelledby="accountability-heading" className="border-t pt-6">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h2 id="accountability-heading" className="text-sm font-semibold">
+                    Rendición de cuentas
+                  </h2>
+                  {report && report.evidences.length > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      Gasto declarado:{' '}
+                      <span className="font-medium text-foreground">
+                        {formatCop(report.totalSpent)}
+                      </span>
+                    </span>
+                  )}
+                </div>
+
+                {report && report.evidences.length > 0 ? (
+                  <ul className="mt-4 space-y-3" data-testid="accountability-evidences">
+                    {report.evidences.map((evidence) => (
+                      <li
+                        key={evidence.id}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="flex items-center gap-2 text-sm font-medium">
+                            <Badge variant="secondary">{EVIDENCE_TYPE_LABELS[evidence.type]}</Badge>
+                            <span className="truncate">{evidence.concept}</span>
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatBogota(evidence.spentAt)}
+                            {typeof evidence.amount === 'number' &&
+                              ` · ${formatCop(evidence.amount)}`}
+                          </p>
+                        </div>
+                        <a
+                          href={evidence.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-primary hover:underline"
+                        >
+                          Ver soporte
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    Esta campaña aún no ha publicado evidencias de rendición.
+                  </p>
+                )}
+              </section>
             </CardContent>
           </Card>
         )}
