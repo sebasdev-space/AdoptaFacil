@@ -80,6 +80,7 @@ function fakeAuthApi(accountType: 'organization' | 'person'): AuthApi {
     login: async () => session,
     register: async () => session,
     requestPasswordReset: async () => {},
+    confirmPasswordReset: async () => {},
     refresh: async () => TOKENS,
     logout: async () => {},
     me: async () => session.user,

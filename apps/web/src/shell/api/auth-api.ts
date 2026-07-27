@@ -6,6 +6,7 @@ import type {
   LoginResponse,
   RegisterRequest,
   RegisterResponse,
+  ResetPasswordRequest,
   Role,
 } from './auth-contract';
 import type { ApiClient } from './api-client';
@@ -23,6 +24,12 @@ export interface AuthApi {
   register(request: RegisterRequest): Promise<RegisterResponse>;
   /** Request a password reset. Resolves with no body (202); never enumerates. */
   requestPasswordReset(request: ForgotPasswordRequest): Promise<void>;
+  /**
+   * Confirm a password reset with the single-use token from the emailed link and
+   * the new password. Resolves with no body (204); rejects (400) if the token is
+   * invalid/expired/used or the password is too weak.
+   */
+  confirmPasswordReset(request: ResetPasswordRequest): Promise<void>;
   /** Exchange a refresh token for a fresh pair (no access token required). */
   refresh(refreshToken: string): Promise<AuthTokens>;
   /** Best-effort server-side revocation; must not throw for the caller. */
@@ -106,6 +113,17 @@ export class HttpAuthApi implements AuthApi {
       jsonRequestInit('POST', request),
     );
     // 202 Accepted with no body; parseJsonResponse throws on non-2xx.
+    await parseJsonResponse<void>(response);
+  }
+
+  async confirmPasswordReset(request: ResetPasswordRequest): Promise<void> {
+    // Unauthenticated (the user forgot their password) → a plain fetch, never
+    // through the client's refresh interceptor.
+    const response = await this.fetchFn(
+      endpoint(this.baseUrl, '/auth/password-reset/confirm'),
+      jsonRequestInit('POST', request),
+    );
+    // 204 No Content on success; parseJsonResponse throws (→ ApiError) on non-2xx.
     await parseJsonResponse<void>(response);
   }
 

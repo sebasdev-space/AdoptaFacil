@@ -4,6 +4,7 @@ import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { purgeOrganizations } from './support/cleanup';
 
 /**
  * End-to-end auth flow over HTTP: register (both account types), login, refresh
@@ -29,10 +30,11 @@ describe('Auth endpoints (register/login/refresh/logout)', () => {
   });
 
   afterAll(async () => {
-    if (createdOrgIds.length > 0) {
-      // Cascade removes users, credentials, refresh and reset tokens.
-      await admin.organization.deleteMany({ where: { id: { in: createdOrgIds } } });
-    }
+    // The password-reset request now writes an append-only audit_logs row (T-110),
+    // whose immutability trigger blocks the org cascade DELETE (RNF04). Purge those
+    // rows under replica mode first (shared teardown helper), then the cascade
+    // removes users, credentials, refresh and reset tokens as before.
+    await purgeOrganizations(admin, createdOrgIds);
     await admin.$disconnect();
     await app?.close();
   });

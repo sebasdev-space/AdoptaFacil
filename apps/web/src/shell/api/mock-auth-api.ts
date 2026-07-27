@@ -6,6 +6,7 @@ import type {
   LoginResponse,
   RegisterRequest,
   RegisterResponse,
+  ResetPasswordRequest,
 } from './auth-contract';
 import { Role } from './auth-contract';
 import { ApiError } from './api-error';
@@ -125,6 +126,21 @@ export class MockAuthApi implements AuthApi {
     // Always resolves, regardless of whether the account exists (no enumeration).
     // The real backend returns 202 with no body; the generic confirmation copy
     // lives in the UI.
+    return Promise.resolve();
+  }
+
+  confirmPasswordReset(request: ResetPasswordRequest): Promise<void> {
+    // The mock can't map an email to a real emailed token; it mirrors the SHAPE
+    // of the backend instead. A token flagged invalid/expired is rejected with a
+    // generic 400 (as the backend does); any other non-empty token succeeds and
+    // updates the single seeded account's password so a follow-up login works.
+    if (!request.token || /invalid|expired|used/i.test(request.token)) {
+      return Promise.reject(
+        new ApiError(400, 'invalid_reset_token', 'El enlace no es válido o expiró'),
+      );
+    }
+    const [entry] = this.accounts.entries();
+    if (entry) this.accounts.set(entry[0], { ...entry[1], password: request.password });
     return Promise.resolve();
   }
 

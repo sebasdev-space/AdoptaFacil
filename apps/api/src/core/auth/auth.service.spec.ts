@@ -1,5 +1,8 @@
+import type { ConfigService } from '@nestjs/config';
+import type { AuditService } from '../audit/audit.service';
 import type { NotificationPort } from '../notifications/notification.port';
 import type { PrismaService } from '../../prisma/prisma.service';
+import type { Env } from '../../config/env.validation';
 import { AuthService } from './auth.service';
 import type { PasswordService } from './password.service';
 import type { TokenService } from './token.service';
@@ -45,7 +48,14 @@ function makeService(tx: TxMock): { service: AuthService; withOrgContext: jest.M
     }),
   } as unknown as TokenService;
   const notifications = { send: jest.fn() } as unknown as NotificationPort;
-  return { service: new AuthService(prisma, passwords, tokens, notifications), withOrgContext };
+  const audit = { record: jest.fn(), recordWithTx: jest.fn() } as unknown as AuditService;
+  const config = {
+    get: (key: string) => (key === 'WEB_BASE_URL' ? 'http://localhost:5173' : undefined),
+  } as unknown as ConfigService<Env, true>;
+  return {
+    service: new AuthService(prisma, passwords, tokens, notifications, audit, config),
+    withOrgContext,
+  };
 }
 
 describe('AuthService — Owner on organization registration (T-012b)', () => {

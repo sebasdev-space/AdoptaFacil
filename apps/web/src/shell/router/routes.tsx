@@ -4,7 +4,12 @@ import { AppLayout } from '../layout';
 import { ANIMAL_VIEW_ROLES, ORG_DOCUMENTS_ROLES, PLATFORM_DOCUMENTS_ROLES } from '../navigation';
 import { AnimalDetailPage } from '../pages/animal-detail-page';
 import { HomePage, NotFoundPage, PlaceholderPage } from '../../features/_layout';
-import { ForgotPasswordPage, LoginPage, RegisterPage } from '../../features/auth';
+import {
+  ForgotPasswordPage,
+  LoginPage,
+  RegisterPage,
+  ResetPasswordPage,
+} from '../../features/auth';
 import {
   OrgDocumentsPage,
   OrgFormalizationPage,
@@ -38,6 +43,10 @@ export function AppRoutes() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot" element={<ForgotPasswordPage />} />
+      {/* Public reset screen reached from the emailed link (M02 / RF05, T-110).
+          HANDOFF(@fabian): minimal shell route for the auth reset page (the page
+          itself lives in features/auth). Cross-review this single line. */}
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       {/* Public rich organization portal (§M14, T-026) — no auth, public fields
           only: real profile + placeholder sections wired per docs/TASKS.md. */}
       <Route path="/o/:slug" element={<OrgPublicPage />} />
