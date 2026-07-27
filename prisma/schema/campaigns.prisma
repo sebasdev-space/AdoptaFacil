@@ -26,7 +26,43 @@ model Campaign {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
+  evidences CampaignEvidence[]
+
   @@index([organizationId])
   @@index([organizationId, status])
   @@map("campaigns")
+}
+
+/// Spending evidence for accountability (RF16, §9 M06 · T-054): invoices,
+/// receipts, proofs and photos an org uploads to show HOW campaign money was
+/// used. Tenant-scoped (organization_id + RLS ENABLE+FORCE + tenant_isolation).
+/// Money in INTEGER COP pesos (`amount` optional — a photo may carry none). Files
+/// go through StoragePort as PUBLIC objects (donor must see them); only the
+/// storage ref + business metadata live here. Soft-managed via `deleted_at`
+/// (never physically deleted by the app role); edits/removals are audited.
+/// Public exposure goes through a SECURITY DEFINER function (public columns
+/// only), never a raw cross-tenant select.
+///
+/// NOTE (module boundary): the campaign FK is a Prisma @relation (intra-module);
+/// the FK to `organizations` is declared in the T-054 migration SQL (not as a
+/// @relation) to avoid editing org.prisma — another owner's file.
+model CampaignEvidence {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  campaignId     String    @map("campaign_id") @db.Uuid
+  type           String
+  concept        String
+  amount         Int?
+  spentAt        DateTime  @map("spent_at")
+  storageRef     String    @map("storage_ref")
+  order          Int       @default(0)
+  deletedAt      DateTime? @map("deleted_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([campaignId])
+  @@map("campaign_evidences")
 }

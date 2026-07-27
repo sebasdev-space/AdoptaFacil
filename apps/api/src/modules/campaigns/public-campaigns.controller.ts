@@ -1,5 +1,9 @@
 import { Controller, Get, NotFoundException, Param, ParseUUIDPipe, Query } from '@nestjs/common';
-import { type CampaignPublic, type Paginated } from '@adoptafacil/contracts';
+import {
+  type CampaignAccountabilityReport,
+  type CampaignPublic,
+  type Paginated,
+} from '@adoptafacil/contracts';
 import { PublicCampaignsService } from './public-campaigns.service';
 
 /**
@@ -26,5 +30,20 @@ export class PublicCampaignsController {
       throw new NotFoundException('Campaign not found');
     }
     return campaign;
+  }
+
+  /**
+   * Public accountability report (RF16): what the campaign declared it spent,
+   * with the evidences. No session; cancelled campaigns → 404.
+   */
+  @Get(':id/accountability')
+  async accountability(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<CampaignAccountabilityReport> {
+    const report = await this.service.getAccountability(id);
+    if (!report) {
+      throw new NotFoundException('Campaign not found');
+    }
+    return report;
   }
 }

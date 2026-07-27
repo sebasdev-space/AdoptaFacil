@@ -1,4 +1,4 @@
-import { CampaignCategory, CampaignStatus } from '@adoptafacil/contracts';
+import { CampaignCategory, CampaignEvidenceType, CampaignStatus } from '@adoptafacil/contracts';
 
 /** Etiquetas legibles (es-CO) de las categorías — enum CERRADO del contrato (§9 M06).
  *  No se inventan categorías fuera del enum. */
@@ -16,6 +16,14 @@ export const STATUS_LABELS: Record<CampaignStatus, string> = {
   [CampaignStatus.Active]: 'Activa',
   [CampaignStatus.Closed]: 'Finalizada',
   [CampaignStatus.Cancelled]: 'Cancelada',
+};
+
+/** Etiquetas legibles (es-CO) del tipo de evidencia de rendición (RF16, enum CERRADO). */
+export const EVIDENCE_TYPE_LABELS: Record<CampaignEvidenceType, string> = {
+  [CampaignEvidenceType.Invoice]: 'Factura',
+  [CampaignEvidenceType.Receipt]: 'Comprobante',
+  [CampaignEvidenceType.Proof]: 'Soporte',
+  [CampaignEvidenceType.Photo]: 'Foto',
 };
 
 /** Variante de badge semántica por estado. */
