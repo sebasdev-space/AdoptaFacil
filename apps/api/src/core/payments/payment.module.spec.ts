@@ -3,11 +3,23 @@ import { Test } from '@nestjs/testing';
 import { FakePaymentAdapter, type PaymentPort } from '@adoptafacil/contracts';
 import { PAYMENT_PORT } from './payment.port';
 import { PaymentModule } from './payment.module';
+import { WompiPaymentAdapter } from './wompi-payment.adapter';
 
 describe('PaymentModule (T-052)', () => {
   async function resolvePort(): Promise<PaymentPort> {
     const moduleRef = await Test.createTestingModule({
       imports: [ConfigModule.forRoot({ isGlobal: true }), PaymentModule],
+    }).compile();
+    return moduleRef.get<PaymentPort>(PAYMENT_PORT);
+  }
+
+  /** Isolated env (ignores the real .env) so the wompi-driver test is deterministic. */
+  async function resolvePortWithEnv(env: Record<string, string>): Promise<PaymentPort> {
+    const moduleRef = await Test.createTestingModule({
+      imports: [
+        ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: true, load: [() => env] }),
+        PaymentModule,
+      ],
     }).compile();
     return moduleRef.get<PaymentPort>(PAYMENT_PORT);
   }
@@ -45,5 +57,16 @@ describe('PaymentModule (T-052)', () => {
     });
     expect(p1.payoutId).toBe(p2.payoutId);
     expect(p1.status).toBe('scheduled');
+  });
+
+  it('binds PAYMENT_PORT to the WompiPaymentAdapter when PAYMENT_DRIVER=wompi (T-060)', async () => {
+    const port = await resolvePortWithEnv({
+      PAYMENT_DRIVER: 'wompi',
+      WOMPI_BASE_URL: 'https://sandbox.wompi.co/v1',
+      WOMPI_PUBLIC_KEY: 'pub_test_dummy',
+      WOMPI_PRIVATE_KEY: 'prv_test_dummy',
+      WOMPI_EVENTS_SECRET: 'test_events_dummy',
+    });
+    expect(port).toBeInstanceOf(WompiPaymentAdapter);
   });
 });

@@ -54,9 +54,16 @@ export const envSchema = z.object({
   // Base URL the API is reachable at, used to build upload/serve URLs.
   STORAGE_PUBLIC_BASE_URL: z.string().url().default('http://localhost:3000'),
   // T-052 (payments): which PaymentPort adapter to bind. 'fake' = deterministic
-  // dev/test double (default); 'wompi' is the real gateway wiring point (M15, not
-  // implemented yet). Swap happens in PaymentModule, no consumer changes.
+  // dev/test double (default); 'wompi' is the real gateway (T-060, recaudo via
+  // Payment Links). Swap happens in PaymentModule, no consumer changes.
   PAYMENT_DRIVER: z.enum(['fake', 'wompi']).default('fake'),
+  // T-060 (M15a): Wompi credentials — read ONLY from env; never hardcoded, never
+  // committed. Optional at the schema level so 'fake' mode boots without them;
+  // the refine below enforces their presence when PAYMENT_DRIVER=wompi.
+  WOMPI_BASE_URL: z.string().url().optional(),
+  WOMPI_PUBLIC_KEY: z.string().min(1).optional(),
+  WOMPI_PRIVATE_KEY: z.string().min(1).optional(),
+  WOMPI_EVENTS_SECRET: z.string().min(1).optional(),
 });
 
 /** Runtime config type (from the base object schema). */
@@ -71,7 +78,15 @@ const REQUIRED_SMTP_KEYS = [
   'SMTP_FROM',
 ] as const;
 
-/** The validated schema + cross-field rules (fail-fast for smtp credentials). */
+/** Wompi vars required when PAYMENT_DRIVER=wompi (fail-fast at boot, T-060). */
+const REQUIRED_WOMPI_KEYS = [
+  'WOMPI_BASE_URL',
+  'WOMPI_PUBLIC_KEY',
+  'WOMPI_PRIVATE_KEY',
+  'WOMPI_EVENTS_SECRET',
+] as const;
+
+/** The validated schema + cross-field rules (fail-fast for smtp/wompi credentials). */
 export const validatedEnvSchema = envSchema.superRefine((env, ctx) => {
   if (env.NOTIFICATION_DRIVER === 'smtp') {
     for (const key of REQUIRED_SMTP_KEYS) {
@@ -80,6 +95,17 @@ export const validatedEnvSchema = envSchema.superRefine((env, ctx) => {
           code: z.ZodIssueCode.custom,
           path: [key],
           message: `${key} is required when NOTIFICATION_DRIVER=smtp`,
+        });
+      }
+    }
+  }
+  if (env.PAYMENT_DRIVER === 'wompi') {
+    for (const key of REQUIRED_WOMPI_KEYS) {
+      if (env[key] === undefined || env[key] === null || env[key] === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `${key} is required when PAYMENT_DRIVER=wompi`,
         });
       }
     }
