@@ -123,6 +123,32 @@ export interface Paginated<T> {
 }
 
 // ============================================================================
+// Campaign funding (RF15 real progress · T-055). An APPROVED donation attributed
+// to a campaign (payments PaymentConcept { kind:'campaign', id }) adds its NET
+// (breakdown.net — computeBreakdown is the single source) to the campaign's
+// raisedAmount, exactly ONCE (idempotent by collectionId). progress stays DERIVED
+// (raisedAmount/goalAmount). This slice consumes M05 donations + the PaymentPort;
+// it never re-implements the payment/commission math.
+// ============================================================================
+
+/** Result of applying one approved campaign collection to raised (webhook path). */
+export interface CampaignFundingResult {
+  /** True only when this collection was newly counted (idempotent no-op otherwise). */
+  applied: boolean;
+  campaignId?: string;
+  /** Net COP added to raisedAmount when applied. */
+  net?: number;
+}
+
+/** Result of reconciling all of an org's approved campaign donations into raised. */
+export interface CampaignFundingReconcileResult {
+  /** How many collections were newly applied in this run. */
+  applied: number;
+  /** Sum of the nets newly applied (integer COP). */
+  totalNet: number;
+}
+
+// ============================================================================
 // Accountability / rendición de cuentas (RF16, §9 M06) — T-054. An organization
 // uploads spending evidences (invoices/receipts/proofs/photos) against a
 // campaign; the public accountability report shows what was spent, with the
