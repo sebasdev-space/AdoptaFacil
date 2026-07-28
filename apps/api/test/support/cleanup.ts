@@ -19,6 +19,8 @@ import type { PrismaClient } from '@prisma/client';
 // clinical_event_attachments before clinical_events (child first); both are
 // append-only (immutability triggers reject removal for every role). Replica mode
 // in the purge tx disables the triggers so these org-scoped deletes go through.
+// sponsorship_status_history (M07, T-056) is append-only the same way
+// (immutability trigger rejects removal for every role, incl. superuser).
 const APPEND_ONLY_TABLES = [
   'audit_logs',
   'formalization_transitions',
@@ -26,6 +28,7 @@ const APPEND_ONLY_TABLES = [
   'clinical_event_attachments',
   'clinical_events',
   'animals',
+  'sponsorship_status_history',
 ];
 
 export async function purgeOrganizations(

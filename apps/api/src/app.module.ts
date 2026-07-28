@@ -16,6 +16,7 @@ import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { DonationsModule } from './modules/donations/donations.module';
 import { OrgModule } from './modules/org/org.module';
 import { PortalsModule } from './modules/portals/portals.module';
+import { SponsorshipsModule } from './modules/sponsorships/sponsorships.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { QueueModule } from './queues/queue.module';
 import { RedisModule } from './redis/redis.module';
@@ -58,6 +59,8 @@ import { RedisModule } from './redis/redis.module';
     DonationsModule,
     // M06 · fundraising campaigns (RF15 / T-053).
     CampaignsModule,
+    // M07 · recurring sponsorships base (RF17 / T-056, no payment yet).
+    SponsorshipsModule,
   ],
 })
 export class AppModule {}

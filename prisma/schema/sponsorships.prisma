@@ -1,3 +1,90 @@
-// Module: sponsorships · Owner: @sebastian (Ola 0)
-// TODO: models defined by @sebastian. Every business model MUST carry
-// organization_id and enable RLS following the _rls_probe reference in org.prisma.
+// Module: sponsorships (M07) · Owner: @sebastian
+// Apadrinamientos recurrentes (RF17, §9/§14 M07). Base slice (T-056): planes +
+// suscripción + estado + historial, SIN cobro (T-057 conecta el PaymentPort).
+//
+// NOTE (module boundary): `animalId` references the M03 `Animal` model (owned by
+// the SAME developer, different file) as a PLAIN SCALAR — no cross-file Prisma
+// @relation, to keep sponsorships.prisma decoupled from animals.prisma (same
+// convention as campaigns→organizations). The FK (ON DELETE CASCADE) is declared
+// in the T-056 migration SQL, mirroring T-104/T-105. The FK to `organizations` is
+// likewise SQL-only (org.prisma untouched).
+
+/// A recurring-sponsorship PLAN an organization defines for one of its animals
+/// (RF17, §14). Money in INTEGER COP pesos (never float). `periodicity` is a
+/// CLOSED-for-now enum (`monthly` — the base document's wording); TODO(client):
+/// extend if other cadences are requested. `isActive=false` = archived (the org
+/// stops offering it; existing sponsorships on it are unaffected). Tenant-scoped
+/// (organization_id + RLS ENABLE+FORCE + tenant_isolation).
+model SponsorshipPlan {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  animalId       String   @map("animal_id") @db.Uuid
+  name           String
+  amount         Int
+  periodicity    String   @default("monthly")
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  sponsorships Sponsorship[]
+
+  @@index([organizationId])
+  @@index([animalId])
+  @@map("sponsorship_plans")
+}
+
+/// A sponsor's (padrino) subscription to a plan (RF17, §14). Lives in the
+/// BENEFICIARY org's tenant — the sponsor (a Person) is not a member of that org,
+/// so creation is cross-tenant (SECURITY DEFINER, same technique as M05
+/// `create_donation`). `animalId` is denormalized from the plan (per the base
+/// document's §14 model) for direct query without a join. `status` is the
+/// CURRENT state (active|suspended|cancelled); `SponsorshipStatusHistory` is its
+/// immutable audit trail. TODO(T-057): connect to PAYMENT_PORT for real recurring
+/// charges + SponsorshipPayment; this slice creates NO payment.
+model Sponsorship {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  planId         String    @map("plan_id") @db.Uuid
+  animalId       String    @map("animal_id") @db.Uuid
+  sponsorUserId  String    @map("sponsor_user_id") @db.Uuid
+  status         String    @default("active")
+  startedAt      DateTime  @default(now()) @map("started_at")
+  suspendedAt    DateTime? @map("suspended_at")
+  cancelledAt    DateTime? @map("cancelled_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  plan    SponsorshipPlan            @relation(fields: [planId], references: [id], onDelete: Cascade)
+  history SponsorshipStatusHistory[]
+
+  @@index([organizationId])
+  @@index([planId])
+  @@index([animalId])
+  @@index([sponsorUserId])
+  @@map("sponsorships")
+}
+
+/// Append-only history of sponsorship status changes (RF17). Same pattern as
+/// `FormalizationTransition` (org.prisma): tenant-scoped RLS + immutable (the
+/// T-056 migration grants the app role only SELECT+INSERT and installs triggers
+/// rejecting UPDATE/DELETE/TRUNCATE). `fromStatus` is null on the row created at
+/// subscription time (no prior state). `reason` is free-text, optional — staff
+/// may record why (e.g. "fallecimiento del animal", §24 paused/not implemented
+/// here); this column is deliberately generic so that future reason keeps working
+/// without a schema change.
+model SponsorshipStatusHistory {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  sponsorshipId  String   @map("sponsorship_id") @db.Uuid
+  fromStatus     String?  @map("from_status")
+  toStatus       String   @map("to_status")
+  actorUserId    String?  @map("actor_user_id") @db.Uuid
+  reason         String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  sponsorship Sponsorship @relation(fields: [sponsorshipId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([sponsorshipId])
+  @@map("sponsorship_status_history")
+}
