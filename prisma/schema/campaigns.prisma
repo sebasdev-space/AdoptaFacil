@@ -26,11 +26,37 @@ model Campaign {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  evidences CampaignEvidence[]
+  evidences          CampaignEvidence[]
+  fundingApplications CampaignFundingApplication[]
 
   @@index([organizationId])
   @@index([organizationId, status])
   @@map("campaigns")
+}
+
+/// Idempotency ledger for real campaign funding (RF15 · T-055). One row per
+/// APPROVED campaign-attributed donation that has been counted toward a
+/// campaign's raised_amount, keyed UNIQUELY by the payment collection_id. Its
+/// existence is the persistent "already counted" marker: a repeated webhook
+/// (same collection) hits the unique conflict and is a no-op, so the net is added
+/// exactly once. Append-only (no update/delete by the app role). Tenant-scoped
+/// (organization_id + RLS ENABLE+FORCE + tenant_isolation). Written by a bounded
+/// SECURITY DEFINER function so the gateway webhook (no tenant context) can apply
+/// it without evading RLS. FK to organizations is declared in the T-055 migration
+/// SQL (not a @relation) to avoid editing org.prisma.
+model CampaignFundingApplication {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  campaignId     String   @map("campaign_id") @db.Uuid
+  collectionId   String   @unique @map("collection_id")
+  net            Int
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([campaignId])
+  @@map("campaign_funding_applications")
 }
 
 /// Spending evidence for accountability (RF16, §9 M06 · T-054): invoices,
