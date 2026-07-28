@@ -51,15 +51,16 @@ Al abrir `http://localhost:5173` deberías ver el shell mostrando `status: ok`,
 
 ## Scripts (raíz, orquestados por Turborepo)
 
-| Comando                                           | Qué hace                            |
-| ------------------------------------------------- | ----------------------------------- |
-| `pnpm dev`                                        | Levanta api + web en modo watch     |
-| `pnpm build`                                      | Compila todos los paquetes/apps     |
-| `pnpm lint`                                       | ESLint en todo el monorepo          |
-| `pnpm typecheck`                                  | `tsc --noEmit` en todo el monorepo  |
-| `pnpm test`                                       | Pruebas unitarias (jest + vitest)   |
-| `pnpm format`                                     | Prettier `--write`                  |
-| `pnpm --filter @adoptafacil/api test:integration` | Smoke `/health` + RLS (requiere DB) |
+| Comando                                           | Qué hace                                                                                                                                                                                               |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm dev`                                        | Levanta api + web en modo watch                                                                                                                                                                        |
+| `pnpm build`                                      | Compila todos los paquetes/apps                                                                                                                                                                        |
+| `pnpm lint`                                       | ESLint en todo el monorepo                                                                                                                                                                             |
+| `pnpm typecheck`                                  | `tsc --noEmit` en todo el monorepo                                                                                                                                                                     |
+| `pnpm test`                                       | Pruebas unitarias (jest + vitest)                                                                                                                                                                      |
+| `pnpm format`                                     | Prettier `--write`                                                                                                                                                                                     |
+| `pnpm --filter @adoptafacil/api test:integration` | Smoke `/health` + RLS (requiere DB)                                                                                                                                                                    |
+| `pnpm seed:admin`                                 | Siembra un PlatformAdmin/PlatformSuperAdmin (idempotente) para operar la cola de revisión de documentos, RF03 — ver [apps/api/scripts/seed-platform-admin.ts](apps/api/scripts/seed-platform-admin.ts) |
 
 ## Estructura
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   type Animal,
   type AnimalSpecies,
@@ -217,7 +218,9 @@ export function AnimalsPage() {
                             className="h-10 w-10 rounded object-cover"
                           />
                         )}
-                        <span className="font-medium">{animal.name}</span>
+                        <Link to={`/animales/${animal.id}`} className="font-medium hover:underline">
+                          {animal.name}
+                        </Link>
                         <Badge variant="secondary">{SPECIES_LABELS[animal.species]}</Badge>
                         <Badge>{animal.status}</Badge>
                         {animal.isActive === false && <Badge variant="destructive">Inactivo</Badge>}
