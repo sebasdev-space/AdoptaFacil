@@ -18,6 +18,7 @@ import { TenantContextService } from '../../core/tenant/tenant-context.service';
 import { AuditService } from '../../core/audit/audit.service';
 import { PAYMENT_PORT } from '../../core/payments/payment.port';
 import type { RequestUser } from '../../core/auth/auth.types';
+import { CampaignFundingService } from '../campaigns/campaign-funding.service';
 
 /** Row shape returned by the SECURITY DEFINER donation functions (snake_case). */
 interface DonationRow {
@@ -70,6 +71,7 @@ export class DonationsService {
     private readonly tenant: TenantContextService,
     private readonly audit: AuditService,
     @Inject(PAYMENT_PORT) private readonly payment: PaymentPort,
+    private readonly campaignFunding: CampaignFundingService,
   ) {}
 
   private requireOrgId(): string {
@@ -201,9 +203,43 @@ export class DonationsService {
         entityId: donation.id,
         metadata: { dedupKey: event.dedupKey },
       });
+
+      if (donation.concept_kind === 'campaign') {
+        await this.applyCampaignFunding(donation.organization_id, donation.id, event.collectionId);
+      }
     }
 
     return { applied: true, status, donationId: donation.id };
+  }
+
+  /**
+   * Apply an approved campaign-concept donation to its campaign's raised amount
+   * (T-057 enganche), reusing Sebastián's idempotent `CampaignFundingService` (a
+   * repeated collectionId is a safe no-op there too). Best-effort: the donation is
+   * ALREADY approved and its receipt ALREADY issued by this point, so a failure
+   * here (e.g. the campaign was closed/cancelled between donation and webhook) is
+   * audited and swallowed — it must never revert or fail the webhook response.
+   */
+  private async applyCampaignFunding(
+    organizationId: string,
+    donationId: string,
+    collectionId: string,
+  ): Promise<void> {
+    try {
+      await this.campaignFunding.applyApprovedCollection(collectionId);
+    } catch (error) {
+      this.logger.warn(
+        `Campaign funding enganche failed for donation=${donationId} collectionId=${collectionId}: ${(error as Error).message}`,
+      );
+      await this.audit.record({
+        organizationId,
+        actorUserId: null,
+        action: 'donation.campaign_funding_failed',
+        entityType: 'donation',
+        entityId: donationId,
+        metadata: { collectionId, reason: (error as Error).message },
+      });
+    }
   }
 
   /** The beneficiary org's received donations with their receipts (RLS-scoped). */

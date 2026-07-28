@@ -125,15 +125,15 @@ describe('Campaign funding (RF15 · T-055)', () => {
 
   it('applies an APPROVED campaign donation to raised, exactly once (idempotent)', async () => {
     const { collectionId, net } = await donateToCampaign(campaignX, orgIds[0]);
+    // The donations webhook itself applies the funding now (T-057 enganche) —
+    // no separate call needed on the happy path.
     await webhook(collectionId, 'approved');
-
-    const first = await funding.applyApprovedCollection(collectionId);
-    expect(first).toEqual({ applied: true, campaignId: campaignX, net });
     expect(await raisedOf(campaignX)).toBe(net);
 
-    // Repeated application (as a duplicate webhook would) is a no-op.
-    const second = await funding.applyApprovedCollection(collectionId);
-    expect(second).toEqual({ applied: false });
+    // A second application of the SAME collection (as a duplicate webhook, a
+    // manual retry, or the reconcile endpoint would attempt) is a no-op.
+    const again = await funding.applyApprovedCollection(collectionId);
+    expect(again).toEqual({ applied: false });
     expect(await raisedOf(campaignX)).toBe(net);
   });
 
@@ -151,10 +151,16 @@ describe('Campaign funding (RF15 · T-055)', () => {
     expect(await raisedOf(campaignX)).toBe(raisedBefore);
   });
 
-  it('reconcile endpoint applies the org approved campaign donations (idempotent)', async () => {
+  it('reconcile endpoint catches up a donation approved OUT-OF-BAND (idempotent)', async () => {
+    // Since the donations webhook now applies funding itself (T-057 enganche),
+    // exercising the reconcile endpoint's OWN catch-up purpose means simulating a
+    // donation that became 'approved' WITHOUT going through that webhook path
+    // (e.g. legacy data, or an org that missed the enganche) — a direct row
+    // update, bypassing the API webhook entirely.
     const raisedBefore = await raisedOf(campaignX);
     const { collectionId, net } = await donateToCampaign(campaignX, orgIds[0]);
-    await webhook(collectionId, 'approved');
+    await admin.donation.updateMany({ where: { collectionId }, data: { status: 'approved' } });
+    expect(await raisedOf(campaignX)).toBe(raisedBefore); // not yet counted
 
     const res = await request(server)
       .post('/campaigns/funding/reconcile')
@@ -162,7 +168,6 @@ describe('Campaign funding (RF15 · T-055)', () => {
       .expect(200);
     expect(res.body.applied).toBeGreaterThanOrEqual(1);
     expect(await raisedOf(campaignX)).toBe(raisedBefore + net);
-    void collectionId;
 
     // Reconcile again → nothing new.
     const again = await request(server)
@@ -176,13 +181,14 @@ describe('Campaign funding (RF15 · T-055)', () => {
   it('attributes funding only to the target campaign/org (isolation)', async () => {
     const raisedXBefore = await raisedOf(campaignX);
     const { collectionId, net } = await donateToCampaign(campaignZ, orgB);
+    // The webhook itself applies the funding (T-057 enganche).
     await webhook(collectionId, 'approved');
-
-    const applied = await funding.applyApprovedCollection(collectionId);
-    expect(applied).toEqual({ applied: true, campaignId: campaignZ, net });
     expect(await raisedOf(campaignZ)).toBe(net);
     // X is untouched by Z's funding.
     expect(await raisedOf(campaignX)).toBe(raisedXBefore);
+
+    // A second application of the same collection is a no-op (already counted).
+    expect(await funding.applyApprovedCollection(collectionId)).toEqual({ applied: false });
 
     // Org B reconcile never touches Org A's campaign.
     await request(server)
