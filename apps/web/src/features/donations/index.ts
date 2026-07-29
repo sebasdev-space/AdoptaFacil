@@ -2,12 +2,20 @@
 export { DonatePage } from './pages/donate-page';
 export { DonateForm, type DonateFormValues } from './components/donate-form';
 export { DonationBreakdown } from './components/donation-breakdown';
+export { MyDonationsList } from './components/my-donations-list';
 export {
   buildDonationBreakdown,
   safeBuildDonationBreakdown,
   formatCop,
+  formatBogota,
   type BreakdownLine,
 } from './model/donation-breakdown-view';
+export {
+  DONATION_STATUS_LABELS,
+  DONATION_STATUS_BADGE_VARIANT,
+  normalizeDonations,
+  organizationLabel,
+} from './model/my-donations-view';
 export {
   createDonation,
   listReceivedDonations,

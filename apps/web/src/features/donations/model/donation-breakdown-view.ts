@@ -28,6 +28,16 @@ export function formatCop(pesos: number): string {
   }).format(pesos);
 }
 
+/** Presenta un ISO-8601 UTC en hora Colombia (UTC en almacenamiento, CO en UI). */
+export function formatBogota(isoUtc: string): string {
+  const date = new Date(isoUtc);
+  if (Number.isNaN(date.getTime())) return isoUtc;
+  return new Intl.DateTimeFormat('es-CO', {
+    timeZone: 'America/Bogota',
+    dateStyle: 'medium',
+  }).format(date);
+}
+
 /**
  * Construye el desglose presentable a partir del monto pretendido y de quién asume
  * la comisión. `breakdown` es EXACTAMENTE `computeBreakdown(intendedAmount,

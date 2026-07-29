@@ -16,6 +16,7 @@ import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
 import { createDonation } from '../api/donations-api';
 import { DonateForm, type DonateFormValues } from '../components/donate-form';
+import { MyDonationsList } from '../components/my-donations-list';
 import { formatCop } from '../model/donation-breakdown-view';
 
 interface DonationTarget {
@@ -58,13 +59,17 @@ export function DonatePage() {
   const [done, setDone] = useState<Donation | null>(null);
 
   if (!target) {
+    // Reached from the "Donaciones" menu entry (no org target): T-064 completes
+    // this branch with the donor's OWN donation history, previously just a
+    // static empty-state. Starting a NEW donation still only happens from an
+    // org's public portal (/o/:slug → "Donar"), never listed/picked here.
     return (
       <PageContainer>
-        <PageHeader title="Donar" description="Apoya a una organización de rescate." />
-        <EmptyState
-          title="Elige una organización desde su portal"
-          description="Esta pantalla recibe la organización desde su portal público (integración con M14: /o/:slug → «Donar»). Aún no hay una organización seleccionada."
+        <PageHeader
+          title="Mis donaciones"
+          description="Historial de tus donaciones. Para donar, entra al portal público de una organización."
         />
+        <MyDonationsList />
       </PageContainer>
     );
   }
