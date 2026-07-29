@@ -50,7 +50,10 @@ afterEach(() => {
 
 describe('PortalThemePage — owner personalization', () => {
   it('denies editing to a user without Owner/Administrator (deny-by-default)', async () => {
-    renderShell({ route: '/organizacion/portal', ...sessionWith([]) });
+    // An org role that is NOT Owner/Administrator: passes the route-level
+    // ORG_MEMBER_ROLES gate (T-062) and reaches the page, whose OWN internal
+    // check still blocks editing to non-Owner/Administrator roles.
+    renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Operator]) });
 
     expect(
       await screen.findByText('No tienes permiso para editar la personalización'),

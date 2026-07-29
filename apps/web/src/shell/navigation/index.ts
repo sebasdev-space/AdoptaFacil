@@ -4,6 +4,7 @@ export {
   type NavItem,
   ANIMAL_VIEW_ROLES,
   ORG_DOCUMENTS_ROLES,
+  ORG_MEMBER_ROLES,
   PLATFORM_DOCUMENTS_ROLES,
 } from './nav-items';
 export { NavProvider, useNav } from './nav-context';
