@@ -45,7 +45,9 @@ function resolve(theme: Theme): ResolvedTheme {
 
 export interface ThemeProviderProps {
   children: ReactNode;
-  /** Initial selection when the app boots. Defaults to following the OS. */
+  /** Initial selection when the app boots. Defaults to 'light' (T-D03) — pass
+   *  'system' explicitly to follow the OS instead. The toggle/`setTheme` still
+   *  let the user pick any theme for the rest of the session. */
   defaultTheme?: Theme;
   /** Optional hook for wiring persistence later (called on every change). */
   onThemeChange?: (theme: Theme) => void;
@@ -53,7 +55,7 @@ export interface ThemeProviderProps {
 
 export function ThemeProvider({
   children,
-  defaultTheme = 'system',
+  defaultTheme = 'light',
   onThemeChange,
 }: ThemeProviderProps) {
   const [theme, setThemeState] = useState<Theme>(defaultTheme);
