@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Role } from '@adoptafacil/contracts';
 import { renderShell } from '../../../test-utils';
@@ -38,6 +38,15 @@ function stubFetch(handler: (url: string, init?: RequestInit) => unknown) {
       });
     }),
   );
+}
+
+/** Route by URL: `/org/profile` gets its own body (default: no slug), everything
+ *  else (the theme endpoint) gets `themeBody`. */
+function stubFetchByUrl(
+  themeBody: unknown,
+  orgProfileBody: unknown = { id: 'org-1', name: 'Org' },
+) {
+  stubFetch((url) => (url.includes('/org/profile') ? orgProfileBody : themeBody));
 }
 
 beforeEach(() => {
@@ -90,5 +99,52 @@ describe('PortalThemePage — owner personalization', () => {
   it('also allows an Administrator to edit', async () => {
     renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Administrator]) });
     expect(await screen.findByLabelText('Color primario')).toBeInTheDocument();
+  });
+
+  it('shows a color picker reflecting the saved HSL as hex, and typing hex updates the HSL text (T-D03)', async () => {
+    stubFetchByUrl({ tokens: { primary: '0 0% 0%' } });
+    renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
+
+    const text = await screen.findByLabelText('Color primario');
+    expect(text).toHaveValue('0 0% 0%');
+    const picker = screen.getByLabelText('Selector de color: Color primario');
+    expect(picker).toHaveValue('#000000');
+
+    // Picking white in the picker updates the underlying HSL text field.
+    fireEvent.change(picker, { target: { value: '#ffffff' } });
+    expect(await screen.findByLabelText('Color primario')).toHaveValue('0 0% 100%');
+  });
+
+  it('shows "Ver portal público" linking to /o/:slug when the org has one, hidden otherwise (T-D03)', async () => {
+    stubFetchByUrl(
+      { tokens: {} },
+      { id: 'org-1', name: 'Refugio Patitas', slug: 'patitas-felices' },
+    );
+    renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
+
+    const link = await screen.findByRole('link', { name: /Ver portal público/ });
+    expect(link).toHaveAttribute('href', '/o/patitas-felices');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  it('hides "Ver portal público" when the org has no slug yet (never a broken link)', async () => {
+    stubFetchByUrl({ tokens: {} }, { id: 'org-1', name: 'Refugio Patitas' });
+    renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
+
+    await screen.findByLabelText('Color primario');
+    expect(screen.queryByRole('link', { name: /Ver portal público/ })).not.toBeInTheDocument();
+  });
+
+  it('the live preview reflects the accent color from the FORM, not just the saved tokens (T-D03)', async () => {
+    stubFetchByUrl({ tokens: {} });
+    renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
+
+    const accentText = await screen.findByLabelText('Color de acento');
+    fireEvent.change(accentText, { target: { value: '0 0% 0%' } });
+
+    const preview = screen.getByTestId('theme-preview');
+    const chip = within(preview).getByText('Acento');
+    expect(chip).toHaveStyle({ backgroundColor: 'hsl(0 0% 0%)' });
   });
 });
