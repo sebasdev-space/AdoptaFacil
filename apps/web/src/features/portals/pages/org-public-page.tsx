@@ -5,10 +5,12 @@ import { EmptyState, Skeleton } from '@adoptafacil/ui';
 import { brandTokensToStyle } from '../../../shell/theme';
 import { buildPortalView } from '../model/portal-view';
 import { safePortalTheme } from '../model/theme';
+import { fetchPublicAnimals } from '../api/public-animals';
 import { PortalProfileSection } from '../components/portal-profile-section';
 import { PortalPlaceholderSection } from '../components/portal-placeholder-section';
 import { PortalTransparencyBar } from '../components/portal-transparency-bar';
 import { PortalDonateCta } from '../components/portal-donate-cta';
+import { PortalSocialLinks } from '../components/portal-social-links';
 import { PortalAdoptionSection } from '../components/portal-adoption-section';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
@@ -21,15 +23,19 @@ type LoadState = 'loading' | 'ready' | 'not-found' | 'error';
  * so it only ever shows public fields the backend chooses to expose (never
  * phone/legalName; NIT only once formalized).
  *
- * The portal is a rich, multi-section page:
- *  - a persistent transparency indicator with REAL derived data (§M14, T-027):
- *    nivel (verificationLevel) · % formalización (derivado) · rendición (placeholder).
- *  - "perfil" — the organization's real public identity, read straight from the
- *    `OrganizationPublic` contract (inherits any public-field change by contract),
- *    including the reserved org-type badge slot.
- *  - aggregated sections (mascotas / campaña / necesita hoy / transparencia) —
- *    structured PLACEHOLDERS with their integration point, wired when their owning
- *    modules exist (see docs/TASKS.md · deuda de cableado M14).
+ * The portal is a rich, multi-section page (pulido visual T-D02):
+ *  - hero + "perfil" — cover/logo, name, type/formalization badges and a real
+ *    stats row (location, adoptable animal count, formalization), read straight
+ *    from the `OrganizationPublic` contract (inherits any public-field change).
+ *  - the transparency indicator (§M14, T-027) only mounts when it has a REAL
+ *    signal to show (verificationLevel > 0) — otherwise it stays unmounted rather
+ *    than displaying an always-"No disponible" bar.
+ *  - two-column layout: animals catalog (main) + sidebar (social links/contact +
+ *    the "Donar" CTA).
+ *  - aggregated sections still in `status: 'placeholder'` (campaña / necesita hoy
+ *    / transparencia — no owning module yet) are simply NOT mounted, instead of
+ *    showing an empty "Próximamente" card; only 'pets' is wired to real data
+ *    (see docs/TASKS.md · deuda de cableado M14).
  *
  * PERSONALIZATION (T-027): the org's brand tokens are fetched and applied at
  * runtime as CSS custom properties on a SCOPED wrapper (not the global <html>), so
@@ -41,6 +47,7 @@ export function OrgPublicPage() {
   const [view, setView] = useState<PortalView | null>(null);
   const [theme, setTheme] = useState<PortalTheme>({});
   const [state, setState] = useState<LoadState>('loading');
+  const [animalTotal, setAnimalTotal] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     if (!slug) {
@@ -80,12 +87,45 @@ export function OrgPublicPage() {
     };
   }, [slug]);
 
+  // Real animal count for the profile stats row (pulido visual T-D02). A tiny,
+  // INDEPENDENT fetch (limit 1, unfiltered) so it stays stable regardless of the
+  // species filter the visitor picks inside PortalAdoptionSection — its own
+  // internal fetch/filter logic is untouched.
+  useEffect(() => {
+    if (!slug) return;
+    let active = true;
+    fetchPublicAnimals({ slug, limit: 1, offset: 0 })
+      .then((page) => {
+        if (active) setAnimalTotal(page.total);
+      })
+      .catch(() => {
+        // Best-effort: the stat simply stays absent (never fabricated).
+      });
+    return () => {
+      active = false;
+    };
+  }, [slug]);
+
   // Only the safe token subset ever reaches inline styles (custom properties
   // cannot execute script; unknown keys were already filtered out).
   const themeStyle = useMemo(() => brandTokensToStyle(theme), [theme]);
 
+  // Nivel de verificación SIEMPRE en 0 hasta que exista el catálogo (T-103) — la
+  // barra de transparencia solo aporta información real cuando hay un nivel > 0
+  // que mostrar (pulido visual T-D02, condición basada en el dato real, no un
+  // "nunca más" hardcodeado: si el catálogo se puebla, la barra vuelve a aparecer).
+  const hasVerificationSignal = (view?.profile.organization.verificationLevel?.level ?? 0) > 0;
+
+  // Secciones agregadas AÚN sin módulo dueño (campaña/necesita hoy/transparencia)
+  // nacen en status:'placeholder' — ocultarlas evita el "Próximamente" vacío frente
+  // al cliente (pulido visual T-D02). 'pets' es la única sección ya cableada a datos
+  // reales y siempre se muestra.
+  const visibleSections = view?.sections.filter(
+    (section) => section.kind === 'pets' || section.status !== 'placeholder',
+  );
+
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6" style={themeStyle}>
+    <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6" style={themeStyle}>
       {state === 'loading' && <Skeleton className="h-72 w-full" />}
       {state === 'not-found' && (
         <EmptyState
@@ -98,23 +138,35 @@ export function OrgPublicPage() {
       )}
       {state === 'ready' && view && (
         <div className="space-y-8">
-          <div className="flex justify-end">
-            <PortalTransparencyBar organization={view.profile.organization} />
-          </div>
-          <PortalProfileSection profile={view.profile} />
-          {/* CTA "Donar" (§M05/M14, T-051): público; el gate de sesión vive en la
-              ruta /donaciones (RequireAuth), no aquí. */}
-          <PortalDonateCta organization={view.profile.organization} />
-          {/* La sección "Mascotas en adopción" (kind 'pets') ya está CABLEADA al
-              catálogo público (§M14/M03, T-052); las demás siguen como placeholders
-              hasta que su módulo dueño exista. */}
-          {view.sections.map((section) =>
-            section.kind === 'pets' ? (
-              <PortalAdoptionSection key={section.kind} slug={slug as string} />
-            ) : (
-              <PortalPlaceholderSection key={section.kind} section={section} />
-            ),
+          {hasVerificationSignal && (
+            <div className="flex justify-end">
+              <PortalTransparencyBar organization={view.profile.organization} />
+            </div>
           )}
+          <PortalProfileSection profile={view.profile} animalCount={animalTotal} />
+
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="space-y-6 lg:col-span-2">
+              {/* La sección "Mascotas en adopción" (kind 'pets') ya está CABLEADA
+                  al catálogo público (§M14/M03, T-052); cualquier otra sección que
+                  algún día deje de ser placeholder aparecería aquí también. */}
+              {visibleSections?.map((section) =>
+                section.kind === 'pets' ? (
+                  <PortalAdoptionSection key={section.kind} slug={slug as string} />
+                ) : (
+                  <PortalPlaceholderSection key={section.kind} section={section} />
+                ),
+              )}
+            </div>
+
+            {/* Sidebar (§M14, pulido visual T-D02): redes/contacto + CTA "Donar"
+                (§M05, T-051) — el mismo <Link>/query params de siempre, solo
+                reposicionado. El gate de sesión vive en /donaciones (RequireAuth). */}
+            <aside className="space-y-6">
+              <PortalDonateCta organization={view.profile.organization} />
+              <PortalSocialLinks organization={view.profile.organization} />
+            </aside>
+          </div>
         </div>
       )}
     </main>

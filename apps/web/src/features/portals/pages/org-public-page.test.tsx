@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FormalizationState, type OrganizationPublic } from '@adoptafacil/contracts';
 import { renderShell } from '../../../test-utils';
@@ -64,7 +64,11 @@ describe('OrgPublicPage — rich public portal', () => {
     expect(await screen.findByRole('heading', { name: /Refugio Patitas/ })).toBeInTheDocument();
     expect(screen.queryByTestId('org-type-badge')).not.toBeInTheDocument();
     expect(screen.getByText('RTE vigente')).toBeInTheDocument();
-    expect(screen.getByText('Verificación nivel 2')).toBeInTheDocument();
+    // The formalization badge + stats row show the STATE label (Formalizada,
+    // appears twice), never the verification level — that stays at 0 until the
+    // ladder catalog exists (T-103), so it is never surfaced in the UI (T-D02).
+    expect(screen.getAllByText('Formalizada').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText(/Verificación nivel/)).not.toBeInTheDocument();
   });
 
   it('shows the org-type badge with its label when the projection carries the type (T-030)', async () => {
@@ -89,19 +93,18 @@ describe('OrgPublicPage — rich public portal', () => {
     expect(href).toContain('organizationName=Refugio+Patitas');
   });
 
-  it('renders the still-placeholder aggregated sections with an empty state', async () => {
+  it('does NOT mount the still-placeholder aggregated sections (no empty "Próximamente")', async () => {
     renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
     await screen.findByRole('heading', { name: /Refugio Patitas/ });
 
-    // "Mascotas en adopción" (kind 'pets') is now a LIVE section (T-052), so it is
-    // no longer a placeholder — only the remaining three stay as placeholders.
+    // Pulido visual (T-D02): campaña/necesita hoy/transparencia have NO owning
+    // module yet (status stays 'placeholder' forever until one exists) — showing
+    // an empty "Próximamente" card in front of the client reads as unfinished, so
+    // these sections are simply not mounted. Only 'pets' (LIVE since T-052) shows.
     for (const title of ['Campaña activa', 'Necesita hoy', 'Transparencia']) {
-      const heading = screen.getByRole('heading', { name: title });
-      const section = heading.closest('section');
-      expect(section).not.toBeNull();
-      expect(within(section as HTMLElement).getByRole('status')).toBeInTheDocument();
-      expect(section).toHaveAttribute('data-integration-point');
+      expect(screen.queryByRole('heading', { name: title })).not.toBeInTheDocument();
     }
+    expect(screen.getByRole('heading', { name: 'Mascotas en adopción' })).toBeInTheDocument();
   });
 
   it('shows the transparency indicator with REAL derived data (§M14, T-027)', async () => {
@@ -155,6 +158,70 @@ describe('OrgPublicPage — rich public portal', () => {
     expect(screen.queryByText('900123456-7')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Sitio web' })).not.toBeInTheDocument();
     expect(screen.getByText('hola@patitas.org')).toBeInTheDocument();
+  });
+
+  it('renders the hero cover + logo from real URLs when the profile has them (T-D02)', async () => {
+    stubFetch({
+      org: {
+        ...ORG,
+        logoUrl: 'https://cdn.test/logo.png',
+        coverPhotos: ['https://cdn.test/cover.png'],
+      },
+    });
+    renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+    await screen.findByRole('heading', { name: /Refugio Patitas/ });
+
+    expect(screen.getByAltText('Logo de Refugio Patitas')).toHaveAttribute(
+      'src',
+      'https://cdn.test/logo.png',
+    );
+    // The cover is decorative (alt=""); querying by its known src is the stable seam.
+    const cover = document.querySelector('img[src="https://cdn.test/cover.png"]');
+    expect(cover).not.toBeNull();
+  });
+
+  it('falls back to initials (no logo) when the profile has neither logo nor cover', async () => {
+    renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+    await screen.findByRole('heading', { name: /Refugio Patitas/ });
+
+    // "Refugio Patitas" → initials "RP", never a broken <img>.
+    expect(screen.getByText('RP')).toBeInTheDocument();
+    expect(screen.queryByAltText(/Logo de/)).not.toBeInTheDocument();
+  });
+
+  it('hides the transparency bar when there is no real verification signal (level 0/absent)', async () => {
+    const { verificationLevel: _level, ...noLevel } = ORG;
+    stubFetch({ org: noLevel });
+    renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+    await screen.findByRole('heading', { name: /Refugio Patitas/ });
+
+    // No fabricated "Nivel 0 · Rendición: No disponible" bar in front of the client.
+    expect(screen.queryByTestId('transparency-indicator')).not.toBeInTheDocument();
+  });
+
+  it('shows the real animal count in the profile stats row', async () => {
+    stubFetch();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith('/theme')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => ({ tokens: {} }) });
+        }
+        if (url.includes('/animals')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ items: [], total: 3, limit: 1, offset: 0 }),
+          });
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => ORG });
+      }),
+    );
+    renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+    await screen.findByRole('heading', { name: /Refugio Patitas/ });
+
+    expect(await screen.findByText('3 animales disponibles')).toBeInTheDocument();
   });
 
   it('shows a clear public 404 for an unknown slug', async () => {

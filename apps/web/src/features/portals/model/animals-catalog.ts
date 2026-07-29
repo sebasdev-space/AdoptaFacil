@@ -1,4 +1,10 @@
-import type { AnimalSex, AnimalSize, AnimalSpecies, AnimalSummary } from '@adoptafacil/contracts';
+import type {
+  AnimalSex,
+  AnimalSize,
+  AnimalSpecies,
+  AnimalSummary,
+  ComputedAge,
+} from '@adoptafacil/contracts';
 
 /** Etiquetas legibles (es-CO) de los campos PÚBLICOS del animal. */
 export const SPECIES_LABELS: Record<AnimalSpecies, string> = {
@@ -18,6 +24,17 @@ export const SIZE_LABELS: Record<AnimalSize, string> = {
   medium: 'Mediano',
   large: 'Grande',
 };
+
+/** Etiqueta legible de la edad DERIVADA (calculada en la API, T-104) — nunca una
+ *  fecha de nacimiento cruda. Ausente cuando la organización no la registró. */
+export function ageLabel(age?: ComputedAge): string | undefined {
+  if (!age) return undefined;
+  const parts: string[] = [];
+  if (age.years > 0) parts.push(`${age.years} ${age.years === 1 ? 'año' : 'años'}`);
+  if (age.months > 0) parts.push(`${age.months} m`);
+  const text = parts.join(' ') || '< 1 mes';
+  return age.approximate ? `~${text}` : text;
+}
 
 /**
  * Enlace al flujo de SOLICITUD de adopción de T-028a (seam que dejó tipado la
