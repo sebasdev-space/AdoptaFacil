@@ -9,6 +9,14 @@ import { renderShell } from '../../test-utils';
  * by ANY authenticated user, including a Persona/donante with zero org roles).
  * They now demand ORG_MEMBER_ROLES (§13's full org-role set) at both barriers —
  * same double-barrier pattern as T-031 (menu entry + route guard).
+ *
+ * T-063 — same fix for the "Campañas" MENU ENTRY only: a donor reaches the public
+ * campaigns portal (/campanas, T-055) from an org's public portal (/o/:slug), not
+ * from this sidebar link, so the entry is now ORG_MEMBER_ROLES-gated too. The
+ * underlying /campanas ROUTE stays public and untouched (covered separately by
+ * routing.test.tsx's "serves /campanas as a PUBLIC campaigns portal without a
+ * session") — there is no <RequireRoles> on it, so it is NOT in the SURFACES list
+ * below (that list is for routes gated at BOTH barriers).
  */
 function sessionWith(roles: Role[]) {
   return {
@@ -88,25 +96,27 @@ describe('T-062 · sidebar reflects the org gate (first barrier)', () => {
     return screen.getByRole('navigation', { name: 'Navegación principal' });
   }
 
-  it('shows the org-management entries to an org role', async () => {
+  it('shows the org-management entries (incl. Campañas) to an org role', async () => {
     renderShell({ route: '/', ...sessionWith([Role.Owner]) });
     await waitFor(() =>
       expect(within(nav()).getByRole('link', { name: 'Mi organización' })).toBeInTheDocument(),
     );
     expect(within(nav()).getByRole('link', { name: 'Personalización' })).toBeInTheDocument();
     expect(within(nav()).getByRole('link', { name: 'Transparencia' })).toBeInTheDocument();
+    expect(within(nav()).getByRole('link', { name: 'Campañas' })).toBeInTheDocument();
   });
 
-  it('hides the org-management entries from a Persona (no org role)', async () => {
+  it('hides the org-management entries (incl. Campañas) from a Persona (no org role)', async () => {
     renderShell({ route: '/', ...sessionWith([]) });
-    // Ungated entries (incl. the public campaigns portal link) stay visible…
+    // Ungated entries stay visible…
     await waitFor(() =>
       expect(within(nav()).getByRole('link', { name: 'Donaciones' })).toBeInTheDocument(),
     );
-    expect(within(nav()).getByRole('link', { name: 'Campañas' })).toBeInTheDocument();
-    // …the org-management surfaces do not.
+    // …the org-management surfaces do not — a donor reaches campaigns via the
+    // org's public portal (/o/:slug → "Campaña activa"), not this menu (T-063).
     expect(within(nav()).queryByRole('link', { name: 'Mi organización' })).not.toBeInTheDocument();
     expect(within(nav()).queryByRole('link', { name: 'Personalización' })).not.toBeInTheDocument();
     expect(within(nav()).queryByRole('link', { name: 'Transparencia' })).not.toBeInTheDocument();
+    expect(within(nav()).queryByRole('link', { name: 'Campañas' })).not.toBeInTheDocument();
   });
 });

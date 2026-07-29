@@ -78,9 +78,13 @@ export const navItems: NavItem[] = [
   { path: '/', label: 'Inicio', icon: HomeIcon, end: true },
   { path: '/adopciones', label: 'Adopciones', icon: PawIcon },
   { path: '/donaciones', label: 'Donaciones', icon: HeartIcon },
-  // '/campanas' is the PUBLIC campaigns portal (T-055, outside RequireAuth) —
-  // relevant to a donor too, so it stays open to every authenticated role.
-  { path: '/campanas', label: 'Campañas', icon: MegaphoneIcon },
+  // '/campanas' is the PUBLIC campaigns portal (T-055, outside RequireAuth) — a
+  // donor reaches it from the ORG's public portal (/o/:slug), not from this menu
+  // (§M06: viewing is a donor action, but browsing/managing this SIDEBAR entry is
+  // an org concern — same class of gap T-062 fixed). Gating only the MENU ENTRY:
+  // the route itself stays public/untouched for anonymous visitors and for a
+  // donor who lands on /campanas via the portal CTA.
+  { path: '/campanas', label: 'Campañas', icon: MegaphoneIcon, roles: ORG_MEMBER_ROLES },
   // Org-facing dashboard (formalización + rendición del portal, T-062 fix).
   { path: '/transparencia', label: 'Transparencia', icon: ShieldIcon, roles: ORG_MEMBER_ROLES },
   // M03 · animales + recordatorios clínicos (T-031, wires T-104/T-106). Reuses
