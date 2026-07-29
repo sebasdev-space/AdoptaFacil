@@ -27,18 +27,21 @@ export interface PortalDonateCtaProps {
  * SEAM (donación de invitado): el gate de sesión NO está aquí sino en `RequireAuth`
  * sobre la ruta `/donaciones` (ver shell/router/routes.tsx). Si el cliente habilita
  * el checkout anónimo, basta relajar ESE guard; este CTA no cambia.
+ *
+ * Pulido visual (T-D02): vive en el sidebar del portal, full-width y prominente
+ * (`size: 'lg'`). El `<Link>`/query params NO cambiaron — solo su posición y estilo.
  */
 export function PortalDonateCta({ organization }: PortalDonateCtaProps) {
   return (
-    <div className="flex flex-col items-start gap-1">
+    <div className="flex flex-col items-stretch gap-1.5">
       <Link
         to={buildDonateHref(organization)}
-        className={cn(buttonVariants())}
+        className={cn(buttonVariants({ size: 'lg' }), 'w-full')}
         data-testid="portal-donate-cta"
       >
         Donar a {organization.name}
       </Link>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-center text-xs text-muted-foreground">
         Tu aporte es transparente: verás el desglose completo antes de pagar.
       </p>
     </div>
