@@ -20,6 +20,8 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,cjs,mjs,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,cjs,mjs,json,md,yml,yaml}\"",
     "setup:env": "node scripts/setup-env.mjs",
+    "seed:admin": "pnpm --filter @adoptafacil/api run seed:admin",
+    "seed:demo": "pnpm --filter @adoptafacil/api run seed:demo",
     "postinstall": "prisma generate",
     "prepare": "husky"
   },
