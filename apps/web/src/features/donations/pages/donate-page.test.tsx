@@ -79,8 +79,10 @@ describe('DonatePage — "no target" now shows "Mis donaciones" (T-064)', () => 
 
     expect(await screen.findByRole('heading', { name: 'Mis donaciones' })).toBeInTheDocument();
     expect(await screen.findByText('Organización #08d734c6')).toBeInTheDocument();
-    expect(screen.getByText('Aprobada')).toBeInTheDocument();
-    expect(screen.getByText(/50\.000/)).toBeInTheDocument();
+    // Same async-loaded render as the heading/org label above — findBy, not
+    // getBy, so a slower CI runner can't race ahead of the fetched list.
+    expect(await screen.findByText('Aprobada')).toBeInTheDocument();
+    expect(await screen.findByText(/50\.000/)).toBeInTheDocument();
   });
 
   it('shows an empty-state (not a crash) when the donor has no donations yet', async () => {
@@ -161,9 +163,16 @@ describe('DonatePage — "no target" now shows "Mis donaciones" (T-064)', () => 
     renderShell({ route: '/donaciones', ...personSession() });
     await screen.findByRole('heading', { name: 'Mis donaciones' });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Ver recibo' }));
-    await waitFor(() => expect(screen.getByText('Donante Tester')).toBeInTheDocument());
-    expect(screen.getByText(/45\.210/)).toBeInTheDocument();
+    // The button only exists once the fetched (approved) donation has rendered
+    // — findBy (not getBy) so CI's slower scheduling can't race ahead of it.
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver recibo' }));
+    await waitFor(() => {
+      // { selector: 'dd' } scopes to the receipt's donor field specifically —
+      // the session user's own name ALSO renders in the shell header (same
+      // literal text here, coincidentally), so an unscoped match is ambiguous.
+      expect(screen.getByText('Donante Tester', { selector: 'dd' })).toBeInTheDocument();
+      expect(screen.getByText(/45\.210/)).toBeInTheDocument();
+    });
   });
 
   it('does NOT offer "Ver recibo" for a PENDING donation', async () => {
@@ -200,7 +209,9 @@ describe('DonatePage — "no target" now shows "Mis donaciones" (T-064)', () => 
 
     renderShell({ route: '/donaciones', ...personSession() });
     await screen.findByRole('heading', { name: 'Mis donaciones' });
-    expect(screen.getByText('Pendiente')).toBeInTheDocument();
+    // Same async-loaded render as the heading above — findBy, not getBy.
+    expect(await screen.findByText('Pendiente')).toBeInTheDocument();
+    // Absence check: safe as queryBy once the render above is confirmed settled.
     expect(screen.queryByRole('button', { name: 'Ver recibo' })).not.toBeInTheDocument();
   });
 });
