@@ -1,7 +1,12 @@
 import { Route, Routes } from 'react-router-dom';
 import { RequireAuth, RequireRoles } from '../auth';
 import { AppLayout } from '../layout';
-import { ANIMAL_VIEW_ROLES, ORG_DOCUMENTS_ROLES, PLATFORM_DOCUMENTS_ROLES } from '../navigation';
+import {
+  ANIMAL_VIEW_ROLES,
+  ORG_DOCUMENTS_ROLES,
+  ORG_MEMBER_ROLES,
+  PLATFORM_DOCUMENTS_ROLES,
+} from '../navigation';
 import { AnimalDetailPage } from '../pages/animal-detail-page';
 import { HomePage, NotFoundPage, PlaceholderPage } from '../../features/_layout';
 import {
@@ -114,18 +119,39 @@ export function AppRoutes() {
           <Route path="certificado" element={<CertificateEmissionPage />} />
           {/* /campanas ahora es PÚBLICO (portal de campañas, T-055) — declarado
               arriba fuera de RequireAuth; ya no es un placeholder protegido. */}
+          {/* Org-facing dashboard placeholder; T-062 gates it like the rest of
+              "Mi organización" — a Persona has no formalización/rendición to see. */}
           <Route
             path="transparencia"
             element={
-              <PlaceholderPage
-                title="Transparencia"
-                description="Formalización y rendición de cuentas del portal."
-              />
+              <RequireRoles roles={ORG_MEMBER_ROLES}>
+                <PlaceholderPage
+                  title="Transparencia"
+                  description="Formalización y rendición de cuentas del portal."
+                />
+              </RequireRoles>
             }
           />
-          {/* M01 · organization profile + formalization (my lines, before catch-all). */}
-          <Route path="organizacion" element={<OrgProfilePage />} />
-          <Route path="organizacion/formalizacion" element={<OrgFormalizationPage />} />
+          {/* M01 · organization profile + formalization (my lines, before catch-all).
+              T-062: gated to ORG_MEMBER_ROLES — a Persona has no org to manage;
+              matches GET /org/profile and GET /org/formalization (any authenticated
+              member, no @Roles — the backend scopes by tenant, not role). */}
+          <Route
+            path="organizacion"
+            element={
+              <RequireRoles roles={ORG_MEMBER_ROLES}>
+                <OrgProfilePage />
+              </RequireRoles>
+            }
+          />
+          <Route
+            path="organizacion/formalizacion"
+            element={
+              <RequireRoles roles={ORG_MEMBER_ROLES}>
+                <OrgFormalizationPage />
+              </RequireRoles>
+            }
+          />
           {/* M01 · gestión documental de la org (T-031, wires T-103, RF03). */}
           <Route
             path="organizacion/documentos"
@@ -135,8 +161,17 @@ export function AppRoutes() {
               </RequireRoles>
             }
           />
-          {/* M14 · portal personalization by tokens (T-027, Owner/Admin gated). */}
-          <Route path="organizacion/portal" element={<PortalThemePage />} />
+          {/* M14 · portal personalization by tokens (T-027). Owner/Admin gate the
+              EDIT action (backend PUT + PortalThemePage itself); T-062 gates
+              VIEW/ENTRY here to ORG_MEMBER_ROLES, matching GET /portals/theme. */}
+          <Route
+            path="organizacion/portal"
+            element={
+              <RequireRoles roles={ORG_MEMBER_ROLES}>
+                <PortalThemePage />
+              </RequireRoles>
+            }
+          />
           {/* M01 · revisión documental cross-tenant (T-031, wires T-103, RF03).
               Audiencia de PLATAFORMA — denegada a roles de organización. */}
           <Route
