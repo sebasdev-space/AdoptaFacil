@@ -29,6 +29,9 @@ export const DOCUMENT_ACCEPT = [
   'image/gif',
 ] as const;
 
+/** Profile images (logo/cover) accept images only (T-D05). */
+export const IMAGE_ACCEPT = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
+
 /**
  * Validate a file before uploading. Returns a plain-language error message
  * (RNF09) or `null` when the file is acceptable.

@@ -12,7 +12,7 @@ export interface ToasterToast {
   title?: React.ReactNode;
   description?: React.ReactNode;
   action?: React.ReactNode;
-  variant?: 'default' | 'success' | 'destructive' | 'warning';
+  variant?: 'default' | 'success' | 'destructive' | 'warning' | 'info';
   /** Controlled open state, managed by the store. */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;

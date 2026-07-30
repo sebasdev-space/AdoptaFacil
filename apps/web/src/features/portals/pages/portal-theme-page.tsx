@@ -191,7 +191,11 @@ export function PortalThemePage() {
         json: { tokens: tokensFromForm(form) },
       });
       setForm(safePortalTheme(config.tokens) as FormState);
-      toast({ title: 'Personalización guardada', description: 'Tu portal se re-tematizó.' });
+      toast({
+        title: 'Personalización guardada',
+        description: 'Tu portal se re-tematizó.',
+        variant: 'success',
+      });
     } catch (error) {
       toast({
         title: 'No se pudo guardar',
