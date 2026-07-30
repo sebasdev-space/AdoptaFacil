@@ -107,6 +107,14 @@ Con `DATABASE_URL_APP` ya configurado (paso 2):
   servicio sin el disco, los archivos subidos antes se pierden.
 - **`--frozen-lockfile` falla en el build:** el lockfile quedó desactualizado.
   Corre `pnpm install` local, comitea `pnpm-lock.yaml`, vuelve a desplegar.
+- **`prisma: command not found` / `husky: command not found` / `nest: command
+not found` durante el build (T-D07):** pnpm salta TODAS las devDependencies
+  cuando `NODE_ENV=production` está en el entorno (confirmado: `adoptafacil-api`
+  lo declara como env var, y Render la expone también durante el build, no solo
+  en runtime) — pero `prisma`, `@nestjs/cli`, `typescript` y `husky` son
+  devDependencies. El `buildCommand` del Blueprint ya incluye `--prod=false`
+  para forzar su instalación durante el build; si copias el comando a mano
+  (fuera del Blueprint) no olvides ese flag.
 - **Build falla por memoria/timeout:** el plan `starter` del API suele alcanzar;
   si el build de `apps/web` (Vite) se queda sin memoria, sube el plan del
   static site temporalmente durante el build (Render permite build en plan
