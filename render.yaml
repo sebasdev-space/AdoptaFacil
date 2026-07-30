@@ -37,8 +37,14 @@ services:
     runtime: node
     plan: starter
     region: oregon
+    # HUSKY=0: sin esto, el "prepare": "husky" del root package.json puede
+    # fallar en un entorno de build sin hooks de git usables.
+    # --prod=false: NODE_ENV=production (env var de este servicio, ver abajo)
+    # hace que pnpm SALTE devDependencies por defecto — pero prisma, @nestjs/cli
+    # y typescript viven ahí. Sin este flag, "pnpm prisma generate" y
+    # "nest build" fallan por binario no encontrado (T-D07).
     buildCommand: >
-      pnpm install --frozen-lockfile &&
+      HUSKY=0 pnpm install --frozen-lockfile --prod=false &&
       pnpm prisma generate &&
       pnpm --filter @adoptafacil/api build
     # OJO: tsconfig.json de apps/api no fija "rootDir", así que `nest build`
@@ -114,8 +120,11 @@ services:
     runtime: static
     plan: free # los sitios estáticos son gratis en Render
     region: oregon
+    # Mismo resguardo que adoptafacil-api (T-D07): este servicio no declara
+    # NODE_ENV hoy, pero si Render llegara a inyectarlo, --prod=false evita el
+    # mismo fallo (vite/typescript son devDependencies).
     buildCommand: >
-      pnpm install --frozen-lockfile &&
+      HUSKY=0 pnpm install --frozen-lockfile --prod=false &&
       pnpm --filter @adoptafacil/web build
     staticPublishPath: apps/web/dist
     routes:
