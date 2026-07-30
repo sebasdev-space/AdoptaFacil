@@ -1,0 +1,132 @@
+# render.yaml — AdoptaFácil Blueprint (T-D06)
+#
+# Cómo usarlo: en el dashboard de Render → New → Blueprint → conectar este repo
+# (rama a desplegar, normalmente main) → Render lee este archivo y propone los
+# 4 servicios de abajo. Antes de "Apply" hay que llenar las env vars marcadas
+# `sync: false` (Render las deja vacías a propósito, ver DEPLOY.md para el
+# valor exacto de cada una y el orden de despliegue — hay dependencias
+# circulares de URL entre api/web que se resuelven en un segundo paso).
+#
+# Nombres de plan/región: son los vigentes al escribir este archivo. Verifica
+# en tu dashboard si Render los renombró; ajusta sin cambiar la forma del resto.
+
+databases:
+  # Postgres administrado por Render. El usuario "adoptafacil" es el OWNER de
+  # la base (privilegios de DDL/CREATE ROLE) — se usa para DATABASE_URL
+  # (migraciones). NO lo llames "adoptafacil_app": ese nombre lo usa la
+  # migración inicial para crear el rol NO-superusuario que exige RLS
+  # (RNF03); si coincidiera con el owner de Render, `CREATE ROLE` fallaría
+  # por colisión de nombre.
+  - name: adoptafacil-db
+    databaseName: adoptafacil
+    user: adoptafacil
+    plan: starter # el free tier de Postgres en Render expira y borra datos — no usarlo con fundaciones reales registrándose
+    region: oregon
+
+services:
+  # === Redis (BullMQ: recordatorios clínicos, seguimiento de adopciones) ===
+  - type: redis
+    name: adoptafacil-redis
+    plan: starter
+    region: oregon
+    ipAllowList: [] # sin acceso público; solo servicios internos del mismo proyecto Render
+
+  # === API (NestJS) ===
+  - type: web
+    name: adoptafacil-api
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: >
+      pnpm install --frozen-lockfile &&
+      pnpm prisma generate &&
+      pnpm --filter @adoptafacil/api build
+    # OJO: tsconfig.json de apps/api no fija "rootDir", así que `nest build`
+    # conserva la carpeta src/ dentro de dist/ (no es dist/main.js).
+    startCommand: node apps/api/dist/src/main.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: '20'
+      - key: DATABASE_URL
+        fromDatabase:
+          name: adoptafacil-db
+          property: connectionString
+      # NO es un valor derivable por Render (el rol adoptafacil_app lo crea
+      # nuestra propia migración inicial, no Render) — ver DEPLOY.md para
+      # cómo construir esta cadena a partir de DATABASE_URL.
+      - key: DATABASE_URL_APP
+        sync: false
+      - key: REDIS_URL
+        fromService:
+          name: adoptafacil-redis
+          type: redis
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      # URL pública del frontend (adoptafacil-web) — se llena DESPUÉS del
+      # primer deploy, cuando Render ya asignó la URL real (ver DEPLOY.md).
+      - key: API_CORS_ORIGIN
+        sync: false
+      # URL pública del propio frontend, usada para construir el link de
+      # "restablecer contraseña" en los correos. Mismo valor que API_CORS_ORIGIN.
+      - key: WEB_BASE_URL
+        sync: false
+      - key: STORAGE_DRIVER
+        value: disk
+      - key: STORAGE_DISK_ROOT
+        value: /var/data/storage
+      - key: STORAGE_MAX_FILE_MB
+        value: '15'
+      # URL pública de ESTE MISMO servicio (adoptafacil-api) — necesaria para
+      # construir las URLs de descarga de archivos. Se llena tras el primer
+      # deploy, igual que API_CORS_ORIGIN (ver DEPLOY.md).
+      - key: STORAGE_PUBLIC_BASE_URL
+        sync: false
+      # 'log' por defecto (no requiere credenciales). Cambiar a 'smtp' + llenar
+      # las SMTP_* de abajo si se quiere correo real para la demo.
+      - key: NOTIFICATION_DRIVER
+        value: log
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: PAYMENT_DRIVER
+        value: fake
+    disk:
+      name: adoptafacil-storage
+      mountPath: /var/data/storage
+      sizeGB: 1
+
+  # === Web (Vite/React, sitio estático) ===
+  - type: web
+    name: adoptafacil-web
+    runtime: static
+    plan: free # los sitios estáticos son gratis en Render
+    region: oregon
+    buildCommand: >
+      pnpm install --frozen-lockfile &&
+      pnpm --filter @adoptafacil/web build
+    staticPublishPath: apps/web/dist
+    routes:
+      # SPA: cualquier ruta que no sea un asset debe servir index.html para
+      # que React Router la resuelva client-side (si no, F5 en /organizacion da 404).
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: NODE_VERSION
+        value: '20'
+      # URL pública de adoptafacil-api — se llena tras el primer deploy (ver DEPLOY.md).
+      - key: VITE_API_URL
+        sync: false
