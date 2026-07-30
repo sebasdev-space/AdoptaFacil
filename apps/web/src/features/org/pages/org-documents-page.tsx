@@ -192,7 +192,11 @@ export function OrgDocumentsPage() {
       await uploadFileBytes(client, reserved.upload.key, file);
       closeUpload();
       await load();
-      toast({ title: 'Documento subido', description: 'Nueva versión enviada a revisión.' });
+      toast({
+        title: 'Documento subido',
+        description: 'Nueva versión enviada a revisión.',
+        variant: 'success',
+      });
     } catch (error) {
       toast({
         title: 'No se pudo subir el documento',

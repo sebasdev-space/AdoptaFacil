@@ -209,7 +209,7 @@ export function AnimalsPage() {
       setDescription('');
       setPhotoFile(null);
       await load();
-      toast({ title: 'Expediente creado' });
+      toast({ title: 'Expediente creado', variant: 'success' });
     } catch (error) {
       toast({
         title: 'No se pudo crear el expediente',

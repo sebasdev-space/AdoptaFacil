@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Toaster } from '@adoptafacil/ui';
 import { SessionProvider, type SessionProviderProps } from './auth';
 import { NavProvider } from './navigation';
 import { ThemeProvider, type ThemeProviderProps } from './theme';
@@ -35,6 +36,11 @@ export function AppProviders({ children, theme, session, transparency }: AppProv
           <SessionTransparencyProvider>{nav}</SessionTransparencyProvider>
         )}
       </SessionProvider>
+      {/* Global toast viewport (T-D05) — every feature's `useToast()`/`toast()`
+          call queues into the shared store in packages/ui; this is the ONE place
+          in the whole app that actually renders it. Previously missing entirely,
+          so no toast anywhere in the app was ever visible despite being fired. */}
+      <Toaster />
     </ThemeProvider>
   );
 }
