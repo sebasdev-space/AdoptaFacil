@@ -4,7 +4,6 @@ import {
   AlertTriangleIcon,
   HeartIcon,
   HomeIcon,
-  MegaphoneIcon,
   PawIcon,
   ShieldIcon,
   type IconProps,
@@ -53,8 +52,10 @@ export const ORG_MEMBER_ROLES = ORG_ROLES;
  * Primary portal sections shown in the sidebar (§M14 portales).
  *
  * This is the single source of truth for the navigation: the sidebar renders it
- * and the router (see router/routes.tsx) maps each `path` to a page. Module
- * owners replace the placeholder pages in Ola 1 without touching this list.
+ * and the router (see router/routes.tsx) maps each `path` to a page. A section
+ * whose real screen doesn't exist yet is simply NOT listed here (T-065,
+ * pre-demo) rather than pointing at a placeholder — module owners add the
+ * entry once the real route exists.
  */
 export interface NavItem {
   /** Route path; also the NavLink target. */
@@ -78,15 +79,19 @@ export const navItems: NavItem[] = [
   { path: '/', label: 'Inicio', icon: HomeIcon, end: true },
   { path: '/adopciones', label: 'Adopciones', icon: PawIcon },
   { path: '/donaciones', label: 'Donaciones', icon: HeartIcon },
-  // '/campanas' is the PUBLIC campaigns portal (T-055, outside RequireAuth) — a
-  // donor reaches it from the ORG's public portal (/o/:slug), not from this menu
-  // (§M06: viewing is a donor action, but browsing/managing this SIDEBAR entry is
-  // an org concern — same class of gap T-062 fixed). Gating only the MENU ENTRY:
-  // the route itself stays public/untouched for anonymous visitors and for a
-  // donor who lands on /campanas via the portal CTA.
-  { path: '/campanas', label: 'Campañas', icon: MegaphoneIcon, roles: ORG_MEMBER_ROLES },
-  // Org-facing dashboard (formalización + rendición del portal, T-062 fix).
-  { path: '/transparencia', label: 'Transparencia', icon: ShieldIcon, roles: ORG_MEMBER_ROLES },
+  // T-065 (pre-demo): "Campañas" REMOVED from the menu entirely (was gated to
+  // ORG_MEMBER_ROLES by T-063, but for an Owner the link still pointed at the
+  // PUBLIC portal route below — clicking it exits the shell, no sidebar). The
+  // route itself is UNTOUCHED: a donor still reaches it from the org's public
+  // portal (/o/:slug), never from this menu; the in-shell management screen
+  // (/organizacion/campanas) doesn't exist yet — reversible post-30 once it does.
+  //
+  // T-065: "Transparencia" REMOVED from the menu entirely — the screen was only
+  // ever a placeholder ("se implementará en la Ola 1..."); the REAL transparency
+  // indicator (Nivel/%/Rendición) already lives in the persistent header bar on
+  // every page (shell/transparency), so nothing is actually lost. The `/transparencia`
+  // ROUTE stays registered (routes.tsx) but now redirects home instead of showing
+  // the stale placeholder text — reversible post-30 once a real screen exists.
   // M03 · animales + recordatorios clínicos (T-031, wires T-104/T-106). Reuses
   // PawIcon; a dedicated "bell" for reminders is a reported gap in shell/icons.
   { path: '/animales', label: 'Animales', icon: PawIcon, roles: ANIMAL_VIEW_ROLES },
