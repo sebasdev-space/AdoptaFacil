@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { RequireAuth, RequireRoles } from '../auth';
 import { AppLayout } from '../layout';
 import {
@@ -8,7 +8,7 @@ import {
   PLATFORM_DOCUMENTS_ROLES,
 } from '../navigation';
 import { AnimalDetailPage } from '../pages/animal-detail-page';
-import { HomePage, NotFoundPage, PlaceholderPage } from '../../features/_layout';
+import { HomePage, NotFoundPage } from '../../features/_layout';
 import {
   ForgotPasswordPage,
   LoginPage,
@@ -35,8 +35,9 @@ import { CertificateEmissionPage, CertificateVerificationPage } from '../../feat
  *   everything else            → protected by <RequireAuth>, rendered inside the
  *                                <AppLayout> shell (sidebar + header + indicator)
  *
- * Protected sections whose real screens arrive in Ola 1 render <PlaceholderPage>.
- * Module owners swap those elements without touching the guard or the layout.
+ * Protected sections whose real screens haven't landed yet just aren't routed/
+ * navigable (T-065, pre-demo) instead of rendering a stale placeholder — module
+ * owners add the real route (and its nav entry) when the screen exists.
  *
  * Exposed as an element (not a data router) so tests can mount it under a
  * <MemoryRouter initialEntries={…}> to exercise public vs protected routing.
@@ -119,19 +120,12 @@ export function AppRoutes() {
           <Route path="certificado" element={<CertificateEmissionPage />} />
           {/* /campanas ahora es PÚBLICO (portal de campañas, T-055) — declarado
               arriba fuera de RequireAuth; ya no es un placeholder protegido. */}
-          {/* Org-facing dashboard placeholder; T-062 gates it like the rest of
-              "Mi organización" — a Persona has no formalización/rendición to see. */}
-          <Route
-            path="transparencia"
-            element={
-              <RequireRoles roles={ORG_MEMBER_ROLES}>
-                <PlaceholderPage
-                  title="Transparencia"
-                  description="Formalización y rendición de cuentas del portal."
-                />
-              </RequireRoles>
-            }
-          />
+          {/* T-065 (pre-demo): la ruta se mantiene registrada (no se borra, reversible
+              post-30) pero ya NO muestra el placeholder ("se implementará en la Ola
+              1...") — nada de "pendiente" visible en la demo. Redirige a inicio; el
+              indicador REAL de transparencia (Nivel/%/Rendición) ya vive en la barra
+              superior del shell en todas las pantallas. */}
+          <Route path="transparencia" element={<Navigate to="/" replace />} />
           {/* M01 · organization profile + formalization (my lines, before catch-all).
               T-062: gated to ORG_MEMBER_ROLES — a Persona has no org to manage;
               matches GET /org/profile and GET /org/formalization (any authenticated
