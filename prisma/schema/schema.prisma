@@ -7,6 +7,9 @@
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["prismaSchemaFolder"]
+  // "native" keeps local Windows/Mac dev working; "debian-openssl-3.0.x" is the
+  // engine Render's native Node runtime needs (Render deploy, T-D06).
+  binaryTargets   = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {

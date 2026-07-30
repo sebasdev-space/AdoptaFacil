@@ -106,3 +106,4 @@ Detalles en [`prisma/README.md`](./prisma/README.md).
 - [`docs/CONTRACTS.md`](./docs/CONTRACTS.md) — registro vivo de contratos.
 - [`docs/TASKS.md`](./docs/TASKS.md) — convención del tablero `T-###`.
 - [`prisma/README.md`](./prisma/README.md) — esquema dividido y RLS.
+- [`DEPLOY.md`](./DEPLOY.md) — despliegue en Render (Blueprint, env vars, troubleshooting).
