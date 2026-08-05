@@ -6,7 +6,8 @@ import { AppProviders } from '../app-providers';
 import { AppRoutes } from './routes';
 import { renderShell } from '../../test-utils';
 
-// Home page hits /health on mount; stub fetch so the shell renders offline.
+// Several routed pages fetch on mount (e.g. a PlatformAdmin's home health check,
+// donations, campaigns); stub fetch so the shell renders offline.
 beforeEach(() => {
   vi.stubGlobal(
     'fetch',
@@ -39,13 +40,15 @@ describe('routing — public vs protected', () => {
     expect(screen.getByText('Verificando tu sesión…')).toBeInTheDocument();
   });
 
-  it('renders the protected home inside the shell when authenticated', async () => {
+  it('renders the protected home inside the shell when authenticated', () => {
     renderShell({ route: '/', session: { initialStatus: 'authenticated' } });
     expect(screen.getByRole('heading', { name: 'Inicio' })).toBeInTheDocument();
     // Sidebar navigation is present.
     expect(screen.getByRole('link', { name: 'Adopciones' })).toBeInTheDocument();
-    // Flush the /health fetch so the state update settles inside act().
-    expect(await screen.findByText('status')).toBeInTheDocument();
+    // The system-health block is platform-admin only (F-VISUAL-02); the default
+    // test session carries no roles, so it stays hidden here. Covered for both
+    // a non-admin and a PlatformAdmin in home-page.test.tsx.
+    expect(screen.queryByText('Estado del sistema')).not.toBeInTheDocument();
   });
 
   it('renders a protected module route when authenticated', () => {
