@@ -29,4 +29,9 @@ describe('LoginPage', () => {
     // Still on the login screen.
     expect(screen.getByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
   });
+
+  it('F-LANDING-02: shows a "Volver al inicio" link to the public general portal', () => {
+    renderShell({ route: '/login', session: { initialStatus: 'unauthenticated' } });
+    expect(screen.getByRole('link', { name: '← Volver al inicio' })).toHaveAttribute('href', '/');
+  });
 });

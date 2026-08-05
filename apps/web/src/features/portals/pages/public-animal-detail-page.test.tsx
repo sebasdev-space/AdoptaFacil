@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { AnimalSummary } from '@adoptafacil/contracts';
 import { PublicAnimalDetailPage } from './public-animal-detail-page';
@@ -7,6 +7,12 @@ import { PublicAnimalDetailPage } from './public-animal-detail-page';
 /**
  * §M14/M03 (T-052) — public animal detail. Public fields only (never clinical
  * record/reminders/documents) + a "Solicitar adopción" CTA into the T-028a flow.
+ *
+ * F-LANDING-02: an animal is reached from BOTH the general portal (`/`) and its
+ * org's portal (`/o/:slug`), so the page offers two exits — "Volver al inicio"
+ * (always present, no fetch needed) and "Ver {org name}" (independent,
+ * best-effort fetch of the org's public profile; absent if it fails/never a
+ * generic label).
  */
 const ANIMAL: AnimalSummary = {
   id: 'a1',
@@ -39,6 +45,32 @@ function stubAnimals(body: unknown) {
     vi.fn(() => Promise.resolve({ ok: true, status: 200, json: async () => body })),
   );
 }
+
+/** Discriminates by URL: the org PROFILE endpoint vs. the animals CATALOG one
+ *  (they're different fetches, different shapes — see PublicAnimalDetailPage). */
+function stubByUrl(profileBody: unknown, animalsBody: unknown) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: RequestInfo | URL) => {
+      const isProfile = !String(url).includes('/animals');
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => (isProfile ? profileBody : animalsBody),
+      });
+    }),
+  );
+}
+
+// Every test either overrides this via stubAnimals/stubByUrl, or relies on
+// nav-state to skip the animal fetch — but the org-NAME fetch always fires
+// regardless of nav-state, so fetch must never be left unstubbed.
+beforeEach(() => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) }),
+  );
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -80,5 +112,30 @@ describe('PublicAnimalDetailPage', () => {
     renderDetail();
     expect(await screen.findByText('Animal no encontrado')).toBeInTheDocument();
     expect(screen.queryByTestId('request-adoption-cta')).not.toBeInTheDocument();
+  });
+
+  it('F-LANDING-02: always shows "Volver al inicio" (→ /), even before the org name loads', () => {
+    renderDetail({ state: { animal: ANIMAL } });
+    expect(screen.getByRole('link', { name: '← Volver al inicio' })).toHaveAttribute('href', '/');
+  });
+
+  it('F-LANDING-02: shows "Ver {org name}" (→ /o/:slug) once the org profile resolves — never a generic label', async () => {
+    stubByUrl({ name: 'Fundación Patitas' }, { items: [ANIMAL], total: 1, limit: 50, offset: 0 });
+    renderDetail({ state: { animal: ANIMAL } });
+
+    expect(screen.getByRole('link', { name: '← Volver al inicio' })).toHaveAttribute('href', '/');
+    const orgLink = await screen.findByRole('link', { name: 'Ver Fundación Patitas' });
+    expect(orgLink).toHaveAttribute('href', '/o/patitas');
+    // Never a generic fallback label while/if the name is unavailable.
+    expect(screen.queryByRole('link', { name: /^Ver$/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Ver organización')).not.toBeInTheDocument();
+  });
+
+  it('F-LANDING-02: "Ver {org}" stays absent (never generic) when the org profile fetch fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }));
+    renderDetail({ state: { animal: ANIMAL } });
+
+    expect(screen.getByRole('link', { name: '← Volver al inicio' })).toHaveAttribute('href', '/');
+    expect(screen.queryByText(/^Ver /)).not.toBeInTheDocument();
   });
 });

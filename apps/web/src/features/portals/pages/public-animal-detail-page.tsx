@@ -24,6 +24,8 @@ import {
 // catálogo (no hay GET público de un animal individual y NO se crean endpoints).
 const CATALOG_CAP = 50;
 
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+
 type DetailState = 'loading' | 'ready' | 'not-found' | 'error';
 
 interface AnimalNavState {
@@ -40,6 +42,13 @@ interface AnimalNavState {
  * El botón "Solicitar adopción" enlaza al flujo de T-028a (Persona autenticada). La
  * ruta destino está bajo `RequireAuth`: sin sesión, returnTo a login y regreso al
  * animal (deny-by-default); con sesión, entra directo.
+ *
+ * F-LANDING-02: un animal se alcanza tanto desde el portal general (`/`, F-LANDING-01)
+ * como desde el portal de su organización (`/o/:slug`) — por eso ofrece DOS salidas:
+ * "Volver al inicio" (siempre disponible, no depende de ningún fetch) y "Ver
+ * {nombre real}" hacia `/o/:slug` (fetch independiente y best-effort, igual que el
+ * conteo de animales de `OrgPublicPage`; nunca un texto genérico — si el nombre no
+ * carga, ese segundo enlace simplemente no aparece, "Volver al inicio" sigue ahí).
  */
 export function PublicAnimalDetailPage() {
   const { slug, animalId } = useParams<{ slug: string; animalId: string }>();
@@ -48,6 +57,7 @@ export function PublicAnimalDetailPage() {
 
   const [animal, setAnimal] = useState<AnimalSummary | null>(preloaded ?? null);
   const [state, setState] = useState<DetailState>(preloaded ? 'ready' : 'loading');
+  const [orgName, setOrgName] = useState<string | null>(null);
 
   useEffect(() => {
     if (preloaded || !slug || !animalId) {
@@ -70,16 +80,37 @@ export function PublicAnimalDetailPage() {
     };
   }, [preloaded, slug, animalId]);
 
+  useEffect(() => {
+    if (!slug) return;
+    let active = true;
+    fetch(`${API_BASE}/public/organizations/${encodeURIComponent(slug)}`)
+      .then((response) => (response.ok ? (response.json() as Promise<{ name?: string }>) : null))
+      .then((body) => {
+        if (active && body?.name) setOrgName(body.name);
+      })
+      .catch(() => {
+        // Best-effort: "Ver {org}" simply stays absent; "Volver al inicio" remains.
+      });
+    return () => {
+      active = false;
+    };
+  }, [slug]);
+
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
-      {slug && (
-        <Link
-          to={`/o/${encodeURIComponent(slug)}`}
-          className="text-sm text-primary hover:underline"
-        >
-          ← Volver al portal
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <Link to="/" className="text-sm text-primary hover:underline">
+          ← Volver al inicio
         </Link>
-      )}
+        {slug && orgName && (
+          <Link
+            to={`/o/${encodeURIComponent(slug)}`}
+            className="text-sm text-primary hover:underline"
+          >
+            Ver {orgName}
+          </Link>
+        )}
+      </div>
 
       <div className="mt-4">
         {state === 'loading' && <Skeleton className="h-72 w-full" />}

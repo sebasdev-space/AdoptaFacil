@@ -20,6 +20,11 @@ afterEach(() => {
 });
 
 describe('RegisterPage — Organization vs Person', () => {
+  it('F-LANDING-02: shows a "Volver al inicio" link to the public general portal', () => {
+    renderShell({ route: '/register', session: { initialStatus: 'unauthenticated' } });
+    expect(screen.getByRole('link', { name: '← Volver al inicio' })).toHaveAttribute('href', '/');
+  });
+
   it('shows the organization fields by default and person fields after switching', async () => {
     const user = userEvent.setup();
     renderShell({ route: '/register', session: { initialStatus: 'unauthenticated' } });
