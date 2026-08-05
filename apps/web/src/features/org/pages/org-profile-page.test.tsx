@@ -63,13 +63,15 @@ afterEach(() => {
 describe('OrgProfilePage — hub central (S2-REORG)', () => {
   it('shows the 3-button action bar: Formalización (with state), Personalización, Ver portal público', async () => {
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
-    await screen.findByRole('heading', { name: 'Mi organización' });
     // Scoped to <main>: the sidebar nav ALSO has a "Personalización" link
     // (different route context) — the action bar's own link must be queried
     // separately from it.
     const main = within(screen.getByRole('main'));
 
-    const formalizacion = main.getByRole('link', { name: /Formalización/ });
+    // The action bar only renders once `GET /org/profile` resolves — the
+    // heading itself renders earlier and is not a reliable load signal, so the
+    // FIRST query must be a `find*` (async) to actually wait for it.
+    const formalizacion = await main.findByRole('link', { name: /Formalización/ });
     expect(formalizacion).toHaveAttribute('href', '/organizacion/formalizacion');
     expect(formalizacion).toHaveTextContent('En proceso');
 
@@ -95,7 +97,6 @@ describe('OrgProfilePage — hub central (S2-REORG)', () => {
 
   it('renders all 6 cards from S2-REORG §3.2, each exactly once', async () => {
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
-    await screen.findByRole('heading', { name: 'Mi organización' });
 
     const titles = [
       'Datos institucionales',
@@ -105,27 +106,33 @@ describe('OrgProfilePage — hub central (S2-REORG)', () => {
       'Acerca de nosotros',
       'Información de contacto extendida',
     ];
+    // The heading renders before `GET /org/profile` resolves (it doesn't depend
+    // on `org`), so awaiting it alone doesn't prove the form mounted — only
+    // that the shell did. Each card title must be awaited individually
+    // (findAllByText polls) instead of assumed present via a synchronous
+    // getAllByText right after the heading; otherwise this races the mocked
+    // fetch's microtask and flakes under different event-loop timing (CI).
     for (const title of titles) {
-      expect(screen.getAllByText(title)).toHaveLength(1);
+      expect(await screen.findAllByText(title)).toHaveLength(1);
     }
   });
 
   it('has NO URL text fields for logo/cover — upload-only (S2-REORG §5)', async () => {
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
-    await screen.findByRole('heading', { name: 'Mi organización' });
 
+    // `find*` first to wait for the async form to mount before asserting on
+    // fields that only exist once it does (see the "6 cards" test above).
+    expect(await screen.findByLabelText('Subir logo')).toBeInTheDocument();
+    expect(screen.getByLabelText('Subir portada')).toBeInTheDocument();
     expect(screen.queryByLabelText('URL del logo')).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Fotos de portada/)).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Subir logo')).toBeInTheDocument();
-    expect(screen.getByLabelText('Subir portada')).toBeInTheDocument();
   });
 
   it('shows "Cambiar logo" + a preview once the org already has one', async () => {
     stubFetch(() => ({ ...BASE_ORG, logoUrl: 'https://cdn.test/logo.png' }));
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
-    await screen.findByRole('heading', { name: 'Mi organización' });
 
-    expect(screen.getByLabelText('Cambiar logo')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Cambiar logo')).toBeInTheDocument();
     expect(screen.queryByLabelText('Subir logo')).not.toBeInTheDocument();
   });
 
@@ -143,10 +150,9 @@ describe('OrgProfilePage — hub central (S2-REORG)', () => {
       return BASE_ORG;
     });
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
-    await screen.findByRole('heading', { name: 'Mi organización' });
 
     const file = new File(['bytes'], 'logo.png', { type: 'image/png' });
-    const input = screen.getByLabelText('Subir logo');
+    const input = await screen.findByLabelText('Subir logo');
     await userEvent.upload(input, file);
 
     await screen.findByLabelText('Cambiar logo');
@@ -200,10 +206,9 @@ describe('OrgProfilePage — hub central (S2-REORG)', () => {
 
   it('the map field uses the fixed label/placeholder (S2-REORG §6)', async () => {
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
-    await screen.findByRole('heading', { name: 'Mi organización' });
 
+    const mapField = await screen.findByLabelText('Ubicación en el mapa');
     expect(screen.queryByLabelText('Enlace a Google Maps')).not.toBeInTheDocument();
-    const mapField = screen.getByLabelText('Ubicación en el mapa');
     expect(mapField).toHaveAttribute(
       'placeholder',
       'Pega el enlace de Google Maps de tu ubicación',
