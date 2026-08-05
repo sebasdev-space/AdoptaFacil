@@ -255,12 +255,37 @@ export class DonationsService {
     return rows.map((r) => this.fromModel(r));
   }
 
-  /** The donor's own donations (cross-tenant via SECURITY DEFINER, by identity). */
+  /**
+   * The donor's own donations (cross-tenant via SECURITY DEFINER, by identity),
+   * enriched with the beneficiary org's display name (S1-02) so Fabián's "mis
+   * donaciones" inbox doesn't have to do N+1 requests or show a raw id.
+   *
+   * `donations_for_donor` returns `SETOF "donations"` (no join) because it lives
+   * in an already-shipped migration and this task is query+contract only (no
+   * migrations) — so the name is resolved with a second, batched lookup instead
+   * of a join inside the function. `organizations` carries NO RLS policy of its
+   * own (it is the tenant anchor, not tenant-scoped data — same trust boundary
+   * the public-portal SECURITY DEFINER functions already rely on), so reading
+   * it directly by id, cross-tenant, needs no `withOrgContext`.
+   */
   async listMine(actor: RequestUser): Promise<Donation[]> {
     const rows = await this.prisma.$queryRaw<DonationRow[]>(Prisma.sql`
       SELECT * FROM donations_for_donor(${actor.id}::uuid)
     `);
-    return rows.map((r) => this.fromRow(r));
+    const orgNames = await this.organizationNamesById(rows.map((r) => r.organization_id));
+    return rows.map((r) => this.fromRow(r, orgNames.get(r.organization_id)));
+  }
+
+  private async organizationNamesById(ids: string[]): Promise<Map<string, string>> {
+    const uniqueIds = [...new Set(ids)];
+    if (uniqueIds.length === 0) {
+      return new Map();
+    }
+    const orgs = await this.prisma.organization.findMany({
+      where: { id: { in: uniqueIds } },
+      select: { id: true, name: true },
+    });
+    return new Map(orgs.map((org) => [org.id, org.name]));
   }
 
   /** The donor's receipt for THEIR OWN donation (cross-tenant, by identity). */
@@ -286,10 +311,11 @@ export class DonationsService {
     return rows[0] ?? null;
   }
 
-  private fromRow(row: DonationRow): Donation {
+  private fromRow(row: DonationRow, organizationName?: string): Donation {
     return {
       id: row.id,
       organizationId: row.organization_id,
+      organizationName,
       donorUserId: row.donor_user_id,
       concept: { kind: row.concept_kind as PaymentConcept['kind'], id: row.concept_id },
       commissionPayer: row.commission_payer as Donation['commissionPayer'],

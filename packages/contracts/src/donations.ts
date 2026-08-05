@@ -69,6 +69,13 @@ export interface Donation {
   id: string;
   /** Organización BENEFICIARIA (dueña del recaudo). */
   organizationId: string;
+  /**
+   * Nombre visible de la organización beneficiaria. Opcional y aditivo: solo
+   * `GET /donations/mine` lo resuelve (S1-02, bandeja "mis donaciones" del
+   * donante, que no conoce el nombre por fuera de este id); el resto de rutas
+   * (creación, webhook, `donations/received`) lo dejan `undefined`.
+   */
+  organizationName?: string;
   /** Persona autenticada que donó (fijada por el backend desde el JWT). */
   donorUserId: string;
   /** Para qué es la donación (P1: la organización; forward-compat animal/campaña). */

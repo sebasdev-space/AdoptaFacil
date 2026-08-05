@@ -217,7 +217,11 @@ describe('Donations (M05: donate + breakdown + receipt)', () => {
       .get('/donations/mine')
       .set('Authorization', `Bearer ${personToken}`)
       .expect(200);
-    expect(mine.body.some((d: { id: string }) => d.id === orgDonationId)).toBe(true);
+    const mineDonation = mine.body.find((d: { id: string }) => d.id === orgDonationId);
+    expect(mineDonation).toBeTruthy();
+    // S1-02: the donor's inbox resolves the beneficiary org's display name
+    // (not just its id) via a batched lookup, no N+1.
+    expect(mineDonation.organizationName).toBe('Refugio Beneficiario');
 
     const receipt = await request(server)
       .get(`/donations/${orgDonationId}/receipt`)
