@@ -272,14 +272,14 @@ describe('OrgPublicPage — rich public portal', () => {
       ).toBeInTheDocument();
     });
 
-    it('shows "Información" with hours/address/phones when extendedContact is set, and embeds the map', async () => {
+    it('shows "Información" with hours/address/phones when extendedContact is set, and embeds an already-embeddable map URL', async () => {
       stubFetch({
         org: {
           ...ORG,
           extendedContact: {
             hours: 'Lun-Vie 9am-5pm',
             fullAddress: 'Calle 45 #12-34, Bogotá',
-            mapUrl: 'https://maps.google.com/embed?q=Bogota',
+            mapUrl: 'https://maps.google.com/maps?q=Bogota&output=embed',
             additionalPhones: ['3001234567'],
           },
         },
@@ -293,8 +293,35 @@ describe('OrgPublicPage — rich public portal', () => {
       expect(screen.getByText('3001234567')).toBeInTheDocument();
       expect(screen.getByTitle('Ubicación en el mapa')).toHaveAttribute(
         'src',
-        'https://maps.google.com/embed?q=Bogota',
+        'https://maps.google.com/maps?q=Bogota&output=embed',
       );
+    });
+
+    it('S2-REORG: converts a Google Maps SHARE url (not already embeddable) instead of showing the "refused to connect" iframe', async () => {
+      stubFetch({
+        org: { ...ORG, extendedContact: { mapUrl: 'https://maps.google.com/?q=Bogota' } },
+      });
+      renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+      await screen.findByRole('heading', { name: /Refugio Patitas/ });
+
+      await userEvent.click(screen.getByRole('tab', { name: 'Información' }));
+      expect(await screen.findByTitle('Ubicación en el mapa')).toHaveAttribute(
+        'src',
+        'https://maps.google.com/maps?q=Bogota&output=embed',
+      );
+    });
+
+    it('S2-REORG: falls back to a plain link for a non-Google-Maps URL (never an iframe that could be blocked)', async () => {
+      stubFetch({
+        org: { ...ORG, extendedContact: { mapUrl: 'https://www.openstreetmap.org/way/123' } },
+      });
+      renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+      await screen.findByRole('heading', { name: /Refugio Patitas/ });
+
+      await userEvent.click(screen.getByRole('tab', { name: 'Información' }));
+      const link = await screen.findByRole('link', { name: /Ver en mapa/ });
+      expect(link).toHaveAttribute('href', 'https://www.openstreetmap.org/way/123');
+      expect(screen.queryByTitle('Ubicación en el mapa')).not.toBeInTheDocument();
     });
 
     it('positions the logo per logoPosition (default "left" unchanged)', async () => {

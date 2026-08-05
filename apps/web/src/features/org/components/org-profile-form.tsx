@@ -1,5 +1,9 @@
 import { useState } from 'react';
-import type { Organization, UpdateOrganizationProfileInput } from '@adoptafacil/contracts';
+import type {
+  Organization,
+  OrganizationExtendedContact,
+  UpdateOrganizationProfileInput,
+} from '@adoptafacil/contracts';
 import { Button, Card, CardContent, CardHeader, CardTitle, useToast } from '@adoptafacil/ui';
 import { useApiClient, type ApiClient } from '../../../shell/api';
 import {
@@ -10,12 +14,17 @@ import {
 } from '../data/colombian-locations';
 import { IMAGE_ACCEPT, uploadFileBytes, validateUpload } from '../lib/storage';
 import { TextAreaField, TextField } from './profile-fields';
-import {
-  parseUrlLines,
-  validateOptionalEmail,
-  validateOptionalSlug,
-  validateOptionalUrl,
-} from '../validation';
+import { validateOptionalEmail, validateOptionalSlug, validateOptionalUrl } from '../validation';
+
+const ABOUT_US_MAX = 2000;
+
+/** "a, b\nc" → ["a", "b", "c"] — separadas por coma O por línea, vacías descartadas. */
+function parsePhones(raw: string): string[] {
+  return raw
+    .split(/[,\n]/)
+    .map((phone) => phone.trim())
+    .filter(Boolean);
+}
 
 interface FormState {
   name: string;
@@ -27,7 +36,7 @@ interface FormState {
   whatsapp: string;
   phone: string;
   logoUrl: string;
-  coverPhotos: string; // one URL per line
+  coverUrl: string;
   department: string;
   city: string;
   address: string;
@@ -35,9 +44,19 @@ interface FormState {
   facebook: string;
   tiktok: string;
   website: string;
+  // S2-REORG: movidos desde la página de Personalización — se guardan con el
+  // MISMO endpoint (PUT /org/profile) que el resto de este formulario; solo
+  // cambió DÓNDE se editan, nunca dónde se persisten (ya vivían en
+  // organization_profiles.about_us/extended_contact desde S2-PORTAL).
+  aboutUs: string;
+  contactHours: string;
+  contactFullAddress: string;
+  contactMapUrl: string;
+  contactPhones: string;
 }
 
 function initialState(org: Organization): FormState {
+  const contact = org.extendedContact;
   return {
     name: org.name ?? '',
     slug: org.slug ?? '',
@@ -48,7 +67,7 @@ function initialState(org: Organization): FormState {
     whatsapp: org.whatsapp ?? '',
     phone: org.phone ?? '',
     logoUrl: org.logoUrl ?? '',
-    coverPhotos: (org.coverPhotos ?? []).join('\n'),
+    coverUrl: org.coverPhotos?.[0] ?? '',
     department: org.location?.department ?? '',
     city: org.location?.city ?? '',
     address: org.location?.address ?? '',
@@ -56,6 +75,11 @@ function initialState(org: Organization): FormState {
     facebook: org.socialLinks?.facebook ?? '',
     tiktok: org.socialLinks?.tiktok ?? '',
     website: org.socialLinks?.website ?? '',
+    aboutUs: org.aboutUs ?? '',
+    contactHours: contact?.hours ?? '',
+    contactFullAddress: contact?.fullAddress ?? '',
+    contactMapUrl: contact?.mapUrl ?? '',
+    contactPhones: contact?.additionalPhones?.join(', ') ?? '',
   };
 }
 
@@ -88,6 +112,24 @@ function cleanFormatted(value: string): string | undefined {
   return v ? v : undefined;
 }
 
+/**
+ * Always an object (never `undefined`) — same "don't silently no-op a clear"
+ * lesson as `cleanText` above, applied to a JSON column: `organization_profiles
+ * .extended_contact` is fully REPLACED on every PUT (Prisma JSON columns don't
+ * merge), so a sub-field simply omitted here is correctly cleared server-side —
+ * but the FULL update itself must never be a bare `undefined`, or the whole
+ * object would silently survive unchanged if the user clears every sub-field.
+ */
+function extendedContactFromForm(form: FormState): OrganizationExtendedContact {
+  const additionalPhones = parsePhones(form.contactPhones);
+  return {
+    ...(form.contactHours.trim() ? { hours: form.contactHours.trim() } : {}),
+    ...(form.contactFullAddress.trim() ? { fullAddress: form.contactFullAddress.trim() } : {}),
+    ...(form.contactMapUrl.trim() ? { mapUrl: form.contactMapUrl.trim() } : {}),
+    ...(additionalPhones.length > 0 ? { additionalPhones } : {}),
+  };
+}
+
 function buildPayload(form: FormState): UpdateOrganizationProfileInput {
   const location = {
     // Fixed — the platform is Colombia-only (base document); not user-editable.
@@ -115,9 +157,11 @@ function buildPayload(form: FormState): UpdateOrganizationProfileInput {
     whatsapp: cleanText(form.whatsapp),
     phone: cleanText(form.phone),
     logoUrl: cleanFormatted(form.logoUrl),
-    coverPhotos: parseUrlLines(form.coverPhotos),
+    coverPhotos: form.coverUrl.trim() ? [form.coverUrl.trim()] : [],
     location,
     ...(hasAnySocialLink ? { socialLinks } : {}),
+    aboutUs: cleanText(form.aboutUs),
+    extendedContact: extendedContactFromForm(form),
   };
 }
 
@@ -128,8 +172,8 @@ interface UploadTargetResult {
 
 /** Reserve a storage target (`POST /org/profile/uploads`, Owner/Administrator,
  *  public visibility — T-108) and PUT the real bytes to it. Returns the
- *  publicly-servable URL to store as `logoUrl`/a `coverPhotos` entry. Reuses
- *  the SAME upload plumbing already wired for documents/animal photos — no new
+ *  publicly-servable URL to store as `logoUrl`/`coverPhotos[0]`. Reuses the
+ *  SAME upload plumbing already wired for documents/animal photos — no new
  *  endpoint needed (T-D05 P3 finding: the endpoint already existed, unused by
  *  the UI until now). */
 async function uploadProfileImage(client: ApiClient, file: File): Promise<string> {
@@ -149,16 +193,41 @@ async function uploadProfileImage(client: ApiClient, file: File): Promise<string
   return `${origin}/storage/public?key=${encodeURIComponent(reserved.key)}`;
 }
 
-interface LogoFieldProps {
-  value: string;
-  onChange: (value: string) => void;
-  error?: string;
+/** Simple camera glyph for the empty image placeholder (feature-local — no
+ *  icon library added, same convention as the portal pages' link icons). */
+function CameraIcon() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      className="h-6 w-6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z" />
+      <circle cx="12" cy="13" r="4" />
+    </svg>
+  );
 }
 
-/** URL field + "O sube una imagen" fallback (T-D05 P3) — the URL stays the
- *  source of truth (still directly editable), the file input just fills it in
- *  via the real upload endpoint. Preview reflects whatever `value` currently is. */
-function LogoField({ value, onChange, error }: LogoFieldProps) {
+interface ImageUploadFieldProps {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  shape: 'circle' | 'rectangle';
+}
+
+/**
+ * Logo/portada — SOLO subida de archivo (S2-REORG): el campo de texto "URL
+ * del logo/portada" se quitó por completo (era jerga técnica innecesaria para
+ * un usuario no técnico). `value` sigue siendo una URL internamente — el
+ * flujo de guardado (`PUT /org/profile`) no cambia, solo cómo se llena.
+ */
+function ImageUploadField({ id, label, value, onChange, shape }: ImageUploadFieldProps) {
   const client = useApiClient();
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
@@ -189,119 +258,49 @@ function LogoField({ value, onChange, error }: LogoFieldProps) {
     }
   };
 
-  return (
-    <div className="space-y-2">
-      <TextField
-        id="org-logo"
-        label="URL del logo"
-        value={value}
-        onChange={onChange}
-        error={error}
-      />
-      <div className="flex items-center gap-3">
-        <label className="cursor-pointer text-sm font-medium text-primary hover:underline">
-          {uploading ? 'Subiendo…' : 'O sube una imagen'}
-          <input
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            disabled={uploading}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.target.value = '';
-              if (file) void handleFile(file);
-            }}
-          />
-        </label>
-        {value && (
-          <img
-            src={value}
-            alt="Vista previa del logo"
-            className="h-12 w-12 rounded border border-border object-cover"
-          />
-        )}
-      </div>
-    </div>
-  );
-}
-
-interface CoverPhotosFieldProps {
-  value: string;
-  onChange: (value: string) => void;
-  error?: string;
-}
-
-/** Same upload fallback as the logo, but APPENDS a new line instead of
- *  replacing (this field holds a "one URL per line" list, T-D05 P3). */
-function CoverPhotosField({ value, onChange, error }: CoverPhotosFieldProps) {
-  const client = useApiClient();
-  const { toast } = useToast();
-  const [uploading, setUploading] = useState(false);
-  const urls = parseUrlLines(value);
-
-  const handleFile = async (file: File): Promise<void> => {
-    const invalid = validateUpload(file, IMAGE_ACCEPT);
-    if (invalid) {
-      toast({ title: 'Imagen no válida', description: invalid, variant: 'warning' });
-      return;
-    }
-    setUploading(true);
-    try {
-      const url = await uploadProfileImage(client, file);
-      onChange(value.trim() ? `${value.trim()}\n${url}` : url);
-      toast({
-        title: 'Imagen subida',
-        description: 'Se agregó a la lista. Haz clic en "Guardar cambios" para aplicarla.',
-        variant: 'info',
-      });
-    } catch (error) {
-      toast({
-        title: 'No se pudo subir la imagen',
-        description: error instanceof Error ? error.message : 'Inténtalo de nuevo.',
-        variant: 'destructive',
-      });
-    } finally {
-      setUploading(false);
-    }
-  };
+  const previewClass =
+    shape === 'circle'
+      ? 'h-20 w-20 shrink-0 rounded-full border border-border object-cover'
+      : 'h-24 w-full rounded-md border border-border object-cover';
+  const placeholderClass =
+    shape === 'circle'
+      ? 'flex h-20 w-20 shrink-0 items-center justify-center rounded-full border border-dashed border-border bg-muted text-muted-foreground'
+      : 'flex h-24 w-full items-center justify-center rounded-md border border-dashed border-border bg-muted text-muted-foreground';
 
   return (
-    <div className="space-y-2">
-      <TextAreaField
-        id="org-covers"
-        label="Fotos de portada (una URL por línea)"
-        value={value}
-        onChange={onChange}
-        error={error}
-      />
-      <div className="flex items-center gap-3">
-        <label className="cursor-pointer text-sm font-medium text-primary hover:underline">
-          {uploading ? 'Subiendo…' : 'O sube una imagen'}
-          <input
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            disabled={uploading}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.target.value = '';
-              if (file) void handleFile(file);
-            }}
-          />
-        </label>
-      </div>
-      {urls.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {urls.map((url) => (
-            <img
-              key={url}
-              src={url}
-              alt="Vista previa de portada"
-              className="h-12 w-20 rounded border border-border object-cover"
-            />
-          ))}
+    <div className={shape === 'circle' ? 'flex items-center gap-4' : 'space-y-2'}>
+      {value ? (
+        <img src={value} alt={`Vista previa: ${label}`} className={previewClass} />
+      ) : (
+        <div aria-hidden className={placeholderClass}>
+          <CameraIcon />
         </div>
       )}
+      <div className="space-y-1">
+        <span className="block text-sm font-medium text-foreground">{label}</span>
+        <label
+          htmlFor={id}
+          className="inline-flex cursor-pointer items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+        >
+          {uploading
+            ? 'Subiendo…'
+            : value
+              ? `Cambiar ${label.toLowerCase()}`
+              : `Subir ${label.toLowerCase()}`}
+          <input
+            id={id}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            disabled={uploading}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = '';
+              if (file) void handleFile(file);
+            }}
+          />
+        </label>
+      </div>
     </div>
   );
 }
@@ -333,14 +332,11 @@ export function OrgProfileForm({ initial, onSaved }: OrgProfileFormProps) {
     const next: Partial<Record<keyof FormState, string>> = {
       slug: validateOptionalSlug(form.slug),
       contactEmail: validateOptionalEmail(form.contactEmail),
-      logoUrl: validateOptionalUrl(form.logoUrl),
       instagram: validateOptionalUrl(form.instagram),
       facebook: validateOptionalUrl(form.facebook),
       tiktok: validateOptionalUrl(form.tiktok),
       website: validateOptionalUrl(form.website),
-      coverPhotos: parseUrlLines(form.coverPhotos)
-        .map((u) => validateOptionalUrl(u))
-        .find(Boolean),
+      contactMapUrl: validateOptionalUrl(form.contactMapUrl),
       name: form.name.trim() ? undefined : 'El nombre es obligatorio.',
     };
     const cleaned = Object.fromEntries(Object.entries(next).filter(([, v]) => v));
@@ -391,6 +387,7 @@ export function OrgProfileForm({ initial, onSaved }: OrgProfileFormProps) {
     <div className="space-y-6 pb-20">
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-6">
+          {/* Card 1 — Datos institucionales */}
           <Card>
             <CardHeader>
               <CardTitle>Datos institucionales</CardTitle>
@@ -437,6 +434,7 @@ export function OrgProfileForm({ initial, onSaved }: OrgProfileFormProps) {
             </CardContent>
           </Card>
 
+          {/* Card 3 — Ubicación (fuente única: no se repite en Personalización) */}
           <Card>
             <CardHeader>
               <CardTitle>Ubicación</CardTitle>
@@ -523,9 +521,36 @@ export function OrgProfileForm({ initial, onSaved }: OrgProfileFormProps) {
               />
             </CardContent>
           </Card>
+
+          {/* Card 5 — Acerca de nosotros (S2-REORG: movida desde Personalización) */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Acerca de nosotros</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1.5">
+              <label htmlFor="org-about-us" className="block text-sm font-medium text-foreground">
+                Quiénes somos
+              </label>
+              <textarea
+                id="org-about-us"
+                value={form.aboutUs}
+                maxLength={ABOUT_US_MAX}
+                placeholder="Cuéntale al mundo quiénes son, su historia, su misión y por qué hacen lo que hacen..."
+                onChange={(event) => set('aboutUs')(event.target.value)}
+                className="min-h-32 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+              <p className="text-right text-xs text-muted-foreground">
+                {form.aboutUs.length}/{ABOUT_US_MAX}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Este texto aparece en la sección "Nosotros" de tu portal público.
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="space-y-6">
+          {/* Card 2 — Contacto */}
           <Card>
             <CardHeader>
               <CardTitle>Contacto</CardTitle>
@@ -556,49 +581,102 @@ export function OrgProfileForm({ initial, onSaved }: OrgProfileFormProps) {
             </CardContent>
           </Card>
 
+          {/* Card 4 — Imágenes y redes sociales (S2-REORG: solo subida, sin URL de texto) */}
           <Card>
             <CardHeader>
-              <CardTitle>Imágenes y redes</CardTitle>
+              <CardTitle>Imágenes y redes sociales</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <LogoField value={form.logoUrl} onChange={set('logoUrl')} error={errors.logoUrl} />
-              </div>
-              <div className="sm:col-span-2">
-                <CoverPhotosField
-                  value={form.coverPhotos}
-                  onChange={set('coverPhotos')}
-                  error={errors.coverPhotos}
+            <CardContent className="space-y-4">
+              <ImageUploadField
+                id="org-logo-upload"
+                label="Logo"
+                value={form.logoUrl}
+                onChange={set('logoUrl')}
+                shape="circle"
+              />
+              <ImageUploadField
+                id="org-cover-upload"
+                label="Portada"
+                value={form.coverUrl}
+                onChange={set('coverUrl')}
+                shape="rectangle"
+              />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <TextField
+                  id="org-instagram"
+                  label="Instagram"
+                  value={form.instagram}
+                  onChange={set('instagram')}
+                  error={errors.instagram}
+                />
+                <TextField
+                  id="org-facebook"
+                  label="Facebook"
+                  value={form.facebook}
+                  onChange={set('facebook')}
+                  error={errors.facebook}
+                />
+                <TextField
+                  id="org-tiktok"
+                  label="TikTok"
+                  value={form.tiktok}
+                  onChange={set('tiktok')}
+                  error={errors.tiktok}
+                />
+                <TextField
+                  id="org-website"
+                  label="Sitio web"
+                  value={form.website}
+                  onChange={set('website')}
+                  error={errors.website}
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Card 6 — Información de contacto extendida (S2-REORG: movida desde
+              Personalización; el mapa se corrige del lado del portal público,
+              ver PortalContactInfoSection/model/google-maps.ts). */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Información de contacto extendida</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <TextField
-                id="org-instagram"
-                label="Instagram"
-                value={form.instagram}
-                onChange={set('instagram')}
-                error={errors.instagram}
+                id="org-contact-hours"
+                label="Horario de atención"
+                value={form.contactHours}
+                onChange={set('contactHours')}
+                placeholder="Lun-Vie 9:00am - 5:00pm"
               />
               <TextField
-                id="org-facebook"
-                label="Facebook"
-                value={form.facebook}
-                onChange={set('facebook')}
-                error={errors.facebook}
+                id="org-contact-address"
+                label="Dirección completa"
+                value={form.contactFullAddress}
+                onChange={set('contactFullAddress')}
+                placeholder="Calle 45 #12-34, Bogotá"
               />
               <TextField
-                id="org-tiktok"
-                label="TikTok"
-                value={form.tiktok}
-                onChange={set('tiktok')}
-                error={errors.tiktok}
+                id="org-contact-map"
+                label="Ubicación en el mapa"
+                type="url"
+                value={form.contactMapUrl}
+                onChange={set('contactMapUrl')}
+                error={errors.contactMapUrl}
+                placeholder="Pega el enlace de Google Maps de tu ubicación"
+                hint="Busca tu ubicación en Google Maps, copia el enlace y pégalo aquí."
               />
               <TextField
-                id="org-website"
-                label="Sitio web"
-                value={form.website}
-                onChange={set('website')}
-                error={errors.website}
+                id="org-contact-phones"
+                label="Teléfonos adicionales"
+                value={form.contactPhones}
+                onChange={set('contactPhones')}
+                placeholder="3001234567, 3007654321"
+                hint="Separados por coma o uno por línea."
               />
+              <p className="text-xs text-muted-foreground">
+                Esta información aparece en la sección "Información" de tu portal público.
+              </p>
             </CardContent>
           </Card>
         </div>
