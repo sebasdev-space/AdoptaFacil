@@ -197,7 +197,12 @@ export class FollowUpService {
         filename: input.photoFilename as string,
       });
       storageRef = stored.key;
-      storageUrl = stored.url;
+      // `createUploadTarget().url` is the PUT-only upload target (see
+      // StorageController), never a viewable link — `resolvePublicUrl(key)` is
+      // the GET-able one that must be persisted as `storageUrl`/`photoUrl`
+      // (S1-04; same bug class as the localhost issue, found while auditing
+      // every storage-URL construction site).
+      storageUrl = this.storage.resolvePublicUrl(stored.key);
     }
 
     const kind = hasPhoto ? 'photo' : 'questionnaire';

@@ -5,6 +5,7 @@ import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { FollowUpService } from '../src/modules/adoptions/followup.service';
+import { STORAGE_PORT, type StoragePort } from '../src/core/storage/storage.port';
 import { purgeOrganizations } from './support/cleanup';
 
 /**
@@ -195,6 +196,18 @@ describe('Adoption follow-up (M04: post-adoption tracking)', () => {
       })
       .expect(201);
     expect(submitted.body.status).toBe('completed');
+
+    // S1-04: the evidence photo must resolve through the GET-able storage
+    // route (`resolvePublicUrl`), never the PUT-only upload target that
+    // `createUploadTarget().url` returns.
+    const withEvidence = await request(server)
+      .get(`/adoptions/followups/by-contract/${contractId}`)
+      .set('Authorization', `Bearer ${refugeToken}`)
+      .expect(200);
+    const milestone = withEvidence.body.find((m: { id: string }) => m.id === futureMilestoneId);
+    const photoEvidence = milestone.evidence.find((e: { kind: string }) => e.kind === 'photo');
+    const storage = app.get<StoragePort>(STORAGE_PORT);
+    expect(photoEvidence.photoUrl).toBe(storage.resolvePublicUrl(photoEvidence.storageRef));
   });
 
   it("forbids a person from responding someone else's milestone (identity gate, 404)", async () => {
