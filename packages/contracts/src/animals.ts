@@ -174,6 +174,46 @@ export interface AnimalSummaryPage {
   offset: number;
 }
 
+/**
+ * Public-safe projection of the org an animal belongs to, for the GLOBAL public
+ * catalog (S1-07) — just enough to render a card and link to `/o/:slug`. Same
+ * trust boundary as {@link AnimalSummary}: no NIT/legalName/phone/audit data.
+ */
+export interface PublicAnimalOrganizationSummary {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl?: string;
+  city?: string;
+}
+
+/**
+ * One item of the GLOBAL public adoption catalog (S1-07): `GET /public/animals`
+ * — every field from {@link AnimalSummary} (species/breed/sex/computedAge/
+ * photoUrl/status), plus which organization it belongs to. Deliberately reuses
+ * AnimalSummary's shape (rather than a parallel string-only projection) so the
+ * portal's existing animal card component works unchanged for both the
+ * per-org and the global catalog.
+ */
+export interface PublicAnimalSummary extends AnimalSummary {
+  organization: PublicAnimalOrganizationSummary;
+}
+
+/**
+ * Paginated projection for `GET /public/animals` (S1-07). Page-based (not
+ * offset-based like {@link AnimalSummaryPage}) — this listing merges results
+ * across organizations, where a page number is the natural fit for the
+ * landing page's pager/infinite-scroll.
+ */
+export interface PublicAnimalsPage {
+  data: PublicAnimalSummary[];
+  /** Total adoptable animals matching the query across ALL public orgs. */
+  total: number;
+  page: number;
+  /** Effective page size (server-capped). */
+  limit: number;
+}
+
 // ============================================================================
 // M03 write DTOs (T-104, RF07). Owner/Administrator/Operator/Veterinarian write;
 // ReadOnlyAuditor may only read. All timestamps are ISO-8601 UTC.

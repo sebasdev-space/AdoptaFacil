@@ -7,11 +7,14 @@ import type {
   AnimalStatus,
   AnimalSummary,
   AnimalSummaryPage,
+  PublicAnimalOrganizationSummary,
+  PublicAnimalsPage,
+  PublicAnimalSummary,
 } from '@adoptafacil/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 import { STORAGE_PORT, type StoragePort } from '../../core/storage/storage.port';
 import { computeAge } from './animal-age';
-import type { PublicAnimalsQuery } from './public-animals.schemas';
+import type { PublicAnimalsGlobalQuery, PublicAnimalsQuery } from './public-animals.schemas';
 
 /** Raw item shape emitted by the SECURITY DEFINER function (public-safe only). */
 interface RawItem {
@@ -72,6 +75,102 @@ export class PublicAnimalsService {
       limit: page.limit,
       offset: page.offset,
     };
+  }
+
+  /**
+   * The GLOBAL adoptable catalog across EVERY organization with a public
+   * profile (S1-07), for the public landing page.
+   *
+   * RLS note (no migrations allowed for this task): there is no existing
+   * cross-org SECURITY DEFINER function that returns organization_profiles
+   * fields (slug/logoUrl/city) for MORE than one org at a time — every public
+   * cross-tenant read in this codebase (`organization_public`,
+   * `public_org_adoptable_animals`, `public_campaigns`...) is SLUG- or
+   * ID-scoped, and adding a new one requires a migration. Instead this method:
+   *   1. Reads `organizations` (the tenant anchor — NOT RLS-protected) to get
+   *      every organization id, then reads each one's profile inside its own
+   *      `withOrgContext` transaction (the same explicit-org accessor
+   *      seeds/jobs already use) to find which ones have a public slug.
+   *   2. Calls the EXISTING `public_org_adoptable_animals` SECURITY DEFINER
+   *      function once per public org (capped at `PER_ORG_CAP` items each),
+   *      and merges + paginates the results in memory.
+   *
+   * Cost is O(organizations on the platform) per request, not O(animals) —
+   * fine at pilot scale (a handful of real rescue orgs), but NOT how this
+   * should work once the platform has many orgs: that needs a proper
+   * cross-tenant SECURITY DEFINER function (a follow-up task, since it
+   * requires a migration this one cannot make).
+   */
+  async listAllAdoptable(query: PublicAnimalsGlobalQuery): Promise<PublicAnimalsPage> {
+    const page = query.page ?? 1;
+    const limit = Math.min(query.limit ?? 20, 50);
+
+    let directory = await this.getPublicOrgDirectory();
+    if (query.city) {
+      const needle = query.city.trim().toLowerCase();
+      directory = directory.filter((org) => org.city?.toLowerCase() === needle);
+    }
+
+    const now = new Date();
+    const perOrg = await Promise.all(
+      directory.map((org) =>
+        this.prisma.$queryRaw<Array<{ data: RawPage | null }>>(
+          Prisma.sql`SELECT public_org_adoptable_animals(${org.slug}, ${PublicAnimalsService.PER_ORG_CAP}::int, 0::int, ${query.species ?? null}::text) AS data`,
+        ),
+      ),
+    );
+
+    const allItems: PublicAnimalSummary[] = [];
+    perOrg.forEach((rows, i) => {
+      const org = directory[i];
+      const orgPage = rows[0]?.data;
+      if (!orgPage) return;
+      for (const item of orgPage.items) {
+        allItems.push({ ...this.toSummary(item, now), organization: org });
+      }
+    });
+
+    const start = (page - 1) * limit;
+    return {
+      data: allItems.slice(start, start + limit),
+      total: allItems.length,
+      page,
+      limit,
+    };
+  }
+
+  /** Server cap per organization for the global catalog fan-out (see
+   *  {@link listAllAdoptable}'s RLS note) — matches the per-org endpoint's max. */
+  private static readonly PER_ORG_CAP = 50;
+
+  /** Every organization with a public profile (slug set), with just the
+   *  public-safe fields the global catalog needs. */
+  private async getPublicOrgDirectory(): Promise<PublicAnimalOrganizationSummary[]> {
+    const organizations = await this.prisma.organization.findMany({
+      select: { id: true, name: true },
+    });
+    const profiles = await Promise.all(
+      organizations.map((org) =>
+        this.prisma.withOrgContext(org.id, (tx) =>
+          tx.organizationProfile.findUnique({ where: { organizationId: org.id } }),
+        ),
+      ),
+    );
+
+    const directory: PublicAnimalOrganizationSummary[] = [];
+    organizations.forEach((org, i) => {
+      const profile = profiles[i];
+      if (!profile?.slug) return;
+      const location = profile.location as { city?: string } | null;
+      directory.push({
+        id: org.id,
+        name: org.name,
+        slug: profile.slug,
+        logoUrl: profile.logoUrl ?? undefined,
+        city: location?.city ?? undefined,
+      });
+    });
+    return directory;
   }
 
   private toSummary(item: RawItem, now: Date): AnimalSummary {

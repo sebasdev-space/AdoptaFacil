@@ -15,3 +15,18 @@ export const publicAnimalsQuerySchema = z.object({
 });
 
 export type PublicAnimalsQuery = z.infer<typeof publicAnimalsQuerySchema>;
+
+/**
+ * Query validation for the GLOBAL public adoption catalog (S1-07),
+ * `GET /public/animals`. Page-based (the landing page's pager), server-capped
+ * at 50 like the per-org endpoint; `city` matches an organization's profile
+ * city case-insensitively (exact match — no fuzzy search in this cut).
+ */
+export const publicAnimalsGlobalQuerySchema = z.object({
+  species: z.enum(['dog', 'cat', 'other']).optional(),
+  city: z.string().trim().min(1).optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).optional(),
+});
+
+export type PublicAnimalsGlobalQuery = z.infer<typeof publicAnimalsGlobalQuerySchema>;
