@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import type { OrganizationPublic, PortalTheme, PortalView } from '@adoptafacil/contracts';
-import { EmptyState, Skeleton } from '@adoptafacil/ui';
+import type {
+  OrganizationPublic,
+  PortalLogoPosition,
+  PortalSocialNavPosition,
+  PortalTheme,
+  PortalView,
+} from '@adoptafacil/contracts';
+import { EmptyState, Skeleton, Tabs, TabsContent, TabsList, TabsTrigger } from '@adoptafacil/ui';
 import { brandTokensToStyle } from '../../../shell/theme';
 import { buildPortalView } from '../model/portal-view';
-import { safePortalTheme } from '../model/theme';
+import { safeLogoPosition, safePortalTheme, safeSocialNavPosition } from '../model/theme';
 import { fetchPublicAnimals } from '../api/public-animals';
 import { PortalProfileSection } from '../components/portal-profile-section';
 import { PortalPlaceholderSection } from '../components/portal-placeholder-section';
@@ -12,10 +18,19 @@ import { PortalTransparencyBar } from '../components/portal-transparency-bar';
 import { PortalDonateCta } from '../components/portal-donate-cta';
 import { PortalSocialLinks } from '../components/portal-social-links';
 import { PortalAdoptionSection } from '../components/portal-adoption-section';
+import { PortalAboutSection } from '../components/portal-about-section';
+import { PortalContactInfoSection } from '../components/portal-contact-info-section';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
 type LoadState = 'loading' | 'ready' | 'not-found' | 'error';
+
+interface Layout {
+  logoPosition: PortalLogoPosition;
+  socialNavPosition: PortalSocialNavPosition;
+}
+
+const DEFAULT_LAYOUT: Layout = { logoPosition: 'left', socialNavPosition: 'right' };
 
 /**
  * PUBLIC organization PORTAL at `/o/:slug` (§M14). Rendered OUTSIDE the app shell
@@ -46,6 +61,7 @@ export function OrgPublicPage() {
   const { slug } = useParams<{ slug: string }>();
   const [view, setView] = useState<PortalView | null>(null);
   const [theme, setTheme] = useState<PortalTheme>({});
+  const [layout, setLayout] = useState<Layout>(DEFAULT_LAYOUT);
   const [state, setState] = useState<LoadState>('loading');
   const [animalTotal, setAnimalTotal] = useState<number | undefined>(undefined);
 
@@ -57,8 +73,9 @@ export function OrgPublicPage() {
     let active = true;
     const encoded = encodeURIComponent(slug);
 
-    // The profile drives the page state (404/error). The theme is best-effort:
-    // if it fails or is absent, the portal simply renders the default design.
+    // The profile drives the page state (404/error). The theme (colors +
+    // layout, S2-PORTAL) is best-effort: if it fails or is absent, the portal
+    // simply renders the default design/layout.
     const profile = fetch(`${API_BASE}/public/organizations/${encoded}`).then((response) => {
       if (response.status === 404) throw new Error('not-found');
       if (!response.ok) throw new Error('error');
@@ -66,16 +83,31 @@ export function OrgPublicPage() {
     });
 
     const brand = fetch(`${API_BASE}/public/organizations/${encoded}/theme`)
-      .then((response) => (response.ok ? (response.json() as Promise<{ tokens?: unknown }>) : null))
-      .then((body) => safePortalTheme(body?.tokens))
-      .catch(() => ({}) as PortalTheme);
+      .then((response) =>
+        response.ok
+          ? (response.json() as Promise<{
+              tokens?: unknown;
+              logoPosition?: unknown;
+              socialNavPosition?: unknown;
+            }>)
+          : null,
+      )
+      .then((body) => ({
+        tokens: safePortalTheme(body?.tokens),
+        layout: {
+          logoPosition: safeLogoPosition(body?.logoPosition),
+          socialNavPosition: safeSocialNavPosition(body?.socialNavPosition),
+        },
+      }))
+      .catch(() => ({ tokens: {} as PortalTheme, layout: DEFAULT_LAYOUT }));
 
     profile
       .then(async (data) => {
-        const tokens = await brand;
+        const brandResult = await brand;
         if (!active) return;
         setView(buildPortalView(data));
-        setTheme(tokens);
+        setTheme(brandResult.tokens);
+        setLayout(brandResult.layout);
         setState('ready');
       })
       .catch((err: unknown) => {
@@ -124,6 +156,18 @@ export function OrgPublicPage() {
     (section) => section.kind === 'pets' || section.status !== 'placeholder',
   );
 
+  // Tabs "Nosotros"/"Información" (S2-PORTAL) solo existen cuando hay contenido
+  // REAL que mostrar — nunca una tab vacía. "Portafolio" siempre está (§5.1).
+  const aboutUs = view?.profile.organization.aboutUs?.trim();
+  const contact = view?.profile.organization.extendedContact;
+  const hasContactInfo = Boolean(
+    contact &&
+    (contact.hours ||
+      contact.fullAddress ||
+      contact.mapUrl ||
+      (contact.additionalPhones && contact.additionalPhones.length > 0)),
+  );
+
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6" style={themeStyle}>
       {state === 'loading' && <Skeleton className="h-72 w-full" />}
@@ -143,30 +187,67 @@ export function OrgPublicPage() {
               <PortalTransparencyBar organization={view.profile.organization} />
             </div>
           )}
-          <PortalProfileSection profile={view.profile} animalCount={animalTotal} />
+          <PortalProfileSection
+            profile={view.profile}
+            animalCount={animalTotal}
+            logoPosition={layout.logoPosition}
+          />
 
-          <div className="grid gap-6 lg:grid-cols-3">
-            <div className="space-y-6 lg:col-span-2">
-              {/* La sección "Mascotas en adopción" (kind 'pets') ya está CABLEADA
-                  al catálogo público (§M14/M03, T-052); cualquier otra sección que
-                  algún día deje de ser placeholder aparecería aquí también. */}
-              {visibleSections?.map((section) =>
-                section.kind === 'pets' ? (
-                  <PortalAdoptionSection key={section.kind} slug={slug as string} />
-                ) : (
-                  <PortalPlaceholderSection key={section.kind} section={section} />
-                ),
-              )}
-            </div>
+          {/* Menú de tabs (S2-PORTAL, §5.1): "Portafolio" siempre presente;
+              "Nosotros"/"Información" solo cuando hay contenido real. */}
+          <Tabs defaultValue="portafolio">
+            <TabsList>
+              <TabsTrigger value="portafolio">Portafolio</TabsTrigger>
+              {aboutUs && <TabsTrigger value="nosotros">Nosotros</TabsTrigger>}
+              {hasContactInfo && <TabsTrigger value="informacion">Información</TabsTrigger>}
+            </TabsList>
 
-            {/* Sidebar (§M14, pulido visual T-D02): redes/contacto + CTA "Donar"
-                (§M05, T-051) — el mismo <Link>/query params de siempre, solo
-                reposicionado. El gate de sesión vive en /donaciones (RequireAuth). */}
-            <aside className="space-y-6">
-              <PortalDonateCta organization={view.profile.organization} />
-              <PortalSocialLinks organization={view.profile.organization} />
-            </aside>
-          </div>
+            <TabsContent value="portafolio">
+              <div className="grid gap-6 lg:grid-cols-3">
+                <div
+                  className={`space-y-6 lg:col-span-2 ${
+                    layout.socialNavPosition === 'left' ? 'lg:order-last' : ''
+                  }`}
+                >
+                  {/* La sección "Mascotas en adopción" (kind 'pets') ya está
+                      CABLEADA al catálogo público (§M14/M03, T-052); cualquier
+                      otra sección que algún día deje de ser placeholder
+                      aparecería aquí también. */}
+                  {visibleSections?.map((section) =>
+                    section.kind === 'pets' ? (
+                      <PortalAdoptionSection key={section.kind} slug={slug as string} />
+                    ) : (
+                      <PortalPlaceholderSection key={section.kind} section={section} />
+                    ),
+                  )}
+                </div>
+
+                {/* Sidebar (§M14, pulido visual T-D02): redes/contacto + CTA
+                    "Donar" (§M05, T-051), reposicionable (S2-PORTAL). El gate
+                    de sesión vive en /donaciones (RequireAuth). */}
+                <aside
+                  className={`space-y-6 ${
+                    layout.socialNavPosition === 'left' ? 'lg:order-first' : ''
+                  }`}
+                >
+                  <PortalDonateCta organization={view.profile.organization} />
+                  <PortalSocialLinks organization={view.profile.organization} />
+                </aside>
+              </div>
+            </TabsContent>
+
+            {aboutUs && (
+              <TabsContent value="nosotros">
+                <PortalAboutSection aboutUs={aboutUs} />
+              </TabsContent>
+            )}
+
+            {hasContactInfo && contact && (
+              <TabsContent value="informacion">
+                <PortalContactInfoSection contact={contact} />
+              </TabsContent>
+            )}
+          </Tabs>
         </div>
       )}
     </main>

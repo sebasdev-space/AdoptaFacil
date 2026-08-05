@@ -45,6 +45,17 @@ export const updateOrgProfileSchema = z
       })
       .strict()
       .optional(),
+    // S2-PORTAL: contenido de las tabs públicas "Nosotros"/"Información".
+    aboutUs: shortText(2000).optional(),
+    extendedContact: z
+      .object({
+        hours: shortText(200).optional(),
+        fullAddress: shortText(300).optional(),
+        mapUrl: url.optional(),
+        additionalPhones: z.array(shortText(30)).max(10).optional(),
+      })
+      .strict()
+      .optional(),
     subdomain: slug.optional(),
     slug: slug.optional(),
     organizationType: z.nativeEnum(OrganizationType).optional(),

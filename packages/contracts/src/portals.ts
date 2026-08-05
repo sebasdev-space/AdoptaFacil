@@ -117,14 +117,27 @@ export type PortalThemeToken = PortalColorToken | PortalScalarToken;
  */
 export type PortalTheme = Partial<Record<PortalThemeToken, string>>;
 
+/**
+ * Posiciones de layout configurables del portal (S2-PORTAL). Igual que los
+ * tokens de color, son un subconjunto SEGURO y acotado (nunca CSS/HTML libre).
+ */
+export type PortalLogoPosition = 'left' | 'center' | 'right';
+export type PortalSocialNavPosition = 'left' | 'right';
+
 /** Respuesta de lectura del tema (propio o público). */
 export interface PortalThemeConfig {
   tokens: PortalTheme;
+  /** Dónde se posiciona el logo sobre el hero (S2-PORTAL). Default: 'left'. */
+  logoPosition?: PortalLogoPosition;
+  /** De qué lado va el sidebar de redes/contacto (S2-PORTAL). Default: 'right'. */
+  socialNavPosition?: PortalSocialNavPosition;
 }
 
 /** Entrada para crear/actualizar el tema (Owner/Admin). */
 export interface UpdatePortalThemeInput {
   tokens: PortalTheme;
+  logoPosition?: PortalLogoPosition;
+  socialNavPosition?: PortalSocialNavPosition;
 }
 
 // ----------------------------------------------------------------------------

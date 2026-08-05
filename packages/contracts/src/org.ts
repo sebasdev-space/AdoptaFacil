@@ -37,6 +37,11 @@ export interface Organization {
   phone?: string;
   location?: OrganizationLocation;
   socialLinks?: OrganizationSocialLinks;
+  /** Free text: mission/history/"quiénes somos" (S2-PORTAL). Rendered in the
+   *  public portal's "Nosotros" tab; the tab is hidden while this is unset. */
+  aboutUs?: string;
+  /** Structured contact detail for the public portal's "Información" tab. */
+  extendedContact?: OrganizationExtendedContact;
 
   // --- Public portal (M14, additive) -----------------------------------------
   /** Subdomain for the org portal, e.g. `patitaspeludas` in
@@ -128,6 +133,22 @@ export interface OrganizationSocialLinks {
   facebook?: string;
   tiktok?: string;
   website?: string;
+}
+
+/**
+ * Extended contact info for the public portal's "Información" tab (S2-PORTAL).
+ * Free-form/structured so the frontend renders each field on its own (hours,
+ * full address, an embeddable map link, extra phone numbers) — separate from
+ * `OrganizationLocation`/`phone`, which stay the internal/back-office fields.
+ */
+export interface OrganizationExtendedContact {
+  /** e.g. "Lun-Vie 9:00am - 5:00pm". */
+  hours?: string;
+  /** Full street address, as opposed to the structured `OrganizationLocation`. */
+  fullAddress?: string;
+  /** A Google Maps link, embedded as a plain iframe — no Maps API/key involved. */
+  mapUrl?: string;
+  additionalPhones?: string[];
 }
 
 /**
@@ -230,6 +251,10 @@ export interface OrganizationPublic {
   formalizationState?: FormalizationState;
   rteVigente?: boolean;
   verificationLevel?: VerificationLevel;
+  /** "Nosotros" tab content (S2-PORTAL); absent ⇒ the portal hides that tab. */
+  aboutUs?: string;
+  /** "Información" tab content (S2-PORTAL); absent ⇒ the portal hides that tab. */
+  extendedContact?: OrganizationExtendedContact;
   /**
    * NIT — public transparency datum for formalized ESALs in Colombia (team
    * decision, T-101). Exposed ONLY once the organization is formalized
@@ -281,6 +306,8 @@ export interface UpdateOrganizationProfileInput {
   phone?: string;
   location?: OrganizationLocation;
   socialLinks?: OrganizationSocialLinks;
+  aboutUs?: string;
+  extendedContact?: OrganizationExtendedContact;
   subdomain?: string;
   slug?: string;
   /** Legal/organizational type for the profile badge (RF01, T-030). */

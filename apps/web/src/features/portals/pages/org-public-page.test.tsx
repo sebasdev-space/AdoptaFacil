@@ -1,4 +1,5 @@
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FormalizationState, type OrganizationPublic } from '@adoptafacil/contracts';
 import { renderShell } from '../../../test-utils';
@@ -29,15 +30,28 @@ interface StubOptions {
   orgStatus?: number;
   orgOk?: boolean;
   theme?: Record<string, unknown>;
+  logoPosition?: string;
+  socialNavPosition?: string;
 }
 
-function stubFetch({ org = ORG, orgStatus = 200, orgOk = true, theme = {} }: StubOptions = {}) {
+function stubFetch({
+  org = ORG,
+  orgStatus = 200,
+  orgOk = true,
+  theme = {},
+  logoPosition,
+  socialNavPosition,
+}: StubOptions = {}) {
   vi.stubGlobal(
     'fetch',
     vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith('/theme')) {
-        return Promise.resolve({ ok: true, status: 200, json: async () => ({ tokens: theme }) });
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ tokens: theme, logoPosition, socialNavPosition }),
+        });
       }
       return Promise.resolve({ ok: orgOk, status: orgStatus, json: async () => org });
     }),
@@ -232,5 +246,72 @@ describe('OrgPublicPage — rich public portal', () => {
     expect(await screen.findByText('Organización no encontrada')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /Refugio Patitas/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Mascotas en adopción' })).not.toBeInTheDocument();
+  });
+
+  describe('S2-PORTAL: tabs + layout', () => {
+    it('always shows the "Portafolio" tab; hides "Nosotros"/"Información" while empty', async () => {
+      renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+      await screen.findByRole('heading', { name: /Refugio Patitas/ });
+
+      expect(screen.getByRole('tab', { name: 'Portafolio' })).toBeInTheDocument();
+      expect(screen.queryByRole('tab', { name: 'Nosotros' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('tab', { name: 'Información' })).not.toBeInTheDocument();
+      // Contenido de siempre (catálogo + sidebar) sigue ahí, sin cambios.
+      expect(screen.getByRole('heading', { name: 'Mascotas en adopción' })).toBeInTheDocument();
+    });
+
+    it('shows "Nosotros" with the real content when aboutUs is set', async () => {
+      stubFetch({ org: { ...ORG, aboutUs: 'Somos un refugio con 10 años de historia.' } });
+      renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+      await screen.findByRole('heading', { name: /Refugio Patitas/ });
+
+      const tab = screen.getByRole('tab', { name: 'Nosotros' });
+      await userEvent.click(tab);
+      expect(
+        await screen.findByText('Somos un refugio con 10 años de historia.'),
+      ).toBeInTheDocument();
+    });
+
+    it('shows "Información" with hours/address/phones when extendedContact is set, and embeds the map', async () => {
+      stubFetch({
+        org: {
+          ...ORG,
+          extendedContact: {
+            hours: 'Lun-Vie 9am-5pm',
+            fullAddress: 'Calle 45 #12-34, Bogotá',
+            mapUrl: 'https://maps.google.com/embed?q=Bogota',
+            additionalPhones: ['3001234567'],
+          },
+        },
+      });
+      renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+      await screen.findByRole('heading', { name: /Refugio Patitas/ });
+
+      await userEvent.click(screen.getByRole('tab', { name: 'Información' }));
+      expect(await screen.findByText('Lun-Vie 9am-5pm')).toBeInTheDocument();
+      expect(screen.getByText('Calle 45 #12-34, Bogotá')).toBeInTheDocument();
+      expect(screen.getByText('3001234567')).toBeInTheDocument();
+      expect(screen.getByTitle('Ubicación en el mapa')).toHaveAttribute(
+        'src',
+        'https://maps.google.com/embed?q=Bogota',
+      );
+    });
+
+    it('positions the logo per logoPosition (default "left" unchanged)', async () => {
+      stubFetch({ org: { ...ORG, logoUrl: 'https://cdn.test/logo.png' }, logoPosition: 'center' });
+      renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+
+      const logo = await screen.findByAltText('Logo de Refugio Patitas');
+      expect(logo.parentElement?.className).toContain('left-1/2');
+    });
+
+    it('moves the social sidebar to the left when socialNavPosition is "left"', async () => {
+      stubFetch({ socialNavPosition: 'left' });
+      renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+      await screen.findByRole('heading', { name: /Refugio Patitas/ });
+
+      const sidebar = screen.getByRole('link', { name: 'Sitio web' }).closest('aside');
+      expect(sidebar?.className).toContain('lg:order-first');
+    });
   });
 });

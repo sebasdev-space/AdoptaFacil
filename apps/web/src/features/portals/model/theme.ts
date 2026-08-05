@@ -1,4 +1,9 @@
-import type { PortalTheme, PortalThemeToken } from '@adoptafacil/contracts';
+import type {
+  PortalLogoPosition,
+  PortalSocialNavPosition,
+  PortalTheme,
+  PortalThemeToken,
+} from '@adoptafacil/contracts';
 
 /**
  * M14 personalización por tokens (T-027) — metadatos de la UI de configuración y
@@ -68,4 +73,19 @@ export function safePortalTheme(raw: unknown): PortalTheme {
     }
   }
   return out;
+}
+
+const LOGO_POSITIONS = new Set<string>(['left', 'center', 'right']);
+const SOCIAL_NAV_POSITIONS = new Set<string>(['left', 'right']);
+
+/** Same defense-in-depth as `safePortalTheme` — an unexpected value from the
+ *  public API falls back to the design-system default instead of propagating. */
+export function safeLogoPosition(raw: unknown): PortalLogoPosition {
+  return typeof raw === 'string' && LOGO_POSITIONS.has(raw) ? (raw as PortalLogoPosition) : 'left';
+}
+
+export function safeSocialNavPosition(raw: unknown): PortalSocialNavPosition {
+  return typeof raw === 'string' && SOCIAL_NAV_POSITIONS.has(raw)
+    ? (raw as PortalSocialNavPosition)
+    : 'right';
 }

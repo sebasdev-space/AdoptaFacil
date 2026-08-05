@@ -119,10 +119,17 @@ export const portalThemeTokensSchema = z
     }
   });
 
-/** PUT /portals/theme body. */
+/** S2-PORTAL: layout positions, validated as closed enums (never free CSS). */
+const logoPositionSchema = z.enum(['left', 'center', 'right']);
+const socialNavPositionSchema = z.enum(['left', 'right']);
+
+/** PUT /portals/theme body. `logoPosition`/`socialNavPosition` are optional and
+ *  independent of `tokens` (S2-PORTAL) — a request may update either or both. */
 export const updatePortalThemeSchema = z
   .object({
     tokens: portalThemeTokensSchema,
+    logoPosition: logoPositionSchema.optional(),
+    socialNavPosition: socialNavPositionSchema.optional(),
   })
   .strict();
 

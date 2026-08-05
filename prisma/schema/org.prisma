@@ -74,6 +74,13 @@ model OrganizationProfile {
   /// Legal/organizational type (OrganizationType contract, RF01/T-030). Public
   /// exposure is gated by the platform `show_organization_type` policy.
   organizationType   String?  @map("organization_type")
+  /// Free text: mission/history/"quiénes somos" (S2-PORTAL). Rendered in the
+  /// public portal's "Nosotros" tab; the tab is hidden when this is empty.
+  aboutUs            String?  @map("about_us")
+  /// { hours?, fullAddress?, mapUrl?, additionalPhones? } — OrganizationExtendedContact
+  /// contract (S2-PORTAL). Rendered in the public portal's "Información" tab;
+  /// the tab is hidden when this is empty/absent.
+  extendedContact    Json?    @map("extended_contact")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
