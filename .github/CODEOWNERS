@@ -31,7 +31,16 @@
 
 # --- Frontend por dominio (M01 perfil/formalización vs M14 portales) ------
 /apps/web/src/features/org/          @sebastian
+/apps/web/src/features/animals/      @sebastian
+/apps/web/src/features/campaigns/    @sebastian
 /apps/web/src/features/portals/      @fabian
+/apps/web/src/features/adoptions/    @fabian
+/apps/web/src/features/donations/    @fabian
+/apps/web/src/features/certificates/ @fabian
+/apps/web/src/features/_layout/      @fabian
+# Auth es compartido: pantallas propias (Fabián, T-023/T-024) + flujos que
+# tocan el core de sesión (Sebastián, T-110 reset de contraseña) — S1-06.
+/apps/web/src/features/auth/         @sebastian @fabian
 
 # --- Prisma schema (per module owner) ------------------------------------
 /prisma/schema/org.prisma            @sebastian
@@ -50,6 +59,8 @@
 /prisma/schema/community.prisma      @fabian
 
 # --- Contracts (per module owner) ----------------------------------------
+/packages/contracts/src/auth.ts          @sebastian
+/packages/contracts/src/audit.ts         @sebastian
 /packages/contracts/src/org.ts           @sebastian
 /packages/contracts/src/animals.ts       @sebastian
 /packages/contracts/src/campaigns.ts     @sebastian
