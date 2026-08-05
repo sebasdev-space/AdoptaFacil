@@ -8,6 +8,7 @@ import {
   PLATFORM_DOCUMENTS_ROLES,
 } from '../navigation';
 import { AnimalDetailPage } from '../pages/animal-detail-page';
+import { GeneralPortalPage } from '../../features/catalog';
 import { HomePage, NotFoundPage } from '../../features/_layout';
 import {
   ForgotPasswordPage,
@@ -31,7 +32,16 @@ import { CertificateEmissionPage, CertificateVerificationPage } from '../../feat
 /**
  * Route tree for the shell.
  *
+ *   /                          → PUBLIC general portal (F-LANDING-01, M14, RF25):
+ *                                the platform's front door — consolidated animal
+ *                                catalog across every org, login/register access,
+ *                                no session required. A user WITH a session who
+ *                                lands here is redirected to /inicio (their shell)
+ *                                by the page itself (`useSession().status`).
  *   /login, /register, /forgot → public (auth screens, M02 / T-023)
+ *   /inicio                    → the authenticated shell's home (protected;
+ *                                was the index route before F-LANDING-01 claimed
+ *                                "/" for the public portal — moved, not removed).
  *   everything else            → protected by <RequireAuth>, rendered inside the
  *                                <AppLayout> shell (sidebar + header + indicator)
  *
@@ -45,6 +55,8 @@ import { CertificateEmissionPage, CertificateVerificationPage } from '../../feat
 export function AppRoutes() {
   return (
     <Routes>
+      {/* Public general portal (F-LANDING-01) — the platform's entry point. */}
+      <Route path="/" element={<GeneralPortalPage />} />
       {/* Public auth screens */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
@@ -75,7 +87,10 @@ export function AppRoutes() {
       {/* Protected — guard first, then the shell layout */}
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>
-          <Route index element={<HomePage />} />
+          {/* F-LANDING-01: "/" now belongs to the public general portal, so the
+              authenticated shell's home moved to /inicio (nav entry updated to
+              match). Not an index route anymore — there is no bare protected "". */}
+          <Route path="inicio" element={<HomePage />} />
           {/* M04 · adopciones (T-028a): tablero de evaluación (org) + solicitud (persona). */}
           <Route path="adopciones" element={<AdoptionsKanbanPage />} />
           <Route path="adopciones/solicitar" element={<AdoptionRequestPage />} />
@@ -125,7 +140,7 @@ export function AppRoutes() {
               1...") — nada de "pendiente" visible en la demo. Redirige a inicio; el
               indicador REAL de transparencia (Nivel/%/Rendición) ya vive en la barra
               superior del shell en todas las pantallas. */}
-          <Route path="transparencia" element={<Navigate to="/" replace />} />
+          <Route path="transparencia" element={<Navigate to="/inicio" replace />} />
           {/* M01 · organization profile + formalization (my lines, before catch-all).
               T-062: gated to ORG_MEMBER_ROLES — a Persona has no org to manage;
               matches GET /org/profile and GET /org/formalization (any authenticated

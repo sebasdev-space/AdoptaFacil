@@ -14,7 +14,7 @@ export function NotFoundPage() {
             La sección que buscas no existe o aún no está disponible.
           </p>
         </div>
-        <Link to="/" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+        <Link to="/inicio" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
           Volver al inicio
         </Link>
       </div>
