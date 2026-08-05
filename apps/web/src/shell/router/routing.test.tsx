@@ -28,23 +28,37 @@ describe('routing — public vs protected', () => {
     expect(screen.getByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
   });
 
-  it('redirects an unauthenticated visitor from a protected route to /login', () => {
-    renderShell({ route: '/', session: { initialStatus: 'unauthenticated' } });
+  it('redirects an unauthenticated visitor from a protected route (/inicio) to /login', () => {
+    renderShell({ route: '/inicio', session: { initialStatus: 'unauthenticated' } });
     // Landed on the login page instead of the protected home.
     expect(screen.getByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Inicio' })).not.toBeInTheDocument();
   });
 
-  it('shows a loading state while the session is resolving', () => {
+  it('shows a loading state at "/" while the session is resolving', () => {
     renderShell({ route: '/', session: { initialStatus: 'loading' } });
     expect(screen.getByText('Verificando tu sesión…')).toBeInTheDocument();
   });
 
-  it('renders the protected home inside the shell when authenticated', () => {
+  // F-LANDING-01 — "/" is the PUBLIC general portal now: the platform's front
+  // door, not the shell's home. See features/catalog for the catalog itself.
+  it('shows the public general portal at "/" to an unauthenticated visitor (no redirect to login)', async () => {
+    renderShell({ route: '/', session: { initialStatus: 'unauthenticated' } });
+    expect(
+      await screen.findByRole('heading', { name: 'Encuentra a tu próxima mascota' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Iniciar sesión' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Iniciar sesión' })).not.toBeInTheDocument();
+  });
+
+  it('redirects an authenticated visitor away from "/" to their shell (/inicio)', async () => {
     renderShell({ route: '/', session: { initialStatus: 'authenticated' } });
-    expect(screen.getByRole('heading', { name: 'Inicio' })).toBeInTheDocument();
-    // Sidebar navigation is present.
+    expect(await screen.findByRole('heading', { name: 'Inicio' })).toBeInTheDocument();
+    // Landed inside the AUTHENTICATED shell, not the public portal.
     expect(screen.getByRole('link', { name: 'Adopciones' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Encuentra a tu próxima mascota' }),
+    ).not.toBeInTheDocument();
     // The system-health block is platform-admin only (F-VISUAL-02); the default
     // test session carries no roles, so it stays hidden here. Covered for both
     // a non-admin and a PlatformAdmin in home-page.test.tsx.

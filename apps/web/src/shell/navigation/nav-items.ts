@@ -76,7 +76,9 @@ export interface NavItem {
 }
 
 export const navItems: NavItem[] = [
-  { path: '/', label: 'Inicio', icon: HomeIcon, end: true },
+  // F-LANDING-01: "/" is now the PUBLIC general portal, outside the shell — the
+  // authenticated home moved to /inicio (see shell/router/routes.tsx).
+  { path: '/inicio', label: 'Inicio', icon: HomeIcon, end: true },
   { path: '/adopciones', label: 'Adopciones', icon: PawIcon },
   { path: '/donaciones', label: 'Donaciones', icon: HeartIcon },
   // T-065 (pre-demo): "Campañas" REMOVED from the menu entirely (was gated to
