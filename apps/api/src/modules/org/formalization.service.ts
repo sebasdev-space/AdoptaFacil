@@ -108,6 +108,11 @@ export class FormalizationService {
         update: { formalizationState: input.targetState, rteVigente },
       });
 
+      // S1-05: the verification level is a computed effect of formalization +
+      // documents, never set directly — recompute it now that formalization
+      // moved (the profile row above already exists, from this same upsert).
+      await this.documents.recomputeAndPersistVerification(tx, organizationId);
+
       const row = await tx.formalizationTransition.create({
         data: {
           organizationId,

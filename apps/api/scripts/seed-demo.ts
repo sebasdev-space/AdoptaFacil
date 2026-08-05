@@ -2,8 +2,8 @@
  * Idempotent demo seed (T-D01). Leaves the local DB ready for the client demo
  * (2026-07-30, scope: organización + donación) by driving the REAL NestJS
  * services — not raw SQL — so RLS, RBAC-attributed audit, append-only
- * formalization history, and the (currently empty) verification-level ladder
- * all stay coherent with what the running API would produce.
+ * formalization history, and the verification-level ladder all stay coherent
+ * with what the running API would produce.
  *
  * Usage (from repo root, AFTER `pnpm seed:admin`):
  *   pnpm seed:demo
@@ -21,14 +21,17 @@
  * Idempotent by natural keys: owner/donor email, organization slug, document
  * type per org, animal name per org. Re-running never duplicates or fails.
  *
- * KNOWN LIMITATION (reported, not invented around): `VERIFICATION_LEVELS`
- * (apps/api/src/modules/org/verification.ts) is an EMPTY TODO(client) catalog,
- * and the `organization_profiles.verification_level` column the public portal
- * reads is never written by any real service. Approving documents here is
- * still done for REAL (audited, RLS-scoped, versioned) — but the public badge
- * will show Level 0 for BOTH organizations regardless. The visible contrast in
- * the demo comes from the FORMALIZATION state instead (ESAL vs En proceso),
- * which is real and live today.
+ * VERIFICATION LEVEL (S1-05): `VERIFICATION_LEVELS`
+ * (apps/api/src/modules/org/verification.ts) now holds a real initial default
+ * ladder (TODO(client): tiers/labels are ours, not the client's — redefinable
+ * without code changes), and `organization_profiles.verification_level` is
+ * written automatically as a side effect of `platformDocuments.decide()` and
+ * `formalization.transition()` below — never set here directly. With this
+ * seed's data: Patitas Felices (ESAL, RUT + certificado de existencia
+ * aprobados) lands on level 3 ("Confiable" — level 4 needs ESAL_RTE, one step
+ * further); Huellas de Esperanza (En proceso, mismos dos documentos
+ * aprobados pero el tercero pendiente a propósito) lands on level 2
+ * ("Verificado") — formalización por debajo de "Formalizada" le bloquea el 3.
  */
 import { NestFactory } from '@nestjs/core';
 

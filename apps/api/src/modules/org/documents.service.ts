@@ -3,6 +3,7 @@ import type { Prisma, OrganizationDocument as DocumentRow } from '@prisma/client
 import {
   DocumentStatus,
   DocumentType,
+  FormalizationState,
   type OrganizationDocument,
   type UploadOrganizationDocumentInput,
   type UploadOrganizationDocumentResult,
@@ -130,14 +131,37 @@ export class DocumentsService {
   }
 
   /** Verification level computed live from the org's Approved & current
-   *  documents (a vencido document blocks its tier until renewed). */
+   *  documents AND formalization state (a vencido document, or a formalization
+   *  state below a tier's floor, blocks that tier until resolved). */
   async getVerification(): Promise<VerificationLevel> {
     const organizationId = this.requireOrgId();
     const now = new Date();
-    const rows = await this.prisma.withOrgContext(organizationId, (tx) =>
-      tx.organizationDocument.findMany({ where: { organizationId } }),
-    );
-    return computeVerificationLevel(rows.map(toSnapshot), VERIFICATION_LEVELS, now);
+    return this.prisma.withOrgContext(organizationId, async (tx) => {
+      const [documents, formalizationState] = await Promise.all([
+        this.snapshotsInTx(tx, organizationId),
+        this.formalizationStateInTx(tx, organizationId),
+      ]);
+      return computeVerificationLevel(documents, formalizationState, VERIFICATION_LEVELS, now);
+    });
+  }
+
+  /** All document snapshots (type/status/expiresAt) of an org, inside an
+   *  existing tenant transaction — the shared read `satisfiedTypesInTx` and the
+   *  verification writer build on. */
+  private async snapshotsInTx(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+  ): Promise<DocumentSnapshot[]> {
+    const rows = await tx.organizationDocument.findMany({ where: { organizationId } });
+    return rows.map(toSnapshot);
+  }
+
+  private async formalizationStateInTx(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+  ): Promise<FormalizationState> {
+    const profile = await tx.organizationProfile.findUnique({ where: { organizationId } });
+    return (profile?.formalizationState as FormalizationState) ?? FormalizationState.Informal;
   }
 
   /** Document types Approved & vigente for an org, computed inside an existing
@@ -147,8 +171,34 @@ export class DocumentsService {
     organizationId: string,
     now: Date = new Date(),
   ): Promise<DocumentType[]> {
-    const rows = await tx.organizationDocument.findMany({ where: { organizationId } });
-    return [...satisfiedDocumentTypes(rows.map(toSnapshot), now)];
+    const documents = await this.snapshotsInTx(tx, organizationId);
+    return [...satisfiedDocumentTypes(documents, now)];
+  }
+
+  /**
+   * Recompute the verification level from the org's CURRENT documents +
+   * formalization state and persist it to `organization_profiles.verification_level`
+   * (S1-05 writer). The calculation is always derived from real state — nothing
+   * sets a level directly. Callers run this inside their own `withOrgContext`
+   * transaction, as a side effect of whatever changed the inputs (a document
+   * decision, or a formalization transition).
+   */
+  async recomputeAndPersistVerification(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    now: Date = new Date(),
+  ): Promise<VerificationLevel> {
+    const [documents, formalizationState] = await Promise.all([
+      this.snapshotsInTx(tx, organizationId),
+      this.formalizationStateInTx(tx, organizationId),
+    ]);
+    const level = computeVerificationLevel(documents, formalizationState, VERIFICATION_LEVELS, now);
+    await tx.organizationProfile.upsert({
+      where: { organizationId },
+      create: { organizationId, verificationLevel: level as unknown as Prisma.InputJsonValue },
+      update: { verificationLevel: level as unknown as Prisma.InputJsonValue },
+    });
+    return level;
   }
 }
 
