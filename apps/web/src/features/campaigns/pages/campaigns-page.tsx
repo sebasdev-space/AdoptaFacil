@@ -114,10 +114,7 @@ export function CampaignsPage() {
 
   return (
     <PageContainer>
-      <PageHeader
-        title="Campañas"
-        description="Campañas de recaudación de tu organización (RF15)."
-      />
+      <PageHeader title="Campañas" description="Campañas de recaudación de tu organización." />
       {loading && <Skeleton className="h-64 w-full" />}
       {!loading && (
         <div className="space-y-6">

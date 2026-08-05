@@ -114,7 +114,7 @@ export function RemindersInboxPage() {
     <PageContainer>
       <PageHeader
         title="Recordatorios"
-        description="Recordatorios de vacunas y tratamientos de tu organización (RF09)."
+        description="Recordatorios de vacunas y tratamientos de tu organización."
       />
       {loading && <Skeleton className="h-64 w-full" />}
       {!loading && (

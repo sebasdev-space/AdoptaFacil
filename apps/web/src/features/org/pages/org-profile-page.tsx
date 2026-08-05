@@ -178,7 +178,7 @@ export function OrgProfilePage() {
     <PageContainer>
       <PageHeader
         title="Mi organización"
-        description="Perfil institucional de tu organización (M01)."
+        description="Perfil institucional de tu organización."
         actions={
           <Link
             to="/organizacion/formalizacion"

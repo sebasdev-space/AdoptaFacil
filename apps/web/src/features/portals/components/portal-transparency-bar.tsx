@@ -35,8 +35,7 @@ export function PortalTransparencyBar({ organization }: PortalTransparencyBarPro
         className="text-xs text-muted-foreground"
         data-integration-point={ACCOUNTABILITY_INTEGRATION_POINT}
       >
-        Rendición de cuentas: disponible cuando la organización tenga campañas y donaciones
-        (M05/M06).
+        Rendición de cuentas: disponible cuando la organización tenga campañas y donaciones.
       </p>
     </div>
   );

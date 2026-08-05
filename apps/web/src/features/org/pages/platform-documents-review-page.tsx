@@ -104,7 +104,7 @@ export function PlatformDocumentsReviewPage() {
     <PageContainer>
       <PageHeader
         title="Revisión de documentos"
-        description="Cola de verificación documental de todas las organizaciones (RF03)."
+        description="Cola de verificación documental de todas las organizaciones."
       />
       {loading && <Skeleton className="h-64 w-full" />}
       {!loading && (

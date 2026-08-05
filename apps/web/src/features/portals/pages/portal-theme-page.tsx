@@ -228,7 +228,7 @@ export function PortalThemePage() {
       <PageContainer>
         <PageHeader
           title="Personalización del portal"
-          description="Apariencia de marca de tu organización (§M14)."
+          description="Apariencia de marca de tu organización."
         />
         <EmptyState
           title="No tienes permiso para editar la personalización"

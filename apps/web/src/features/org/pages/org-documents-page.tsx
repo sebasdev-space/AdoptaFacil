@@ -232,7 +232,7 @@ export function OrgDocumentsPage() {
     <PageContainer>
       <PageHeader
         title="Documentos"
-        description="Gestión documental con versionamiento y niveles de verificación (RF03)."
+        description="Gestión documental con versionamiento y niveles de verificación."
       />
       {loading && <Skeleton className="h-64 w-full" />}
       {!loading && (
