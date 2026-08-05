@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Role,
   type Organization,
-  type OrganizationExtendedContact,
   type PortalLogoPosition,
   type PortalSocialNavPosition,
   type PortalTheme,
@@ -27,58 +26,6 @@ import { brandTokensToStyle } from '../../../shell/theme';
 import { hexToHslString, hslStringToHex } from '../model/color-conversion';
 import { PORTAL_THEME_FIELDS, safePortalTheme, type PortalThemeField } from '../model/theme';
 import { PortalMiniPreview } from '../components/portal-mini-preview';
-
-const ABOUT_US_MAX = 2000;
-
-/** "a, b\nc" → ["a", "b", "c"] — separadas por coma O por línea, vacías descartadas. */
-function parsePhones(raw: string): string[] {
-  return raw
-    .split(/[,\n]/)
-    .map((phone) => phone.trim())
-    .filter(Boolean);
-}
-
-interface ContentFormState {
-  aboutUs: string;
-  hours: string;
-  fullAddress: string;
-  mapUrl: string;
-  additionalPhones: string;
-}
-
-const EMPTY_CONTENT: ContentFormState = {
-  aboutUs: '',
-  hours: '',
-  fullAddress: '',
-  mapUrl: '',
-  additionalPhones: '',
-};
-
-function contentFromOrganization(org: Organization | null | undefined): ContentFormState {
-  const contact = org?.extendedContact;
-  return {
-    aboutUs: org?.aboutUs ?? '',
-    hours: contact?.hours ?? '',
-    fullAddress: contact?.fullAddress ?? '',
-    mapUrl: contact?.mapUrl ?? '',
-    additionalPhones: contact?.additionalPhones?.join(', ') ?? '',
-  };
-}
-
-/** `undefined` cuando TODOS los campos están vacíos — nunca se manda un objeto
- *  vacío que borraría un extendedContact ya guardado por accidente de forma. */
-function extendedContactFromForm(
-  content: ContentFormState,
-): OrganizationExtendedContact | undefined {
-  const additionalPhones = parsePhones(content.additionalPhones);
-  const out: OrganizationExtendedContact = {
-    ...(content.hours.trim() ? { hours: content.hours.trim() } : {}),
-    ...(content.fullAddress.trim() ? { fullAddress: content.fullAddress.trim() } : {}),
-    ...(content.mapUrl.trim() ? { mapUrl: content.mapUrl.trim() } : {}),
-    ...(additionalPhones.length > 0 ? { additionalPhones } : {}),
-  };
-  return Object.keys(out).length > 0 ? out : undefined;
-}
 
 /** Empty string ⇒ "use the default token" (the field is omitted from the payload). */
 type FormState = Partial<Record<string, string>>;
@@ -133,47 +80,30 @@ interface ColorFieldProps {
 }
 
 /**
- * One color token as a native color picker (T-D03) — `<input type="color">`
- * needs no dependency and works in every evergreen browser. The backend only
- * ever sees/stores the BARE HSL string (unchanged format); hex is a UI-only
- * detour. The raw HSL stays visible/editable below for advanced users.
+ * One color token as a COMPACT native color picker (S2-REORG: no HSL value
+ * shown by default — a non-technical owner never needs to see `"142 72% 29%"`
+ * to pick a color; the raw value is still one hover away via the native
+ * `title` tooltip for anyone who wants it). Clicking the swatch opens the
+ * browser's own color picker; the backend still only ever sees/stores the
+ * bare HSL string it always did (T-D03) — only the UI changed.
  */
 function ColorField({ field, value, onChange }: ColorFieldProps) {
   const inputId = `token-${field.token}`;
-  const hintId = `${inputId}-hint`;
   const displayHsl = value || DISPLAY_FALLBACK_HSL[field.token] || '0 0% 50%';
   const hex = hslStringToHex(displayHsl);
 
   return (
-    <div className="space-y-1.5">
-      <label htmlFor={inputId} className="block text-sm font-medium text-foreground">
+    <div className="space-y-1" title={displayHsl}>
+      <label htmlFor={inputId} className="block text-xs font-medium text-foreground">
         {field.label}
       </label>
-      <div className="flex items-center gap-3">
-        <input
-          type="color"
-          aria-label={`Selector de color: ${field.label}`}
-          value={hex}
-          onChange={(event) => onChange(hexToHslString(event.target.value))}
-          className="h-10 w-14 cursor-pointer rounded border border-input bg-background p-1"
-        />
-        <div
-          aria-hidden
-          className="h-8 w-8 shrink-0 rounded border border-border"
-          style={{ backgroundColor: `hsl(${displayHsl})` }}
-        />
-        <Input
-          id={inputId}
-          value={value}
-          placeholder={displayHsl}
-          aria-describedby={hintId}
-          onChange={(event) => onChange(event.target.value)}
-          className="text-xs text-muted-foreground"
-        />
-      </div>
-      <p id={hintId} className="text-xs text-muted-foreground">
-        {field.hint}
-      </p>
+      <input
+        id={inputId}
+        type="color"
+        value={hex}
+        onChange={(event) => onChange(hexToHslString(event.target.value))}
+        className="h-10 w-full cursor-pointer rounded-md border border-input bg-background p-1"
+      />
     </div>
   );
 }
@@ -243,16 +173,14 @@ const SOCIAL_NAV_POSITION_OPTIONS = [
 
 /**
  * `/organizacion/portal` — configuración de PERSONALIZACIÓN del portal (§M14,
- * T-027). El dueño define los tokens de marca (subconjunto seguro), con vista
- * previa en vivo. Gating deny-by-default: sólo Owner/Administrador pueden editar
- * (la autoridad real la impone el backend con RolesGuard; aquí evitamos mostrar
- * el editor a quien no tiene rol). NO hay CSS libre: sólo tokens validados.
- *
- * Pulido UX (T-D03): color pickers nativos (`<input type="color">`) en vez de
- * texto HSL crudo, vista previa realmente conectada al color de acento (antes
- * mostraba un badge "Acento" con `variant="outline"`, que NUNCA usaba
- * `--accent`/`--accent-foreground`), y un enlace directo al portal público real
- * de la organización.
+ * T-027). Solo lo VISUAL (S2-REORG): colores + layout + vista previa. El
+ * contenido de la organización ("Nosotros", contacto extendido) se mueve a
+ * "Mi organización" (`org-profile-form.tsx`) — sigue viviendo en
+ * `organization_profiles` (`PUT /org/profile`), esta página nunca lo tocó a
+ * nivel de backend, solo dejó de MOSTRARLO aquí. Gating deny-by-default: sólo
+ * Owner/Administrador pueden editar (la autoridad real la impone el backend
+ * con RolesGuard; aquí evitamos mostrar el editor a quien no tiene rol).
+ * NO hay CSS libre: sólo tokens validados.
  */
 export function PortalThemePage() {
   const client = useApiClient();
@@ -263,7 +191,6 @@ export function PortalThemePage() {
   const [form, setForm] = useState<FormState>({});
   const [logoPosition, setLogoPosition] = useState<PortalLogoPosition>('left');
   const [socialNavPosition, setSocialNavPosition] = useState<PortalSocialNavPosition>('right');
-  const [content, setContent] = useState<ContentFormState>(EMPTY_CONTENT);
   const [slug, setSlug] = useState<string | undefined>(undefined);
   const [orgName, setOrgName] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
@@ -277,8 +204,9 @@ export function PortalThemePage() {
     let active = true;
     Promise.all([
       client.request<PortalThemeConfig>('/portals/theme'),
-      // Best-effort: the org profile (slug + "Nosotros"/contacto extendido)
-      // simply stays empty if this fails — the editor still works either way.
+      // Best-effort, READ-ONLY: only for the "Ver portal público" link and the
+      // mini preview's org name — this page no longer WRITES to /org/profile
+      // (S2-REORG; "Nosotros"/contacto viven en Mi organización ahora).
       client.request<Organization>('/org/profile').catch(() => null),
     ])
       .then(([config, org]) => {
@@ -288,7 +216,6 @@ export function PortalThemePage() {
         setSocialNavPosition(config.socialNavPosition ?? 'right');
         setSlug(org?.slug ?? undefined);
         setOrgName(org?.name ?? undefined);
-        setContent(contentFromOrganization(org));
       })
       .catch(() => {
         // Leave the form empty; the org simply has no theme yet (or a transient
@@ -312,29 +239,17 @@ export function PortalThemePage() {
 
   const setToken = (token: string, value: string) =>
     setForm((prev) => ({ ...prev, [token]: value }));
-  const setContentField = <K extends keyof ContentFormState>(key: K, value: string) =>
-    setContent((prev) => ({ ...prev, [key]: value }));
 
   const save = async () => {
     setSaving(true);
     try {
-      const [themeConfig, org] = await Promise.all([
-        client.request<PortalThemeConfig>('/portals/theme', {
-          method: 'PUT',
-          json: { tokens: tokensFromForm(form), logoPosition, socialNavPosition },
-        }),
-        client.request<Organization>('/org/profile', {
-          method: 'PUT',
-          json: {
-            aboutUs: content.aboutUs.trim() || undefined,
-            extendedContact: extendedContactFromForm(content),
-          },
-        }),
-      ]);
+      const themeConfig = await client.request<PortalThemeConfig>('/portals/theme', {
+        method: 'PUT',
+        json: { tokens: tokensFromForm(form), logoPosition, socialNavPosition },
+      });
       setForm(safePortalTheme(themeConfig.tokens) as FormState);
       setLogoPosition(themeConfig.logoPosition ?? 'left');
       setSocialNavPosition(themeConfig.socialNavPosition ?? 'right');
-      setContent(contentFromOrganization(org));
       toast({
         title: 'Personalización guardada',
         description: 'Tu portal se re-tematizó.',
@@ -382,11 +297,14 @@ export function PortalThemePage() {
     );
   }
 
+  const colorFields = PORTAL_THEME_FIELDS.filter((field) => field.kind === 'color');
+  const scalarFields = PORTAL_THEME_FIELDS.filter((field) => field.kind !== 'color');
+
   return (
     <PageContainer>
       <PageHeader
         title="Personalización del portal"
-        description="Define los colores de marca de tu portal público. Solo tokens seguros (sin CSS libre); se valida formato y contraste."
+        description="La apariencia visual de tu portal público: colores y diseño."
         actions={publicPortalLink}
       />
       {loading ? (
@@ -396,38 +314,43 @@ export function PortalThemePage() {
           <div className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Tokens de marca</CardTitle>
+                <CardTitle>Colores de tu portal</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Elige los colores que representan a tu organización. Se aplican automáticamente a
+                  tu portal público.
+                </p>
               </CardHeader>
               <CardContent className="space-y-4">
-                {PORTAL_THEME_FIELDS.map((field) =>
-                  field.kind === 'color' ? (
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                  {colorFields.map((field) => (
                     <ColorField
                       key={field.token}
                       field={field}
                       value={form[field.token] ?? ''}
                       onChange={(value) => setToken(field.token, value)}
                     />
-                  ) : (
-                    <div key={field.token} className="space-y-1.5">
-                      <label
-                        htmlFor={`token-${field.token}`}
-                        className="block text-sm font-medium text-foreground"
-                      >
-                        {field.label}
-                      </label>
-                      <Input
-                        id={`token-${field.token}`}
-                        value={form[field.token] ?? ''}
-                        placeholder="0.5rem"
-                        aria-describedby={`token-${field.token}-hint`}
-                        onChange={(event) => setToken(field.token, event.target.value)}
-                      />
-                      <p id={`token-${field.token}-hint`} className="text-xs text-muted-foreground">
-                        {field.hint}
-                      </p>
-                    </div>
-                  ),
-                )}
+                  ))}
+                </div>
+                {scalarFields.map((field) => (
+                  <div key={field.token} className="space-y-1.5">
+                    <label
+                      htmlFor={`token-${field.token}`}
+                      className="block text-sm font-medium text-foreground"
+                    >
+                      {field.label}
+                    </label>
+                    <Input
+                      id={`token-${field.token}`}
+                      value={form[field.token] ?? ''}
+                      placeholder="0.5rem"
+                      aria-describedby={`token-${field.token}-hint`}
+                      onChange={(event) => setToken(field.token, event.target.value)}
+                    />
+                    <p id={`token-${field.token}-hint`} className="text-xs text-muted-foreground">
+                      {field.hint}
+                    </p>
+                  </div>
+                ))}
               </CardContent>
             </Card>
 
@@ -450,101 +373,6 @@ export function PortalThemePage() {
                   value={socialNavPosition}
                   onChange={setSocialNavPosition}
                 />
-              </CardContent>
-            </Card>
-
-            {/* Sección: Nosotros / Acerca de (S2-PORTAL) — contenido de la tab
-                pública "Nosotros"; se oculta en el portal si queda vacío. */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Sección: Nosotros / Acerca de</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1.5">
-                <label htmlFor="about-us" className="block text-sm font-medium text-foreground">
-                  Quiénes somos
-                </label>
-                <textarea
-                  id="about-us"
-                  value={content.aboutUs}
-                  maxLength={ABOUT_US_MAX}
-                  placeholder="Cuéntale al mundo quiénes son, su historia, su misión y por qué hacen lo que hacen..."
-                  onChange={(event) => setContentField('aboutUs', event.target.value)}
-                  className="min-h-32 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                />
-                <p className="text-right text-xs text-muted-foreground">
-                  {content.aboutUs.length}/{ABOUT_US_MAX}
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Sección: Información de contacto (S2-PORTAL) — contenido de la
-                tab pública "Información"; se oculta en el portal si queda vacía. */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Sección: Información de contacto</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="contact-hours"
-                    className="block text-sm font-medium text-foreground"
-                  >
-                    Horario de atención
-                  </label>
-                  <Input
-                    id="contact-hours"
-                    value={content.hours}
-                    placeholder="Lun-Vie 9:00am - 5:00pm"
-                    onChange={(event) => setContentField('hours', event.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="contact-address"
-                    className="block text-sm font-medium text-foreground"
-                  >
-                    Dirección completa
-                  </label>
-                  <Input
-                    id="contact-address"
-                    value={content.fullAddress}
-                    placeholder="Calle 45 #12-34, Bogotá"
-                    onChange={(event) => setContentField('fullAddress', event.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="contact-map"
-                    className="block text-sm font-medium text-foreground"
-                  >
-                    Enlace a Google Maps
-                  </label>
-                  <Input
-                    id="contact-map"
-                    type="url"
-                    value={content.mapUrl}
-                    placeholder="https://maps.google.com/..."
-                    onChange={(event) => setContentField('mapUrl', event.target.value)}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="contact-phones"
-                    className="block text-sm font-medium text-foreground"
-                  >
-                    Teléfonos adicionales
-                  </label>
-                  <Input
-                    id="contact-phones"
-                    value={content.additionalPhones}
-                    placeholder="3001234567, 3007654321"
-                    aria-describedby="contact-phones-hint"
-                    onChange={(event) => setContentField('additionalPhones', event.target.value)}
-                  />
-                  <p id="contact-phones-hint" className="text-xs text-muted-foreground">
-                    Separados por coma o uno por línea.
-                  </p>
-                </div>
               </CardContent>
             </Card>
 

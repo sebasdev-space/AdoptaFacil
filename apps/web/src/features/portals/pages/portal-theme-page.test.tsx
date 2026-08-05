@@ -8,6 +8,12 @@ import { renderShell } from '../../../test-utils';
  * Deny-by-default gating: only Owner/Administrator can edit the tokens. The real
  * authority is server-side (RolesGuard); here we assert the UI never exposes the
  * editor to a user without the role, and that an owner's save PUTs the tokens.
+ *
+ * S2-REORG: this page is now VISUAL ONLY (colors + layout + preview) — "Nosotros"/
+ * contacto extendido moved to Mi organización (see org-profile-form.test.tsx).
+ * `save()` PUTs a single endpoint (/portals/theme) — no more parallel PUT to
+ * /org/profile. Color labels are plain Spanish ("Color principal", not "Color
+ * primario") and the raw HSL text field is gone (compact pickers, S2-REORG §4.3).
  */
 function sessionWith(roles: Role[]) {
   return {
@@ -57,7 +63,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('PortalThemePage — owner personalization', () => {
+describe('PortalThemePage — owner personalization (visual only, S2-REORG)', () => {
   it('denies editing to a user without Owner/Administrator (deny-by-default)', async () => {
     // An org role that is NOT Owner/Administrator: passes the route-level
     // ORG_MEMBER_ROLES gate (T-062) and reaches the page, whose OWN internal
@@ -68,13 +74,20 @@ describe('PortalThemePage — owner personalization', () => {
       await screen.findByText('No tienes permiso para editar la personalización'),
     ).toBeInTheDocument();
     // No editor field is rendered for an unauthorized user.
-    expect(screen.queryByLabelText('Color primario')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Color principal')).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /Guardar personalización/ }),
     ).not.toBeInTheDocument();
   });
 
-  it('lets an Owner edit tokens and PUTs them on save', async () => {
+  it('renames the section to plain Spanish (no "tokens" jargon)', async () => {
+    renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
+    expect(await screen.findByText('Colores de tu portal')).toBeInTheDocument();
+    expect(screen.queryByText('Tokens de marca')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Color principal')).toBeInTheDocument();
+  });
+
+  it('lets an Owner edit a color and PUTs only /portals/theme on save (no more parallel PUT to /org/profile)', async () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     stubFetch((url, init) => {
       calls.push({ url, init });
@@ -84,41 +97,35 @@ describe('PortalThemePage — owner personalization', () => {
 
     renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
 
-    const primary = await screen.findByLabelText('Color primario');
-    fireEvent.change(primary, { target: { value: '24 90% 45%' } });
+    const primary = await screen.findByLabelText('Color principal');
+    fireEvent.change(primary, { target: { value: '#ff5500' } });
     fireEvent.click(screen.getByRole('button', { name: /Guardar personalización/ }));
 
     await waitFor(() => {
-      const put = calls.find((c) => c.init?.method === 'PUT');
-      expect(put).toBeDefined();
-      expect(put?.url).toMatch(/\/portals\/theme$/);
-      // S2-PORTAL: el save ahora también manda las posiciones de layout
-      // (default 'left'/'right' cuando el tema no trae ninguna todavía).
-      expect(JSON.parse(String(put?.init?.body))).toEqual({
-        tokens: { primary: '24 90% 45%' },
-        logoPosition: 'left',
-        socialNavPosition: 'right',
-      });
+      const puts = calls.filter((c) => c.init?.method === 'PUT');
+      expect(puts).toHaveLength(1);
+      expect(puts[0].url).toMatch(/\/portals\/theme$/);
+      const body = JSON.parse(String(puts[0].init?.body));
+      expect(body.logoPosition).toBe('left');
+      expect(body.socialNavPosition).toBe('right');
+      expect(body.tokens.primary).toMatch(/^\d+(\.\d+)? \d+% \d+%$/); // re-converted to HSL
     });
   });
 
   it('also allows an Administrator to edit', async () => {
     renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Administrator]) });
-    expect(await screen.findByLabelText('Color primario')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Color principal')).toBeInTheDocument();
   });
 
-  it('shows a color picker reflecting the saved HSL as hex, and typing hex updates the HSL text (T-D03)', async () => {
+  it('shows the color picker reflecting the saved HSL as hex, with the raw HSL available on hover (S2-REORG §4.3)', async () => {
     stubFetchByUrl({ tokens: { primary: '0 0% 0%' } });
     renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
 
-    const text = await screen.findByLabelText('Color primario');
-    expect(text).toHaveValue('0 0% 0%');
-    const picker = screen.getByLabelText('Selector de color: Color primario');
+    const picker = await screen.findByLabelText('Color principal');
     expect(picker).toHaveValue('#000000');
-
-    // Picking white in the picker updates the underlying HSL text field.
-    fireEvent.change(picker, { target: { value: '#ffffff' } });
-    expect(await screen.findByLabelText('Color primario')).toHaveValue('0 0% 100%');
+    // No raw HSL text visible by default (compact pickers) — only a tooltip.
+    expect(screen.queryByText('142 72% 29%')).not.toBeInTheDocument();
+    expect(picker.closest('[title]')).toHaveAttribute('title', '0 0% 0%');
   });
 
   it('shows "Ver portal público" linking to /o/:slug when the org has one, hidden otherwise (T-D03)', async () => {
@@ -138,7 +145,7 @@ describe('PortalThemePage — owner personalization', () => {
     stubFetchByUrl({ tokens: {} }, { id: 'org-1', name: 'Refugio Patitas' });
     renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
 
-    await screen.findByLabelText('Color primario');
+    await screen.findByLabelText('Color principal');
     expect(screen.queryByRole('link', { name: /Ver portal público/ })).not.toBeInTheDocument();
   });
 
@@ -146,18 +153,18 @@ describe('PortalThemePage — owner personalization', () => {
     stubFetchByUrl({ tokens: {} });
     renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
 
-    const accentText = await screen.findByLabelText('Color de acento');
-    fireEvent.change(accentText, { target: { value: '0 0% 0%' } });
+    const accentPicker = await screen.findByLabelText('Color de acento');
+    fireEvent.change(accentPicker, { target: { value: '#000000' } });
 
     const preview = screen.getByTestId('theme-preview');
     const chip = within(preview).getByText('Acento');
     expect(chip).toHaveStyle({ backgroundColor: 'hsl(0 0% 0%)' });
   });
 
-  describe('S2-PORTAL: diseño, contenido y mini-réplica', () => {
+  describe('S2-PORTAL: diseño y mini-réplica (siguen en Personalización)', () => {
     it('renders the mini preview (no fetch — pure props from the form)', async () => {
       renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
-      await screen.findByLabelText('Color primario');
+      await screen.findByLabelText('Color principal');
       expect(screen.getByTestId('portal-mini-preview')).toBeInTheDocument();
     });
 
@@ -171,7 +178,7 @@ describe('PortalThemePage — owner personalization', () => {
         return { tokens: {} };
       });
       renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
-      await screen.findByLabelText('Color primario');
+      await screen.findByLabelText('Color principal');
 
       fireEvent.click(screen.getByRole('button', { name: 'Centro' }));
       expect(screen.getByRole('button', { name: 'Centro' })).toHaveAttribute(
@@ -186,46 +193,18 @@ describe('PortalThemePage — owner personalization', () => {
         expect(JSON.parse(String(put?.init?.body))).toMatchObject({ logoPosition: 'center' });
       });
     });
+  });
 
-    it('loads "Nosotros"/contacto extendido from the profile and PUTs them on save', async () => {
-      const calls: Array<{ url: string; init?: RequestInit }> = [];
-      stubFetch((url, init) => {
-        calls.push({ url, init });
-        if (url.includes('/org/profile')) {
-          return {
-            id: 'org-1',
-            name: 'Refugio Patitas',
-            slug: 'patitas',
-            aboutUs: 'Historia real de la fundación.',
-            extendedContact: { hours: 'Lun-Vie 9am-5pm', additionalPhones: ['3001234567'] },
-          };
-        }
-        return { tokens: {} };
-      });
+  describe('S2-REORG: contenido de la organización ya NO vive aquí', () => {
+    it('never shows "Nosotros"/contacto extendido — movidos a Mi organización', async () => {
       renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
+      await screen.findByLabelText('Color principal');
 
-      const aboutUs = await screen.findByLabelText('Quiénes somos');
-      expect(aboutUs).toHaveValue('Historia real de la fundación.');
-      expect(screen.getByLabelText('Horario de atención')).toHaveValue('Lun-Vie 9am-5pm');
-      expect(screen.getByLabelText('Teléfonos adicionales')).toHaveValue('3001234567');
-
-      fireEvent.change(screen.getByLabelText('Dirección completa'), {
-        target: { value: 'Calle 45 #12-34, Bogotá' },
-      });
-      fireEvent.click(screen.getByRole('button', { name: /Guardar personalización/ }));
-
-      await waitFor(() => {
-        const put = calls.find((c) => c.url.includes('/org/profile') && c.init?.method === 'PUT');
-        expect(put).toBeDefined();
-        expect(JSON.parse(String(put?.init?.body))).toEqual({
-          aboutUs: 'Historia real de la fundación.',
-          extendedContact: {
-            hours: 'Lun-Vie 9am-5pm',
-            fullAddress: 'Calle 45 #12-34, Bogotá',
-            additionalPhones: ['3001234567'],
-          },
-        });
-      });
+      expect(screen.queryByText('Sección: Nosotros / Acerca de')).not.toBeInTheDocument();
+      expect(screen.queryByText('Acerca de nosotros')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Quiénes somos')).not.toBeInTheDocument();
+      expect(screen.queryByText('Sección: Información de contacto')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Horario de atención')).not.toBeInTheDocument();
     });
   });
 });

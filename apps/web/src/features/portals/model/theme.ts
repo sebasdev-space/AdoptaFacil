@@ -31,10 +31,13 @@ export interface PortalThemeField {
 
 /** Campos editables del tema, en orden de presentación. Fuente única de la UI. */
 export const PORTAL_THEME_FIELDS: readonly PortalThemeField[] = [
-  { token: 'primary', label: 'Color primario', kind: 'color', hint: 'HSL: "H S% L%"' },
+  // Labels en español simple (S2-REORG) — un dueño no técnico nunca necesita
+  // ver "token"/"HSL": el color lo elige con el selector nativo, el hint (con
+  // el formato crudo) solo aparece en un tooltip al pasar el mouse.
+  { token: 'primary', label: 'Color principal', kind: 'color', hint: 'HSL: "H S% L%"' },
   {
     token: 'primary-foreground',
-    label: 'Texto sobre primario',
+    label: 'Texto sobre el principal',
     kind: 'color',
     hint: 'HSL: "H S% L%"',
   },
