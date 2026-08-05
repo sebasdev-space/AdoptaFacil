@@ -3,6 +3,7 @@ import { RequireAuth, RequireRoles } from '../auth';
 import { AppLayout } from '../layout';
 import {
   ANIMAL_VIEW_ROLES,
+  CAMPAIGNS_VIEW_ROLES,
   ORG_DOCUMENTS_ROLES,
   ORG_MEMBER_ROLES,
   PLATFORM_DOCUMENTS_ROLES,
@@ -23,7 +24,12 @@ import {
   PlatformDocumentsReviewPage,
 } from '../../features/org';
 import { OrgPublicPage, PortalThemePage, PublicAnimalDetailPage } from '../../features/portals';
-import { PublicCampaignDetailPage, PublicCampaignsPage } from '../../features/campaigns';
+import {
+  CampaignDetailPage,
+  CampaignsPage,
+  PublicCampaignDetailPage,
+  PublicCampaignsPage,
+} from '../../features/campaigns';
 import { AnimalsPage, RemindersInboxPage } from '../../features/animals';
 import { AdoptionRequestPage, AdoptionsKanbanPage } from '../../features/adoptions';
 import { DonatePage } from '../../features/donations';
@@ -79,8 +85,7 @@ export function AppRoutes() {
       <Route path="/verificar/:code" element={<CertificateVerificationPage />} />
       {/* Public campaigns portal (§M14/M06, T-055) — no auth, active campaigns from
           /public/campaigns + public detail by id. The AUTHENTICATED org management
-          screen (features/campaigns/CampaignsPage) is a separate surface (unrouted;
-          daily item con @sebastian). */}
+          screen lives at /organizacion/campanas below (S2-01), a separate surface. */}
       <Route path="/campanas" element={<PublicCampaignsPage />} />
       <Route path="/campanas/:id" element={<PublicCampaignDetailPage />} />
 
@@ -178,6 +183,26 @@ export function AppRoutes() {
             element={
               <RequireRoles roles={ORG_MEMBER_ROLES}>
                 <PortalThemePage />
+              </RequireRoles>
+            }
+          />
+          {/* M06 · gestión de campañas de recaudación para la organización (RF15,
+              S2-01). Reconecta el screen autenticado que T-065 dejó sin ruta;
+              gated a CAMPAIGNS_VIEW_ROLES, calcado del @Roles real de
+              CampaignsController (GET /campaigns). */}
+          <Route
+            path="organizacion/campanas"
+            element={
+              <RequireRoles roles={CAMPAIGNS_VIEW_ROLES}>
+                <CampaignsPage />
+              </RequireRoles>
+            }
+          />
+          <Route
+            path="organizacion/campanas/:id"
+            element={
+              <RequireRoles roles={CAMPAIGNS_VIEW_ROLES}>
+                <CampaignDetailPage />
               </RequireRoles>
             }
           />
