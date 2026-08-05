@@ -25,35 +25,129 @@ registrarse cuanto antes — no requiere Docker ni infraestructura propia.
    `/health` (db/redis `down`) porque el rol `adoptafacil_app` aún no existe —
    es esperado, se corrige en el paso 3.
 
-## 2. Construir `DATABASE_URL_APP`
+## 2. Construir `DATABASE_URL_APP` (rotar password + restaurar FORCE RLS)
 
 La API se conecta en runtime como el rol **no-superusuario** `adoptafacil_app`
 (no como el owner) para que RLS se aplique de verdad (`prisma.service.ts`).
 Ese rol lo crea la migración inicial (`prisma/migrations/20260716051053_init/
 migration.sql`) con `CREATE ROLE adoptafacil_app LOGIN PASSWORD 'adoptafacil_app'
-NOSUPERUSER NOBYPASSRLS` — Render no lo conoce, así que hay que armar la cadena
-a mano:
+NOSUPERUSER NOBYPASSRLS` — password hardcodeada (heredada de dev/CI, donde no
+importa) que **hay que rotar** antes de usar la base con datos reales.
 
-1. Dashboard → `adoptafacil-db` → copia el **Internal Database URL**
-   (algo como `postgresql://adoptafacil:<password>@<host>/adoptafacil`).
-2. Reemplaza `adoptafacil:<password>` por `adoptafacil_app:adoptafacil_app`
-   (usuario y contraseña que crea la migración), dejando el mismo host/puerto/
-   nombre de base y cualquier `?sslmode=...` que traiga.
-3. Pega el resultado en `DATABASE_URL_APP` del servicio `adoptafacil-api`.
+> ⚠️ **Antes de seguir, lee "Hallazgo S1-01" más abajo.** Restaurar FORCE ROW
+> LEVEL SECURITY sin verificar primero que el owner de la base pueda saltar
+> RLS (BYPASSRLS) puede romper TODOS los endpoints `/public/*` (catálogo de
+> adopción, perfiles públicos de organización, campañas, apadrinamientos...) y
+> `pnpm seed:admin`. El script de abajo verifica esto automáticamente y se
+> detiene sin tocar nada si no puede garantizarlo — pero si eso pasa, **no lo
+> fuerces manualmente** sin antes leer esa sección.
 
-**Riesgo de seguridad a tener en cuenta:** esa contraseña (`adoptafacil_app`)
-está hardcodeada en texto plano en el SQL de la migración (heredada de dev/CI,
-donde no importa). Para producción real con datos de fundaciones, rota la
-contraseña después del primer `db:deploy` (paso 4):
+Usa `scripts/render-setup-roles.sh` (S1-01) en vez de construir la cadena a
+mano — rota el password, verifica que el owner pueda saltar RLS, restaura
+`FORCE ROW LEVEL SECURITY` en todas las tablas con policy `tenant_isolation`
+(las descubre dinámicamente, no hay lista que mantener), y verifica la
+conexión como `adoptafacil_app` antes de imprimir el `DATABASE_URL_APP` listo
+para pegar:
 
-```sql
--- Desde el Shell de Render (psql) o cualquier cliente conectado como owner:
-ALTER ROLE adoptafacil_app WITH PASSWORD '<contraseña-fuerte-nueva>';
-```
+1. Dashboard → `adoptafacil-api` → **Shell** (o cualquier shell con `pnpm` y
+   Node apuntando a la base, parado en la raíz del repo).
+2. Diagnóstico rápido, de solo lectura, antes de correr nada (confirma si el
+   Hallazgo S1-01 aplica a tu instancia de Render):
+   ```bash
+   echo "SELECT rolname, rolsuper, rolbypassrls, rolcreaterole FROM pg_roles WHERE rolname = current_user;" \
+     | pnpm exec prisma db execute --stdin --url="$DATABASE_URL"
+   ```
+   Si `rolsuper` y `rolbypassrls` son `f` (false) para el owner, el script del
+   paso 3 se va a detener en el paso "3/5" — es esperado, sigue en "Hallazgo
+   S1-01" antes de continuar.
+3. Corre el script con un password fuerte y nuevo (nunca el hardcodeado de la
+   migración):
+   ```bash
+   ADOPTAFACIL_APP_PASSWORD='<password-fuerte-nueva>' ./scripts/render-setup-roles.sh
+   ```
+4. Si termina con éxito, copia el `DATABASE_URL_APP` que imprime al final y
+   pégalo en el servicio `adoptafacil-api` (dispara un redeploy automático).
 
-y actualiza `DATABASE_URL_APP` con la contraseña nueva (dispara un redeploy
-automático del API). Esto NO toca la migración (cero migraciones nuevas, tal
-como pide la tarea) — es un ajuste operativo posterior.
+El script es idempotente (correrlo dos veces no falla ni rompe nada) y no
+toca ninguna migración — es un ajuste operativo, tal como pide la tarea.
+
+### Hallazgo S1-01: por qué el workaround actual (`NO FORCE` + `DATABASE_URL_APP=DATABASE_URL`) existe, y qué se necesita para revertirlo con seguridad
+
+**Cómo funcionan los endpoints públicos hoy:** el catálogo de adopción público,
+los perfiles públicos de organización, las campañas públicas, la rendición de
+cuentas pública, el resumen público de apadrinamiento, etc. (todos bajo
+`*.controller.ts` con rutas `/public/*` o similares — ver
+`public-animals.service.ts`, `public-campaigns.service.ts`,
+`org-profile.service.ts`, entre ~10 módulos) **no filtran por tenant en la
+capa de la app**: llaman a funciones `SECURITY DEFINER` de Postgres (p. ej.
+`public_org_adoptable_animals`, `organization_public`, `public_campaigns`)
+que resuelven la organización por slug/id y consultan directamente las tablas
+protegidas por RLS. Esto es intencional y está documentado en cada migración
+(`prisma/migrations/.../migration.sql`, buscar `SECURITY DEFINER`) — es el
+patrón "excepción controlada a RLS" en vez de un `SELECT *` sin filtro.
+
+**Por qué eso funciona en local/CI pero es frágil en Render:** una función
+`SECURITY DEFINER` corre con los privilegios de su **owner** (quien ejecutó la
+migración, vía `DATABASE_URL`) — y en Postgres, el owner de una tabla **salta
+RLS automáticamente, a menos que la tabla tenga `FORCE`**. En local/CI,
+`DATABASE_URL` conecta como `adoptafacil` (docker-compose), que es el usuario
+`POSTGRES_USER` de la imagen oficial `postgres:16` → es **superusuario real**,
+y un superusuario salta RLS **siempre**, con o sin `FORCE`. Por eso todo
+funciona ahí incluso con `FORCE` puesto desde el día 1. `pnpm seed:admin`
+tiene el mismo patrón a propósito (`apps/api/scripts/seed-platform-admin.ts`,
+comentario: _"Superuser connection (bypasses RLS)"_) — crea el PlatformAdmin
+conectando directo por `DATABASE_URL`, sin pasar por `withOrgContext`.
+
+En Render, el owner de la base (`adoptafacil`) **casi con certeza no es un
+superusuario real** (los proveedores de Postgres administrado no lo dan, por
+seguridad del control plane) — es un rol con `CREATEROLE`/`CREATEDB` pero sin
+`SUPERUSER` ni `BYPASSRLS`. Verificado empíricamente contra Postgres 16.14 (la
+misma versión que corre Render) con un rol simulado idéntico: con `FORCE`
+puesto, ese tipo de owner **sí queda sujeto a RLS**, así que las funciones
+`SECURITY DEFINER` (que corren como él) y `pnpm seed:admin` (que conecta como
+él) dejan de ver/escribir filas — no con un error, sino devolviendo 0 filas o
+fallando el `WITH CHECK` de la policy en silencio. Esto es, con alta
+probabilidad, lo que forzó el workaround actual: alguien restauró
+funcionalidad rápido bajo presión desactivando `FORCE` en todas las tablas
+(en vez de resolver la causa real) y apuntando `DATABASE_URL_APP` al owner.
+
+**El fix correcto — y su bloqueo verificado:** el owner necesita el atributo
+`BYPASSRLS` (equivalente a lo que ya tiene "gratis" el superusuario local) para
+que las funciones `SECURITY DEFINER` y `pnpm seed:admin` sigan funcionando una
+vez restaurado `FORCE`. `scripts/render-setup-roles.sh` intenta
+`ALTER ROLE <owner> BYPASSRLS` automáticamente antes de tocar `FORCE`, y
+**aborta sin cambiar nada si falla**. Probado contra Postgres 16.14 con un rol
+`CREATEROLE`/`CREATEDB` sin `SUPERUSER` (el mismo perfil que se espera del
+owner de Render): el intento de auto-concederse `BYPASSRLS` fallar con
+`permission denied to alter role` — **solo un superusuario puede otorgar
+`BYPASSRLS`**, ni siquiera `CREATEROLE` alcanza (endurecido así desde
+Postgres 16). No se pudo verificar contra la instancia real de Render (sin
+acceso), así que esto queda como **condición de parada real**, no una
+suposición: el diagnóstico del paso 2 de arriba confirma si aplica.
+
+Si el script se detiene en el paso "3/5" (`No se pudo otorgar BYPASSRLS...`),
+las opciones son:
+
+- **Opción A (probar primero, sin código):** pedirle a soporte de Render que
+  otorgue `BYPASSRLS` al usuario owner de `adoptafacil-db` (algunos
+  proveedores administrados sí atienden este tipo de solicitud puntual vía
+  soporte). Cero cambios de código si funciona.
+- **Opción B (garantizada, pero requiere una migración nueva — fuera de
+  alcance de S1-01):** en vez de depender de que el owner salte RLS por
+  privilegio, hacer que cada función `SECURITY DEFINER` pública fije
+  explícitamente `app.current_org_id` para la organización que ya resolvió
+  (p. ej. `PERFORM set_config('app.current_org_id', v_org::text, true);` justo
+  después de resolver `v_org` en `public_org_adoptable_animals`,
+  `organization_public`, `public_campaigns`, etc. — mismo mecanismo que usa
+  `PrismaService.withOrgContext`), y ajustar `seed-platform-admin.ts` para
+  envolver su transacción con el mismo `set_config`. Esto hace que la policy
+  `tenant_isolation` se cumpla por sí sola, sin depender de si el owner puede
+  saltar RLS — funciona igual en local, CI y Render. Queda **TODO(client)**
+  como tarea de seguimiento si la Opción A no es viable.
+
+**Mientras tanto:** el workaround actual (inseguro, pero funcional) sigue
+activo — este script no lo toca si no puede garantizar que restaurar `FORCE`
+no rompa nada. No lo fuerces manualmente sin haber resuelto la Opción A o B.
 
 ## 3. Resolver las URLs públicas (segunda pasada de env vars)
 
@@ -82,8 +176,19 @@ Con `DATABASE_URL_APP` ya configurado (paso 2):
 2. `pnpm db:deploy` — corre `prisma migrate deploy`: crea todas las tablas,
    las policies RLS y el rol `adoptafacil_app` (una sola vez; migraciones
    futuras se corren igual, manualmente, nunca en el `buildCommand`).
-3. `pnpm seed:admin` — crea el PlatformAdmin inicial.
-4. `pnpm seed:demo` — datos de demo (opcional, útil para la demo del 30 de julio).
+3. `pnpm seed:admin` — crea el PlatformAdmin inicial. **Depende del mismo fix
+   de "Hallazgo S1-01" (paso 2):** este script conecta como el owner
+   (`DATABASE_URL`) a propósito para saltarse RLS al crear el primer usuario
+   (`apps/api/scripts/seed-platform-admin.ts`) — si `FORCE` está restaurado
+   pero el owner no tiene `BYPASSRLS`, este comando fallará igual que los
+   endpoints `/public/*`. No es un problema nuevo de `seed:admin`: es el mismo
+   bloqueo, así que se resuelve solo una vez.
+4. `pnpm seed:demo` — datos de demo (opcional). No tiene esta dependencia: usa
+   los servicios reales de Nest vía `withOrgContext` (el rol de app,
+   tenant-scoped), igual que cualquier request autenticado — funciona con
+   `FORCE` puesto sin necesitar `BYPASSRLS` en nadie. Por esto no hace falta un
+   script separado que desactive/reactive RLS para sembrar (se evaluó y se
+   descartó en S1-01: sería trabajo extra sin beneficio).
 5. Confirma en `https://<tu-api>.onrender.com/health` que responde
    `{"status":"ok","db":"up","redis":"up"}`.
 
@@ -115,6 +220,13 @@ not found` durante el build (T-D07):** pnpm salta TODAS las devDependencies
   devDependencies. El `buildCommand` del Blueprint ya incluye `--prod=false`
   para forzar su instalación durante el build; si copias el comando a mano
   (fuera del Blueprint) no olvides ese flag.
+- **Endpoints `/public/*` devuelven 404/vacío o `pnpm seed:admin` falla
+  después de restaurar `FORCE ROW LEVEL SECURITY` (S1-01):** el owner de la
+  base necesita el atributo `BYPASSRLS` para que las funciones
+  `SECURITY DEFINER` públicas y `seed:admin` sigan funcionando bajo `FORCE` —
+  ver "Hallazgo S1-01" en la sección 2. Si `scripts/render-setup-roles.sh` se
+  detuvo en el paso "3/5", esto es exactamente lo que habría pasado si se
+  hubiera forzado igual; no se aplicó ningún cambio.
 - **Build falla por memoria/timeout:** el plan `starter` del API suele alcanzar;
   si el build de `apps/web` (Vite) se queda sin memoria, sube el plan del
   static site temporalmente durante el build (Render permite build en plan
