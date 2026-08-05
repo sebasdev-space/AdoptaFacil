@@ -192,6 +192,70 @@ Con `DATABASE_URL_APP` ya configurado (paso 2):
 5. Confirma en `https://<tu-api>.onrender.com/health` que responde
    `{"status":"ok","db":"up","redis":"up"}`.
 
+### Hallazgo S1-04: URLs de storage con `localhost` en producción (dato ya sembrado, no un bug de código)
+
+Si el logo/portada de una organización (o una foto de seguimiento post-adopción)
+muestra una URL con `http://localhost:3000/storage/...`, **no es un bug de
+`DiskStorageAdapter` ni de `seed-demo.ts`** — se investigó a fondo y ambos ya
+leen `STORAGE_PUBLIC_BASE_URL` correctamente
+(`disk-storage.adapter.ts:35,45,50`; `seed-demo.ts:383-384` llama a
+`storage.resolvePublicUrl(...)`, nunca hardcodea el host). El código de lectura
+en runtime (`public-animals.service.ts:90`, `organization_public`/
+`public_org_adoptable_animals`) también resuelve bien.
+
+El problema real: `organization_profiles.logo_url`/`cover_photos` (y
+`adoption_followup_evidence.storage_url`) **guardan la URL ya resuelta en el
+momento de escribirla** (a diferencia de `animal_photos`/`campaign_evidences`,
+que guardan solo la clave cruda `storage_ref` y la resuelven de nuevo en cada
+lectura — esas se auto-corrigen solas apenas `STORAGE_PUBLIC_BASE_URL` esté
+bien puesto, sin tocar datos). Si esas dos columnas se escribieron ANTES de
+que `STORAGE_PUBLIC_BASE_URL` apuntara a la URL pública real de Render — p.
+ej. corriendo `pnpm seed:demo` desde una terminal local con `DATABASE_URL`/
+`DATABASE_URL_APP` apuntando a la base de Render pero sin exportar también el
+`STORAGE_PUBLIC_BASE_URL` de Render (así toma el default local
+`http://localhost:3000` de `env.validation.ts:55`) — la URL localhost queda
+grabada para siempre; arreglar la env var después NO las corrige solas.
+
+**Fix retroactivo (correr UNA vez, después de que `STORAGE_PUBLIC_BASE_URL`
+ya esté bien puesto en Render).** Desde el Shell de `adoptafacil-api` (usa
+`prisma db execute`, no requiere `psql` — mismo patrón que
+`scripts/render-setup-roles.sh`):
+
+```bash
+STORAGE_PUBLIC_BASE_URL='https://adoptafacil-api.onrender.com'   # el valor real que pegaste en el paso 3
+
+cat <<SQL | pnpm exec prisma db execute --stdin --url="$DATABASE_URL"
+UPDATE organization_profiles
+SET logo_url = REPLACE(logo_url, 'http://localhost:3000', '$STORAGE_PUBLIC_BASE_URL')
+WHERE logo_url LIKE 'http://localhost%';
+
+UPDATE organization_profiles
+SET cover_photos = (
+  SELECT array_agg(REPLACE(url, 'http://localhost:3000', '$STORAGE_PUBLIC_BASE_URL'))
+  FROM unnest(cover_photos) AS url
+)
+WHERE EXISTS (SELECT 1 FROM unnest(cover_photos) AS url WHERE url LIKE 'http://localhost%');
+
+-- adoption_followup_evidence.storage_url tenía ADEMÁS un bug de código propio
+-- (S1-04, ver apps/api/src/modules/adoptions/followup.service.ts): guardaba la
+-- URL del endpoint de SUBIDA (PUT /storage/upload, solo para el navegador que
+-- sube el archivo) en vez de la de LECTURA (GET /storage/private). Ya
+-- corregido en el código; las filas viejas necesitan corregir AMBAS cosas.
+UPDATE adoption_followup_evidence
+SET storage_url = REPLACE(
+  REPLACE(storage_url, 'http://localhost:3000', '$STORAGE_PUBLIC_BASE_URL'),
+  '/storage/upload?key=', '/storage/private?key='
+)
+WHERE storage_url LIKE '%/storage/upload?key=%' OR storage_url LIKE 'http://localhost%';
+SQL
+```
+
+Idempotente (`REPLACE` sobre una URL ya corregida no hace nada — no calza
+`LIKE 'http://localhost%'` ni contiene `/storage/upload?key=`), así que correrlo
+de más no rompe nada. No hace falta para `animal_photos`/`campaign_evidences`
+(se resuelven solas, ver arriba) ni para nada sembrado DESPUÉS de que
+`STORAGE_PUBLIC_BASE_URL` ya estuviera bien puesto.
+
 ## 5. Logs y troubleshooting
 
 - **Logs:** dashboard → el servicio → pestaña **Logs** (build y runtime
@@ -210,6 +274,11 @@ Con `DATABASE_URL_APP` ya configurado (paso 2):
   = URL pública de la propia API, y que el Persistent Disk (`adoptafacil-storage`,
   montado en `/var/data/storage`) sigue asociado al servicio — si se recrea el
   servicio sin el disco, los archivos subidos antes se pierden.
+- **Logos/portadas muestran `http://localhost:3000/storage/...` (S1-04):** no
+  es un bug de código (`DiskStorageAdapter`/`seed-demo.ts` ya usan
+  `STORAGE_PUBLIC_BASE_URL` bien) — son URLs que se grabaron en
+  `organization_profiles` ANTES de que esa env var apuntara a la URL real.
+  Ver "Hallazgo S1-04" en la sección 4 para el fix retroactivo (una sola vez).
 - **`--frozen-lockfile` falla en el build:** el lockfile quedó desactualizado.
   Corre `pnpm install` local, comitea `pnpm-lock.yaml`, vuelve a desplegar.
 - **`prisma: command not found` / `husky: command not found` / `nest: command
