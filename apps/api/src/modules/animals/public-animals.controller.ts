@@ -1,8 +1,13 @@
 import { Controller, Get, NotFoundException, Param, Query } from '@nestjs/common';
-import type { AnimalSummaryPage } from '@adoptafacil/contracts';
+import type { AnimalSummaryPage, PublicAnimalsPage } from '@adoptafacil/contracts';
 import { ZodValidationPipe } from '../../core/auth/zod-validation.pipe';
 import { PublicAnimalsService } from './public-animals.service';
-import { type PublicAnimalsQuery, publicAnimalsQuerySchema } from './public-animals.schemas';
+import {
+  type PublicAnimalsGlobalQuery,
+  type PublicAnimalsQuery,
+  publicAnimalsGlobalQuerySchema,
+  publicAnimalsQuerySchema,
+} from './public-animals.schemas';
 
 /**
  * PUBLIC adoption catalog (T-029, RF07). No authentication: exposes only the
@@ -26,5 +31,15 @@ export class PublicAnimalsController {
       throw new NotFoundException('Organization not found');
     }
     return page;
+  }
+
+  /** GLOBAL adoptable catalog across every public org (S1-07), for the public
+   *  landing page's portfolio view. See `PublicAnimalsService.listAllAdoptable`
+   *  for how this stays RLS-safe without a new SQL function. */
+  @Get('public/animals')
+  async listAll(
+    @Query(new ZodValidationPipe(publicAnimalsGlobalQuerySchema)) query: PublicAnimalsGlobalQuery,
+  ): Promise<PublicAnimalsPage> {
+    return this.service.listAllAdoptable(query);
   }
 }
