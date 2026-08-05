@@ -1,14 +1,27 @@
 import { Badge, Card, CardContent, CardHeader } from '@adoptafacil/ui';
-import { FormalizationState, type PortalProfile } from '@adoptafacil/contracts';
+import {
+  FormalizationState,
+  type PortalLogoPosition,
+  type PortalProfile,
+} from '@adoptafacil/contracts';
 import { OrgTypeBadge } from './org-type-badge';
 
 export interface PortalProfileSectionProps {
   profile: PortalProfile;
   /** Total de animales adoptables (conteo real del catálogo público), si ya cargó. */
   animalCount?: number;
+  /** Posición del logo sobre el hero (S2-PORTAL). Default: 'left' (como antes). */
+  logoPosition?: PortalLogoPosition;
 }
 
 const HEADING_ID = 'portal-profile-heading';
+
+/** Clases de posicionamiento del logo circular sobre el borde del cover. */
+const LOGO_POSITION_CLASSES: Record<PortalLogoPosition, string> = {
+  left: 'left-6',
+  center: 'left-1/2 -translate-x-1/2',
+  right: 'right-6',
+};
 
 /** Etiquetas legibles (es-CO) del estado de formalización (§14, RF02). */
 const FORMALIZATION_LABELS: Record<FormalizationState, string> = {
@@ -39,7 +52,11 @@ function initials(name: string): string {
  * (siempre 0 hasta que exista el catálogo, T-103) y las redes sociales/contacto
  * viven en el sidebar (`PortalSocialLinks`), no en esta card.
  */
-export function PortalProfileSection({ profile, animalCount }: PortalProfileSectionProps) {
+export function PortalProfileSection({
+  profile,
+  animalCount,
+  logoPosition = 'left',
+}: PortalProfileSectionProps) {
   const { organization: org, organizationType } = profile;
   const cover = org.coverPhotos?.[0];
   const formalizationLabel = org.formalizationState
@@ -63,7 +80,7 @@ export function PortalProfileSection({ profile, animalCount }: PortalProfileSect
               className="h-48 w-full bg-gradient-to-br from-primary/30 via-primary/10 to-transparent sm:h-60"
             />
           )}
-          <div className="absolute -bottom-10 left-6">
+          <div className={`absolute -bottom-10 ${LOGO_POSITION_CLASSES[logoPosition]}`}>
             {org.logoUrl ? (
               <img
                 src={org.logoUrl}

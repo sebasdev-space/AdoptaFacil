@@ -1,6 +1,8 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type {
+  PortalLogoPosition,
+  PortalSocialNavPosition,
   PortalTheme,
   PortalThemeConfig,
   UpdatePortalThemeInput,
@@ -37,12 +39,18 @@ export class PortalThemeService {
     const organizationId = this.requireOrgId();
     return this.prisma.withOrgContext(organizationId, async (tx) => {
       const row = await tx.portalTheme.findUnique({ where: { organizationId } });
-      return { tokens: (row?.tokens as PortalTheme | undefined) ?? {} };
+      return {
+        tokens: (row?.tokens as PortalTheme | undefined) ?? {},
+        logoPosition: (row?.logoPosition as PortalLogoPosition | null) ?? undefined,
+        socialNavPosition: (row?.socialNavPosition as PortalSocialNavPosition | null) ?? undefined,
+      };
     });
   }
 
   /** Create/patch the caller's theme (Owner/Administrator). Persists the validated
-   *  tokens and records an audit event, all in one RLS-scoped transaction. */
+   *  tokens (+ layout positions, S2-PORTAL) and records an audit event, all in one
+   *  RLS-scoped transaction. `logoPosition`/`socialNavPosition` are independent of
+   *  `tokens` — omitting one leaves its stored value untouched. */
   async updateTheme(
     actorUserId: string,
     input: UpdatePortalThemeInput,
@@ -53,8 +61,21 @@ export class PortalThemeService {
     return this.prisma.withOrgContext(organizationId, async (tx) => {
       const row = await tx.portalTheme.upsert({
         where: { organizationId },
-        create: { organizationId, tokens },
-        update: { tokens },
+        create: {
+          organizationId,
+          tokens,
+          ...(input.logoPosition !== undefined ? { logoPosition: input.logoPosition } : {}),
+          ...(input.socialNavPosition !== undefined
+            ? { socialNavPosition: input.socialNavPosition }
+            : {}),
+        },
+        update: {
+          tokens,
+          ...(input.logoPosition !== undefined ? { logoPosition: input.logoPosition } : {}),
+          ...(input.socialNavPosition !== undefined
+            ? { socialNavPosition: input.socialNavPosition }
+            : {}),
+        },
       });
       await this.audit.recordWithTx(tx, {
         organizationId,
@@ -62,24 +83,45 @@ export class PortalThemeService {
         action: 'portal.theme_updated',
         entityType: 'portal_theme',
         entityId: organizationId,
-        // Only WHICH tokens changed — never full values (branding is low-risk but
-        // we keep the audit metadata minimal and consistent with org profile).
-        metadata: { tokens: Object.keys(input.tokens) },
+        // Only WHICH tokens/fields changed — never full values (branding is
+        // low-risk but we keep the audit metadata minimal and consistent).
+        metadata: {
+          tokens: Object.keys(input.tokens),
+          layout: [
+            ...(input.logoPosition !== undefined ? ['logoPosition'] : []),
+            ...(input.socialNavPosition !== undefined ? ['socialNavPosition'] : []),
+          ],
+        },
       });
-      return { tokens: (row.tokens as PortalTheme) ?? {} };
+      return {
+        tokens: (row.tokens as PortalTheme) ?? {},
+        logoPosition: (row.logoPosition as PortalLogoPosition | null) ?? undefined,
+        socialNavPosition: (row.socialNavPosition as PortalSocialNavPosition | null) ?? undefined,
+      };
     });
   }
 
   /**
    * Public theme by slug. Reads through the `organization_portal_theme` SECURITY
-   * DEFINER function (public tokens only, no tenant context needed, RLS not
-   * evaded). Returns empty tokens when the org has no theme or the slug is unknown
-   * — the portal then simply renders the design-system default.
+   * DEFINER function (public tokens + layout only, no tenant context needed, RLS
+   * not evaded). Returns the defaults when the org has no theme or the slug is
+   * unknown — the portal then simply renders the design-system default layout.
    */
   async getPublicBySlug(slug: string): Promise<PortalThemeConfig> {
-    const rows = await this.prisma.$queryRaw<Array<{ tokens: PortalTheme | null }>>(
-      Prisma.sql`SELECT organization_portal_theme(${slug}) AS tokens`,
-    );
-    return { tokens: rows[0]?.tokens ?? {} };
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        data: {
+          tokens: PortalTheme;
+          logoPosition: PortalLogoPosition;
+          socialNavPosition: PortalSocialNavPosition;
+        } | null;
+      }>
+    >(Prisma.sql`SELECT organization_portal_theme(${slug}) AS data`);
+    const data = rows[0]?.data;
+    return {
+      tokens: data?.tokens ?? {},
+      logoPosition: data?.logoPosition ?? 'left',
+      socialNavPosition: data?.socialNavPosition ?? 'right',
+    };
   }
 }

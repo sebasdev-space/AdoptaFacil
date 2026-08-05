@@ -4,6 +4,7 @@ import type { Organization as OrgRow, OrganizationProfile as ProfileRow } from '
 import {
   FormalizationState,
   type Organization,
+  type OrganizationExtendedContact,
   type OrganizationLocation,
   type OrganizationPublic,
   type OrganizationSocialLinks,
@@ -33,6 +34,8 @@ function toOrganization(org: OrgRow, profile: ProfileRow | null): Organization {
     phone: profile?.phone ?? undefined,
     location: (profile?.location as OrganizationLocation | null) ?? undefined,
     socialLinks: (profile?.socialLinks as OrganizationSocialLinks | null) ?? undefined,
+    aboutUs: profile?.aboutUs ?? undefined,
+    extendedContact: (profile?.extendedContact as OrganizationExtendedContact | null) ?? undefined,
     subdomain: profile?.subdomain ?? undefined,
     slug: profile?.slug ?? undefined,
     formalizationState:
@@ -93,11 +96,15 @@ export class OrgProfileService {
       subdomain: input.subdomain,
       slug: input.slug,
       organizationType: input.organizationType,
+      aboutUs: input.aboutUs,
       ...(input.location !== undefined
         ? { location: input.location as unknown as Prisma.InputJsonValue }
         : {}),
       ...(input.socialLinks !== undefined
         ? { socialLinks: input.socialLinks as unknown as Prisma.InputJsonValue }
+        : {}),
+      ...(input.extendedContact !== undefined
+        ? { extendedContact: input.extendedContact as unknown as Prisma.InputJsonValue }
         : {}),
     };
 

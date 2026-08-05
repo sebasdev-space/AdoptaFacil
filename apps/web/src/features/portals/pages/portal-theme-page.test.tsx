@@ -92,7 +92,13 @@ describe('PortalThemePage — owner personalization', () => {
       const put = calls.find((c) => c.init?.method === 'PUT');
       expect(put).toBeDefined();
       expect(put?.url).toMatch(/\/portals\/theme$/);
-      expect(JSON.parse(String(put?.init?.body))).toEqual({ tokens: { primary: '24 90% 45%' } });
+      // S2-PORTAL: el save ahora también manda las posiciones de layout
+      // (default 'left'/'right' cuando el tema no trae ninguna todavía).
+      expect(JSON.parse(String(put?.init?.body))).toEqual({
+        tokens: { primary: '24 90% 45%' },
+        logoPosition: 'left',
+        socialNavPosition: 'right',
+      });
     });
   });
 
@@ -146,5 +152,80 @@ describe('PortalThemePage — owner personalization', () => {
     const preview = screen.getByTestId('theme-preview');
     const chip = within(preview).getByText('Acento');
     expect(chip).toHaveStyle({ backgroundColor: 'hsl(0 0% 0%)' });
+  });
+
+  describe('S2-PORTAL: diseño, contenido y mini-réplica', () => {
+    it('renders the mini preview (no fetch — pure props from the form)', async () => {
+      renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
+      await screen.findByLabelText('Color primario');
+      expect(screen.getByTestId('portal-mini-preview')).toBeInTheDocument();
+    });
+
+    it('changing the logo position toggle updates the state and is included on save', async () => {
+      const calls: Array<{ url: string; init?: RequestInit }> = [];
+      stubFetch((url, init) => {
+        calls.push({ url, init });
+        if (init?.method === 'PUT' && url.includes('/portals/theme')) {
+          return { tokens: {}, logoPosition: 'center', socialNavPosition: 'right' };
+        }
+        return { tokens: {} };
+      });
+      renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
+      await screen.findByLabelText('Color primario');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Centro' }));
+      expect(screen.getByRole('button', { name: 'Centro' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /Guardar personalización/ }));
+      await waitFor(() => {
+        const put = calls.find((c) => c.url.includes('/portals/theme') && c.init?.method === 'PUT');
+        expect(put).toBeDefined();
+        expect(JSON.parse(String(put?.init?.body))).toMatchObject({ logoPosition: 'center' });
+      });
+    });
+
+    it('loads "Nosotros"/contacto extendido from the profile and PUTs them on save', async () => {
+      const calls: Array<{ url: string; init?: RequestInit }> = [];
+      stubFetch((url, init) => {
+        calls.push({ url, init });
+        if (url.includes('/org/profile')) {
+          return {
+            id: 'org-1',
+            name: 'Refugio Patitas',
+            slug: 'patitas',
+            aboutUs: 'Historia real de la fundación.',
+            extendedContact: { hours: 'Lun-Vie 9am-5pm', additionalPhones: ['3001234567'] },
+          };
+        }
+        return { tokens: {} };
+      });
+      renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
+
+      const aboutUs = await screen.findByLabelText('Quiénes somos');
+      expect(aboutUs).toHaveValue('Historia real de la fundación.');
+      expect(screen.getByLabelText('Horario de atención')).toHaveValue('Lun-Vie 9am-5pm');
+      expect(screen.getByLabelText('Teléfonos adicionales')).toHaveValue('3001234567');
+
+      fireEvent.change(screen.getByLabelText('Dirección completa'), {
+        target: { value: 'Calle 45 #12-34, Bogotá' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: /Guardar personalización/ }));
+
+      await waitFor(() => {
+        const put = calls.find((c) => c.url.includes('/org/profile') && c.init?.method === 'PUT');
+        expect(put).toBeDefined();
+        expect(JSON.parse(String(put?.init?.body))).toEqual({
+          aboutUs: 'Historia real de la fundación.',
+          extendedContact: {
+            hours: 'Lun-Vie 9am-5pm',
+            fullAddress: 'Calle 45 #12-34, Bogotá',
+            additionalPhones: ['3001234567'],
+          },
+        });
+      });
+    });
   });
 });

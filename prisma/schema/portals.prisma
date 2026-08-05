@@ -18,12 +18,20 @@
 /// seguro (colores en canales HSL + `radius`), ya validado en la API antes de
 /// escribir. Un tema vacío ⇒ el portal usa el tema por defecto del design system.
 model PortalTheme {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @unique @map("organization_id") @db.Uuid
+  id                String   @id @default(uuid()) @db.Uuid
+  organizationId    String   @unique @map("organization_id") @db.Uuid
   /// PortalTheme (contrato): Partial<Record<PortalThemeToken, string>>.
-  tokens         Json     @default("{}")
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
+  tokens            Json     @default("{}")
+  /// "left" | "center" | "right" (S2-PORTAL). Dónde se posiciona el logo sobre
+  /// el hero del portal público. Validado en la API (no CSS libre), igual que
+  /// `tokens` — esto NO vive dentro de `tokens` porque no es un valor de color/
+  /// longitud CSS, es una posición estructural distinta en naturaleza.
+  logoPosition      String?  @default("left") @map("logo_position")
+  /// "left" | "right" (S2-PORTAL). De qué lado va el sidebar de redes/contacto
+  /// respecto al catálogo de animales.
+  socialNavPosition String?  @default("right") @map("social_nav_position")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@index([organizationId])
   @@map("portal_themes")
