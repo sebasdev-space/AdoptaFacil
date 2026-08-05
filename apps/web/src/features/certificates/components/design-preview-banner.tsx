@@ -21,8 +21,8 @@ export function DesignPreviewBanner({ detail }: DesignPreviewBannerProps) {
     >
       <Badge variant="warning">Vista de diseño</Badge>
       <span>
-        Anticipo del certificado de donación (RF14). {detail ?? 'Aún no es funcional:'} los datos,
-        el código y el QR son de muestra.
+        Anticipo del certificado de donación. {detail ?? 'Aún no es funcional:'} los datos, el
+        código y el QR son de muestra.
       </span>
     </div>
   );

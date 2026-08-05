@@ -124,7 +124,7 @@ export function OrgFormalizationPage() {
     <PageContainer>
       <PageHeader
         title="Formalización"
-        description="Progreso de formalización de tu organización (RF02)."
+        description="Progreso de formalización de tu organización."
       />
       {loading && <Skeleton className="h-64 w-full" />}
       {!loading && status && (

@@ -49,7 +49,7 @@ function SidebarFooter() {
   return (
     <div className="border-t px-4 py-3 text-xs text-muted-foreground">
       <p>AdoptaFácil V2.0</p>
-      <p className="mt-0.5">Portal con transparencia · §M14</p>
+      <p className="mt-0.5">Portal con transparencia</p>
     </div>
   );
 }

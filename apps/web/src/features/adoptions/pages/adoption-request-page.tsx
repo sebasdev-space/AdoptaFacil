@@ -80,7 +80,7 @@ export function AdoptionRequestPage() {
         <PageHeader title="Solicitar adopción" description="Postúlate para adoptar un animal." />
         <EmptyState
           title="Elige un animal desde el catálogo"
-          description="Esta pantalla recibe el animal desde el catálogo público de la organización (integración con M03: GET /public/organizations/:slug/animals, pendiente de publicación por Sebastián)."
+          description="Esta pantalla recibe el animal desde el catálogo público de la organización. Vuelve al catálogo y elige un animal para continuar."
         />
       </PageContainer>
     );

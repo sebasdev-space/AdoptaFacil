@@ -129,7 +129,7 @@ export function DonatePage() {
                   Ver tu certificado de donación
                 </Link>
                 <p className="text-xs text-muted-foreground">
-                  Vista de diseño: anticipo del certificado verificable (RF14).
+                  Vista previa: anticipo del certificado verificable.
                 </p>
               </div>
             </div>

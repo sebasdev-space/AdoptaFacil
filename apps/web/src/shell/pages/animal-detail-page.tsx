@@ -20,7 +20,7 @@ export function AnimalDetailPage() {
     <PageContainer>
       <PageHeader
         title="Detalle del animal"
-        description="Expediente clínico del animal (RF08). Registrar/editar: solo Veterinario."
+        description="Expediente clínico del animal. Registrar/editar: solo Veterinario."
       />
       <Link
         to="/animales"

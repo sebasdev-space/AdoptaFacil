@@ -243,10 +243,7 @@ export function AnimalsPage() {
 
   return (
     <PageContainer>
-      <PageHeader
-        title="Animales"
-        description="Expediente de animales de tu organización (RF07)."
-      />
+      <PageHeader title="Animales" description="Expediente de animales de tu organización." />
       {loading && <Skeleton className="h-64 w-full" />}
       {!loading && (
         <div className="space-y-6">
