@@ -154,12 +154,13 @@ describe('Organization documents (M01, RF03: versioning + RBAC + platform review
       .expect(403);
   });
 
-  it('exposes a computed verification level (level 0 with the empty TODO(client) catalog)', async () => {
+  it('exposes a computed verification level (level 0: no document approved yet)', async () => {
     const res = await request(server)
       .get('/org/documents/verification')
       .set('Authorization', `Bearer ${owner.token}`)
       .expect(200);
     expect(res.body.level).toBe(0);
+    expect(res.body.blockedBy).toEqual(['rut']);
   });
 
   // --- Cross-tenant platform review ------------------------------------------
@@ -205,6 +206,22 @@ describe('Organization documents (M01, RF03: versioning + RBAC + platform review
     expect(approved.body.status).toBe('approved');
     expect(approved.body.reviewedByUserId).toBe(platformAdmin.userId);
     await decide(platformAdmin.token, id, 'reject', 'too late').expect(400);
+  });
+
+  it('S1-05: approving a document persists the recomputed verification level as a side effect', async () => {
+    // Owner now has an APPROVED rut (previous test) but never uploaded an
+    // existence_representation_certificate ⇒ level 1, blocked on tier 2.
+    const res = await request(server)
+      .get('/org/documents/verification')
+      .set('Authorization', `Bearer ${owner.token}`)
+      .expect(200);
+    expect(res.body.level).toBe(1);
+    expect(res.body.blockedBy).toEqual(['existence_representation_certificate']);
+
+    const profile = await admin.organizationProfile.findUnique({
+      where: { organizationId: owner.orgId },
+    });
+    expect(profile?.verificationLevel).toMatchObject({ level: 1 });
   });
 
   it('returns 404 when deciding a non-existent document', async () => {

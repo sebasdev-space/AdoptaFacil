@@ -87,6 +87,16 @@ describe('Formalization state machine (M01, RF02)', () => {
     expect(rte.body.status).toEqual({ state: 'esal_rte', rteVigente: true });
   });
 
+  it('S1-05: a transition persists a recomputed verification level, even at esal_rte with no documents', async () => {
+    // No document was ever uploaded/approved for this org — reaching the top
+    // of the formalization ladder must NOT be enough on its own (tier 1 still
+    // requires an approved rut), proving the writer reads BOTH inputs.
+    const profile = await admin.organizationProfile.findUnique({
+      where: { organizationId: ownerOrgId },
+    });
+    expect(profile?.verificationLevel).toMatchObject({ level: 0, blockedBy: ['rut'] });
+  });
+
   it('records an append-only history preserving the same organization_id', async () => {
     const res = await request(server)
       .get('/org/formalization/history')

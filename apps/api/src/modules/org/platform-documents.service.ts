@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
   type DocumentReviewQueueItem,
@@ -6,6 +6,7 @@ import {
   type ReviewOrganizationDocumentInput,
 } from '@adoptafacil/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
+import { DocumentsService } from './documents.service';
 
 /** Map the review decision verb to the stored status it produces. */
 const DECISION_STATUS: Record<ReviewOrganizationDocumentInput['decision'], string> = {
@@ -28,7 +29,12 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  */
 @Injectable()
 export class PlatformDocumentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger('PlatformDocuments');
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly documents: DocumentsService,
+  ) {}
 
   /** Pending/UnderReview documents across all organizations, oldest first. */
   async queue(): Promise<DocumentReviewQueueItem[]> {
@@ -57,7 +63,25 @@ export class PlatformDocumentsService {
       const rows = await this.prisma.$queryRaw<Array<{ data: OrganizationDocument }>>(
         Prisma.sql`SELECT platform_document_decide(${documentId}::uuid, ${status}, ${reviewerUserId}::uuid, ${note}) AS data`,
       );
-      return rows[0].data;
+      const decided = rows[0].data;
+
+      // S1-05: recompute the org's verification level now that a document
+      // decision may have changed which documents count as approved. Runs
+      // cross-tenant (the reviewer is not a member of the document's org) via
+      // the same explicit-org accessor seeds/jobs use. Best-effort: the
+      // document decision above already committed and is audited by the
+      // DEFINER function — a failure here must never revert or fail it.
+      try {
+        await this.prisma.withOrgContext(decided.organizationId, (tx) =>
+          this.documents.recomputeAndPersistVerification(tx, decided.organizationId),
+        );
+      } catch (error) {
+        this.logger.warn(
+          `Verification recompute failed for org=${decided.organizationId} after deciding document=${documentId}: ${(error as Error).message}`,
+        );
+      }
+
+      return decided;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (/document not found/i.test(message)) {

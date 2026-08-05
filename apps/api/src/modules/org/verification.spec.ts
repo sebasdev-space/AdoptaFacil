@@ -1,4 +1,4 @@
-import { DocumentStatus, DocumentType } from '@adoptafacil/contracts';
+import { DocumentStatus, DocumentType, FormalizationState } from '@adoptafacil/contracts';
 import {
   computeVerificationLevel,
   effectiveStatus,
@@ -7,14 +7,26 @@ import {
   type LevelRequirement,
 } from './verification';
 
-// A TEST catalog (the production one is empty — TODO(client)). This exercises the
-// MECHANISM without inventing the real business catalog.
+// A TEST catalog — exercises the MECHANISM without depending on the real
+// production ladder (VERIFICATION_LEVELS), which can be redefined by the
+// client without touching this file.
 const LEVELS: LevelRequirement[] = [
   { level: 1, label: 'Básico', requiredDocuments: [DocumentType.Rut] },
   {
     level: 2,
     label: 'Verificada',
     requiredDocuments: [DocumentType.Rut, DocumentType.ExistenceRepresentationCertificate],
+  },
+];
+
+// A catalog with a formalization-gated top tier, for the formalization tests.
+const LEVELS_WITH_FORMALIZATION: LevelRequirement[] = [
+  { level: 1, label: 'Básico', requiredDocuments: [DocumentType.Rut] },
+  {
+    level: 2,
+    label: 'Confiable',
+    requiredDocuments: [DocumentType.Rut],
+    minFormalizationState: FormalizationState.Formalizada,
   },
 ];
 
@@ -67,6 +79,7 @@ describe('verification level computation (T-103)', () => {
           doc(DocumentType.Rut, DocumentStatus.Approved, FUTURE),
           doc(DocumentType.ExistenceRepresentationCertificate, DocumentStatus.Approved, null),
         ],
+        FormalizationState.Informal,
         LEVELS,
         NOW,
       );
@@ -82,6 +95,7 @@ describe('verification level computation (T-103)', () => {
           // required for level 2 but expired → level 2 blocked, level 1 kept.
           doc(DocumentType.ExistenceRepresentationCertificate, DocumentStatus.Approved, PAST),
         ],
+        FormalizationState.Informal,
         LEVELS,
         NOW,
       );
@@ -93,6 +107,7 @@ describe('verification level computation (T-103)', () => {
     it('stays at level 0 when a lower tier is not met', () => {
       const level = computeVerificationLevel(
         [doc(DocumentType.Rut, DocumentStatus.Pending)],
+        FormalizationState.Informal,
         LEVELS,
         NOW,
       );
@@ -101,13 +116,37 @@ describe('verification level computation (T-103)', () => {
       expect(level.blockedBy).toEqual([DocumentType.Rut]);
     });
 
-    it('sits at level 0 with the empty production catalog (no requirement invented)', () => {
+    it('sits at level 0 with an empty catalog (mechanism invents no requirement)', () => {
       const level = computeVerificationLevel(
         [doc(DocumentType.Rut, DocumentStatus.Approved, FUTURE)],
+        FormalizationState.Informal,
         [],
         NOW,
       );
       expect(level.level).toBe(0);
+      expect(level.blockedBy).toBeUndefined();
+    });
+
+    it('blocks a formalization-gated tier when documents are met but formalization is below the floor', () => {
+      const level = computeVerificationLevel(
+        [doc(DocumentType.Rut, DocumentStatus.Approved, FUTURE)],
+        FormalizationState.EnProceso,
+        LEVELS_WITH_FORMALIZATION,
+        NOW,
+      );
+      expect(level.level).toBe(1);
+      expect(level.nextLevel).toBe(2);
+      expect(level.blockedBy).toEqual([`formalization:${FormalizationState.Formalizada}`]);
+    });
+
+    it('reaches a formalization-gated tier once formalization meets the floor', () => {
+      const level = computeVerificationLevel(
+        [doc(DocumentType.Rut, DocumentStatus.Approved, FUTURE)],
+        FormalizationState.ESAL,
+        LEVELS_WITH_FORMALIZATION,
+        NOW,
+      );
+      expect(level.level).toBe(2);
       expect(level.blockedBy).toBeUndefined();
     });
   });
