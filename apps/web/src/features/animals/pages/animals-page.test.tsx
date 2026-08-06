@@ -57,6 +57,7 @@ function stubFetch(handler: (url: string, init?: RequestInit) => unknown) {
         status: 200,
         headers: { get: () => null },
         json: async () => body,
+        blob: async () => new Blob([JSON.stringify(body)]),
       });
     }),
   );
@@ -237,5 +238,81 @@ describe('AnimalsPage — listado + modal (S2-04A)', () => {
     await screen.findByText('Firulais');
     expect(screen.getByRole('button', { name: 'Reactivar' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Eliminar Firulais' })).not.toBeInTheDocument();
+  });
+});
+
+describe('AnimalsPage — importación masiva desde Excel (S2-04B-1)', () => {
+  it('hides "Importar Excel" from a Veterinarian (narrower than canManage)', async () => {
+    stubFetch((url) => {
+      if (url.includes('/animals/breeds')) return [];
+      if (url.includes('/animals')) return [];
+      return [];
+    });
+    renderShell({ route: '/animales', ...sessionWith([Role.Veterinarian]) });
+
+    await screen.findByText('Registra tu primer animal para empezar');
+    expect(screen.queryByRole('button', { name: /Importar Excel/ })).not.toBeInTheDocument();
+  });
+
+  it('uploads a file and shows the created/failed report with per-row errors', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    stubFetch((url, init) => {
+      calls.push({ url, init });
+      if (url.includes('/animals/breeds')) return [];
+      if (url.endsWith('/animals/bulk-import') && init?.method === 'POST') {
+        return {
+          totalRows: 2,
+          created: 1,
+          failed: 1,
+          errors: [{ row: 3, field: 'Especie', message: 'Especie no reconocida.' }],
+        };
+      }
+      if (url.includes('/animals')) return [];
+      return [];
+    });
+    renderShell({ route: '/animales', ...sessionWith([Role.Owner]) });
+
+    fireEvent.click(await screen.findByRole('button', { name: /Importar Excel/ }));
+    const dialog = await screen.findByRole('dialog');
+
+    const file = new File(['bytes'], 'animales.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const input = within(dialog).getByLabelText('Archivo (.xlsx)');
+    fireEvent.change(input, { target: { files: [file] } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Importar' }));
+
+    await waitFor(() => {
+      const post = calls.find((c) => c.url.endsWith('/animals/bulk-import'));
+      expect(post).toBeDefined();
+      expect(post?.init?.body).toBeInstanceOf(FormData);
+    });
+    expect(await within(dialog).findByText('1 creados')).toBeInTheDocument();
+    expect(within(dialog).getByText('1 con errores')).toBeInTheDocument();
+    expect(within(dialog).getByText('Especie no reconocida.')).toBeInTheDocument();
+    expect(await screen.findByText('1 creados, 1 con errores')).toBeInTheDocument();
+  });
+
+  it('downloads the template via requestBlob when "Descargar plantilla" is clicked', async () => {
+    const calls: string[] = [];
+    stubFetch((url) => {
+      calls.push(url);
+      if (url.includes('/animals/breeds')) return [];
+      if (url.includes('/animals')) return [];
+      return {};
+    });
+    const createObjectURL = vi.fn().mockReturnValue('blob:mock');
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL });
+
+    renderShell({ route: '/animales', ...sessionWith([Role.Owner]) });
+    fireEvent.click(await screen.findByRole('button', { name: /Importar Excel/ }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: /Descargar plantilla/ }));
+
+    await waitFor(() => {
+      expect(calls.some((u) => u.includes('/animals/bulk-import/template'))).toBe(true);
+    });
+    expect(createObjectURL).toHaveBeenCalled();
   });
 });

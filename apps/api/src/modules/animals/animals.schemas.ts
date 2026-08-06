@@ -1,9 +1,11 @@
 import { z } from 'zod';
 
-/** Enums mirror the STABLE contract value sets (animals.ts). */
-const species = z.enum(['dog', 'cat', 'other']);
-const sex = z.enum(['male', 'female', 'unknown']);
-const size = z.enum(['small', 'medium', 'large']);
+/** Enums mirror the STABLE contract value sets (animals.ts). Exported so
+ *  `bulk-import.schemas.ts` (S2-04B-1) validates rows against the SAME rules
+ *  instead of duplicating them and risking drift. */
+export const species = z.enum(['dog', 'cat', 'other']);
+export const sex = z.enum(['male', 'female', 'unknown']);
+export const size = z.enum(['small', 'medium', 'large']);
 const status = z.enum(['available', 'in_process', 'adopted', 'unavailable']);
 
 const photoInput = z
@@ -15,7 +17,7 @@ const photoInput = z
   .strict();
 
 /** Personality tags (S2-04A) — free text, max 10, no empty/oversized entries. */
-const tags = z.array(z.string().trim().min(1).max(40)).max(10);
+export const tags = z.array(z.string().trim().min(1).max(40)).max(10);
 
 /** Create an animal record. `.strict()` rejects unknown keys. */
 export const createAnimalSchema = z

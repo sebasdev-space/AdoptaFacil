@@ -29,6 +29,7 @@ import { PageContainer, PageHeader } from '../../_layout';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
 import { AnimalFormModal } from '../components/animal-form-modal';
+import { BulkImportDialog } from '../components/bulk-import-dialog';
 import {
   FolderIcon,
   PawEmptyIcon,
@@ -36,6 +37,7 @@ import {
   PlusIcon,
   SearchIcon,
   TrashIcon,
+  UploadIcon,
 } from '../components/icons';
 
 const SPECIES_LABELS: Record<AnimalSpecies, string> = {
@@ -82,6 +84,10 @@ export function AnimalsPage() {
     hasRole(Role.Operator) ||
     hasRole(Role.Veterinarian);
   const canDelete = hasRole(Role.Owner) || hasRole(Role.Administrator);
+  // S2-04B-1: narrower than `canManage` — Veterinarian may create/edit one
+  // animal but not bulk-import (matches the backend's BULK_IMPORT_ROLES).
+  const canBulkImport =
+    hasRole(Role.Owner) || hasRole(Role.Administrator) || hasRole(Role.Operator);
   const { toast } = useToast();
 
   const [animals, setAnimals] = useState<Animal[]>([]);
@@ -93,6 +99,7 @@ export function AnimalsPage() {
   const [editingAnimal, setEditingAnimal] = useState<Animal | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Animal | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
 
   const load = async (): Promise<void> => {
     const items = await client.request<Animal[]>('/animals?includeInactive=true');
@@ -197,11 +204,22 @@ export function AnimalsPage() {
                 ))}
               </select>
             </div>
-            {canManage && (
-              <Button onClick={openCreateModal} className="gap-1.5">
-                <PlusIcon /> Registrar animal
-              </Button>
-            )}
+            <div className="flex gap-2">
+              {canBulkImport && (
+                <Button
+                  variant="outline"
+                  onClick={() => setBulkImportOpen(true)}
+                  className="gap-1.5"
+                >
+                  <UploadIcon /> Importar Excel
+                </Button>
+              )}
+              {canManage && (
+                <Button onClick={openCreateModal} className="gap-1.5">
+                  <PlusIcon /> Registrar animal
+                </Button>
+              )}
+            </div>
           </div>
 
           {filtered.length === 0 ? (
@@ -325,6 +343,12 @@ export function AnimalsPage() {
         onOpenChange={setModalOpen}
         animal={editingAnimal}
         onSaved={() => void load()}
+      />
+
+      <BulkImportDialog
+        open={bulkImportOpen}
+        onOpenChange={setBulkImportOpen}
+        onImported={() => void load()}
       />
 
       <Dialog open={deleteTarget !== null} onOpenChange={(next) => !next && setDeleteTarget(null)}>
