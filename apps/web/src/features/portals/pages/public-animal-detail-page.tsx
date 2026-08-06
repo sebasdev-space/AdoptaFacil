@@ -98,14 +98,17 @@ export function PublicAnimalDetailPage() {
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-        <Link to="/" className="text-sm text-primary hover:underline">
+      {/* F1-03+: botones SECUNDARIOS (outline) — misma jerarquía que "Volver al
+          inicio" en not-found-page.tsx/AuthLayout; nunca compiten con "Solicitar
+          adopción" (sólido, más abajo), que sigue siendo el protagonista. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Link to="/" className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}>
           ← Volver al inicio
         </Link>
         {slug && orgName && (
           <Link
             to={`/o/${encodeURIComponent(slug)}`}
-            className="text-sm text-primary hover:underline"
+            className={cn(buttonVariants({ variant: 'outline', size: 'sm' }))}
           >
             Ver {orgName}
           </Link>

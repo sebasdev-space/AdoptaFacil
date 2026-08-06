@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  buttonVariants,
   Card,
   CardContent,
   CardDescription,
@@ -31,6 +32,10 @@ export interface AuthLayoutProps {
  * plain navigation link to an EXISTING public route — it does not touch the
  * returnTo mechanism (RequireAuth/LoginPage's `state.from`), which keeps working
  * unchanged: this is an additional way OUT, not a replacement for it.
+ *
+ * F1-03+: styled as a SECONDARY (outline) button — visible as a button, but it
+ * never competes with the screen's actual primary action (the sólido submit
+ * button inside `children`), same hierarchy as the other return-to-home links.
  */
 export function AuthLayout({ title, description, children, footer, wide }: AuthLayoutProps) {
   return (
@@ -38,7 +43,7 @@ export function AuthLayout({ title, description, children, footer, wide }: AuthL
       <Link
         to="/"
         className={cn(
-          'text-sm text-primary hover:underline',
+          buttonVariants({ variant: 'outline', size: 'sm' }),
           wide ? 'w-full max-w-lg' : 'w-full max-w-sm',
         )}
       >
