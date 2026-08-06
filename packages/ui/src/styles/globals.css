@@ -53,9 +53,11 @@
     --info: 205 78% 40%;
     --info-foreground: 0 0% 100%;
 
-    /* Lines & form controls */
-    --border: 150 12% 88%;
-    --input: 150 12% 86%;
+    /* Lines & form controls. F-BORDE: L bajado de 88%/86% a 54%/52% — el rango
+       72-75% sugerido en revisión NO alcanza 3:1 (queda en ~1.7-1.9:1 real,
+       ver PR); H/S sin cambios. */
+    --border: 150 12% 54%;
+    --input: 150 12% 52%;
     --ring: 142 72% 29%;
 
     /* Typography */
@@ -102,8 +104,11 @@
     --info: 205 70% 55%;
     --info-foreground: 150 30% 8%;
 
-    --border: 150 8% 22%;
-    --input: 150 8% 24%;
+    /* F-BORDE: el cálculo mostró que el oscuro TAMBIÉN fallaba (~1.5-1.8:1,
+       no "probablemente ya cumple" como se asumió) — L subido de 22%/24% a
+       39%/41% para alcanzar 3:1 contra --card (el peor caso en oscuro). */
+    --border: 150 8% 39%;
+    --input: 150 8% 41%;
     --ring: 142 65% 45%;
   }
 
