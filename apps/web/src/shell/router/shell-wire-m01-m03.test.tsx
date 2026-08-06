@@ -130,13 +130,14 @@ describe('T-031 · menu reflects the role (first barrier)', () => {
     renderShell({ route: '/', ...sessionWith([]) });
     // Ungated entries stay visible…
     await waitFor(() =>
-      expect(within(nav()).getByRole('link', { name: 'Adopciones' })).toBeInTheDocument(),
+      expect(within(nav()).getByRole('link', { name: 'Donaciones' })).toBeInTheDocument(),
     );
-    // …role-gated ones do not.
+    // …role-gated ones do not — "Adopciones" (F-NAV-ADOPCIONES) included.
     expect(within(nav()).queryByRole('link', { name: 'Animales' })).not.toBeInTheDocument();
     expect(within(nav()).queryByRole('link', { name: 'Documentos' })).not.toBeInTheDocument();
     expect(
       within(nav()).queryByRole('link', { name: 'Revisión de documentos' }),
     ).not.toBeInTheDocument();
+    expect(within(nav()).queryByRole('link', { name: 'Adopciones' })).not.toBeInTheDocument();
   });
 });

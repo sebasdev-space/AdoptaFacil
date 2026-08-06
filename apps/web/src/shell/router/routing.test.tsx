@@ -54,8 +54,10 @@ describe('routing — public vs protected', () => {
   it('redirects an authenticated visitor away from "/" to their shell (/inicio)', async () => {
     renderShell({ route: '/', session: { initialStatus: 'authenticated' } });
     expect(await screen.findByRole('heading', { name: 'Inicio' })).toBeInTheDocument();
-    // Landed inside the AUTHENTICATED shell, not the public portal.
-    expect(screen.getByRole('link', { name: 'Adopciones' })).toBeInTheDocument();
+    // Landed inside the AUTHENTICATED shell, not the public portal. "Adopciones"
+    // is role-gated now (F-NAV-ADOPCIONES); "Donaciones" stays ungated for
+    // every authenticated session, so it proves the shell rendered.
+    expect(screen.getByRole('link', { name: 'Donaciones' })).toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: 'Encuentra a tu próxima mascota' }),
     ).not.toBeInTheDocument();
