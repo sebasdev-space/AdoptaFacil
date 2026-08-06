@@ -377,6 +377,17 @@ export interface ClinicalEvent {
   createdAt: string;
 }
 
+/**
+ * One entry of the "carnet de vacunación" timeline (S2-04B-2) — the animal's
+ * CURRENT clinical events (same set `listCurrent`/`GET .../clinical-events`
+ * already returns), enriched with the author's display name so the UI/PDF
+ * never has to resolve a bare `authorUserId` itself. Read-only projection;
+ * publishes NO new write surface over RF08's existing model.
+ */
+export interface ClinicalCarnetEntry extends ClinicalEvent {
+  authorName: string;
+}
+
 /** Reserve an attachment for a clinical event version (metadata only). */
 export interface ClinicalAttachmentInput {
   filename: string;
