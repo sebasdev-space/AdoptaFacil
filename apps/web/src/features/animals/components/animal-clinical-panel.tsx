@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  type ClinicalCarnetEntry,
   type ClinicalEvent,
   ClinicalEventType,
   type CreateClinicalEventInput,
@@ -14,10 +15,15 @@ import {
   CardTitle,
   Input,
   Skeleton,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
   useToast,
 } from '@adoptafacil/ui';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
+import { downloadClinicalCarnetPdf } from '../lib/carnet';
 
 const TYPE_LABELS: Record<ClinicalEventType, string> = {
   [ClinicalEventType.Vaccine]: 'Vacuna',
@@ -54,12 +60,24 @@ export function AnimalClinicalPanel({ animalId }: AnimalClinicalPanelProps) {
   const [attachment, setAttachment] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // S2-04B-2 — "Carnet" tab: a separate read model (adds `authorName`), fetched
+  // independently of `events` above so the existing "Registro" tab/behavior
+  // never changes (regresión cero).
+  const [carnet, setCarnet] = useState<ClinicalCarnetEntry[]>([]);
+  const [carnetLoading, setCarnetLoading] = useState(true);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
   const base = `/animals/${animalId}/clinical-events`;
 
   const load = async (): Promise<void> => {
     const list = await client.request<ClinicalEvent[]>(base);
     setEvents(list);
     setLoading(false);
+  };
+
+  const loadCarnet = async (): Promise<void> => {
+    const list = await client.request<ClinicalCarnetEntry[]>(`${base}/carnet`);
+    setCarnet(list);
   };
 
   useEffect(() => {
@@ -76,6 +94,36 @@ export function AnimalClinicalPanel({ animalId }: AnimalClinicalPanelProps) {
       active = false;
     };
   }, [client, base]);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const list = await client.request<ClinicalCarnetEntry[]>(`${base}/carnet`);
+        if (active) setCarnet(list);
+      } finally {
+        if (active) setCarnetLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [client, base]);
+
+  async function handleDownloadPdf(): Promise<void> {
+    setDownloadingPdf(true);
+    try {
+      await downloadClinicalCarnetPdf(client, animalId);
+    } catch (error) {
+      toast({
+        title: 'No se pudo descargar el carnet',
+        description: error instanceof Error ? error.message : 'Inténtalo de nuevo.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }
 
   const submit = async (): Promise<void> => {
     if (!occurredAt) {
@@ -98,7 +146,7 @@ export function AnimalClinicalPanel({ animalId }: AnimalClinicalPanelProps) {
       setOccurredAt('');
       setNextDueDate('');
       setAttachment('');
-      await load();
+      await Promise.all([load(), loadCarnet()]);
       toast({ title: 'Evento clínico registrado' });
     } catch (error) {
       toast({
@@ -160,27 +208,75 @@ export function AnimalClinicalPanel({ animalId }: AnimalClinicalPanelProps) {
           <CardTitle>Expediente clínico</CardTitle>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <Skeleton className="h-24 w-full" />
-          ) : events.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin eventos clínicos.</p>
-          ) : (
-            <ul className="space-y-3">
-              {events.map((event) => (
-                <li key={event.id} className="border-b pb-2 text-sm last:border-b-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium">{TYPE_LABELS[event.type]}</span>
-                    <Badge variant="secondary">v{event.version}</Badge>
-                    <span className="text-muted-foreground">{formatCO(event.occurredAt)}</span>
-                    {event.nextDueDate && <Badge>Próxima: {formatCO(event.nextDueDate)}</Badge>}
-                    {event.attachments.length > 0 && (
-                      <span className="text-muted-foreground">📎 {event.attachments.length}</span>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+          <Tabs defaultValue="registro">
+            <TabsList>
+              <TabsTrigger value="registro">Registro</TabsTrigger>
+              <TabsTrigger value="carnet">Carnet</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="registro" className="mt-4">
+              {loading ? (
+                <Skeleton className="h-24 w-full" />
+              ) : events.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sin eventos clínicos.</p>
+              ) : (
+                <ul className="space-y-3">
+                  {events.map((event) => (
+                    <li key={event.id} className="border-b pb-2 text-sm last:border-b-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{TYPE_LABELS[event.type]}</span>
+                        <Badge variant="secondary">v{event.version}</Badge>
+                        <span className="text-muted-foreground">{formatCO(event.occurredAt)}</span>
+                        {event.nextDueDate && <Badge>Próxima: {formatCO(event.nextDueDate)}</Badge>}
+                        {event.attachments.length > 0 && (
+                          <span className="text-muted-foreground">
+                            📎 {event.attachments.length}
+                          </span>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </TabsContent>
+
+            <TabsContent value="carnet" className="mt-4 space-y-4">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={downloadingPdf}
+                onClick={() => void handleDownloadPdf()}
+              >
+                {downloadingPdf ? 'Generando…' : 'Descargar carnet (PDF)'}
+              </Button>
+
+              {carnetLoading ? (
+                <Skeleton className="h-24 w-full" />
+              ) : carnet.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Sin eventos clínicos registrados todavía.
+                </p>
+              ) : (
+                <ol className="space-y-4">
+                  {carnet.map((entry) => (
+                    <li key={entry.id} className="border-l-2 border-primary/40 pl-4 text-sm">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">{TYPE_LABELS[entry.type]}</span>
+                        <span className="text-muted-foreground">{formatCO(entry.occurredAt)}</span>
+                        {entry.nextDueDate && <Badge>Próxima: {formatCO(entry.nextDueDate)}</Badge>}
+                      </div>
+                      <p className="text-muted-foreground">Autor: {entry.authorName}</p>
+                      {entry.attachments.length > 0 && (
+                        <p className="text-muted-foreground">
+                          📎 {entry.attachments.length} adjunto(s)
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>
