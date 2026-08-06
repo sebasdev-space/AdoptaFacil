@@ -274,6 +274,31 @@ export interface CreateAnimalBreedInput {
   name: string;
 }
 
+// ============================================================================
+// M03 bulk import (S2-04B-1, RF07). `POST /animals/bulk-import` never aborts
+// on a bad row — valid rows are created, invalid ones are reported by row
+// number so the uploader can fix and re-upload just those. Additive.
+// ============================================================================
+
+/** One row that failed validation/creation during a bulk import. `row` is
+ *  1-based and counts the HEADER row as row 1 (so it matches what the
+ *  uploader sees when opening the spreadsheet). `field` is omitted for
+ *  file-level problems (e.g. an unreadable row). */
+export interface BulkImportRowError {
+  row: number;
+  field?: string;
+  message: string;
+}
+
+/** Summary returned by `POST /animals/bulk-import` — never the file content,
+ *  never per-row raw values beyond what's needed to locate the problem. */
+export interface BulkImportResultDto {
+  totalRows: number;
+  created: number;
+  failed: number;
+  errors: BulkImportRowError[];
+}
+
 /** Result of reserving an animal photo: the stored metadata + the simulable
  *  storage target the client PUTs the bytes to. */
 export interface AnimalPhotoUploadResult {

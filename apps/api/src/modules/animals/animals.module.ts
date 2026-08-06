@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { AuthModule } from '../../core/auth/auth.module';
 import { AnimalsController } from './animals.controller';
 import { AnimalsService } from './animals.service';
+import { BulkImportService } from './bulk-import.service';
 import { ClinicalController } from './clinical.controller';
 import { ClinicalService } from './clinical.service';
 import { RemindersController } from './reminders.controller';
@@ -34,6 +35,7 @@ import { PublicAnimalsService } from './public-animals.service';
   ],
   providers: [
     AnimalsService,
+    BulkImportService,
     ClinicalService,
     RemindersService,
     RemindersProcessor,

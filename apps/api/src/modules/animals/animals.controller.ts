@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -9,13 +10,23 @@ import {
   Patch,
   Post,
   Query,
+  Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
+// Side-effect import: pulls in @types/multer's ambient `Express.Multer.File`
+// augmentation (NOT in tsconfig's explicit `types` array, so it needs an
+// explicit reference rather than relying on automatic @types inclusion).
+import 'multer';
 import {
   type Animal,
   type AnimalBreed,
   type AnimalPhotoUploadResult,
   type AnimalSpecies,
+  type BulkImportResultDto,
   type CreateAnimalBreedInput,
   type CreateAnimalInput,
   Role,
@@ -28,6 +39,7 @@ import { ZodValidationPipe } from '../../core/auth/zod-validation.pipe';
 import { Roles } from '../../core/rbac/roles.decorator';
 import { RolesGuard } from '../../core/rbac/roles.guard';
 import { AnimalsService } from './animals.service';
+import { BulkImportService } from './bulk-import.service';
 import {
   addPhotoSchema,
   createAnimalSchema,
@@ -42,6 +54,13 @@ const VIEW_ROLES = [...WRITE_ROLES, Role.ReadOnlyAuditor] as const;
 /** Roles that may "delete" (soft-remove) a record (S2-04A §3.4) — narrower than
  *  WRITE_ROLES on purpose: Operator/Veterinarian may edit but not remove. */
 const DELETE_ROLES = [Role.Owner, Role.Administrator] as const;
+/** Roles that may bulk-import animals (S2-04B-1 §restricciones) — same
+ *  criterion as creating one manually, MINUS Veterinarian: importing a batch
+ *  of records is an org-management action, not a clinical one. */
+const BULK_IMPORT_ROLES = [Role.Owner, Role.Administrator, Role.Operator] as const;
+/** Defensive ceiling on the upload itself (a 500-row .xlsx is a few hundred KB
+ *  at most) — independent of `BULK_IMPORT_MAX_ROWS`, which caps row COUNT. */
+const BULK_IMPORT_MAX_FILE_MB = 10;
 
 interface PhotoDto {
   filename: string;
@@ -58,7 +77,10 @@ interface PhotoDto {
 @Controller('animals')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class AnimalsController {
-  constructor(private readonly service: AnimalsService) {}
+  constructor(
+    private readonly service: AnimalsService,
+    private readonly bulkImport: BulkImportService,
+  ) {}
 
   @Post()
   @Roles(...WRITE_ROLES)
@@ -90,6 +112,36 @@ export class AnimalsController {
     @Body(new ZodValidationPipe(createBreedSchema)) dto: CreateAnimalBreedInput,
   ): Promise<AnimalBreed> {
     return this.service.createBreed(actor.id, dto);
+  }
+
+  // --- Bulk import (S2-04B-1; declared before ':id' for the same reason as
+  // 'breeds' above) ------------------------------------------------------------
+
+  @Get('bulk-import/template')
+  @Roles(...BULK_IMPORT_ROLES)
+  async downloadBulkImportTemplate(@Res() res: Response): Promise<void> {
+    const buffer = await this.bulkImport.generateTemplate();
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
+    res.setHeader('Content-Disposition', 'attachment; filename="plantilla-animales.xlsx"');
+    res.send(buffer);
+  }
+
+  @Post('bulk-import')
+  @Roles(...BULK_IMPORT_ROLES)
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: BULK_IMPORT_MAX_FILE_MB * 1024 * 1024 } }),
+  )
+  importAnimals(
+    @CurrentUser() actor: RequestUser,
+    @UploadedFile() file: Express.Multer.File | undefined,
+  ): Promise<BulkImportResultDto> {
+    if (!file || !file.buffer) {
+      throw new BadRequestException('Se requiere un archivo .xlsx (campo "file")');
+    }
+    return this.bulkImport.importFile(actor.id, file.buffer);
   }
 
   // --- Single animal ---------------------------------------------------------
