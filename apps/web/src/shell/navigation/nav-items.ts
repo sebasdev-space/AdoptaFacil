@@ -47,6 +47,21 @@ export const CAMPAIGNS_VIEW_ROLES = [
 ] as const;
 
 /**
+ * F-NAV-ADOPCIONES (AUD-F1 finding): "Adopciones" had NO role gate at all —
+ * any authenticated user, including a Persona with no org, saw the entry and
+ * landed on the org's evaluation kanban (empty, meaningless to them). Copied
+ * VERBATIM from `AdoptionsController`'s `EVAL_ROLES` (`GET /adoptions`,
+ * `adoptions.controller.ts:18`) — Owner/Administrator/Operator only, no
+ * ReadOnlyAuditor (unlike CAMPAIGNS_VIEW_ROLES, the backend here is
+ * write-side evaluation, not a view-only audience).
+ *
+ * Containment only: this hides the entry from a Persona. The Persona-facing
+ * "mis solicitudes" view is F1-01, blocked on a backend endpoint that doesn't
+ * exist yet — out of scope here.
+ */
+export const ADOPTIONS_MANAGEMENT_ROLES = [Role.Owner, Role.Administrator, Role.Operator] as const;
+
+/**
  * "Mi organización" / "Personalización" / "Transparencia" (T-062, fix §13 UX
  * gap): these back onto GET endpoints with NO `@Roles` decorator at all (only
  * `@UseGuards(JwtAuthGuard)` — e.g. `GET /org/profile`, `GET /portals/theme`,
@@ -94,7 +109,12 @@ export const navItems: NavItem[] = [
   // F-LANDING-01: "/" is now the PUBLIC general portal, outside the shell — the
   // authenticated home moved to /inicio (see shell/router/routes.tsx).
   { path: '/inicio', label: 'Inicio', icon: HomeIcon, end: true },
-  { path: '/adopciones', label: 'Adopciones', icon: PawIcon },
+  {
+    path: '/adopciones',
+    label: 'Adopciones',
+    icon: PawIcon,
+    roles: ADOPTIONS_MANAGEMENT_ROLES,
+  },
   { path: '/donaciones', label: 'Donaciones', icon: HeartIcon },
   // S2-01: "Campañas" RESTORED — T-065 removed it because the link pointed at
   // the PUBLIC portal route and exited the shell; the in-shell management

@@ -160,6 +160,40 @@ describe('S2-01 · "Campañas" surface demands CAMPAIGNS_VIEW_ROLES (deny-by-def
   });
 });
 
+describe('F-NAV-ADOPCIONES · "Adopciones" demands ADOPTIONS_MANAGEMENT_ROLES (deny-by-default)', () => {
+  function nav() {
+    return screen.getByRole('navigation', { name: 'Navegación principal' });
+  }
+
+  it('shows "Adopciones" to an evaluation role (Operator), pointing at the kanban', async () => {
+    renderShell({ route: '/', ...sessionWith([Role.Operator]) });
+    await waitFor(() =>
+      expect(within(nav()).getByRole('link', { name: 'Adopciones' })).toHaveAttribute(
+        'href',
+        '/adopciones',
+      ),
+    );
+  });
+
+  it('hides "Adopciones" from a Persona (no org role) — was visible to everyone before this fix', async () => {
+    renderShell({ route: '/', ...sessionWith([]) });
+    // An ungated entry stays visible, proving the sidebar actually rendered…
+    await waitFor(() =>
+      expect(within(nav()).getByRole('link', { name: 'Donaciones' })).toBeInTheDocument(),
+    );
+    // …while "Adopciones" is gone.
+    expect(within(nav()).queryByRole('link', { name: 'Adopciones' })).not.toBeInTheDocument();
+  });
+
+  it('hides "Adopciones" from a role outside EVAL_ROLES (e.g. ReadOnlyAuditor — view-only, not an evaluator)', async () => {
+    renderShell({ route: '/', ...sessionWith([Role.ReadOnlyAuditor]) });
+    await waitFor(() =>
+      expect(within(nav()).getByRole('link', { name: 'Mi organización' })).toBeInTheDocument(),
+    );
+    expect(within(nav()).queryByRole('link', { name: 'Adopciones' })).not.toBeInTheDocument();
+  });
+});
+
 describe('T-065 · "Transparencia" route redirects home (no stale "Ola 1" placeholder)', () => {
   it('redirects /transparencia to home for an org role — never shows "en construcción"/"Ola 1"', async () => {
     renderShell({ route: '/transparencia', ...sessionWith([Role.Owner]) });
