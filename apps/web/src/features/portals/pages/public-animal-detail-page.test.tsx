@@ -92,6 +92,13 @@ describe('PublicAnimalDetailPage', () => {
     expect(href).toContain('organizationId=org-1');
     expect(href).toContain('animalId=a1');
     expect(href).toContain('species=dog');
+
+    // F1-03+: hierarchy — "Solicitar adopción" stays the SOLID, protagonist
+    // button; "Volver al inicio" is a SECONDARY (outline) button, never solid.
+    expect(cta.className).toContain('bg-primary');
+    const backLink = screen.getByRole('link', { name: '← Volver al inicio' });
+    expect(backLink.className).toContain('border-input');
+    expect(backLink.className).not.toContain('bg-primary');
   });
 
   it('never exposes internal/clinical data (M03 internal surface)', () => {

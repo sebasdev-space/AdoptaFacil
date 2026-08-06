@@ -25,6 +25,17 @@ describe('RegisterPage — Organization vs Person', () => {
     expect(screen.getByRole('link', { name: '← Volver al inicio' })).toHaveAttribute('href', '/');
   });
 
+  it('F1-03+: "Volver al inicio" is a SECONDARY (outline) button, not the primary CTA style', () => {
+    renderShell({ route: '/register', session: { initialStatus: 'unauthenticated' } });
+    const backLink = screen.getByRole('link', { name: '← Volver al inicio' });
+    expect(backLink.className).toContain('border-input');
+    expect(backLink.className).not.toContain('bg-primary');
+    // The tab's submit button stays the SOLID protagonist.
+    expect(
+      screen.getByRole('button', { name: 'Crear cuenta de organización' }).className,
+    ).toContain('bg-primary');
+  });
+
   it('shows the organization fields by default and person fields after switching', async () => {
     const user = userEvent.setup();
     renderShell({ route: '/register', session: { initialStatus: 'unauthenticated' } });
