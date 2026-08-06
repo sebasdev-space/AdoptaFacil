@@ -4,6 +4,7 @@ import {
   AlertTriangleIcon,
   HeartIcon,
   HomeIcon,
+  MegaphoneIcon,
   PawIcon,
   ShieldIcon,
   type IconProps,
@@ -30,6 +31,20 @@ export const ANIMAL_VIEW_ROLES = [
 export const ORG_DOCUMENTS_ROLES = [Role.Owner, Role.Administrator, Role.ReadOnlyAuditor] as const;
 
 export const PLATFORM_DOCUMENTS_ROLES = [Role.PlatformAdmin, Role.PlatformSuperAdmin] as const;
+
+/**
+ * S2-01 — reconnects "Campañas" as the INTERNAL management surface at
+ * `/organizacion/campanas` (CampaignsPage), not the public portal T-065 pulled it
+ * from. Copied VERBATIM from `CampaignsController`'s VIEW_ROLES (GET /campaigns):
+ * Owner/Administrator/Operator manage; ReadOnlyAuditor views only (no "Coordinator"
+ * role exists in this codebase, despite earlier task notes assuming one).
+ */
+export const CAMPAIGNS_VIEW_ROLES = [
+  Role.Owner,
+  Role.Administrator,
+  Role.Operator,
+  Role.ReadOnlyAuditor,
+] as const;
 
 /**
  * "Mi organización" / "Personalización" / "Transparencia" (T-062, fix §13 UX
@@ -81,13 +96,18 @@ export const navItems: NavItem[] = [
   { path: '/inicio', label: 'Inicio', icon: HomeIcon, end: true },
   { path: '/adopciones', label: 'Adopciones', icon: PawIcon },
   { path: '/donaciones', label: 'Donaciones', icon: HeartIcon },
-  // T-065 (pre-demo): "Campañas" REMOVED from the menu entirely (was gated to
-  // ORG_MEMBER_ROLES by T-063, but for an Owner the link still pointed at the
-  // PUBLIC portal route below — clicking it exits the shell, no sidebar). The
-  // route itself is UNTOUCHED: a donor still reaches it from the org's public
-  // portal (/o/:slug), never from this menu; the in-shell management screen
-  // (/organizacion/campanas) doesn't exist yet — reversible post-30 once it does.
-  //
+  // S2-01: "Campañas" RESTORED — T-065 removed it because the link pointed at
+  // the PUBLIC portal route and exited the shell; the in-shell management
+  // screen (/organizacion/campanas) now exists, so the entry points there
+  // instead, gated to CAMPAIGNS_VIEW_ROLES (never Persona/PlatformAdmin). The
+  // public route (/campanas) is unchanged — a donor still reaches it from the
+  // org's public portal (/o/:slug), never from this menu.
+  {
+    path: '/organizacion/campanas',
+    label: 'Campañas',
+    icon: MegaphoneIcon,
+    roles: CAMPAIGNS_VIEW_ROLES,
+  },
   // T-065: "Transparencia" REMOVED from the menu entirely — the screen was only
   // ever a placeholder ("se implementará en la Ola 1..."); the REAL transparency
   // indicator (Nivel/%/Rendición) already lives in the persistent header bar on

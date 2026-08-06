@@ -14,15 +14,19 @@ import { renderShell } from '../../test-utils';
  * campaigns portal (/campanas, T-055) from an org's public portal (/o/:slug),
  * not from this sidebar link.
  *
- * T-065 (pre-demo) — "Campañas" and "Transparencia" are now REMOVED from the
- * menu ENTIRELY (for every role, Owner included), not just gated: for Campañas,
- * clicking it as an Owner landed on the public /campanas route and exited the
- * shell (no sidebar); for Transparencia, the screen was only ever a stale
- * placeholder ("se implementará en la Ola 1..."). Neither is in the SURFACES
- * list below (no heading to render — Transparencia now redirects home, and
- * Campañas' underlying ROUTE stays public/untouched, covered separately by
- * routing.test.tsx's "serves /campanas as a PUBLIC campaigns portal without a
- * session").
+ * T-065 (pre-demo) — "Campañas" and "Transparencia" were REMOVED from the menu
+ * entirely (for every role, Owner included): for Campañas, clicking it as an
+ * Owner landed on the public /campanas route and exited the shell (no
+ * sidebar); for Transparencia, the screen was only ever a stale placeholder
+ * ("se implementará en la Ola 1..."). Transparencia stays out (still just a
+ * redirect-home, see below).
+ *
+ * S2-01 — "Campañas" is RESTORED, now pointing at the in-shell management
+ * screen (`/organizacion/campanas`) instead of the public portal, gated to
+ * CAMPAIGNS_VIEW_ROLES (Owner/Administrator/Operator/ReadOnlyAuditor — copied
+ * from CampaignsController's real @Roles). The public route (/campanas) is
+ * untouched, covered separately by routing.test.tsx's "serves /campanas as a
+ * PUBLIC campaigns portal without a session".
  */
 function sessionWith(roles: Role[]) {
   return {
@@ -96,20 +100,23 @@ describe('T-062 · sidebar reflects the org gate (first barrier)', () => {
     return screen.getByRole('navigation', { name: 'Navegación principal' });
   }
 
-  it('shows the org-management entries to an org role, but NEVER Campañas/Transparencia (T-065)', async () => {
+  it('shows the org-management entries and Campañas to an org role, but NEVER Transparencia (T-065)', async () => {
     renderShell({ route: '/', ...sessionWith([Role.Owner]) });
     await waitFor(() =>
       expect(within(nav()).getByRole('link', { name: 'Mi organización' })).toBeInTheDocument(),
     );
     expect(within(nav()).getByRole('link', { name: 'Personalización' })).toBeInTheDocument();
-    // Removed from the menu for EVERY role (T-065) — an Owner clicking either
-    // used to be a real problem (Campañas exited the shell; Transparencia showed
-    // a stale "Ola 1" placeholder).
+    // S2-01: Campañas is back, pointing at the internal management screen.
+    expect(within(nav()).getByRole('link', { name: 'Campañas' })).toHaveAttribute(
+      'href',
+      '/organizacion/campanas',
+    );
+    // Transparencia stays removed (T-065) — the screen was only ever a stale
+    // "Ola 1" placeholder; the real indicator lives in the header bar.
     expect(within(nav()).queryByRole('link', { name: 'Transparencia' })).not.toBeInTheDocument();
-    expect(within(nav()).queryByRole('link', { name: 'Campañas' })).not.toBeInTheDocument();
   });
 
-  it('hides the org-management entries from a Persona (no org role); Campañas/Transparencia absent too', async () => {
+  it('hides the org-management entries AND Campañas from a Persona (no org role); Transparencia absent too', async () => {
     renderShell({ route: '/', ...sessionWith([]) });
     // Ungated entries stay visible…
     await waitFor(() =>
@@ -121,6 +128,35 @@ describe('T-062 · sidebar reflects the org gate (first barrier)', () => {
     expect(within(nav()).queryByRole('link', { name: 'Personalización' })).not.toBeInTheDocument();
     expect(within(nav()).queryByRole('link', { name: 'Transparencia' })).not.toBeInTheDocument();
     expect(within(nav()).queryByRole('link', { name: 'Campañas' })).not.toBeInTheDocument();
+  });
+});
+
+describe('S2-01 · "Campañas" surface demands CAMPAIGNS_VIEW_ROLES (deny-by-default)', () => {
+  it('renders the management screen for a write role (Operator)', async () => {
+    renderShell({ route: '/organizacion/campanas', ...sessionWith([Role.Operator]) });
+    expect(
+      await screen.findByRole('heading', { name: 'Campañas de recaudación' }),
+    ).toBeInTheDocument();
+  });
+
+  it('renders (view-only) for ReadOnlyAuditor', async () => {
+    renderShell({ route: '/organizacion/campanas', ...sessionWith([Role.ReadOnlyAuditor]) });
+    expect(
+      await screen.findByRole('heading', { name: 'Campañas de recaudación' }),
+    ).toBeInTheDocument();
+  });
+
+  it('denies a role outside CAMPAIGNS_VIEW_ROLES (e.g. Volunteer)', async () => {
+    renderShell({ route: '/organizacion/campanas', ...sessionWith([Role.Volunteer]) });
+    expect(await screen.findByText('Sin acceso')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Campañas de recaudación' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('denies a Persona (no org role)', async () => {
+    renderShell({ route: '/organizacion/campanas', ...sessionWith([]) });
+    expect(await screen.findByText('Sin acceso')).toBeInTheDocument();
   });
 });
 
