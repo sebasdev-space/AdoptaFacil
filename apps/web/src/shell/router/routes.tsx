@@ -31,7 +31,11 @@ import {
   PublicCampaignsPage,
 } from '../../features/campaigns';
 import { AnimalsPage, RemindersInboxPage } from '../../features/animals';
-import { AdoptionRequestPage, AdoptionsKanbanPage } from '../../features/adoptions';
+import {
+  AdoptionRequestPage,
+  AdoptionsKanbanPage,
+  MyAdoptionRequestsPage,
+} from '../../features/adoptions';
 import { DonatePage } from '../../features/donations';
 import { CertificateEmissionPage, CertificateVerificationPage } from '../../features/certificates';
 
@@ -99,6 +103,12 @@ export function AppRoutes() {
           {/* M04 · adopciones (T-028a): tablero de evaluación (org) + solicitud (persona). */}
           <Route path="adopciones" element={<AdoptionsKanbanPage />} />
           <Route path="adopciones/solicitar" element={<AdoptionRequestPage />} />
+          {/* F1-01: "Mis solicitudes" de la Persona — GET /adoptions/mine no tiene
+              gate de rol (igual que /donaciones), así que esta ruta tampoco lleva
+              <RequireRoles>; el nav item ya la oculta a cuentas de organización
+              (`personaOnly`, nav-items.ts) y la propia página muestra "Mis
+              solicitudes" vacío/con error si algo raro llegara a pasar por URL. */}
+          <Route path="mis-solicitudes" element={<MyAdoptionRequestsPage />} />
           {/* M03 · animales + expediente clínico + recordatorios (T-031, wires
               T-104/T-105/T-106). Cada ruta exige los MISMOS @Roles que su endpoint
               (deny-by-default). El panel clínico es EMBEBIBLE por animalId → vive

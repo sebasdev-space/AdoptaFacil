@@ -14,10 +14,18 @@ import { Brand } from './brand';
  * — the FIRST barrier of the double-barrier UX (the route's <RequireRoles> is
  * the second). Deny-by-default: entries with no roles show for everyone; entries
  * with roles stay hidden while roles are absent (e.g. a degraded roles fetch).
+ *
+ * F1-01: `personaOnly` entries additionally require `accountType === 'person'`
+ * — an allow-list of roles can't express "has none of these", so this checks
+ * the account kind directly instead (see `NavItem.personaOnly`).
  */
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
-  const { hasAnyRole } = useSession();
-  const items = navItems.filter((item) => !item.roles || hasAnyRole(...item.roles));
+  const { hasAnyRole, user } = useSession();
+  const items = navItems.filter(
+    (item) =>
+      (!item.roles || hasAnyRole(...item.roles)) &&
+      (!item.personaOnly || user?.accountType === 'person'),
+  );
 
   return (
     <nav aria-label="Navegación principal" className="flex-1 space-y-1 px-3 py-4">
