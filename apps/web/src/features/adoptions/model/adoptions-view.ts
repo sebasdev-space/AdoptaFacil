@@ -27,7 +27,13 @@ export const ADOPTION_NEXT_STATUSES: Record<AdoptionStatus, readonly AdoptionSta
   rejected: [],
 };
 
-/** Badge variant per status (semantic, not the brand accent). */
+/**
+ * Badge variant per status (semantic, not the brand accent).
+ *
+ * F1-03-COMPLETO: `'success'` (columna "Aprobada") mide ~4.10:1 en tema claro
+ * (bajo el 4.5:1 de AA para texto normal) — token compartido (`--success` en
+ * packages/ui/globals.css), no arreglable aquí; reportado como cruce.
+ */
 export function adoptionStatusVariant(
   status: AdoptionStatus,
 ): 'outline' | 'info' | 'success' | 'destructive' {

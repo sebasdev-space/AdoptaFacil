@@ -18,7 +18,12 @@ describe('certificate trust-flow (mockup)', () => {
   it('emission screen: "vista de diseño" label, sample certificate + verify CTA', async () => {
     renderShell({ route: '/certificado', ...AUTH });
 
-    expect(await screen.findByTestId('design-preview')).toBeInTheDocument();
+    const designPreview = await screen.findByTestId('design-preview');
+    expect(designPreview).toBeInTheDocument();
+    // F1-03-COMPLETO: el borde del aviso usa --warning-foreground (≥3:1 contra el
+    // fondo claro), no --warning (que aquí no pasaba ni a opacidad completa).
+    expect(designPreview.className).toContain('border-warning-foreground');
+    expect(designPreview.className).not.toContain('border-warning/50');
     expect(screen.getByTestId('certificate-document')).toBeInTheDocument();
     expect(screen.getByTestId('certificate-code')).toHaveTextContent(MOCK_CERTIFICATE.code);
     expect(screen.getByTestId('sample-qr')).toBeInTheDocument();
