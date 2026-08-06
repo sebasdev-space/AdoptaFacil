@@ -27,6 +27,12 @@ import { renderShell } from '../../test-utils';
  * from CampaignsController's real @Roles). The public route (/campanas) is
  * untouched, covered separately by routing.test.tsx's "serves /campanas as a
  * PUBLIC campaigns portal without a session".
+ *
+ * S2-04A §4 — "Personalización" is REMOVED from the sidebar (for every role):
+ * it's reached from a button inside "Mi organización" now (OrgProfilePage's
+ * action bar, S2-01/S2-REORG), not as a top-level nav entry. The ROUTE
+ * (`/organizacion/portal`) and its guard are UNCHANGED — the SURFACES table
+ * below still exercises it directly by navigating to the route.
  */
 function sessionWith(roles: Role[]) {
   return {
@@ -100,12 +106,15 @@ describe('T-062 · sidebar reflects the org gate (first barrier)', () => {
     return screen.getByRole('navigation', { name: 'Navegación principal' });
   }
 
-  it('shows the org-management entries and Campañas to an org role, but NEVER Transparencia (T-065)', async () => {
+  it('shows the org-management entries and Campañas to an org role, but NEVER Transparencia (T-065) nor Personalización (S2-04A)', async () => {
     renderShell({ route: '/', ...sessionWith([Role.Owner]) });
     await waitFor(() =>
       expect(within(nav()).getByRole('link', { name: 'Mi organización' })).toBeInTheDocument(),
     );
-    expect(within(nav()).getByRole('link', { name: 'Personalización' })).toBeInTheDocument();
+    // S2-04A §4: "Personalización" left the sidebar — it's a button inside
+    // "Mi organización" now, not a top-level nav entry (the route stays; see
+    // the SURFACES-driven describe block below).
+    expect(within(nav()).queryByRole('link', { name: 'Personalización' })).not.toBeInTheDocument();
     // S2-01: Campañas is back, pointing at the internal management screen.
     expect(within(nav()).getByRole('link', { name: 'Campañas' })).toHaveAttribute(
       'href',

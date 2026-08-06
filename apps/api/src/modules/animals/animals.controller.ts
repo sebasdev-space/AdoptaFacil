@@ -39,6 +39,9 @@ import {
 const WRITE_ROLES = [Role.Owner, Role.Administrator, Role.Operator, Role.Veterinarian] as const;
 /** Roles that may VIEW (write roles + the read-only auditor). */
 const VIEW_ROLES = [...WRITE_ROLES, Role.ReadOnlyAuditor] as const;
+/** Roles that may "delete" (soft-remove) a record (S2-04A §3.4) — narrower than
+ *  WRITE_ROLES on purpose: Operator/Veterinarian may edit but not remove. */
+const DELETE_ROLES = [Role.Owner, Role.Administrator] as const;
 
 interface PhotoDto {
   filename: string;
@@ -123,6 +126,13 @@ export class AnimalsController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<Animal> {
     return this.service.setActive(actor.id, id, false);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  @Roles(...DELETE_ROLES)
+  remove(@CurrentUser() actor: RequestUser, @Param('id', ParseUUIDPipe) id: string): Promise<void> {
+    return this.service.remove(actor.id, id);
   }
 
   @Post(':id/photos')
