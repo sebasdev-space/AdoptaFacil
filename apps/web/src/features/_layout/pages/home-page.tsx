@@ -22,6 +22,9 @@ function StatusRow({ label, value, up }: { label: string; value: string; up: boo
   return (
     <li className="flex items-center justify-between py-1.5">
       <span className="text-sm text-muted-foreground">{label}</span>
+      {/* F1-03-COMPLETO: `variant="success"` mide ~4.10:1 en tema claro (bajo el
+          4.5:1 de AA para texto normal) — token compartido (`--success` en
+          packages/ui/globals.css), no arreglable aquí; reportado como cruce. */}
       <Badge variant={up ? 'success' : 'destructive'}>{value}</Badge>
     </li>
   );

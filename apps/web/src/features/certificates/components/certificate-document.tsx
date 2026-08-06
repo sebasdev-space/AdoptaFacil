@@ -18,7 +18,10 @@ export function CertificateDocument({ certificate }: CertificateDocumentProps) {
       <CardHeader className="gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <CardTitle>Certificado de donación</CardTitle>
-          {/* Gating conceptual RF14: el certificado es SOLO para ESAL con RTE. */}
+          {/* Gating conceptual RF14: el certificado es SOLO para ESAL con RTE.
+              F1-03-COMPLETO: `variant="success"` mide ~4.10:1 en tema claro (bajo
+              el 4.5:1 de AA) — token compartido, reportado como cruce, no tocado
+              aquí. */}
           <Badge variant="success">ESAL · RTE vigente</Badge>
         </div>
         <p className="text-sm text-muted-foreground">
