@@ -14,6 +14,7 @@ import {
 } from '@adoptafacil/ui';
 import { fetchPublicAnimals } from '../api/public-animals';
 import {
+  ageLabel,
   buildAdoptionRequestHref,
   SEX_LABELS,
   SIZE_LABELS,
@@ -162,7 +163,9 @@ export function PublicAnimalDetailPage() {
                 {animal.computedAge && (
                   <div>
                     <dt className="text-xs uppercase text-muted-foreground">Edad aproximada</dt>
-                    <dd className="text-sm">{animal.computedAge.totalMonths} meses</dd>
+                    {/* F-EDAD-DETALLE: mismo ageLabel() que AnimalCard (catálogo) —
+                        antes imprimía totalMonths crudo ("0 meses"/"36 meses"). */}
+                    <dd className="text-sm">{ageLabel(animal.computedAge)}</dd>
                   </div>
                 )}
               </dl>

@@ -26,6 +26,14 @@ const ANIMAL: AnimalSummary = {
   breed: 'Criollo',
 };
 
+// F-EDAD-DETALLE: a 1-year-old, non-approximate animal — ageLabel() renders
+// this as "1 año" (see animals-catalog.test.ts), same string AnimalCard shows
+// in the catalog for an identical computedAge.
+const ANIMAL_WITH_AGE: AnimalSummary = {
+  ...ANIMAL,
+  computedAge: { years: 1, months: 0, totalMonths: 12, approximate: false },
+};
+
 function renderDetail(options: { state?: { animal: AnimalSummary } } = {}) {
   return render(
     <MemoryRouter
@@ -99,6 +107,27 @@ describe('PublicAnimalDetailPage', () => {
     const backLink = screen.getByRole('link', { name: '← Volver al inicio' });
     expect(backLink.className).toContain('border-input');
     expect(backLink.className).not.toContain('bg-primary');
+  });
+
+  it('F-EDAD-DETALLE: shows the age via ageLabel() ("1 año"), same string AnimalCard renders — never raw totalMonths', () => {
+    renderDetail({ state: { animal: ANIMAL_WITH_AGE } });
+
+    expect(screen.getByText('1 año')).toBeInTheDocument();
+    expect(screen.queryByText(/^\d+ meses$/)).not.toBeInTheDocument();
+  });
+
+  it('F-EDAD-DETALLE: a fresh/clamped-to-zero computedAge renders "< 1 mes", never "0 meses"', () => {
+    renderDetail({
+      state: {
+        animal: {
+          ...ANIMAL,
+          computedAge: { years: 0, months: 0, totalMonths: 0, approximate: false },
+        },
+      },
+    });
+
+    expect(screen.getByText('< 1 mes')).toBeInTheDocument();
+    expect(screen.queryByText('0 meses')).not.toBeInTheDocument();
   });
 
   it('never exposes internal/clinical data (M03 internal surface)', () => {
