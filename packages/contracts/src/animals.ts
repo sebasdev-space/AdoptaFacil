@@ -70,6 +70,9 @@ export interface Animal {
   approximateAgeMonths?: number;
   /** Free-text description (descripción). */
   description?: string;
+  /** Personality tags (S2-04A). Free text; the frontend only suggests common
+   *  values — not a closed catalog. Empty array when none. */
+  tags?: string[];
 
   // --- M03 implementation enrichment (T-104, RF07, additive; may be absent) --
   /** Reference to a tenant breed-catalog entry (raza) when chosen from the org's
@@ -243,6 +246,8 @@ export interface CreateAnimalInput {
   /** Approximate age in months when the birth date is unknown. */
   approximateAgeMonths?: number;
   description?: string;
+  /** Personality tags (S2-04A), max 10. */
+  tags?: string[];
   photos?: AnimalPhotoInput[];
 }
 
@@ -259,6 +264,8 @@ export interface UpdateAnimalInput {
   birthDate?: string;
   approximateAgeMonths?: number;
   description?: string;
+  /** Personality tags (S2-04A), max 10. */
+  tags?: string[];
 }
 
 /** Create a tenant-scoped custom breed (raza). */

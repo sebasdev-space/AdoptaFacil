@@ -15,6 +15,7 @@
     "test:rls": "jest --config test/jest-integration.json --runInBand -t \"no-leak\"",
     "seed:admin": "ts-node --transpile-only scripts/seed-platform-admin.ts",
     "seed:demo": "ts-node --transpile-only scripts/seed-demo.ts",
+    "seed:breeds": "ts-node --transpile-only scripts/seed-breeds.ts",
     "db:deploy": "prisma migrate deploy"
   },
   "dependencies": {

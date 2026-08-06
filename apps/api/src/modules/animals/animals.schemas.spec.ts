@@ -42,4 +42,20 @@ describe('animal attribute validation (RF07)', () => {
     expect(createBreedSchema.safeParse({ species: 'cat', name: 'Criollo' }).success).toBe(true);
     expect(createBreedSchema.safeParse({ species: 'cat', name: '' }).success).toBe(false);
   });
+
+  it('accepts personality tags on create and update (S2-04A)', () => {
+    expect(createAnimalSchema.safeParse({ ...valid, tags: ['Juguetón', 'Cariñoso'] }).success).toBe(
+      true,
+    );
+    expect(updateAnimalSchema.safeParse({ tags: ['Tímido'] }).success).toBe(true);
+  });
+
+  it('rejects more than 10 tags', () => {
+    const tooMany = Array.from({ length: 11 }, (_, i) => `tag-${i}`);
+    expect(createAnimalSchema.safeParse({ ...valid, tags: tooMany }).success).toBe(false);
+  });
+
+  it('rejects an empty-string tag', () => {
+    expect(createAnimalSchema.safeParse({ ...valid, tags: [''] }).success).toBe(false);
+  });
 });

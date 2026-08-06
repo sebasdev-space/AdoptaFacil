@@ -19,6 +19,7 @@ interface TxMock {
   user: { create: jest.Mock };
   authCredential: { create: jest.Mock };
   userRole: { create: jest.Mock };
+  animalBreed: { createMany: jest.Mock };
 }
 
 function makeTx(): TxMock {
@@ -27,6 +28,7 @@ function makeTx(): TxMock {
     user: { create: jest.fn().mockResolvedValue({}) },
     authCredential: { create: jest.fn().mockResolvedValue({}) },
     userRole: { create: jest.fn().mockResolvedValue({}) },
+    animalBreed: { createMany: jest.fn().mockResolvedValue({ count: 0 }) },
   };
 }
 
@@ -78,9 +80,14 @@ describe('AuthService — Owner on organization registration (T-012b)', () => {
     expect(tx.userRole.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ role: 'owner' }),
     });
+    // S2-04A: an organization gets the common breed catalog preloaded.
+    expect(tx.animalBreed.createMany).toHaveBeenCalledTimes(1);
+    expect(tx.animalBreed.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skipDuplicates: true }),
+    );
   });
 
-  it('does NOT assign a role when registering a Person', async () => {
+  it('does NOT assign a role or preload breeds when registering a Person', async () => {
     const tx = makeTx();
     const { service } = makeService(tx);
 
@@ -92,6 +99,7 @@ describe('AuthService — Owner on organization registration (T-012b)', () => {
 
     expect(tx.user.create).toHaveBeenCalledTimes(1);
     expect(tx.userRole.create).not.toHaveBeenCalled();
+    expect(tx.animalBreed.createMany).not.toHaveBeenCalled();
   });
 
   it('rejects registration if the Owner role assignment fails (atomic rollback)', async () => {

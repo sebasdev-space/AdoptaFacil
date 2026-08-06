@@ -21,6 +21,7 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { NOTIFICATION_PORT, type NotificationPort } from '../notifications/notification.port';
 import { PrismaService } from '../../prisma/prisma.service';
+import { DEFAULT_ANIMAL_BREEDS } from '../../modules/animals/animal-breeds.catalog';
 import type { Env } from '../../config/env.validation';
 import type { RequestUser } from './auth.types';
 import { PasswordService } from './password.service';
@@ -107,6 +108,17 @@ export class AuthService {
         // personal organization without a role (unchanged from T-011).
         await tx.userRole.create({
           data: { organizationId, userId, role: Role.Owner },
+        });
+        // S2-04A: preload the common breed catalog for the new org (a Person's
+        // personal organization never manages animals, so it's skipped). Each
+        // org's rows stay independent afterward — the org may edit/remove them.
+        await tx.animalBreed.createMany({
+          data: DEFAULT_ANIMAL_BREEDS.map((breed) => ({
+            organizationId,
+            species: breed.species,
+            name: breed.name,
+          })),
+          skipDuplicates: true,
         });
       }
     });
