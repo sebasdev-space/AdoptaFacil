@@ -14,6 +14,9 @@ const photoInput = z
   })
   .strict();
 
+/** Personality tags (S2-04A) — free text, max 10, no empty/oversized entries. */
+const tags = z.array(z.string().trim().min(1).max(40)).max(10);
+
 /** Create an animal record. `.strict()` rejects unknown keys. */
 export const createAnimalSchema = z
   .object({
@@ -27,6 +30,7 @@ export const createAnimalSchema = z
     birthDate: z.string().datetime({ offset: true }).optional(),
     approximateAgeMonths: z.number().int().min(0).max(1200).optional(),
     description: z.string().trim().max(5000).optional(),
+    tags: tags.optional(),
     photos: z.array(photoInput).max(20).optional(),
   })
   .strict();
@@ -44,6 +48,7 @@ export const updateAnimalSchema = z
     birthDate: z.string().datetime({ offset: true }).optional(),
     approximateAgeMonths: z.number().int().min(0).max(1200).optional(),
     description: z.string().trim().max(5000).optional(),
+    tags: tags.optional(),
   })
   .strict()
   .refine((value) => Object.keys(value).length > 0, {

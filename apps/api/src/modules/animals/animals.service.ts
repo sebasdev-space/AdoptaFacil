@@ -33,6 +33,9 @@ import { STORAGE_PORT, type StoragePort } from '../../core/storage/storage.port'
 
 type AnimalWithRelations = AnimalRow & { photos: PhotoRow[]; breed: BreedRow | null };
 
+/** Adoption request statuses that block a delete/soft-remove (RF07 §3.4). */
+const ACTIVE_ADOPTION_STATUSES = ['new', 'in_review', 'approved'] as const;
+
 @Injectable()
 export class AnimalsService {
   constructor(
@@ -80,6 +83,7 @@ export class AnimalsService {
       description: row.description ?? undefined,
       breedId: row.breedId ?? undefined,
       customBreed: row.customBreed ?? undefined,
+      tags: row.tags,
       computedAge,
       isActive: row.isActive,
       photoRecords: photos,
@@ -143,6 +147,7 @@ export class AnimalsService {
           birthDate: input.birthDate ? new Date(input.birthDate) : null,
           approximateAgeMonths: input.approximateAgeMonths ?? null,
           description: input.description ?? null,
+          tags: input.tags ?? [],
           photos:
             reserved.length > 0
               ? { create: reserved.map((r) => ({ organizationId, ...r })) }
@@ -214,6 +219,7 @@ export class AnimalsService {
           birthDate: input.birthDate ? new Date(input.birthDate) : undefined,
           approximateAgeMonths: input.approximateAgeMonths,
           description: input.description,
+          tags: input.tags,
         },
         include: { photos: true, breed: true },
       });
@@ -250,6 +256,38 @@ export class AnimalsService {
         entityId: id,
       });
       return this.toAnimal(updated);
+    });
+  }
+
+  /** "Delete" an animal record from the UI's perspective (S2-04A §3.4). A
+   *  physical DELETE is impossible here — `animals` REVOKEs DELETE from the app
+   *  role and a trigger rejects it for every role (RF07) — so this is a soft
+   *  deactivation, additionally BLOCKED while an adoption request tied to this
+   *  animal is still active (new/in_review/approved). Narrower roles than
+   *  activate/deactivate (Owner/Administrator only); audited distinctly. */
+  async remove(actorUserId: string, id: string): Promise<void> {
+    const organizationId = this.requireOrgId();
+    await this.prisma.withOrgContext(organizationId, async (tx) => {
+      const existing = await tx.animal.findUnique({ where: { id } });
+      if (!existing) {
+        throw new NotFoundException('Animal not found');
+      }
+      const activeAdoption = await tx.adoptionRequest.findFirst({
+        where: { animalId: id, status: { in: [...ACTIVE_ADOPTION_STATUSES] } },
+      });
+      if (activeAdoption) {
+        throw new ConflictException(
+          'No se puede eliminar: el animal tiene una adopción activa vinculada.',
+        );
+      }
+      await tx.animal.update({ where: { id }, data: { isActive: false } });
+      await this.audit.recordWithTx(tx, {
+        organizationId,
+        actorUserId,
+        action: 'animal.removed',
+        entityType: 'animal',
+        entityId: id,
+      });
     });
   }
 

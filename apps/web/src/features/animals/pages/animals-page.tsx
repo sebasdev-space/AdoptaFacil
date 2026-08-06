@@ -1,32 +1,42 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   type Animal,
-  type AnimalBreed,
   type AnimalSex,
-  type AnimalSize,
   type AnimalSpecies,
   type ComputedAge,
-  type CreateAnimalInput,
   Role,
 } from '@adoptafacil/contracts';
 import {
   Badge,
   Button,
+  buttonVariants,
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   EmptyState,
   Input,
   Skeleton,
+  cn,
   useToast,
 } from '@adoptafacil/ui';
 import { PageContainer, PageHeader } from '../../_layout';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
-import { SelectField, TextAreaField } from '../components/animal-form-fields';
-import { PHOTO_ACCEPT, uploadFileBytes, validateUpload } from '../lib/storage';
+import { AnimalFormModal } from '../components/animal-form-modal';
+import {
+  FolderIcon,
+  PawEmptyIcon,
+  PencilIcon,
+  PlusIcon,
+  SearchIcon,
+  TrashIcon,
+} from '../components/icons';
 
 const SPECIES_LABELS: Record<AnimalSpecies, string> = {
   dog: 'Perro',
@@ -40,28 +50,12 @@ const SEX_LABELS: Record<AnimalSex, string> = {
   unknown: 'Desconocido',
 };
 
-const SIZE_LABELS: Record<AnimalSize, string> = {
-  small: 'Pequeño',
-  medium: 'Mediano',
-  large: 'Grande',
-};
-
-const SPECIES_OPTIONS = (Object.keys(SPECIES_LABELS) as AnimalSpecies[]).map((value) => ({
-  value,
-  label: SPECIES_LABELS[value],
-}));
-const SEX_OPTIONS = (Object.keys(SEX_LABELS) as AnimalSex[]).map((value) => ({
-  value,
-  label: SEX_LABELS[value],
-}));
-const SIZE_OPTIONS = (Object.keys(SIZE_LABELS) as AnimalSize[]).map((value) => ({
-  value,
-  label: SIZE_LABELS[value],
-}));
-
-/** Sentinel breed-select value meaning "free-text custom breed" (T-D04) — never
- *  sent to the backend, only used to toggle the custom-breed text input. */
-const CUSTOM_BREED_VALUE = '__custom__';
+const SPECIES_FILTER_OPTIONS: { value: 'all' | AnimalSpecies; label: string }[] = [
+  { value: 'all', label: 'Todas las especies' },
+  { value: 'dog', label: 'Perro' },
+  { value: 'cat', label: 'Gato' },
+  { value: 'other', label: 'Otro' },
+];
 
 /** Etiqueta de edad derivada (calculada en la API). */
 function ageLabel(age?: ComputedAge): string {
@@ -73,14 +67,12 @@ function ageLabel(age?: ComputedAge): string {
   return age.approximate ? `~${text}` : text;
 }
 
-/** `/animales` — expediente de animales (RF07). Crear/editar/activar:
- *  Owner/Administrator/Operator/Veterinarian; ver: + ReadOnlyAuditor.
- *
- *  Pulido UX (T-D04): expone todos los campos que `POST /animals` ya acepta
- *  (raza vía catálogo o personalizada, sexo, tamaño, descripción — antes
- *  hardcodeados a `sex: 'unknown'` / `size: 'medium'` y ocultos del formulario),
- *  agrupa el formulario en un `Card`, y el listado pasa de una lista plana a un
- *  grid de tarjetas. Ningún endpoint cambia. */
+/** `/animales` — expediente de animales (RF07, S2-04A). Crear/editar/eliminar:
+ *  Owner/Administrator/Operator/Veterinarian escriben (eliminar es más
+ *  estricto: solo Owner/Administrator, ver `DELETE_ROLES` en el backend);
+ *  ver: + ReadOnlyAuditor. Listado como vista principal (grid de cards),
+ *  registro/edición en modal — ningún dato de la lista requiere un endpoint
+ *  nuevo salvo `DELETE /animals/:id` (S2-04A §3.4). */
 export function AnimalsPage() {
   const client = useApiClient();
   const { hasRole } = useSession();
@@ -89,23 +81,18 @@ export function AnimalsPage() {
     hasRole(Role.Administrator) ||
     hasRole(Role.Operator) ||
     hasRole(Role.Veterinarian);
+  const canDelete = hasRole(Role.Owner) || hasRole(Role.Administrator);
   const { toast } = useToast();
 
   const [animals, setAnimals] = useState<Animal[]>([]);
-  const [breeds, setBreeds] = useState<AnimalBreed[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [speciesFilter, setSpeciesFilter] = useState<'all' | AnimalSpecies>('all');
 
-  const [name, setName] = useState('');
-  const [species, setSpecies] = useState<AnimalSpecies>('dog');
-  const [breedSelection, setBreedSelection] = useState<string>('');
-  const [customBreed, setCustomBreed] = useState('');
-  const [sex, setSex] = useState<AnimalSex>('unknown');
-  const [size, setSize] = useState<AnimalSize>('medium');
-  const [birthDate, setBirthDate] = useState('');
-  const [description, setDescription] = useState('');
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingAnimal, setEditingAnimal] = useState<Animal | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Animal | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = async (): Promise<void> => {
     const items = await client.request<Animal[]>('/animals?includeInactive=true');
@@ -127,319 +114,239 @@ export function AnimalsPage() {
     };
   }, [client]);
 
-  // Breed catalog is tenant + species scoped (T-104); reload whenever the
-  // selected species changes and drop a stale selection from the previous list.
-  useEffect(() => {
-    let active = true;
-    void (async () => {
-      try {
-        const items = await client.request<AnimalBreed[]>(
-          `/animals/breeds?species=${encodeURIComponent(species)}`,
-        );
-        if (active) setBreeds(items);
-      } catch {
-        if (active) setBreeds([]);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [client, species]);
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return animals.filter((animal) => {
+      const matchesSearch = !q || animal.name.toLowerCase().includes(q);
+      const matchesSpecies = speciesFilter === 'all' || animal.species === speciesFilter;
+      return matchesSearch && matchesSpecies;
+    });
+  }, [animals, search, speciesFilter]);
 
-  useEffect(() => {
-    setBreedSelection('');
-    setCustomBreed('');
-  }, [species]);
+  function openCreateModal(): void {
+    setEditingAnimal(null);
+    setModalOpen(true);
+  }
 
-  useEffect(() => {
-    if (!photoFile) {
-      setPhotoPreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(photoFile);
-    setPhotoPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [photoFile]);
+  function openEditModal(animal: Animal): void {
+    setEditingAnimal(animal);
+    setModalOpen(true);
+  }
 
-  const submit = async (): Promise<void> => {
-    if (!name.trim()) {
-      toast({ title: 'Nombre requerido', variant: 'warning' });
-      return;
-    }
-    if (photoFile) {
-      const invalid = validateUpload(photoFile);
-      if (invalid) {
-        toast({ title: 'Imagen no válida', description: invalid, variant: 'warning' });
-        return;
-      }
-    }
-    setSaving(true);
+  const reactivate = async (animal: Animal): Promise<void> => {
     try {
-      const breedFields: Pick<CreateAnimalInput, 'breedId' | 'customBreed'> =
-        breedSelection === CUSTOM_BREED_VALUE
-          ? customBreed.trim()
-            ? { customBreed: customBreed.trim() }
-            : {}
-          : breedSelection
-            ? { breedId: breedSelection }
-            : {};
-      const body: CreateAnimalInput = {
-        name: name.trim(),
-        species,
-        sex,
-        size,
-        ...breedFields,
-        ...(birthDate ? { birthDate: new Date(birthDate).toISOString() } : {}),
-        ...(description.trim() ? { description: description.trim() } : {}),
-        ...(photoFile ? { photos: [{ filename: photoFile.name }] } : {}),
-      };
-      // 1) Create the record (reserves a public storage key per photo, T-104).
-      const created = await client.request<Animal>('/animals', { method: 'POST', json: body });
-      // 2) Send the real photo bytes to the reserved key (T-108).
-      const key = created.photoRecords?.[0]?.storageRef;
-      if (photoFile && key) {
-        await uploadFileBytes(client, key, photoFile);
-      }
-      setName('');
-      setBreedSelection('');
-      setCustomBreed('');
-      setSex('unknown');
-      setSize('medium');
-      setBirthDate('');
-      setDescription('');
-      setPhotoFile(null);
+      await client.request<Animal>(`/animals/${animal.id}/activate`, { method: 'POST' });
       await load();
-      toast({ title: 'Expediente creado', variant: 'success' });
+      toast({ title: 'Animal reactivado', variant: 'success' });
     } catch (error) {
       toast({
-        title: 'No se pudo crear el expediente',
+        title: 'No se pudo reactivar',
+        description: error instanceof Error ? error.message : 'Inténtalo de nuevo.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  async function confirmDelete(): Promise<void> {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await client.request(`/animals/${deleteTarget.id}`, { method: 'DELETE' });
+      await load();
+      toast({ title: 'Animal eliminado', variant: 'success' });
+      setDeleteTarget(null);
+    } catch (error) {
+      toast({
+        title: 'No se pudo eliminar',
         description: error instanceof Error ? error.message : 'Inténtalo de nuevo.',
         variant: 'destructive',
       });
     } finally {
-      setSaving(false);
+      setDeleting(false);
     }
-  };
-
-  const toggle = async (animal: Animal): Promise<void> => {
-    const action = animal.isActive ? 'deactivate' : 'activate';
-    try {
-      await client.request<Animal>(`/animals/${animal.id}/${action}`, { method: 'POST' });
-      await load();
-    } catch (error) {
-      toast({
-        title: 'No se pudo cambiar el estado',
-        description: error instanceof Error ? error.message : 'Inténtalo de nuevo.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const breedOptions = [
-    { value: '', label: breeds.length ? 'Selecciona una raza…' : 'Sin razas registradas' },
-    ...breeds.map((breed) => ({ value: breed.id, label: breed.name })),
-    { value: CUSTOM_BREED_VALUE, label: 'Otra / Personalizada' },
-  ];
+  }
 
   return (
     <PageContainer>
-      <PageHeader title="Animales" description="Expediente de animales de tu organización." />
+      <PageHeader title="Animales" description="Gestión de animales de tu organización." />
       {loading && <Skeleton className="h-64 w-full" />}
       {!loading && (
-        <div className="space-y-6">
-          {canManage && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Nuevo expediente</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="animal-name"
-                      className="block text-sm font-medium text-foreground"
-                    >
-                      Nombre
-                    </label>
-                    <Input
-                      id="animal-name"
-                      placeholder="Nombre del animal"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                    />
-                  </div>
-                  <SelectField
-                    id="animal-species"
-                    label="Especie"
-                    value={species}
-                    onChange={setSpecies}
-                    options={SPECIES_OPTIONS}
-                  />
-                  <SelectField
-                    id="animal-breed"
-                    label="Raza"
-                    value={breedSelection}
-                    onChange={setBreedSelection}
-                    options={breedOptions}
-                  />
-                  {breedSelection === CUSTOM_BREED_VALUE && (
-                    <div className="space-y-1.5">
-                      <label
-                        htmlFor="animal-custom-breed"
-                        className="block text-sm font-medium text-foreground"
-                      >
-                        Raza personalizada
-                      </label>
-                      <Input
-                        id="animal-custom-breed"
-                        placeholder="Escribe la raza"
-                        value={customBreed}
-                        onChange={(e) => setCustomBreed(e.target.value)}
-                      />
-                    </div>
-                  )}
-                  <SelectField
-                    id="animal-sex"
-                    label="Sexo"
-                    value={sex}
-                    onChange={setSex}
-                    options={SEX_OPTIONS}
-                  />
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="animal-birthdate"
-                      className="block text-sm font-medium text-foreground"
-                    >
-                      Fecha de nacimiento (aproximada)
-                    </label>
-                    <Input
-                      id="animal-birthdate"
-                      type="date"
-                      value={birthDate}
-                      onChange={(e) => setBirthDate(e.target.value)}
-                    />
-                  </div>
-                  <SelectField
-                    id="animal-size"
-                    label="Tamaño"
-                    value={size}
-                    onChange={setSize}
-                    options={SIZE_OPTIONS}
-                  />
-                </div>
-
-                <TextAreaField
-                  id="animal-description"
-                  label="Descripción"
-                  value={description}
-                  onChange={setDescription}
-                  placeholder="Cuéntanos sobre la personalidad y la historia de este animal…"
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="relative sm:w-64">
+                <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  aria-label="Buscar por nombre"
+                  placeholder="Buscar por nombre…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-8"
                 />
+              </div>
+              <select
+                aria-label="Filtrar por especie"
+                value={speciesFilter}
+                onChange={(e) => setSpeciesFilter(e.target.value as 'all' | AnimalSpecies)}
+                className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm sm:w-48"
+              >
+                {SPECIES_FILTER_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {canManage && (
+              <Button onClick={openCreateModal} className="gap-1.5">
+                <PlusIcon /> Registrar animal
+              </Button>
+            )}
+          </div>
 
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="animal-photo"
-                    className="block text-sm font-medium text-foreground"
-                  >
-                    Foto principal (imagen, máx. 15 MB)
-                  </label>
-                  <div className="flex items-center gap-3">
-                    {photoPreviewUrl && (
-                      <img
-                        src={photoPreviewUrl}
-                        alt="Previsualización"
-                        className="h-16 w-16 rounded-md border border-border object-cover"
-                      />
-                    )}
-                    <input
-                      id="animal-photo"
-                      type="file"
-                      accept={PHOTO_ACCEPT.join(',')}
-                      onChange={(e) => setPhotoFile(e.target.files?.[0] ?? null)}
-                      className="block w-full text-sm text-foreground file:mr-3 file:rounded-md file:border file:border-input file:bg-background file:px-3 file:py-1.5 file:text-sm"
-                    />
-                  </div>
-                </div>
-
-                <Button disabled={saving} onClick={() => void submit()}>
-                  {saving ? 'Creando…' : 'Crear expediente'}
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Expedientes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {animals.length === 0 ? (
-                <EmptyState
-                  icon={<span aria-hidden>🐾</span>}
-                  title="Registra tu primer animal para empezar"
-                />
-              ) : (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {animals.map((animal) => (
-                    <Card key={animal.id} className="overflow-hidden">
-                      <Link to={`/animales/${animal.id}`} className="block">
-                        <div className="aspect-[4/3] w-full bg-muted">
-                          {animal.photos[0] ? (
-                            <img
-                              src={animal.photos[0]}
-                              alt={animal.name}
-                              className="h-full w-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                              <span aria-hidden className="text-2xl">
-                                🐾
+          {filtered.length === 0 ? (
+            <EmptyState
+              icon={<PawEmptyIcon />}
+              title={
+                animals.length === 0
+                  ? 'Registra tu primer animal para empezar'
+                  : 'Ningún animal coincide con la búsqueda'
+              }
+              action={
+                animals.length === 0 && canManage ? (
+                  <Button onClick={openCreateModal} className="gap-1.5">
+                    <PlusIcon /> Registrar tu primer animal
+                  </Button>
+                ) : undefined
+              }
+            />
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {filtered.map((animal) => {
+                const isInactive = animal.isActive === false;
+                return (
+                  <Card key={animal.id} className="overflow-hidden">
+                    <Link to={`/animales/${animal.id}`} className="block">
+                      <div className="aspect-[4/3] w-full bg-muted">
+                        {animal.photos[0] ? (
+                          <img
+                            src={animal.photos[0]}
+                            alt={animal.name}
+                            className={cn('h-full w-full object-cover', isInactive && 'opacity-60')}
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                            <PawEmptyIcon className="h-8 w-8" />
+                          </div>
+                        )}
+                      </div>
+                      <CardContent className="space-y-1.5 p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium text-foreground hover:underline">
+                            {animal.name}
+                          </span>
+                          {isInactive && <Badge variant="destructive">Inactivo</Badge>}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <Badge variant="secondary">{SPECIES_LABELS[animal.species]}</Badge>
+                          {animal.breed && <Badge variant="outline">{animal.breed}</Badge>}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {ageLabel(animal.computedAge)} · {SEX_LABELS[animal.sex]}
+                        </p>
+                        {animal.tags && animal.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 pt-0.5">
+                            {animal.tags.map((tag) => (
+                              <span
+                                key={tag}
+                                className="rounded-full bg-secondary/70 px-2 py-0.5 text-[11px] text-secondary-foreground"
+                              >
+                                {tag}
                               </span>
-                            </div>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Link>
+                    {canManage && (
+                      <div className="space-y-1 border-t p-2">
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1 gap-1"
+                            onClick={() => openEditModal(animal)}
+                          >
+                            <PencilIcon /> Editar
+                          </Button>
+                          <Link
+                            to={`/animales/${animal.id}`}
+                            className={cn(
+                              buttonVariants({ variant: 'outline', size: 'sm' }),
+                              'flex-1 gap-1',
+                            )}
+                          >
+                            <FolderIcon /> Expediente
+                          </Link>
+                          {!isInactive && canDelete && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                              onClick={() => setDeleteTarget(animal)}
+                              aria-label={`Eliminar ${animal.name}`}
+                            >
+                              <TrashIcon />
+                            </Button>
                           )}
                         </div>
-                        <CardContent className="space-y-1.5 p-3">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-medium text-foreground hover:underline">
-                              {animal.name}
-                            </span>
-                            {animal.isActive === false && (
-                              <Badge variant="destructive">Inactivo</Badge>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <Badge variant="secondary">{SPECIES_LABELS[animal.species]}</Badge>
-                            <Badge>{animal.status}</Badge>
-                          </div>
-                          <p className="text-xs text-muted-foreground">
-                            {animal.breed ? `${animal.breed} · ` : ''}
-                            {ageLabel(animal.computedAge)} · {SEX_LABELS[animal.sex]}
-                          </p>
-                        </CardContent>
-                      </Link>
-                      {canManage && (
-                        <div className="border-t px-3 py-2">
+                        {isInactive && (
                           <Button
                             size="sm"
                             variant="outline"
                             className="w-full"
-                            onClick={() => void toggle(animal)}
+                            onClick={() => void reactivate(animal)}
                           >
-                            {animal.isActive === false ? 'Reactivar' : 'Desactivar'}
+                            Reactivar
                           </Button>
-                        </div>
-                      )}
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                        )}
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
+
+      <AnimalFormModal
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        animal={editingAnimal}
+        onSaved={() => void load()}
+      />
+
+      <Dialog open={deleteTarget !== null} onOpenChange={(next) => !next && setDeleteTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Eliminar a {deleteTarget?.name}?</DialogTitle>
+            <DialogDescription>Esta acción no se puede deshacer.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => void confirmDelete()}
+              disabled={deleting}
+            >
+              {deleting ? 'Eliminando…' : 'Eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   );
 }

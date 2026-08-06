@@ -134,15 +134,10 @@ export const navItems: NavItem[] = [
     icon: ShieldIcon,
     roles: ORG_DOCUMENTS_ROLES,
   },
-  // M14 · portal personalization by tokens (T-027). Owner/Admin gate the EDIT
-  // action (backend PUT + PortalThemePage itself); T-062 gates VIEW/ENTRY here
-  // to ORG_MEMBER_ROLES, matching GET /portals/theme (any authenticated member).
-  {
-    path: '/organizacion/portal',
-    label: 'Personalización',
-    icon: ShieldIcon,
-    roles: ORG_MEMBER_ROLES,
-  },
+  // M14 · portal personalization by tokens (T-027) — REMOVED from the sidebar
+  // (S2-04A §4): it now lives as a button inside "Mi organización"'s action bar
+  // (OrgProfilePage, S2-01/S2-REORG), not as a top-level nav entry. The ROUTE
+  // (`/organizacion/portal`) and its guard are UNCHANGED — see routes.tsx.
   // M01 · revisión documental de PLATAFORMA (T-031, wires T-103). Audiencia de
   // plataforma, no de organización — separada del resto del menú.
   {
