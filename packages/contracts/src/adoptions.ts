@@ -69,6 +69,14 @@ export interface AdoptionRequest {
   id: string;
   /** Organización dueña del animal (ancla de tenant). */
   organizationId: string;
+  /**
+   * Nombre de la organización dueña del animal. Ausente en la mayoría de las
+   * rutas (la org ya conoce su propio nombre); `GET /adoptions/mine` (F1-01) lo
+   * resuelve para que la bandeja "Mis solicitudes" de la Persona no tenga que
+   * hacer una consulta aparte por cada solicitud — mismo patrón que
+   * `organizationName` en {@link Donation} (`GET /donations/mine`, S1-02).
+   */
+  organizationName?: string;
   /** Referencia al animal en M03 (por id; sin FK Prisma cross-módulo). */
   animalId: string;
   /** Copia de conveniencia para el tablero (fuente de verdad = M03). */
