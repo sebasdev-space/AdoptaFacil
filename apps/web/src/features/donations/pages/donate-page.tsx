@@ -22,6 +22,11 @@ import { formatCop } from '../model/donation-breakdown-view';
 interface DonationTarget {
   organizationId: string;
   organizationName: string;
+  /** F2-03: presentación únicamente — vienen de `OrganizationPublic` vía
+   *  `buildDonateHref` (portal, T-050/F2-03), nunca refetcheados aquí. */
+  organizationLogoUrl?: string;
+  organizationCity?: string;
+  organizationNit?: string;
 }
 
 /**
@@ -38,7 +43,15 @@ function useDonationTarget(): DonationTarget | null {
 
     const organizationId = params.get('organizationId');
     const organizationName = params.get('organizationName');
-    if (organizationId && organizationName) return { organizationId, organizationName };
+    if (organizationId && organizationName) {
+      return {
+        organizationId,
+        organizationName,
+        organizationLogoUrl: params.get('organizationLogoUrl') ?? undefined,
+        organizationCity: params.get('organizationCity') ?? undefined,
+        organizationNit: params.get('organizationNit') ?? undefined,
+      };
+    }
     return null;
   }, [location.state, params]);
 }
@@ -106,9 +119,37 @@ export function DonatePage() {
       <PageHeader title="Donar" description={`Tu aporte para ${target.organizationName}.`} />
       <Card>
         <CardHeader>
-          <CardTitle>{target.organizationName}</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            {target.organizationLogoUrl && (
+              <img
+                src={target.organizationLogoUrl}
+                alt=""
+                aria-hidden
+                data-testid="donation-org-logo"
+                className="h-8 w-8 rounded-full object-cover"
+              />
+            )}
+            {target.organizationName}
+          </CardTitle>
+          {/* F2-03: solo lo que ya viaja en el contrato público (mismo endpoint
+              que el portal /o/:slug consume) — el NIT es dato público una vez
+              formalizada la org, nunca se fabrica ni se muestra el de muestra
+              del certificado (RF14, congelado, no se toca aquí). */}
+          {(target.organizationCity || target.organizationNit) && (
+            <p className="text-xs text-muted-foreground" data-testid="donation-org-meta">
+              {[target.organizationCity, target.organizationNit && `NIT ${target.organizationNit}`]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+          )}
         </CardHeader>
         <CardContent>
+          {user?.name && (
+            <p className="mb-4 text-sm text-muted-foreground" data-testid="donor-identity">
+              Donando como <span className="font-medium text-foreground">{user.name}</span>
+              {user.email && ` (${user.email})`}
+            </p>
+          )}
           {done ? (
             <div className="space-y-4">
               <EmptyState

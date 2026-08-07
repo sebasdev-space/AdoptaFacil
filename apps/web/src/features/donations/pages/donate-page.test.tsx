@@ -85,6 +85,45 @@ describe('DonatePage — "no target" now shows "Mis donaciones" (T-064)', () => 
     expect(await screen.findByText(/50\.000/)).toBeInTheDocument();
   });
 
+  it('F2-03: shows the REAL organization name when the backend resolves it, not the id placeholder', async () => {
+    stubFetch((url) => {
+      if (url.includes('/donations/mine')) {
+        return [
+          {
+            id: 'd-3',
+            organizationId: '08d734c6-1900-4bf4-b3e5-d6468479cf8b',
+            organizationName: 'Refugio Patitas',
+            donorUserId: 'donor-1',
+            concept: { kind: 'organization', id: '08d734c6-1900-4bf4-b3e5-d6468479cf8b' },
+            commissionPayer: 'organization',
+            intendedAmount: 50000,
+            amountCharged: 50000,
+            currency: 'COP',
+            breakdown: {
+              amountCharged: 50000,
+              gross: 50000,
+              platformFee: 2000,
+              platformIva: 380,
+              gatewayFee: 2025,
+              gatewayIva: 385,
+              net: 45210,
+            },
+            collectionId: 'test_real_name',
+            status: 'approved',
+            createdAt: '2026-07-28T21:25:22.299Z',
+            updatedAt: '2026-07-28T21:25:22.299Z',
+          },
+        ];
+      }
+      return [];
+    });
+
+    renderShell({ route: '/donaciones', ...personSession() });
+
+    expect(await screen.findByText('Refugio Patitas')).toBeInTheDocument();
+    expect(screen.queryByText('Organización #08d734c6')).not.toBeInTheDocument();
+  });
+
   it('shows an empty-state (not a crash) when the donor has no donations yet', async () => {
     stubFetch(() => []);
     renderShell({ route: '/donaciones', ...personSession() });
@@ -227,5 +266,50 @@ describe('DonatePage — "with target" is unchanged (non-regression, T-050/T-051
     expect(await screen.findByRole('heading', { name: 'Donar' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Refugio Patitas' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Mis donaciones' })).not.toBeInTheDocument();
+  });
+
+  it("F2-03: shows the donor's own identity (session user), not a placeholder", async () => {
+    stubFetch(() => []);
+    renderShell({
+      route: '/donaciones?organizationId=org-1&organizationName=Refugio%20Patitas',
+      ...personSession(),
+    });
+
+    await screen.findByRole('heading', { name: 'Donar' });
+    const identity = screen.getByTestId('donor-identity');
+    expect(identity).toHaveTextContent('Donante Tester');
+    expect(identity).toHaveTextContent('donante@example.test');
+  });
+
+  it('F2-03: shows org logo/city/NIT when the portal CTA passed them (all real, all optional)', async () => {
+    stubFetch(() => []);
+    renderShell({
+      route:
+        '/donaciones?organizationId=org-1&organizationName=Refugio%20Patitas' +
+        '&organizationLogoUrl=https%3A%2F%2Fcdn.test%2Flogo.png' +
+        '&organizationCity=Bogot%C3%A1&organizationNit=901.456.789-0',
+      ...personSession(),
+    });
+
+    await screen.findByRole('heading', { name: 'Refugio Patitas' });
+    expect(screen.getByTestId('donation-org-logo')).toHaveAttribute(
+      'src',
+      'https://cdn.test/logo.png',
+    );
+    const meta = screen.getByTestId('donation-org-meta');
+    expect(meta).toHaveTextContent('Bogotá');
+    expect(meta).toHaveTextContent('NIT 901.456.789-0');
+  });
+
+  it('F2-03: shows no logo/city/NIT block when the portal CTA did not pass them (never fabricated)', async () => {
+    stubFetch(() => []);
+    renderShell({
+      route: '/donaciones?organizationId=org-1&organizationName=Refugio%20Patitas',
+      ...personSession(),
+    });
+
+    await screen.findByRole('heading', { name: 'Refugio Patitas' });
+    expect(screen.queryByTestId('donation-org-logo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('donation-org-meta')).not.toBeInTheDocument();
   });
 });
