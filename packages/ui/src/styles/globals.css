@@ -47,7 +47,12 @@
     --destructive: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
     --success: 142 66% 34%;
-    --success-foreground: 0 0% 100%;
+    /* F-BADGE: texto blanco medía 4.10:1 sobre --success (bajo el 4.5:1 de AA) —
+       igual que .dark, se usa texto OSCURO sobre el verde en vez de aclarar la
+       marca. Mismo hue/saturación que --success-foreground de .dark (150 30%),
+       L bajado a 4% (en vez de 8%) porque este verde claro es más oscuro que el
+       de .dark (L 34% vs 48%) y a L=8% solo alcanzaba ~4.34:1. Da ~4.80:1. */
+    --success-foreground: 150 30% 4%;
     --warning: 38 92% 45%;
     --warning-foreground: 40 60% 12%;
     --info: 205 78% 40%;
