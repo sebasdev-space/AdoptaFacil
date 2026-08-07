@@ -77,8 +77,23 @@ export interface UpdateSponsorshipPlanInput {
 export interface Sponsorship {
   id: string;
   organizationId: string;
+  /**
+   * Nombre visible de la organización patrocinada. Opcional y aditivo: solo
+   * `GET /sponsorships/mine` lo resuelve (S2-03, bandeja "mis apadrinamientos"
+   * del padrino, que no conoce el nombre por fuera de este id); el resto de
+   * rutas lo dejan `undefined`.
+   */
+  organizationName?: string;
   planId: string;
+  /** Nombre del plan al momento de la consulta. Igual que `organizationName`: solo `mine`. */
+  planName?: string;
+  /** Monto recurrente del plan (COP enteros). Solo `mine`. */
+  planAmount?: number;
+  /** Periodicidad del plan. Solo `mine`. */
+  planPeriodicity?: SponsorshipPeriodicity;
   animalId: string;
+  /** Nombre del animal apadrinado. Solo `mine`. */
+  animalName?: string;
   sponsorUserId: string;
   status: SponsorshipStatus;
   /** ISO-8601 UTC. */

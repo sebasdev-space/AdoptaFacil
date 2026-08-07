@@ -8,6 +8,7 @@ import {
   ORG_DOCUMENTS_ROLES,
   ORG_MEMBER_ROLES,
   PLATFORM_DOCUMENTS_ROLES,
+  SPONSORSHIP_VIEW_ROLES,
 } from '../navigation';
 import { AnimalDetailPage } from '../pages/animal-detail-page';
 import { GeneralPortalPage } from '../../features/catalog';
@@ -38,6 +39,7 @@ import {
   MyAdoptionRequestsPage,
 } from '../../features/adoptions';
 import { DonatePage } from '../../features/donations';
+import { SponsorPage, SponsorshipsPage } from '../../features/sponsorships';
 import { CertificateEmissionPage, CertificateVerificationPage } from '../../features/certificates';
 
 /**
@@ -165,6 +167,11 @@ export function AppRoutes() {
               página/ruta en el frontend — no hay nada que gatear todavía; queda como
               backlog propio (M05, no es cruce con Sebastián). */}
           <Route path="donaciones" element={<DonatePage />} />
+          {/* M07 · apadrinamiento P1 (RF17, S2-03). Mismo SEAM que donaciones: la
+              org/animal objetivo llega por query param (animalId [+ animalName,
+              organizationName]) desde el detalle público de un animal (§M14,
+              fuera de alcance de S2-03); sin objetivo, "mis apadrinamientos". */}
+          <Route path="apadrinar" element={<SponsorPage />} />
           {/* M05/RF14 · certificate EMISSION mockup (T-053). Trust-flow step 2-3,
               reached from the real donation receipt. "Vista de diseño": no backend. */}
           <Route path="certificado" element={<CertificateEmissionPage />} />
@@ -233,6 +240,17 @@ export function AppRoutes() {
             element={
               <RequireRoles roles={CAMPAIGNS_VIEW_ROLES}>
                 <CampaignDetailPage />
+              </RequireRoles>
+            }
+          />
+          {/* M07 · apadrinamientos RECIBIDOS por la organización (RF17, S2-03).
+              Gated a SPONSORSHIP_VIEW_ROLES, calcado del @Roles real de
+              SponsorshipsController (GET /sponsorships) — ver nota en nav-items.ts. */}
+          <Route
+            path="organizacion/apadrinamientos"
+            element={
+              <RequireRoles roles={SPONSORSHIP_VIEW_ROLES}>
+                <SponsorshipsPage />
               </RequireRoles>
             }
           />

@@ -22,6 +22,7 @@ describe('Sponsorships base (RF17 · T-056)', () => {
   let tokenA = '';
   let tokenB = '';
   let personToken = '';
+  let personBToken = '';
   let animalId = '';
   let planId = '';
 
@@ -57,6 +58,13 @@ describe('Sponsorships base (RF17 · T-056)', () => {
       .expect(201);
     personToken = person.body.tokens.accessToken;
     orgIds.push(person.body.user.organizationId);
+
+    const personB = await request(server)
+      .post('/auth/register/person')
+      .send({ displayName: 'Padrino B', email: `t056-pb-${randomUUID()}@test.local`, password })
+      .expect(201);
+    personBToken = personB.body.tokens.accessToken;
+    orgIds.push(personB.body.user.organizationId);
 
     const animal = await request(server)
       .post('/animals')
@@ -123,6 +131,28 @@ describe('Sponsorships base (RF17 · T-056)', () => {
     expect(audited.length).toBeGreaterThanOrEqual(1);
   });
 
+  it('GET /sponsorships/mine (S2-03): the sponsor sees their own subscription, enriched with names', async () => {
+    const res = await request(server)
+      .get('/sponsorships/mine')
+      .set('Authorization', `Bearer ${personToken}`)
+      .expect(200);
+    const mine = res.body.find((s: { id: string }) => s.id === sponsorshipId);
+    expect(mine).toBeDefined();
+    expect(mine.status).toBe('active');
+    expect(mine.organizationName).toBe('Refugio a');
+    expect(mine.planName).toBe('Padrinazgo mensual');
+    expect(mine.planAmount).toBe(30_000);
+    expect(mine.animalName).toBe('Firu');
+  });
+
+  it("GET /sponsorships/mine: no @Roles gate, but identity-scoped — a padrino with no subscriptions gets [] (never sees another sponsor's)", async () => {
+    const res = await request(server)
+      .get('/sponsorships/mine')
+      .set('Authorization', `Bearer ${personBToken}`)
+      .expect(200);
+    expect(res.body).toEqual([]);
+  });
+
   it('404 subscribing to an unknown/archived plan', async () => {
     await request(server)
       .post('/sponsorships')
@@ -177,6 +207,15 @@ describe('Sponsorships base (RF17 · T-056)', () => {
       .set('Authorization', `Bearer ${tokenA}`)
       .send({})
       .expect(400);
+  });
+
+  it('GET /sponsorships/mine reflects lifecycle changes (now cancelled), not a stale snapshot', async () => {
+    const res = await request(server)
+      .get('/sponsorships/mine')
+      .set('Authorization', `Bearer ${personToken}`)
+      .expect(200);
+    const mine = res.body.find((s: { id: string }) => s.id === sponsorshipId);
+    expect(mine.status).toBe('cancelled');
   });
 
   it('deny-by-default: a Person cannot suspend a sponsorship (403)', async () => {

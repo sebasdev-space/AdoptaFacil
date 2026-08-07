@@ -53,6 +53,14 @@ export class SponsorshipsController {
     return this.service.subscribe(actor, dto);
   }
 
+  /** The sponsor's own sponsorships (cross-tenant, by identity) — "mis
+   *  apadrinamientos" (S2-03). No @Roles gate, same as `create` above: any
+   *  authenticated Person may view their OWN subscriptions. */
+  @Get('mine')
+  listMine(@CurrentUser() actor: RequestUser): Promise<Sponsorship[]> {
+    return this.service.listMine(actor);
+  }
+
   @Get()
   @Roles(...VIEW_ROLES)
   list(

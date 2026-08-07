@@ -8,6 +8,7 @@ export {
   ORG_DOCUMENTS_ROLES,
   ORG_MEMBER_ROLES,
   PLATFORM_DOCUMENTS_ROLES,
+  SPONSORSHIP_VIEW_ROLES,
 } from './nav-items';
 export { NavProvider, useNav } from './nav-context';
 export { BREAKPOINTS, DESKTOP_QUERY, type Breakpoint } from './breakpoints';
