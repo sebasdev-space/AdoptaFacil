@@ -69,7 +69,7 @@ describe('OrgProfilePage — hub central (S2-REORG)', () => {
     // separately from it.
     const main = within(screen.getByRole('main'));
 
-    const formalizacion = main.getByRole('link', { name: /Formalización/ });
+    const formalizacion = await main.findByRole('link', { name: /Formalización/ });
     expect(formalizacion).toHaveAttribute('href', '/organizacion/formalizacion');
     expect(formalizacion).toHaveTextContent('En proceso');
 
@@ -105,9 +105,11 @@ describe('OrgProfilePage — hub central (S2-REORG)', () => {
       'Acerca de nosotros',
       'Información de contacto extendida',
     ];
-    for (const title of titles) {
-      expect(screen.getAllByText(title)).toHaveLength(1);
-    }
+    await waitFor(() => {
+      for (const title of titles) {
+        expect(screen.getAllByText(title)).toHaveLength(1);
+      }
+    });
   });
 
   it('has NO URL text fields for logo/cover — upload-only (S2-REORG §5)', async () => {
@@ -116,7 +118,7 @@ describe('OrgProfilePage — hub central (S2-REORG)', () => {
 
     expect(screen.queryByLabelText('URL del logo')).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Fotos de portada/)).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Subir logo')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Subir logo')).toBeInTheDocument();
     expect(screen.getByLabelText('Subir portada')).toBeInTheDocument();
   });
 
@@ -125,7 +127,7 @@ describe('OrgProfilePage — hub central (S2-REORG)', () => {
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
     await screen.findByRole('heading', { name: 'Mi organización' });
 
-    expect(screen.getByLabelText('Cambiar logo')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Cambiar logo')).toBeInTheDocument();
     expect(screen.queryByLabelText('Subir logo')).not.toBeInTheDocument();
   });
 
@@ -146,7 +148,7 @@ describe('OrgProfilePage — hub central (S2-REORG)', () => {
     await screen.findByRole('heading', { name: 'Mi organización' });
 
     const file = new File(['bytes'], 'logo.png', { type: 'image/png' });
-    const input = screen.getByLabelText('Subir logo');
+    const input = await screen.findByLabelText('Subir logo');
     await userEvent.upload(input, file);
 
     await screen.findByLabelText('Cambiar logo');
@@ -203,7 +205,7 @@ describe('OrgProfilePage — hub central (S2-REORG)', () => {
     await screen.findByRole('heading', { name: 'Mi organización' });
 
     expect(screen.queryByLabelText('Enlace a Google Maps')).not.toBeInTheDocument();
-    const mapField = screen.getByLabelText('Ubicación en el mapa');
+    const mapField = await screen.findByLabelText('Ubicación en el mapa');
     expect(mapField).toHaveAttribute(
       'placeholder',
       'Pega el enlace de Google Maps de tu ubicación',

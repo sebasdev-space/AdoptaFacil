@@ -103,6 +103,18 @@ export interface NavItem {
    * the route's <RequireRoles> is the second.
    */
   roles?: readonly Role[];
+  /**
+   * F1-01: restricts the entry to a Persona account (`session.user.accountType
+   * === 'person'`), the INVERSE of `roles` — an org account has at least one
+   * `ORG_ROLES` entry and a Persona has none, so `roles` (an allow-list of "has
+   * ANY of these") can't express "has none of these." Needed because the
+   * backend for this entry's route has no role gate at all (any authenticated
+   * user), unlike every other `personaOnly` candidate scenario — "Donaciones"
+   * stays ungated for both account kinds on purpose (an org's own donation
+   * history is legitimately empty, not hidden); "Mis solicitudes" must not
+   * show an org account someone else's UX at all.
+   */
+  personaOnly?: boolean;
 }
 
 export const navItems: NavItem[] = [
@@ -115,6 +127,12 @@ export const navItems: NavItem[] = [
     icon: PawIcon,
     roles: ADOPTIONS_MANAGEMENT_ROLES,
   },
+  // F1-01: entrada SEPARADA del kanban de organización de arriba — "Adopciones"
+  // es para quien evalúa (Owner/Administrador/Operador); "Mis solicitudes" es
+  // para la Persona que postuló. GET /adoptions/mine no tiene gate de rol
+  // (cualquier autenticado), así que el filtro real es `personaOnly` — ver su
+  // doc en NavItem para por qué no puede expresarse con `roles`.
+  { path: '/mis-solicitudes', label: 'Mis solicitudes', icon: PawIcon, personaOnly: true },
   { path: '/donaciones', label: 'Donaciones', icon: HeartIcon },
   // S2-01: "Campañas" RESTORED — T-065 removed it because the link pointed at
   // the PUBLIC portal route and exited the shell; the in-shell management

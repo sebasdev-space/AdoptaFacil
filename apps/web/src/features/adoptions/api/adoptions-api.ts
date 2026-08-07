@@ -23,6 +23,11 @@ export function listAdoptionRequests(client: ApiClient): Promise<AdoptionRequest
   return client.request<AdoptionRequest[]>('/adoptions');
 }
 
+/** F1-01 — the applicant's own requests (cross-tenant, by identity). */
+export function listMyAdoptionRequests(client: ApiClient): Promise<AdoptionRequest[]> {
+  return client.request<AdoptionRequest[]>('/adoptions/mine');
+}
+
 /** Person applies to adopt an animal (authenticated). */
 export function createAdoptionRequest(
   client: ApiClient,

@@ -233,6 +233,40 @@ describe('F1-02 · "/adopciones" route enforces ADOPTIONS_MANAGEMENT_ROLES on a 
   });
 });
 
+describe('F1-01 · "Mis solicitudes" shows only to a Persona account (personaOnly)', () => {
+  function nav() {
+    return screen.getByRole('navigation', { name: 'Navegación principal' });
+  }
+
+  it('shows "Mis solicitudes" to a Persona (no org role), pointing at its own route', async () => {
+    renderShell({ route: '/', ...sessionWith([]) });
+    await waitFor(() =>
+      expect(within(nav()).getByRole('link', { name: 'Mis solicitudes' })).toHaveAttribute(
+        'href',
+        '/mis-solicitudes',
+      ),
+    );
+  });
+
+  it('hides "Mis solicitudes" from an org account, even one that can evaluate (Operator)', async () => {
+    renderShell({ route: '/', ...sessionWith([Role.Operator]) });
+    // An org-gated entry stays visible, proving the sidebar actually rendered…
+    await waitFor(() =>
+      expect(within(nav()).getByRole('link', { name: 'Adopciones' })).toBeInTheDocument(),
+    );
+    // …while "Mis solicitudes" is gone — this is a Persona-only surface.
+    expect(within(nav()).queryByRole('link', { name: 'Mis solicitudes' })).not.toBeInTheDocument();
+  });
+
+  it('hides "Mis solicitudes" from any other org role (e.g. ReadOnlyAuditor)', async () => {
+    renderShell({ route: '/', ...sessionWith([Role.ReadOnlyAuditor]) });
+    await waitFor(() =>
+      expect(within(nav()).getByRole('link', { name: 'Mi organización' })).toBeInTheDocument(),
+    );
+    expect(within(nav()).queryByRole('link', { name: 'Mis solicitudes' })).not.toBeInTheDocument();
+  });
+});
+
 describe('T-065 · "Transparencia" route redirects home (no stale "Ola 1" placeholder)', () => {
   it('redirects /transparencia to home for an org role — never shows "en construcción"/"Ola 1"', async () => {
     renderShell({ route: '/transparencia', ...sessionWith([Role.Owner]) });

@@ -122,6 +122,33 @@ export class AdoptionsService {
     return rows.map((r) => this.fromModel(r));
   }
 
+  /**
+   * The applicant's OWN adoption requests (F1-01), across every organization they
+   * applied to — cross-tenant via `adoption_requests_for_applicant` SECURITY
+   * DEFINER (by identity, not by tenant), same pattern as `donations_for_donor`
+   * (T-050/S1-02). Enriched with each request's org name (batch, anti-N+1) so
+   * "Mis solicitudes" doesn't show a raw id, mirroring `Donation.organizationName`.
+   */
+  async listMine(actor: RequestUser): Promise<AdoptionRequest[]> {
+    const rows = await this.prisma.$queryRaw<AdoptionRow[]>(Prisma.sql`
+      SELECT * FROM adoption_requests_for_applicant(${actor.id}::uuid)
+    `);
+    const orgNames = await this.organizationNamesById(rows.map((r) => r.organization_id));
+    return rows.map((r) => this.fromRow(r, orgNames.get(r.organization_id)));
+  }
+
+  private async organizationNamesById(ids: string[]): Promise<Map<string, string>> {
+    const uniqueIds = [...new Set(ids)];
+    if (uniqueIds.length === 0) {
+      return new Map();
+    }
+    const orgs = await this.prisma.organization.findMany({
+      where: { id: { in: uniqueIds } },
+      select: { id: true, name: true },
+    });
+    return new Map(orgs.map((org) => [org.id, org.name]));
+  }
+
   /** Move a request through the evaluation state machine, AUDITED (UTC). */
   async transition(
     actor: RequestUser,
@@ -190,10 +217,11 @@ export class AdoptionsService {
     return false;
   }
 
-  private fromRow(row: AdoptionRow): AdoptionRequest {
+  private fromRow(row: AdoptionRow, organizationName?: string): AdoptionRequest {
     return {
       id: row.id,
       organizationId: row.organization_id,
+      organizationName,
       animalId: row.animal_id,
       animalSnapshot: row.animal_snapshot,
       applicantUserId: row.applicant_user_id,

@@ -47,6 +47,16 @@ export class AdoptionsController {
     return this.service.listForOrg();
   }
 
+  /**
+   * The applicant's own requests (F1-01, "Mis solicitudes") — cross-tenant by
+   * identity, no role gate (any authenticated Persona), same pattern as
+   * `GET /donations/mine`.
+   */
+  @Get('mine')
+  listMine(@CurrentUser() actor: RequestUser): Promise<AdoptionRequest[]> {
+    return this.service.listMine(actor);
+  }
+
   /** Move a request through the evaluation state machine (audited). */
   @Post(':id/transitions')
   @UseGuards(RolesGuard)
