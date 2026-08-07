@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { RequireAuth, RequireRoles } from '../auth';
 import { AppLayout } from '../layout';
 import {
+  ADOPTIONS_MANAGEMENT_ROLES,
   ANIMAL_VIEW_ROLES,
   CAMPAIGNS_VIEW_ROLES,
   ORG_DOCUMENTS_ROLES,
@@ -100,8 +101,21 @@ export function AppRoutes() {
               authenticated shell's home moved to /inicio (nav entry updated to
               match). Not an index route anymore — there is no bare protected "". */}
           <Route path="inicio" element={<HomePage />} />
-          {/* M04 · adopciones (T-028a): tablero de evaluación (org) + solicitud (persona). */}
-          <Route path="adopciones" element={<AdoptionsKanbanPage />} />
+          {/* M04 · adopciones (T-028a): tablero de evaluación (org) + solicitud (persona).
+              F1-02: el tablero de evaluación solo tenía el gate del ITEM de nav (#86) —
+              tecleando la URL directo, cualquier autenticado entraba a la vista de gestión.
+              `ADOPTIONS_MANAGEMENT_ROLES` está calcada de `EVAL_ROLES` en
+              `adoptions.controller.ts` (`GET /adoptions`); reutilizada, no redefinida.
+              "Solicitar adopción" es de PERSONA (`POST /adoptions` sin `@Roles`, cualquier
+              autenticado) — se queda solo con `RequireAuth`, sin role-guard. */}
+          <Route
+            path="adopciones"
+            element={
+              <RequireRoles roles={ADOPTIONS_MANAGEMENT_ROLES}>
+                <AdoptionsKanbanPage />
+              </RequireRoles>
+            }
+          />
           <Route path="adopciones/solicitar" element={<AdoptionRequestPage />} />
           {/* F1-01: "Mis solicitudes" de la Persona — GET /adoptions/mine no tiene
               gate de rol (igual que /donaciones), así que esta ruta tampoco lleva
@@ -143,7 +157,13 @@ export function AppRoutes() {
               SEAM (donación de invitado): el gate de sesión es este <RequireAuth> padre.
               Si el cliente habilita checkout anónimo, mover ESTA ruta fuera del guard
               (o envolver DonatePage en un guard más suave) — cambio localizado, sin
-              tocar la lógica de donación. */}
+              tocar la lógica de donación.
+              F1-02: revisado contra el backend — `POST /donations` no lleva `@Roles`
+              (cualquier autenticado dona), así que esta ruta se queda sin role-guard,
+              igual que "Adopciones/solicitar". `GET /donations/received` (MANAGE_ROLES:
+              Owner/Administrador/Operador) SÍ es de gestión de org, pero aún no tiene
+              página/ruta en el frontend — no hay nada que gatear todavía; queda como
+              backlog propio (M05, no es cruce con Sebastián). */}
           <Route path="donaciones" element={<DonatePage />} />
           {/* M05/RF14 · certificate EMISSION mockup (T-053). Trust-flow step 2-3,
               reached from the real donation receipt. "Vista de diseño": no backend. */}

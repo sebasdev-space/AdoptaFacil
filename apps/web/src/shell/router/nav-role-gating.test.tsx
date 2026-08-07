@@ -203,6 +203,36 @@ describe('F-NAV-ADOPCIONES · "Adopciones" demands ADOPTIONS_MANAGEMENT_ROLES (d
   });
 });
 
+describe('F1-02 · "/adopciones" route enforces ADOPTIONS_MANAGEMENT_ROLES on a direct URL hit, not just the nav', () => {
+  it('denies the evaluation board to a Persona typing the URL directly (403 amigable, not a broken screen)', async () => {
+    renderShell({ route: '/adopciones', ...sessionWith([]) });
+    expect(await screen.findByText('Sin acceso')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Adopciones' })).not.toBeInTheDocument();
+  });
+
+  it('denies the board to an org role outside EVAL_ROLES (ReadOnlyAuditor) on a direct URL hit', async () => {
+    renderShell({ route: '/adopciones', ...sessionWith([Role.ReadOnlyAuditor]) });
+    expect(await screen.findByText('Sin acceso')).toBeInTheDocument();
+  });
+
+  it('renders the evaluation board for an EVAL_ROLES member (Operator)', async () => {
+    renderShell({ route: '/adopciones', ...sessionWith([Role.Operator]) });
+    expect(await screen.findByRole('heading', { name: 'Adopciones' })).toBeInTheDocument();
+  });
+
+  it('leaves "Solicitar adopción" (Persona-facing, POST /adoptions has no @Roles) reachable without an org role', async () => {
+    renderShell({ route: '/adopciones/solicitar', ...sessionWith([]) });
+    expect(await screen.findByRole('heading', { name: 'Solicitar adopción' })).toBeInTheDocument();
+    expect(screen.queryByText('Sin acceso')).not.toBeInTheDocument();
+  });
+
+  it('leaves "Donaciones" (Persona-facing, POST /donations has no @Roles) reachable without an org role', async () => {
+    renderShell({ route: '/donaciones', ...sessionWith([]) });
+    expect(await screen.findByRole('heading', { name: 'Mis donaciones' })).toBeInTheDocument();
+    expect(screen.queryByText('Sin acceso')).not.toBeInTheDocument();
+  });
+});
+
 describe('F1-01 · "Mis solicitudes" shows only to a Persona account (personaOnly)', () => {
   function nav() {
     return screen.getByRole('navigation', { name: 'Navegación principal' });
