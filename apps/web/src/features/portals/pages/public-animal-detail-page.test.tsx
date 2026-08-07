@@ -109,6 +109,37 @@ describe('PublicAnimalDetailPage', () => {
     expect(backLink.className).not.toContain('bg-primary');
   });
 
+  it('F-CTA-APADRINAR: shows an "Apadrinar" CTA linking to /apadrinar with the animal id and name', () => {
+    renderDetail({ state: { animal: ANIMAL } });
+
+    const cta = screen.getByTestId('sponsor-animal-cta');
+    const href = cta.getAttribute('href') ?? '';
+    expect(href).toContain('/apadrinar?');
+    expect(href).toContain('animalId=a1');
+    expect(href).toContain('animalName=Firulais');
+    // No org name resolved yet at this point — never a stale/generic value.
+    expect(href).not.toContain('organizationName');
+
+    // Secondary CTA (outline) — "Solicitar adopción" stays the sole solid/primary one.
+    expect(cta.className).not.toContain('bg-primary');
+  });
+
+  it('F-CTA-APADRINAR: includes organizationName in the href once the org profile resolves', async () => {
+    stubByUrl({ name: 'Fundación Patitas' }, { items: [ANIMAL], total: 1, limit: 50, offset: 0 });
+    renderDetail({ state: { animal: ANIMAL } });
+
+    await screen.findByRole('link', { name: 'Ver Fundación Patitas' });
+    const cta = screen.getByTestId('sponsor-animal-cta');
+    expect(cta.getAttribute('href') ?? '').toContain('organizationName=Fundaci%C3%B3n+Patitas');
+  });
+
+  it('F-CTA-APADRINAR: absent in the not-found state, same as "Solicitar adopción"', async () => {
+    stubAnimals({ items: [], total: 0, limit: 50, offset: 0 });
+    renderDetail();
+    await screen.findByText('Animal no encontrado');
+    expect(screen.queryByTestId('sponsor-animal-cta')).not.toBeInTheDocument();
+  });
+
   it('F-EDAD-DETALLE: shows the age via ageLabel() ("1 año"), same string AnimalCard renders — never raw totalMonths', () => {
     renderDetail({ state: { animal: ANIMAL_WITH_AGE } });
 

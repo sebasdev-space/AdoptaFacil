@@ -16,6 +16,7 @@ import { fetchPublicAnimals } from '../api/public-animals';
 import {
   ageLabel,
   buildAdoptionRequestHref,
+  buildSponsorHref,
   SEX_LABELS,
   SIZE_LABELS,
   SPECIES_LABELS,
@@ -43,6 +44,10 @@ interface AnimalNavState {
  * El botón "Solicitar adopción" enlaza al flujo de T-028a (Persona autenticada). La
  * ruta destino está bajo `RequireAuth`: sin sesión, returnTo a login y regreso al
  * animal (deny-by-default); con sesión, entra directo.
+ *
+ * F-CTA-APADRINAR: "Apadrinar" es el punto de entrada que pidió Sebastián hacia
+ * `/apadrinar` (M07/RF17, S2-03 — su dominio, ya funciona end-to-end). Solo el
+ * enlace, mismo mecanismo de `RequireAuth`/returnTo que "Solicitar adopción".
  *
  * F-LANDING-02: un animal se alcanza tanto desde el portal general (`/`, F-LANDING-01)
  * como desde el portal de su organización (`/o/:slug`) — por eso ofrece DOS salidas:
@@ -180,6 +185,19 @@ export function PublicAnimalDetailPage() {
                 </Link>
                 <p className="text-xs text-muted-foreground">
                   Necesitarás iniciar sesión como persona para enviar tu solicitud.
+                </p>
+              </div>
+
+              <div className="flex flex-col items-start gap-1">
+                <Link
+                  to={buildSponsorHref(animal, orgName ?? undefined)}
+                  className={cn(buttonVariants({ variant: 'outline' }))}
+                  data-testid="sponsor-animal-cta"
+                >
+                  Apadrinar
+                </Link>
+                <p className="text-xs text-muted-foreground">
+                  Apadrina a {animal.name} con un aporte mensual, sin necesidad de adoptarlo.
                 </p>
               </div>
             </CardContent>

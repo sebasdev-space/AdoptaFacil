@@ -60,6 +60,25 @@ export function buildAdoptionRequestHref(
   return `/adopciones/solicitar?${params.toString()}`;
 }
 
+/**
+ * Enlace al flujo de APADRINAMIENTO (M07/RF17, S2-03 — dominio de Sebastián). La
+ * página `/apadrinar` (`useSponsorTarget`) espera EXACTAMENTE animalId y, opcional,
+ * animalName/organizationName (solo presentación; no organizationId — el backend
+ * resuelve la org desde el animal). No se reimplementa su lógica; solo se enlaza.
+ * La ruta está bajo `RequireAuth` → sin sesión, returnTo a login y regreso al flujo
+ * con el animal preservado (mismo mecanismo que `buildAdoptionRequestHref`).
+ */
+export function buildSponsorHref(
+  animal: Pick<AnimalSummary, 'id' | 'name'>,
+  organizationName?: string,
+): string {
+  const params = new URLSearchParams({ animalId: animal.id, animalName: animal.name });
+  if (organizationName) {
+    params.set('organizationName', organizationName);
+  }
+  return `/apadrinar?${params.toString()}`;
+}
+
 /** Enlace al detalle PÚBLICO del animal dentro del portal de la organización. */
 export function publicAnimalDetailHref(slug: string, animalId: string): string {
   return `/o/${encodeURIComponent(slug)}/animales/${encodeURIComponent(animalId)}`;
