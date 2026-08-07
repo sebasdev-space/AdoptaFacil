@@ -13,6 +13,7 @@ import {
   type CreateSponsorshipInput,
   type Paginated,
   type Sponsorship,
+  type SponsorshipPeriodicity,
   SponsorshipStatus,
   type SponsorshipStatusHistoryEntry,
 } from '@adoptafacil/contracts';
@@ -36,6 +37,25 @@ interface SponsorshipRawRow {
   suspended_at: Date | null;
   cancelled_at: Date | null;
   created_at: Date;
+}
+
+/** One JSONB element returned by `sponsorships_for_sponsor(...)` (S2-03) —
+ *  already camelCase (built with `jsonb_build_object` in the function itself). */
+interface SponsorshipMineRow {
+  id: string;
+  organizationId: string;
+  planId: string;
+  planName: string;
+  planAmount: number;
+  planPeriodicity: SponsorshipPeriodicity;
+  animalId: string;
+  animalName: string;
+  sponsorUserId: string;
+  status: string;
+  startedAt: string;
+  suspendedAt: string | null;
+  cancelledAt: string | null;
+  createdAt: string;
 }
 
 /** ORM reads (tx.sponsorship.*) already come back camelCase via Prisma's @map. */
@@ -67,6 +87,28 @@ function fromRawRow(row: SponsorshipRawRow): Sponsorship {
     suspendedAt: row.suspended_at?.toISOString(),
     cancelledAt: row.cancelled_at?.toISOString(),
     createdAt: row.created_at.toISOString(),
+  };
+}
+
+/** `sponsorships_for_sponsor(...)` JSONB row → contract shape, enriched with
+ *  `organizationName` (resolved separately, see {@link SponsorshipsService.organizationNamesById}). */
+function toMine(row: SponsorshipMineRow, organizationName: string | undefined): Sponsorship {
+  return {
+    id: row.id,
+    organizationId: row.organizationId,
+    organizationName,
+    planId: row.planId,
+    planName: row.planName,
+    planAmount: row.planAmount,
+    planPeriodicity: row.planPeriodicity,
+    animalId: row.animalId,
+    animalName: row.animalName,
+    sponsorUserId: row.sponsorUserId,
+    status: row.status as SponsorshipStatus,
+    startedAt: row.startedAt,
+    suspendedAt: row.suspendedAt ?? undefined,
+    cancelledAt: row.cancelledAt ?? undefined,
+    createdAt: row.createdAt,
   };
 }
 
@@ -130,6 +172,35 @@ export class SponsorshipsService {
       metadata: { planId: input.planId },
     });
     return fromRawRow(row);
+  }
+
+  /**
+   * The sponsor's (padrino) own sponsorships (cross-tenant via SECURITY DEFINER,
+   * by identity) — "mis apadrinamientos" (S2-03). A sponsor is never a member of
+   * the sponsored org, so this cannot go through the regular RLS-scoped `list`
+   * (see that method's doc). Enriched with the beneficiary org's display name via
+   * a second, batched lookup (same technique as `DonationsService.listMine`);
+   * plan/animal names are already resolved inside the SQL function itself.
+   */
+  async listMine(actor: RequestUser): Promise<Sponsorship[]> {
+    const rows = await this.prisma.$queryRaw<Array<{ data: SponsorshipMineRow[] }>>(
+      Prisma.sql`SELECT sponsorships_for_sponsor(${actor.id}::uuid) AS data`,
+    );
+    const items = rows[0]?.data ?? [];
+    const orgNames = await this.organizationNamesById(items.map((r) => r.organizationId));
+    return items.map((r) => toMine(r, orgNames.get(r.organizationId)));
+  }
+
+  private async organizationNamesById(ids: string[]): Promise<Map<string, string>> {
+    const uniqueIds = [...new Set(ids)];
+    if (uniqueIds.length === 0) {
+      return new Map();
+    }
+    const orgs = await this.prisma.organization.findMany({
+      where: { id: { in: uniqueIds } },
+      select: { id: true, name: true },
+    });
+    return new Map(orgs.map((org) => [org.id, org.name]));
   }
 
   /** Paginated list of the caller's org sponsorships, newest first; optional filters. */

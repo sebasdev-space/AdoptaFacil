@@ -47,6 +47,21 @@ export const CAMPAIGNS_VIEW_ROLES = [
 ] as const;
 
 /**
+ * S2-03 — gestión interna de apadrinamientos recibidos en
+ * `/organizacion/apadrinamientos` (SponsorshipsPage). Copiado VERBATIM de
+ * `SponsorshipsController`'s `VIEW_ROLES` (`GET /sponsorships`): a diferencia
+ * de {@link CAMPAIGNS_VIEW_ROLES}, aquí NO hay Operator — solo
+ * Owner/Administrator gestionan y ven, + ReadOnlyAuditor solo ve. Hallazgo
+ * documentado en el reporte de cierre de S2-03 (el spec original asumía
+ * Operator también).
+ */
+export const SPONSORSHIP_VIEW_ROLES = [
+  Role.Owner,
+  Role.Administrator,
+  Role.ReadOnlyAuditor,
+] as const;
+
+/**
  * F-NAV-ADOPCIONES (AUD-F1 finding): "Adopciones" had NO role gate at all —
  * any authenticated user, including a Persona with no org, saw the entry and
  * landed on the org's evaluation kanban (empty, meaningless to them). Copied
@@ -116,6 +131,10 @@ export const navItems: NavItem[] = [
     roles: ADOPTIONS_MANAGEMENT_ROLES,
   },
   { path: '/donaciones', label: 'Donaciones', icon: HeartIcon },
+  // M07 · "mis apadrinamientos" (S2-03, RF17) — apadrinar/ver el propio historial,
+  // sin @Roles en el backend (`POST /sponsorships`, `GET /sponsorships/mine`),
+  // igual que Donaciones arriba: visible a cualquier usuario autenticado.
+  { path: '/apadrinar', label: 'Mis apadrinamientos', icon: HeartIcon },
   // S2-01: "Campañas" RESTORED — T-065 removed it because the link pointed at
   // the PUBLIC portal route and exited the shell; the in-shell management
   // screen (/organizacion/campanas) now exists, so the entry points there
@@ -127,6 +146,15 @@ export const navItems: NavItem[] = [
     label: 'Campañas',
     icon: MegaphoneIcon,
     roles: CAMPAIGNS_VIEW_ROLES,
+  },
+  // M07 · apadrinamientos RECIBIDOS por la organización (S2-03, RF17). Gated a
+  // SPONSORSHIP_VIEW_ROLES — calcado VERBATIM de `SponsorshipsController`'s
+  // VIEW_ROLES (sin Operator, a diferencia de Campañas; ver comentario ahí).
+  {
+    path: '/organizacion/apadrinamientos',
+    label: 'Apadrinamientos',
+    icon: HeartIcon,
+    roles: SPONSORSHIP_VIEW_ROLES,
   },
   // T-065: "Transparencia" REMOVED from the menu entirely — the screen was only
   // ever a placeholder ("se implementará en la Ola 1..."); the REAL transparency
