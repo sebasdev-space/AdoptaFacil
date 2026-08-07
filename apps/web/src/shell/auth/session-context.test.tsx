@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Role } from '@adoptafacil/contracts';
 import { MockAuthApi } from '../api';
 import { SessionProvider, useSession } from './session-context';
 import { renderShell } from '../../test-utils';
@@ -85,8 +86,23 @@ describe('SessionProvider — session state without browser storage', () => {
 describe('logout redirects protected routes', () => {
   it('sends the user to /login after signing out', async () => {
     const user = userEvent.setup();
-    // Bootstrap an authenticated session inside the real shell.
-    renderShell({ route: '/adopciones', session: { initialStatus: 'authenticated' } });
+    // Bootstrap an authenticated session inside the real shell. "/adopciones" is
+    // role-gated at the route level (F1-02), so this needs an eval role explicitly —
+    // the default mock session carries none.
+    renderShell({
+      route: '/adopciones',
+      session: {
+        initialStatus: 'authenticated',
+        initialUser: {
+          id: 'usr_mock_1',
+          name: 'Equipo AdoptaFácil',
+          email: 'equipo@adoptafacil.org',
+          roles: [Role.Owner],
+          organizationId: 'org_mock_1',
+          accountType: 'organization',
+        },
+      },
+    });
     expect(screen.getByRole('heading', { name: 'Adopciones' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Cerrar sesión' }));

@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
+import { Role } from '@adoptafacil/contracts';
 import { AppProviders } from '../app-providers';
 import { AppRoutes } from './routes';
 import { renderShell } from '../../test-utils';
@@ -67,8 +68,23 @@ describe('routing — public vs protected', () => {
     expect(screen.queryByText('Estado del sistema')).not.toBeInTheDocument();
   });
 
-  it('renders a protected module route when authenticated', () => {
-    renderShell({ route: '/adopciones', session: { initialStatus: 'authenticated' } });
+  it('renders a protected module route when authenticated with the required role (F1-02)', () => {
+    // "/adopciones" is now role-gated at the route level (F1-02, ADOPTIONS_MANAGEMENT_ROLES) —
+    // the default mock session carries no roles, so this needs an eval role explicitly.
+    renderShell({
+      route: '/adopciones',
+      session: {
+        initialStatus: 'authenticated',
+        initialUser: {
+          id: 'usr_mock_1',
+          name: 'Equipo AdoptaFácil',
+          email: 'equipo@adoptafacil.org',
+          roles: [Role.Owner],
+          organizationId: 'org_mock_1',
+          accountType: 'organization',
+        },
+      },
+    });
     expect(screen.getByRole('heading', { name: 'Adopciones' })).toBeInTheDocument();
   });
 
