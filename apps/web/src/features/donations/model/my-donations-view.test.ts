@@ -22,9 +22,18 @@ describe('normalizeDonations (T-064, T-028c guard)', () => {
 });
 
 describe('organizationLabel', () => {
-  it('shows a short, stable identifier — never a fabricated name', () => {
-    const donation: Pick<Donation, 'organizationId'> = {
+  it('F2-03: shows the REAL organization name when the backend resolves it (S1-02)', () => {
+    const donation: Pick<Donation, 'organizationId' | 'organizationName'> = {
       organizationId: '08d734c6-1900-4bf4-b3e5-d6468479cf8b',
+      organizationName: 'Refugio Patitas',
+    };
+    expect(organizationLabel(donation)).toBe('Refugio Patitas');
+  });
+
+  it('falls back to a short, stable identifier when the name is absent — never fabricated', () => {
+    const donation: Pick<Donation, 'organizationId' | 'organizationName'> = {
+      organizationId: '08d734c6-1900-4bf4-b3e5-d6468479cf8b',
+      organizationName: undefined,
     };
     expect(organizationLabel(donation)).toBe('Organización #08d734c6');
   });

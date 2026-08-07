@@ -7,14 +7,26 @@ import { buttonVariants, cn } from '@adoptafacil/ui';
  * resuelta por query param — EXACTAMENTE el mecanismo que espera la página de
  * donación (`useDonationTarget`: organizationId + organizationName). No se
  * reimplementa la resolución de org; solo se le pasa.
+ *
+ * F2-03: logoUrl/ciudad/NIT viajan también, cuando el `OrganizationPublic` ya
+ * cargado en el portal los trae — solo presentación en el checkout, opcionales
+ * (mismo patrón que `photoUrl` en `buildAdoptionRequestHref`). El NIT es un
+ * dato PÚBLICO una vez formalizada la org (`organization_public()`, expuesto
+ * en este mismo endpoint que el portal ya consume) — nada nuevo se expone que
+ * el visitante del portal no viera ya en esta misma página.
  */
-export function buildDonateHref(org: Pick<OrganizationPublic, 'id' | 'name'>): string {
+export function buildDonateHref(
+  org: Pick<OrganizationPublic, 'id' | 'name' | 'logoUrl' | 'nit' | 'location'>,
+): string {
   const params = new URLSearchParams({ organizationId: org.id, organizationName: org.name });
+  if (org.logoUrl) params.set('organizationLogoUrl', org.logoUrl);
+  if (org.nit) params.set('organizationNit', org.nit);
+  if (org.location?.city) params.set('organizationCity', org.location.city);
   return `/donaciones?${params.toString()}`;
 }
 
 export interface PortalDonateCtaProps {
-  organization: Pick<OrganizationPublic, 'id' | 'name'>;
+  organization: Pick<OrganizationPublic, 'id' | 'name' | 'logoUrl' | 'nit' | 'location'>;
 }
 
 /**

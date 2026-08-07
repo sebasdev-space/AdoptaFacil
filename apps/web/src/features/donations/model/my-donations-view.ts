@@ -27,12 +27,18 @@ export const DONATION_STATUS_BADGE_VARIANT: Record<DonationStatus, BadgeProps['v
 };
 
 /**
- * Etiqueta de la organización beneficiaria. `Donation` SOLO trae
- * `organizationId` (sin nombre) — no hay endpoint que resuelva id→nombre para
- * una organización arbitraria (solo por slug, y el donante no lo tiene aquí).
- * Gap real, documentado (no se fabrica un nombre): se muestra un identificador
- * corto y estable en vez de un UUID completo.
+ * Etiqueta de la organización beneficiaria. `GET /donations/mine` SÍ resuelve
+ * `organizationName` (S1-02, batch anti-N+1 en `DonationsService.listMine`,
+ * mismo patrón que `AdoptionRequest.organizationName` de F1-01) — el id
+ * truncado queda solo como fallback defensivo (p. ej. una org borrada), nunca
+ * la ruta normal.
+ *
+ * F2-03: este era un gap real hasta ahora — el contrato y el backend ya
+ * traían el nombre, pero esta función lo ignoraba y fabricaba siempre el
+ * identificador corto, incluso cuando el nombre real estaba disponible.
  */
-export function organizationLabel(donation: Pick<Donation, 'organizationId'>): string {
-  return `Organización #${donation.organizationId.slice(0, 8)}`;
+export function organizationLabel(
+  donation: Pick<Donation, 'organizationId' | 'organizationName'>,
+): string {
+  return donation.organizationName ?? `Organización #${donation.organizationId.slice(0, 8)}`;
 }

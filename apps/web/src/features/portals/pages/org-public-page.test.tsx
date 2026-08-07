@@ -107,6 +107,27 @@ describe('OrgPublicPage — rich public portal', () => {
     expect(href).toContain('organizationName=Refugio+Patitas');
   });
 
+  it('F2-03: the "Donar" CTA also carries city/NIT (both real, already public on this same page)', async () => {
+    renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+    await screen.findByRole('heading', { name: /Refugio Patitas/ });
+
+    const href = screen.getByTestId('portal-donate-cta').getAttribute('href') ?? '';
+    expect(href).toContain(`organizationCity=${encodeURIComponent('Bogotá')}`);
+    expect(href).toContain('organizationNit=900123456-7');
+  });
+
+  it('F2-03: omits city/NIT/logo from the "Donar" CTA when the org does not have them (never fabricated)', async () => {
+    const { nit: _nit, location: _location, ...withoutExtras } = ORG;
+    stubFetch({ org: withoutExtras });
+    renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+    await screen.findByRole('heading', { name: /Refugio Patitas/ });
+
+    const href = screen.getByTestId('portal-donate-cta').getAttribute('href') ?? '';
+    expect(href).not.toContain('organizationCity');
+    expect(href).not.toContain('organizationNit');
+    expect(href).not.toContain('organizationLogoUrl');
+  });
+
   it('does NOT mount the still-placeholder aggregated sections (no empty "Próximamente")', async () => {
     renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
     await screen.findByRole('heading', { name: /Refugio Patitas/ });
