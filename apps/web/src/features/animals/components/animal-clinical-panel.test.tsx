@@ -85,7 +85,7 @@ describe('AnimalClinicalPanel — Registro tab (regresión, pre-existing behavio
     render(providers([Role.Veterinarian], <AnimalClinicalPanel animalId="animal-1" />));
 
     const registro = await screen.findByRole('tabpanel', { name: 'Registro' });
-    expect(within(registro).getByText('Cirugía')).toBeInTheDocument();
+    expect(await within(registro).findByText('Cirugía')).toBeInTheDocument();
     expect(within(registro).getByText('v1')).toBeInTheDocument();
   });
 
@@ -93,7 +93,7 @@ describe('AnimalClinicalPanel — Registro tab (regresión, pre-existing behavio
     stubFetch(() => []);
     render(providers([Role.Owner], <AnimalClinicalPanel animalId="animal-1" />));
     const registro = await screen.findByRole('tabpanel', { name: 'Registro' });
-    expect(within(registro).getByText('Sin eventos clínicos.')).toBeInTheDocument();
+    expect(await within(registro).findByText('Sin eventos clínicos.')).toBeInTheDocument();
   });
 });
 
@@ -112,7 +112,7 @@ describe('AnimalClinicalPanel — Carnet tab (S2-04B-2)', () => {
     await user.click(await screen.findByRole('tab', { name: 'Carnet' }));
 
     const carnet = await screen.findByRole('tabpanel', { name: 'Carnet' });
-    expect(within(carnet).getByText('Vacuna')).toBeInTheDocument();
+    expect(await within(carnet).findByText('Vacuna')).toBeInTheDocument();
     expect(within(carnet).getByText('Autor: Dra. Ana')).toBeInTheDocument();
     expect(within(carnet).getByRole('button', { name: /Descargar carnet/ })).toBeInTheDocument();
   });
@@ -126,7 +126,7 @@ describe('AnimalClinicalPanel — Carnet tab (S2-04B-2)', () => {
 
     const carnet = await screen.findByRole('tabpanel', { name: 'Carnet' });
     expect(
-      within(carnet).getByText('Sin eventos clínicos registrados todavía.'),
+      await within(carnet).findByText('Sin eventos clínicos registrados todavía.'),
     ).toBeInTheDocument();
   });
 });
