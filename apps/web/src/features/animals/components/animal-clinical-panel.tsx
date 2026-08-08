@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
+  type Animal,
   type ClinicalCarnetEntry,
   type ClinicalEvent,
   ClinicalEventType,
+  type ComputedAge,
   type CreateClinicalEventInput,
   Role,
 } from '@adoptafacil/contracts';
@@ -40,6 +42,111 @@ function formatCO(iso?: string): string {
   return iso ? new Date(iso).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' }) : '—';
 }
 
+/** Same derivation shown in `animals-page.tsx`'s `ageLabel` — duplicated
+ *  feature-locally (project convention, see `formatCop`/`formatBogota`)
+ *  rather than shared, since it's a 6-line label with no real drift risk. */
+function ageLabel(age?: ComputedAge): string {
+  if (!age) return 'Edad desconocida';
+  const parts: string[] = [];
+  if (age.years > 0) parts.push(`${age.years} a`);
+  if (age.months > 0) parts.push(`${age.months} m`);
+  const text = parts.join(' ') || '0 m';
+  return age.approximate ? `~${text}` : text;
+}
+
+/** S2-04B-2-REV — foto/nombre/edad header for the "Carnet" tab, requested
+ *  8-ago and confirmed missing by this task's own verification step. Fetches
+ *  the animal record directly (same `VIEW_ROLES` as the clinical endpoints,
+ *  see `animals.controller.ts`) rather than requiring the parent route to
+ *  pass it down, since `AnimalClinicalPanel` is embedded by `animalId` only. */
+function CarnetHeader({ animal }: { animal: Animal | null }) {
+  if (!animal) return <Skeleton className="h-16 w-full" />;
+  const photo = animal.photos[0];
+  return (
+    <div className="flex items-center gap-4">
+      {photo ? (
+        <img
+          src={photo}
+          alt={`Foto de ${animal.name}`}
+          className="h-16 w-16 shrink-0 rounded-full border border-border object-cover"
+        />
+      ) : (
+        <div
+          aria-hidden
+          className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-muted text-lg font-semibold text-muted-foreground"
+        >
+          {animal.name.charAt(0).toUpperCase()}
+        </div>
+      )}
+      <div>
+        <p className="text-base font-semibold text-foreground">{animal.name}</p>
+        <p className="text-sm text-muted-foreground">{ageLabel(animal.computedAge)}</p>
+      </div>
+    </div>
+  );
+}
+
+/** Expandable "ver ediciones anteriores" for one carnet entry (S2-04B-2-REV
+ *  gap: `.../clinical-events/:eventId/history` already existed but no
+ *  frontend consumed it). Only rendered when `entry.version > 1`, so a
+ *  never-edited event never offers a confusing empty history. History comes
+ *  back oldest-first, already ordered by the backend — not re-sorted here. */
+function EventHistory({ animalId, entry }: { animalId: string; entry: ClinicalCarnetEntry }) {
+  const client = useApiClient();
+  const [open, setOpen] = useState(false);
+  const [history, setHistory] = useState<ClinicalEvent[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const toggle = async (): Promise<void> => {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    setOpen(true);
+    if (history) return;
+    setLoading(true);
+    try {
+      const list = await client.request<ClinicalEvent[]>(
+        `/animals/${animalId}/clinical-events/${entry.eventId}/history`,
+      );
+      setHistory(list);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (entry.version <= 1) return null;
+
+  return (
+    <div className="mt-1">
+      <button
+        type="button"
+        onClick={() => void toggle()}
+        className="text-xs font-medium text-primary underline-offset-2 hover:underline"
+      >
+        {open ? 'Ocultar ediciones anteriores' : 'Ver ediciones anteriores'}
+      </button>
+      {open && (
+        <ul className="mt-2 space-y-2 border-l border-dashed border-muted pl-3">
+          {loading && <Skeleton className="h-10 w-full" />}
+          {!loading &&
+            history
+              ?.filter((version) => version.id !== entry.id)
+              .map((version) => (
+                <li key={version.id} className="text-xs text-muted-foreground">
+                  <Badge variant="secondary" className="mr-1">
+                    v{version.version}
+                  </Badge>
+                  {TYPE_LABELS[version.type]} · {formatCO(version.occurredAt)}
+                  {version.nextDueDate && ` · Próxima: ${formatCO(version.nextDueDate)}`}
+                </li>
+              ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export interface AnimalClinicalPanelProps {
   animalId: string;
 }
@@ -66,6 +173,10 @@ export function AnimalClinicalPanel({ animalId }: AnimalClinicalPanelProps) {
   const [carnet, setCarnet] = useState<ClinicalCarnetEntry[]>([]);
   const [carnetLoading, setCarnetLoading] = useState(true);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  // S2-04B-2-REV — Carnet header (foto/nombre/edad), fetched independently of
+  // both `events` and `carnet` above (regresión cero on either).
+  const [animal, setAnimal] = useState<Animal | null>(null);
 
   const base = `/animals/${animalId}/clinical-events`;
 
@@ -109,6 +220,22 @@ export function AnimalClinicalPanel({ animalId }: AnimalClinicalPanelProps) {
       active = false;
     };
   }, [client, base]);
+
+  useEffect(() => {
+    let active = true;
+    void client
+      .request<Animal>(`/animals/${animalId}`)
+      .then((data) => {
+        if (active) setAnimal(data);
+      })
+      .catch(() => {
+        // Header is a nice-to-have alongside the timeline; a failed fetch
+        // here must not block Registro/Carnet (regresión cero).
+      });
+    return () => {
+      active = false;
+    };
+  }, [client, animalId]);
 
   async function handleDownloadPdf(): Promise<void> {
     setDownloadingPdf(true);
@@ -241,6 +368,8 @@ export function AnimalClinicalPanel({ animalId }: AnimalClinicalPanelProps) {
             </TabsContent>
 
             <TabsContent value="carnet" className="mt-4 space-y-4">
+              <CarnetHeader animal={animal} />
+
               <Button
                 variant="outline"
                 size="sm"
@@ -271,6 +400,7 @@ export function AnimalClinicalPanel({ animalId }: AnimalClinicalPanelProps) {
                           📎 {entry.attachments.length} adjunto(s)
                         </p>
                       )}
+                      <EventHistory animalId={animalId} entry={entry} />
                     </li>
                   ))}
                 </ol>
