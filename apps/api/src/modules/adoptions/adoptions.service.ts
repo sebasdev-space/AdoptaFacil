@@ -6,6 +6,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import type {
   AdoptionAnimalSnapshot,
@@ -23,7 +24,12 @@ import {
   type NotificationPort,
 } from '../../core/notifications/notification.port';
 import type { RequestUser } from '../../core/auth/auth.types';
+import type { Env } from '../../config/env.validation';
 import { checkAdoptionTransition } from './adoption-status';
+import {
+  buildAdoptionStatusEmailBody,
+  buildAdoptionStatusEmailSubject,
+} from './adoption-request-email';
 
 /** Shape returned by the `create_adoption_request` SQL function (snake_case). */
 interface AdoptionRow {
@@ -47,13 +53,17 @@ type AdoptionModel = Prisma.AdoptionRequestGetPayload<Record<string, never>>;
 @Injectable()
 export class AdoptionsService {
   private readonly logger = new Logger('Adoptions');
+  private readonly webBaseUrl: string;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenant: TenantContextService,
     private readonly audit: AuditService,
     @Inject(NOTIFICATION_PORT) private readonly notifications: NotificationPort,
-  ) {}
+    config: ConfigService<Env, true>,
+  ) {
+    this.webBaseUrl = config.get('WEB_BASE_URL', { infer: true });
+  }
 
   private requireOrgId(): string {
     const organizationId = this.tenant.getOrganizationId();
@@ -185,19 +195,31 @@ export class AdoptionsService {
       return next;
     });
 
-    await this.notifyApplicant(updated);
+    // Nombre real de la org para el correo (F-CORREO-ADOPCION) — mismo helper
+    // batch anti-N+1 que ya usa `fromRow`/`listMine`, un solo id aquí.
+    const organizationName = (await this.organizationNamesById([organizationId])).get(
+      organizationId,
+    );
+    await this.notifyApplicant(updated, organizationName);
     return this.fromModel(updated);
   }
 
   /** Best-effort applicant notification behind the simulable NotificationPort. */
-  private async notifyApplicant(row: AdoptionModel): Promise<void> {
+  private async notifyApplicant(row: AdoptionModel, organizationName?: string): Promise<void> {
     const applicant = row.applicant as unknown as AdoptionApplicant;
     const snapshot = row.animalSnapshot as unknown as AdoptionAnimalSnapshot;
+    const emailInput = {
+      applicantName: applicant.fullName,
+      animalName: snapshot.name,
+      organizationName,
+      status: row.status as AdoptionStatus,
+      webBaseUrl: this.webBaseUrl,
+    };
     try {
       await this.notifications.send({
         to: applicant.email,
-        subject: `Tu solicitud de adopción de ${snapshot.name}`,
-        body: `El estado de tu solicitud cambió a: ${row.status}.`,
+        subject: buildAdoptionStatusEmailSubject(emailInput),
+        body: buildAdoptionStatusEmailBody(emailInput),
       });
     } catch (error) {
       this.logger.warn(`No se pudo notificar al solicitante: ${(error as Error).message}`);
