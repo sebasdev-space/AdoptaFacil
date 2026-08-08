@@ -1,6 +1,6 @@
 import { Badge, Card, CardContent, CardHeader, CardTitle } from '@adoptafacil/ui';
 import { formatBogota, formatCop, type MockCertificate } from '../model/mock-certificate';
-import { SampleQr } from './sample-qr';
+import { CertificateQr } from './certificate-qr';
 
 export interface CertificateDocumentProps {
   certificate: MockCertificate;
@@ -25,7 +25,8 @@ export function CertificateDocument({ certificate }: CertificateDocumentProps) {
           <Badge variant="success">ESAL · RTE vigente</Badge>
         </div>
         <p className="text-sm text-muted-foreground">
-          {certificate.organizationName} · NIT {certificate.organizationNit}
+          {certificate.organizationName}
+          {certificate.organizationNit && ` · NIT ${certificate.organizationNit}`}
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -58,8 +59,10 @@ export function CertificateDocument({ certificate }: CertificateDocumentProps) {
             </p>
           </div>
           <div className="flex flex-col items-center gap-1">
-            <SampleQr />
-            <span className="text-xs text-muted-foreground">Escanéalo para verificar</span>
+            <CertificateQr />
+            <span className="text-xs text-muted-foreground">
+              Escanéalo para visitar AdoptaFácil
+            </span>
           </div>
         </div>
       </CardContent>

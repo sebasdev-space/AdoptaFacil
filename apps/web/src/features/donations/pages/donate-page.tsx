@@ -156,14 +156,19 @@ export function DonatePage() {
                 title="¡Gracias por tu donación!"
                 description={`Registramos tu donación de ${formatCop(done.amountCharged)}. Cuando el pago se confirme, te emitiremos el recibo automáticamente.`}
               />
-              {/* Empalme al recorrido del certificado (§M05/RF14, T-053). Solo un
-                  ENLACE: la lógica de donación no cambia. Lleva la donación real +
-                  el nombre de la org (T-066, ya en scope como `target.organizationName`)
-                  por nav-state para reflejar datos reales en la maqueta del certificado. */}
+              {/* Empalme al recorrido del certificado (§M05/RF14, T-053 → F-CERT-REAL).
+                  Solo un ENLACE: la lógica de donación no cambia. Lleva la donación real +
+                  el nombre de la org (T-066) + su NIT real si está disponible (F2-03, ya
+                  en scope como `target.organizationNit`) por nav-state para reflejar
+                  datos reales en la maqueta del certificado. */}
               <div className="flex flex-col items-center gap-1 text-center">
                 <Link
                   to="/certificado"
-                  state={{ donation: done, organizationName: target.organizationName }}
+                  state={{
+                    donation: done,
+                    organizationName: target.organizationName,
+                    organizationNit: target.organizationNit,
+                  }}
                   className={cn(buttonVariants())}
                   data-testid="view-certificate-cta"
                 >

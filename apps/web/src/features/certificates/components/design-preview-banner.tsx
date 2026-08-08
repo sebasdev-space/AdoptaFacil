@@ -7,10 +7,16 @@ export interface DesignPreviewBannerProps {
 
 /**
  * Etiqueta "VISTA DE DISEÑO" reutilizable para las pantallas MAQUETADAS del pitch
- * (T-053, pasos 2-5 del flujo de confianza). Deja explícito y honesto que la
- * pantalla es un ANTICIPO del RF14 y aún no es funcional — la donación real (paso 1)
- * NUNCA lleva esta etiqueta. Es la superficie compartida por toda maqueta
+ * (T-053 → F-CERT-REAL, pasos 2-5 del flujo de confianza). Deja explícito y honesto
+ * que la pantalla es un ANTICIPO del RF14 y aún no es funcional — la donación real
+ * (paso 1) NUNCA lleva esta etiqueta. Es la superficie compartida por toda maqueta
  * institucional; reutilizar en lugar de duplicar el aviso.
+ *
+ * F-CERT-REAL (aprobado por Sebastián, 7-ago; copy del acuse): antes decía que
+ * "los datos... son de muestra", pero desde este cambio org/donante/monto SON
+ * reales — el copy se ajusta para no desmentir eso. Lo que sigue sin funcionar es
+ * la VERIFICACIÓN pública (código/hash de muestra, sin backend) — nunca dar a
+ * entender que valida contra un servidor.
  *
  * F1-03-COMPLETO: el borde punteado usaba `border-warning/50`, que contra este
  * fondo casi blanco no pasa 3:1 (WCAG UI) ni siquiera a opacidad 100% (`--warning`
@@ -27,8 +33,8 @@ export function DesignPreviewBanner({ detail }: DesignPreviewBannerProps) {
     >
       <Badge variant="warning">Vista de diseño</Badge>
       <span>
-        Anticipo del certificado de donación. {detail ?? 'Aún no es funcional:'} los datos, el
-        código y el QR son de muestra.
+        Anticipo del certificado de donación. {detail ?? 'Certificado de presentación:'} los datos
+        (organización, donante y monto) son reales; la verificación pública aún no es funcional.
       </span>
     </div>
   );
