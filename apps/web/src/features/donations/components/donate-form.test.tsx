@@ -40,6 +40,14 @@ describe('DonateForm', () => {
     expect(Math.abs(digits(screen.getByTestId('breakdown-net')) - 50000)).toBeLessThanOrEqual(2);
   });
 
+  it('F-NOMENCLATURA: shows "Apoyo de sostenimiento a AdoptaFácil", not "Comisión AdoptaFácil" (indicación fiscal)', () => {
+    render(<DonateForm organizationName="Refugio Patitas" onDonate={vi.fn()} />);
+    fireEvent.change(screen.getByPlaceholderText('50000'), { target: { value: '50000' } });
+
+    expect(screen.getByText('Apoyo de sostenimiento a AdoptaFácil (4%)')).toBeInTheDocument();
+    expect(screen.queryByText(/Comisión AdoptaFácil/i)).not.toBeInTheDocument();
+  });
+
   it('submits the intended amount and the chosen commission payer', () => {
     const onDonate = vi.fn();
     render(<DonateForm organizationName="Refugio Patitas" onDonate={onDonate} />);
