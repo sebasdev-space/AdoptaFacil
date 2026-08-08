@@ -316,3 +316,128 @@ describe('AnimalsPage — importación masiva desde Excel (S2-04B-1)', () => {
     expect(createObjectURL).toHaveBeenCalled();
   });
 });
+
+describe('AnimalsPage — activar apadrinamiento desde la ficha (S2-03-REV)', () => {
+  it('hides the "Apadrinamiento" action from an Operator (narrower than canManage)', async () => {
+    stubFetch((url) => {
+      if (url.includes('/animals/breeds')) return [];
+      if (url.includes('/animals')) return [animal('a1', 'Firulais')];
+      return [];
+    });
+    renderShell({ route: '/animales', ...sessionWith([Role.Operator]) });
+
+    await screen.findByText('Firulais');
+    expect(screen.queryByRole('button', { name: /Apadrinamiento/ })).not.toBeInTheDocument();
+  });
+
+  it('lets an Owner create a plan for an animal with none yet', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    let created = false;
+    stubFetch((url, init) => {
+      calls.push({ url, init });
+      if (url.includes('/animals/breeds')) return [];
+      if (init?.method === 'POST' && url.includes('/sponsorship-plans')) {
+        created = true;
+        return {
+          id: 'plan-1',
+          organizationId: 'org-1',
+          animalId: 'a1',
+          name: 'Apadrinamiento mensual',
+          amount: 25000,
+          periodicity: 'monthly',
+          isActive: true,
+          createdAt: '2026-08-08T00:00:00.000Z',
+        };
+      }
+      if (url.includes('/sponsorship-plans')) {
+        return {
+          items: created
+            ? [
+                {
+                  id: 'plan-1',
+                  organizationId: 'org-1',
+                  animalId: 'a1',
+                  name: 'Apadrinamiento mensual',
+                  amount: 25000,
+                  periodicity: 'monthly',
+                  isActive: true,
+                  createdAt: '2026-08-08T00:00:00.000Z',
+                },
+              ]
+            : [],
+          total: created ? 1 : 0,
+          limit: 1,
+          offset: 0,
+        };
+      }
+      if (url.includes('/animals')) return [animal('a1', 'Firulais')];
+      return [];
+    });
+    renderShell({ route: '/animales', ...sessionWith([Role.Owner]) });
+
+    await screen.findByText('Firulais');
+    fireEvent.click(screen.getByRole('button', { name: /Apadrinamiento/ }));
+
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByText(/todavía no tiene un plan/);
+    fireEvent.change(within(dialog).getByLabelText('Monto mensual (COP)'), {
+      target: { value: '25000' },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Crear plan' }));
+
+    await waitFor(() => {
+      const post = calls.find(
+        (c) => c.init?.method === 'POST' && c.url.includes('/sponsorship-plans'),
+      );
+      expect(post).toBeDefined();
+      const body = JSON.parse(String(post?.init?.body));
+      expect(body).toMatchObject({ animalId: 'a1', amount: 25000, periodicity: 'monthly' });
+    });
+    expect(await within(dialog).findByText('Activo')).toBeInTheDocument();
+    expect(await screen.findByText('Plan de apadrinamiento creado')).toBeInTheDocument();
+  });
+
+  it('lets an Owner deactivate an existing active plan via PATCH', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    let active = true;
+    const planRow = () => ({
+      id: 'plan-1',
+      organizationId: 'org-1',
+      animalId: 'a1',
+      name: 'Apadrinamiento mensual',
+      amount: 25000,
+      periodicity: 'monthly',
+      isActive: active,
+      createdAt: '2026-08-08T00:00:00.000Z',
+    });
+    stubFetch((url, init) => {
+      calls.push({ url, init });
+      if (url.includes('/animals/breeds')) return [];
+      if (init?.method === 'PATCH' && url.includes('/sponsorship-plans/plan-1')) {
+        active = false;
+        return planRow();
+      }
+      if (url.includes('/sponsorship-plans'))
+        return { items: [planRow()], total: 1, limit: 1, offset: 0 };
+      if (url.includes('/animals')) return [animal('a1', 'Firulais')];
+      return [];
+    });
+    renderShell({ route: '/animales', ...sessionWith([Role.Administrator]) });
+
+    await screen.findByText('Firulais');
+    fireEvent.click(screen.getByRole('button', { name: /Apadrinamiento/ }));
+
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByText('Activo');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Desactivar plan' }));
+
+    await waitFor(() => {
+      const patch = calls.find((c) => c.init?.method === 'PATCH');
+      expect(patch).toBeDefined();
+      expect(patch?.url).toContain('/sponsorship-plans/plan-1');
+      expect(JSON.parse(String(patch?.init?.body))).toEqual({ isActive: false });
+    });
+    expect(await within(dialog).findByText('Inactivo')).toBeInTheDocument();
+    expect(await screen.findByText('Plan desactivado')).toBeInTheDocument();
+  });
+});

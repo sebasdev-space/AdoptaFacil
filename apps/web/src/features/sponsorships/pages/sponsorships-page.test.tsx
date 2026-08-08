@@ -131,6 +131,57 @@ describe('SponsorshipsPage — apadrinamientos recibidos por la organización (S
     expect(screen.queryByRole('button', { name: 'Reactivar' })).not.toBeInTheDocument();
   });
 
+  it('ofrece "Cancelar" junto a Suspender para un apadrinamiento activo', async () => {
+    stubFetch(baseHandler([sponsorship()]));
+    renderShell({ route: '/organizacion/apadrinamientos', ...sessionWith([Role.Owner]) });
+
+    expect(await screen.findByRole('button', { name: 'Cancelar' })).toBeInTheDocument();
+  });
+
+  it('nunca ofrece "Cancelar" sobre un apadrinamiento ya cancelado (terminal)', async () => {
+    stubFetch(baseHandler([sponsorship({ status: SponsorshipStatus.Cancelled })]));
+    renderShell({ route: '/organizacion/apadrinamientos', ...sessionWith([Role.Owner]) });
+
+    await screen.findByText('Cancelado');
+    expect(screen.queryByRole('button', { name: 'Cancelar' })).not.toBeInTheDocument();
+  });
+
+  it('cancelar pide confirmación (acción terminal) antes de llamar al endpoint', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    stubFetch((url, init) => {
+      calls.push({ url, init });
+      if (init?.method === 'POST' && url.includes('/cancel')) {
+        return sponsorship({ status: SponsorshipStatus.Cancelled });
+      }
+      return baseHandler([sponsorship()])(url);
+    });
+    renderShell({ route: '/organizacion/apadrinamientos', ...sessionWith([Role.Owner]) });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancelar' }));
+    expect(screen.getByText(/no puede reactivarse/)).toBeInTheDocument();
+    expect(calls.some((c) => c.init?.method === 'POST')).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sí, cancelar' }));
+
+    await waitFor(() => {
+      const post = calls.find((c) => c.init?.method === 'POST');
+      expect(post).toBeDefined();
+      expect(post?.url).toContain('/sponsorships/s-1/cancel');
+    });
+    expect(await screen.findByText('Apadrinamiento cancelado')).toBeInTheDocument();
+  });
+
+  it('oculta "Cancelar" para ReadOnlyAuditor igual que suspender/reactivar', async () => {
+    stubFetch(baseHandler([sponsorship()]));
+    renderShell({
+      route: '/organizacion/apadrinamientos',
+      ...sessionWith([Role.ReadOnlyAuditor]),
+    });
+
+    expect(await screen.findByText('Firulais')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Cancelar' })).not.toBeInTheDocument();
+  });
+
   it('Owner suspende un apadrinamiento activo y ve el toast de confirmación', async () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     let suspended = false;
