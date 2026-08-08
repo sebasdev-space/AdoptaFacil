@@ -29,9 +29,11 @@ import { PageContainer, PageHeader } from '../../_layout';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
 import { AnimalFormModal } from '../components/animal-form-modal';
+import { AnimalSponsorshipPlanModal } from '../components/animal-sponsorship-plan-modal';
 import { BulkImportDialog } from '../components/bulk-import-dialog';
 import {
   FolderIcon,
+  HeartIcon,
   PawEmptyIcon,
   PencilIcon,
   PlusIcon,
@@ -88,6 +90,10 @@ export function AnimalsPage() {
   // animal but not bulk-import (matches the backend's BULK_IMPORT_ROLES).
   const canBulkImport =
     hasRole(Role.Owner) || hasRole(Role.Administrator) || hasRole(Role.Operator);
+  // S2-03-REV: matches `SponsorshipPlansController.WRITE_ROLES` VERBATIM — no
+  // Operator/Veterinarian, unlike the broader `canManage` above (M07 money
+  // gate is narrower than M03's own edit gate).
+  const canManageSponsorship = hasRole(Role.Owner) || hasRole(Role.Administrator);
   const { toast } = useToast();
 
   const [animals, setAnimals] = useState<Animal[]>([]);
@@ -100,6 +106,7 @@ export function AnimalsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Animal | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
+  const [sponsorshipTarget, setSponsorshipTarget] = useState<Animal | null>(null);
 
   const load = async (): Promise<void> => {
     const items = await client.request<Animal[]>('/animals?includeInactive=true');
@@ -318,6 +325,16 @@ export function AnimalsPage() {
                             </Button>
                           )}
                         </div>
+                        {!isInactive && canManageSponsorship && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full gap-1"
+                            onClick={() => setSponsorshipTarget(animal)}
+                          >
+                            <HeartIcon /> Apadrinamiento
+                          </Button>
+                        )}
                         {isInactive && (
                           <Button
                             size="sm"
@@ -350,6 +367,15 @@ export function AnimalsPage() {
         onOpenChange={setBulkImportOpen}
         onImported={() => void load()}
       />
+
+      {sponsorshipTarget && (
+        <AnimalSponsorshipPlanModal
+          open={sponsorshipTarget !== null}
+          onOpenChange={(next) => !next && setSponsorshipTarget(null)}
+          animalId={sponsorshipTarget.id}
+          animalName={sponsorshipTarget.name}
+        />
+      )}
 
       <Dialog open={deleteTarget !== null} onOpenChange={(next) => !next && setDeleteTarget(null)}>
         <DialogContent>

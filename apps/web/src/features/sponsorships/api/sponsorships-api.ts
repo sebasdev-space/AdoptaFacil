@@ -63,3 +63,17 @@ export function reactivateSponsorship(
     json: dto,
   });
 }
+
+/** Cancel a sponsorship — terminal, no reactivation after (Owner/Administrator —
+ *  `POST /sponsorships/:id/cancel`). S2-03-REV: this action existed in the
+ *  backend since the original S2-03 slice but had no frontend consumer. */
+export function cancelSponsorship(
+  client: ApiClient,
+  id: string,
+  dto: SponsorshipStatusChangeInput = {},
+): Promise<Sponsorship> {
+  return client.request<Sponsorship>(`/sponsorships/${id}/cancel`, {
+    method: 'POST',
+    json: dto,
+  });
+}

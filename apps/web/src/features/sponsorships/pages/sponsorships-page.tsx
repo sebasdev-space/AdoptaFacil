@@ -1,11 +1,24 @@
 import { useEffect, useState } from 'react';
 import type { Animal, Sponsorship, SponsorshipPlan } from '@adoptafacil/contracts';
 import { Role, SponsorshipStatus } from '@adoptafacil/contracts';
-import { Badge, Button, EmptyState, Skeleton, useToast } from '@adoptafacil/ui';
+import {
+  Badge,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  EmptyState,
+  Skeleton,
+  useToast,
+} from '@adoptafacil/ui';
 import { PageContainer, PageHeader } from '../../_layout';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
 import {
+  cancelSponsorship,
   listOrgPlans,
   listOrgSponsorships,
   reactivateSponsorship,
@@ -48,6 +61,8 @@ export function SponsorshipsPage() {
   const [animalNamesById, setAnimalNamesById] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<Sponsorship | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   const load = async (): Promise<void> => {
     const [sponsorshipRows, planRows, animals] = await Promise.all([
@@ -110,6 +125,28 @@ export function SponsorshipsPage() {
     }
   };
 
+  // Cancel is TERMINAL (no reactivation after, `SponsorshipStatus` doc) — same
+  // confirm-dialog pattern as `AnimalsPage`'s delete, unlike suspend/reactivate
+  // above which are reversible and fire on a single click.
+  async function confirmCancel(): Promise<void> {
+    if (!cancelTarget) return;
+    setCancelling(true);
+    try {
+      await cancelSponsorship(client, cancelTarget.id);
+      await load();
+      toast({ title: 'Apadrinamiento cancelado', variant: 'success' });
+      setCancelTarget(null);
+    } catch (error) {
+      toast({
+        title: 'No se pudo cancelar el apadrinamiento',
+        description: error instanceof Error ? error.message : 'Inténtalo de nuevo.',
+        variant: 'destructive',
+      });
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   return (
     <PageContainer>
       <PageHeader
@@ -145,7 +182,7 @@ export function SponsorshipsPage() {
                   {formatBogota(sponsorship.startedAt)}
                 </p>
                 {canManage && sponsorship.status !== SponsorshipStatus.Cancelled && (
-                  <div className="mt-2">
+                  <div className="mt-2 flex flex-wrap gap-2">
                     {sponsorship.status === SponsorshipStatus.Active ? (
                       <Button
                         variant="outline"
@@ -165,6 +202,15 @@ export function SponsorshipsPage() {
                         Reactivar
                       </Button>
                     )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                      disabled={busyId === sponsorship.id}
+                      onClick={() => setCancelTarget(sponsorship)}
+                    >
+                      Cancelar
+                    </Button>
                   </div>
                 )}
               </li>
@@ -172,6 +218,30 @@ export function SponsorshipsPage() {
           })}
         </ul>
       )}
+
+      <Dialog open={cancelTarget !== null} onOpenChange={(next) => !next && setCancelTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancelar apadrinamiento</DialogTitle>
+            <DialogDescription>
+              Esta acción es definitiva: un apadrinamiento cancelado no puede reactivarse. ¿Quieres
+              continuar?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelTarget(null)} disabled={cancelling}>
+              Volver
+            </Button>
+            <Button
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => void confirmCancel()}
+              disabled={cancelling}
+            >
+              {cancelling ? 'Cancelando…' : 'Sí, cancelar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   );
 }
