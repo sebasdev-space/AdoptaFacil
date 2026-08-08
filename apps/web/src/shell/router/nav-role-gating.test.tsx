@@ -69,7 +69,9 @@ const SURFACES = [
   {
     name: 'Mi organización',
     route: '/organizacion',
-    heading: 'Mi organización',
+    // S2-05: OrgProfilePage's <h1> is now "Perfil de la organización" (the nav
+    // entry/link text stays "Mi organización" — see nav-items.ts, unchanged).
+    heading: 'Perfil de la organización',
     allow: Role.Operator,
   },
   {

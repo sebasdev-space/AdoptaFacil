@@ -5,13 +5,13 @@ import { Role } from '@adoptafacil/contracts';
 import { renderShell } from '../../../test-utils';
 
 /**
- * `/organizacion` — S2-REORG: this page is now the hub for ALL organization
- * content, including "Acerca de nosotros"/"Información de contacto extendida"
- * (moved here from Personalización, T-027/S2-PORTAL) and a 3-button action bar
- * (Formalización/Personalización/Ver portal público) replacing the loose
- * "Formalización →" link + the "Ver portal público" that used to live inside
- * `ProfileHeaderBanner`. Everything here still saves through ONE endpoint,
- * `PUT /org/profile` — moving the fields never touched the backend.
+ * `/organizacion` — S2-05: single-screen redesign over a top bar (breadcrumb,
+ * REAL completeness meter, Formalización/Personalización/Ver portal público,
+ * Guardar cambios) + 5 tabs (Datos institucionales/Ubicación/Contacto/
+ * Imágenes y redes/Acerca de nosotros), replacing S2-REORG's 6-card layout.
+ * Every field/id and the single `PUT /org/profile` payload are UNCHANGED —
+ * only regrouped ("Contacto" now also holds what used to be "Información de
+ * contacto extendida").
  */
 function sessionWith(roles: Role[]) {
   return {
@@ -52,6 +52,10 @@ function stubFetch(handler: (url: string, init?: RequestInit) => unknown) {
   );
 }
 
+function switchTab(name: string) {
+  fireEvent.mouseDown(screen.getByRole('tab', { name }));
+}
+
 beforeEach(() => {
   stubFetch(() => BASE_ORG);
 });
@@ -60,15 +64,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('OrgProfilePage — hub central (S2-REORG)', () => {
-  it('shows the 3-button action bar: Formalización (with state), Personalización, Ver portal público', async () => {
+describe('OrgProfilePage — redesign de una sola pantalla (S2-05)', () => {
+  it('shows the breadcrumb, the new title, and the top-bar actions for an editor', async () => {
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
-    await screen.findByRole('heading', { name: 'Mi organización' });
-    // Scoped to <main>: the sidebar nav ALSO has a "Personalización" link
-    // (different route context) — the action bar's own link must be queried
-    // separately from it.
-    const main = within(screen.getByRole('main'));
+    await screen.findByRole('heading', { name: 'Perfil de la organización' });
+    expect(screen.getByText(/Configuración/)).toBeInTheDocument();
 
+    const main = within(screen.getByRole('main'));
     const formalizacion = await main.findByRole('link', { name: /Formalización/ });
     expect(formalizacion).toHaveAttribute('href', '/organizacion/formalizacion');
     expect(formalizacion).toHaveTextContent('En proceso');
@@ -80,58 +82,77 @@ describe('OrgProfilePage — hub central (S2-REORG)', () => {
     expect(publicPortal).toHaveAttribute('href', '/o/patitas-felices');
     expect(publicPortal).toHaveAttribute('target', '_blank');
 
-    // Never duplicated (T-D05 had it inside the header banner too).
-    expect(main.getAllByRole('link', { name: /Ver portal público/ })).toHaveLength(1);
+    expect(main.getByRole('button', { name: /Guardar cambios/ })).toBeInTheDocument();
+    // Never duplicated (no bottom sticky button anymore — ONE save action).
+    expect(main.getAllByRole('button', { name: /Guardar cambios/ })).toHaveLength(1);
   });
 
   it('hides "Ver portal público" when the org has no slug yet', async () => {
     stubFetch(() => ({ ...BASE_ORG, slug: undefined }));
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
-    await screen.findByRole('heading', { name: 'Mi organización' });
+    await screen.findByRole('heading', { name: 'Perfil de la organización' });
     expect(
       within(screen.getByRole('main')).queryByRole('link', { name: /Ver portal público/ }),
     ).not.toBeInTheDocument();
   });
 
-  it('renders all 6 cards from S2-REORG §3.2, each exactly once', async () => {
+  it('shows a REAL completeness percent computed from the loaded org, not a hardcoded number', async () => {
+    // BASE_ORG only fills "Nombre" + "Slug del portal" → 2 of 9 tracked fields ≈ 22%.
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
-    await screen.findByRole('heading', { name: 'Mi organización' });
-
-    const titles = [
-      'Datos institucionales',
-      'Contacto',
-      'Ubicación',
-      'Imágenes y redes sociales',
-      'Acerca de nosotros',
-      'Información de contacto extendida',
-    ];
-    await waitFor(() => {
-      for (const title of titles) {
-        expect(screen.getAllByText(title)).toHaveLength(1);
-      }
-    });
+    await screen.findByRole('heading', { name: 'Perfil de la organización' });
+    expect(await screen.findByText('22%')).toBeInTheDocument();
+    expect(screen.getByText('Perfil incompleto')).toBeInTheDocument();
   });
 
-  it('has NO URL text fields for logo/cover — upload-only (S2-REORG §5)', async () => {
+  it('renders all 5 tabs from the redesign, each exactly once', async () => {
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
-    await screen.findByRole('heading', { name: 'Mi organización' });
+    await screen.findByRole('heading', { name: 'Perfil de la organización' });
+
+    const tabs = [
+      'Datos institucionales',
+      'Ubicación',
+      'Contacto',
+      'Imágenes y redes',
+      'Acerca de nosotros',
+    ];
+    for (const name of tabs) {
+      expect(screen.getAllByRole('tab', { name })).toHaveLength(1);
+    }
+    // Default tab shows its fields; the others are not mounted until selected.
+    expect(await screen.findByLabelText('Nombre')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Ciudad / Municipio')).not.toBeInTheDocument();
+  });
+
+  it('regression: "Información de contacto extendida" fields now live inside the "Contacto" tab', async () => {
+    stubFetch(() => ({
+      ...BASE_ORG,
+      extendedContact: { hours: 'Lun-Vie 9am-5pm', additionalPhones: ['3001234567'] },
+    }));
+    renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
+    await screen.findByRole('heading', { name: 'Perfil de la organización' });
+
+    switchTab('Contacto');
+    expect(await screen.findByLabelText('Horario de atención')).toHaveValue('Lun-Vie 9am-5pm');
+    expect(screen.getByLabelText('Teléfonos adicionales')).toHaveValue('3001234567');
+    expect(screen.queryByLabelText('Enlace a Google Maps')).not.toBeInTheDocument();
+    const mapField = screen.getByLabelText('Ubicación en el mapa');
+    expect(mapField).toHaveAttribute(
+      'placeholder',
+      'Pega el enlace de Google Maps de tu ubicación',
+    );
+  });
+
+  it('has NO URL text fields for logo/cover — upload-only (S2-REORG §5, still true post-redesign)', async () => {
+    renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
+    await screen.findByRole('heading', { name: 'Perfil de la organización' });
+    switchTab('Imágenes y redes');
 
     expect(screen.queryByLabelText('URL del logo')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/Fotos de portada/)).not.toBeInTheDocument();
     expect(await screen.findByLabelText('Subir logo')).toBeInTheDocument();
     expect(screen.getByLabelText('Subir portada')).toBeInTheDocument();
   });
 
-  it('shows "Cambiar logo" + a preview once the org already has one', async () => {
-    stubFetch(() => ({ ...BASE_ORG, logoUrl: 'https://cdn.test/logo.png' }));
-    renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
-    await screen.findByRole('heading', { name: 'Mi organización' });
-
-    expect(await screen.findByLabelText('Cambiar logo')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Subir logo')).not.toBeInTheDocument();
-  });
-
-  it('uploads a logo file end-to-end (reserve target → PUT bytes → fills logoUrl for save)', async () => {
+  it('uploads a logo, updates the live preview, and saves via the TOP-BAR Guardar button', async () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     stubFetch((url, init) => {
       calls.push({ url, init });
@@ -145,14 +166,20 @@ describe('OrgProfilePage — hub central (S2-REORG)', () => {
       return BASE_ORG;
     });
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
-    await screen.findByRole('heading', { name: 'Mi organización' });
+    await screen.findByRole('heading', { name: 'Perfil de la organización' });
+    switchTab('Imágenes y redes');
 
     const file = new File(['bytes'], 'logo.png', { type: 'image/png' });
     const input = await screen.findByLabelText('Subir logo');
     await userEvent.upload(input, file);
 
     await screen.findByLabelText('Cambiar logo');
-    fireEvent.click(screen.getByRole('button', { name: /Guardar cambios/ }));
+    // Live preview reflects the uploaded logo immediately (draft, unsaved).
+    expect(screen.getByAltText(/Logo de/)).toBeInTheDocument();
+
+    fireEvent.click(
+      within(screen.getByRole('main')).getByRole('button', { name: /Guardar cambios/ }),
+    );
 
     await waitFor(() => {
       const put = calls.find((c) => c.url.endsWith('/org/profile') && c.init?.method === 'PUT');
@@ -164,7 +191,7 @@ describe('OrgProfilePage — hub central (S2-REORG)', () => {
     });
   });
 
-  it('loads and saves "Acerca de nosotros" + "Información de contacto extendida" through the SAME PUT /org/profile the rest of the form uses', async () => {
+  it('loads and saves fields across tabs through the SAME single PUT /org/profile', async () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     stubFetch((url, init) => {
       calls.push({ url, init });
@@ -176,20 +203,24 @@ describe('OrgProfilePage — hub central (S2-REORG)', () => {
       };
     });
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
+    await screen.findByRole('heading', { name: 'Perfil de la organización' });
 
-    const aboutUs = await screen.findByLabelText('Quiénes somos');
-    expect(aboutUs).toHaveValue('Historia real de la fundación.');
-    expect(screen.getByLabelText('Horario de atención')).toHaveValue('Lun-Vie 9am-5pm');
-    expect(screen.getByLabelText('Teléfonos adicionales')).toHaveValue('3001234567');
+    switchTab('Contacto');
+    const address = await screen.findByLabelText('Dirección completa');
+    fireEvent.change(address, { target: { value: 'Calle 45 #12-34, Bogotá' } });
 
-    fireEvent.change(screen.getByLabelText('Dirección completa'), {
-      target: { value: 'Calle 45 #12-34, Bogotá' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: /Guardar cambios/ }));
+    switchTab('Acerca de nosotros');
+    expect(await screen.findByLabelText('Quiénes somos')).toHaveValue(
+      'Historia real de la fundación.',
+    );
+
+    fireEvent.click(
+      within(screen.getByRole('main')).getByRole('button', { name: /Guardar cambios/ }),
+    );
 
     await waitFor(() => {
       const puts = calls.filter((c) => c.url.endsWith('/org/profile') && c.init?.method === 'PUT');
-      expect(puts).toHaveLength(1); // ONE endpoint, not two.
+      expect(puts).toHaveLength(1); // ONE endpoint, not two — switching tabs never split the save.
       const body = JSON.parse(String(puts[0].init?.body));
       expect(body.aboutUs).toBe('Historia real de la fundación.');
       expect(body.extendedContact).toEqual({
@@ -200,15 +231,35 @@ describe('OrgProfilePage — hub central (S2-REORG)', () => {
     });
   });
 
-  it('the map field uses the fixed label/placeholder (S2-REORG §6)', async () => {
-    renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
-    await screen.findByRole('heading', { name: 'Mi organización' });
+  it.each([
+    ['informal', 'Informal'],
+    ['en_proceso', 'En proceso'],
+    ['formalizada', 'Formalizada'],
+    ['esal', 'ESAL'],
+    ['esal_rte', 'ESAL + RTE'],
+  ])(
+    'Formalización pill reflects the REAL state machine value %s → %s (not a binary Formal/Informal)',
+    async (state, label) => {
+      stubFetch(() => ({ ...BASE_ORG, formalizationState: state }));
+      renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
+      const main = within(screen.getByRole('main'));
+      const formalizacion = await main.findByRole('link', { name: /Formalización/ });
+      expect(formalizacion).toHaveTextContent(label);
+    },
+  );
 
-    expect(screen.queryByLabelText('Enlace a Google Maps')).not.toBeInTheDocument();
-    const mapField = await screen.findByLabelText('Ubicación en el mapa');
-    expect(mapField).toHaveAttribute(
-      'placeholder',
-      'Pega el enlace de Google Maps de tu ubicación',
-    );
+  it('RBAC: a non-editor role sees the top bar but the read-only summary, never the tabs or Guardar', async () => {
+    renderShell({ route: '/organizacion', ...sessionWith([Role.ReadOnlyAuditor]) });
+    await screen.findByRole('heading', { name: 'Perfil de la organización' });
+
+    const main = within(screen.getByRole('main'));
+    // Informational top-bar items stay visible...
+    expect(await main.findByRole('link', { name: /Formalización/ })).toBeInTheDocument();
+    // ...but there is nothing to save.
+    expect(main.queryByRole('button', { name: /Guardar cambios/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Datos institucionales' })).not.toBeInTheDocument();
+    // Unique to `ReadOnlyProfile` (the name itself is also duplicated in the
+    // always-shown `ProfileHeaderBanner`, so assert on a read-only-only row).
+    expect(screen.getByText('/o/patitas-felices')).toBeInTheDocument();
   });
 });

@@ -8,6 +8,7 @@ import {
 } from '@adoptafacil/contracts';
 import {
   Badge,
+  Button,
   buttonVariants,
   Card,
   CardContent,
@@ -18,7 +19,12 @@ import {
 import { PageContainer, PageHeader } from '../../_layout';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
+import { CompletionRing } from '../components/completion-ring';
 import { OrgProfileForm } from '../components/org-profile-form';
+import { useOrgProfileEditor } from '../hooks/use-org-profile-editor';
+import { computeProfileCompleteness } from '../model/profile-completeness';
+
+const PAGE_TITLE = 'Perfil de la organización';
 
 /** Same wording as `org-formalization-page.tsx`'s STATE_LABELS (not exported
  *  there — this is a 5-entry, unlikely-to-drift copy, not worth a shared file
@@ -86,44 +92,101 @@ function PaletteIcon() {
   );
 }
 
-/**
- * Barra de acciones (S2-REORG): 3 botones — Formalización (con el estado
- * actual), Personalización, y Ver portal público — reemplaza el link suelto
- * "Formalización →" del header y el botón "Ver portal público" que vivía
- * dentro de `ProfileHeaderBanner` (T-D05), consolidados en un solo lugar.
- */
-function OrgActionBar({ org }: { org: Organization }) {
-  const linkClass = buttonVariants({ variant: 'outline', size: 'sm' });
+function ChevronRightIcon() {
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
-      <Link to="/organizacion/formalizacion" className={`${linkClass} gap-1.5`}>
-        Formalización
-        <Badge variant="secondary">
-          {FORMALIZATION_LABELS[org.formalizationState ?? FormalizationState.Informal]}
-        </Badge>
-      </Link>
-      <Link to="/organizacion/portal" className={`${linkClass} gap-1.5`}>
-        <PaletteIcon />
-        Personalización
-      </Link>
-      {org.slug && (
-        <a
-          href={`/o/${encodeURIComponent(org.slug)}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={`${linkClass} gap-1.5`}
-        >
-          Ver portal público
-          <ExternalLinkIcon />
-        </a>
-      )}
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      className="h-3 w-3"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+    >
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}
+
+/** Non-navigating breadcrumb (S2-05 top bar) — purely contextual, matching the
+ *  mock's "Configuración > Mi organización" trail. There is no real
+ *  `/configuracion` route in this app, so "Configuración" is plain text, not
+ *  a link (same treatment the mock itself gives it). */
+function Breadcrumb() {
+  return (
+    <p className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
+      Configuración
+      <ChevronRightIcon />
+      Mi organización
+    </p>
+  );
+}
+
+interface OrgTopBarActionsProps {
+  org: Organization;
+  canEdit: boolean;
+  saving: boolean;
+  onSave: () => void;
+}
+
+/**
+ * Barra de acciones (S2-05, reemplaza la de 3 botones de S2-REORG): medidor de
+ * completitud real + Formalización (estado real) + Personalización + Ver
+ * portal público + Guardar cambios (solo si `canEdit`).
+ *
+ * Personalización sigue siendo SOLO un link a `/organizacion/portal` — no un
+ * popover inline. Esa página (color de marca + posiciones + su propia
+ * mini-preview) vive ENTERAMENTE en `features/portals` (dominio de Fabián,
+ * CODEOWNERS); el inventario de este spec confirmó que ya no comparte NINGÚN
+ * campo con "Mi organización" (S2-REORG movió `aboutUs`/`extendedContact`
+ * fuera de Personalización hace tiempo). Cruzar ese dominio para construir un
+ * popover/mini-preview embebido fue explícitamente descartado por decisión del
+ * usuario — "solo enlace directo" — para no importar ni duplicar código ajeno.
+ */
+function OrgTopBarActions({ org, canEdit, saving, onSave }: OrgTopBarActionsProps) {
+  const linkClass = buttonVariants({ variant: 'outline', size: 'sm' });
+  const completeness = computeProfileCompleteness(org);
+
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-3">
+      <CompletionRing
+        percent={completeness.percent}
+        missing={completeness.total - completeness.filled}
+      />
+      <div className="hidden h-8 w-px bg-border sm:block" aria-hidden />
+      <div className="flex flex-wrap items-center gap-2">
+        <Link to="/organizacion/formalizacion" className={`${linkClass} gap-1.5`}>
+          Formalización
+          <Badge variant="secondary">
+            {FORMALIZATION_LABELS[org.formalizationState ?? FormalizationState.Informal]}
+          </Badge>
+        </Link>
+        <Link to="/organizacion/portal" className={`${linkClass} gap-1.5`}>
+          <PaletteIcon />
+          Personalización
+        </Link>
+        {org.slug && (
+          <a
+            href={`/o/${encodeURIComponent(org.slug)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`${linkClass} gap-1.5`}
+          >
+            Ver portal público
+            <ExternalLinkIcon />
+          </a>
+        )}
+        {canEdit && (
+          <Button size="sm" onClick={onSave} disabled={saving}>
+            {saving ? 'Guardando…' : 'Guardar cambios'}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
 
 /** Compact back-office header (T-D05 P2) — logo + name + type/formalization
- *  badges, shown regardless of edit permission. The public-portal link now
- *  lives in `OrgActionBar` (S2-REORG) — not duplicated here. */
+ *  badges, shown regardless of edit permission. */
 function ProfileHeaderBanner({ org }: { org: Organization }) {
   return (
     <Card className="mb-6">
@@ -198,7 +261,18 @@ function ReadOnlyProfile({ org }: { org: Organization }) {
 }
 
 /** Authenticated `/organizacion` page: the caller's org profile. Owner and
- *  Administrator get the edit form; other members see a read-only view. */
+ *  Administrator get the edit form; other members see a read-only view.
+ *
+ * The top bar (`<PageHeader>`) is rendered ONCE, unconditionally, in the SAME
+ * JSX position for the whole component lifetime — only its `actions` prop
+ * value changes as `org` loads. This is deliberate: an earlier version
+ * rendered a DIFFERENT `<PageHeader>` instance once `org` finished loading
+ * (nested inside a loaded-only child component), which is invisible to a
+ * human but makes React unmount+remount the real DOM node during the
+ * loading→loaded transition — flaky under test tooling that grabs an element
+ * reference moments before that swap. `useOrgProfileEditor` accepts a
+ * nullable `org` for exactly this reason: it can be called unconditionally
+ * here, before the fetch resolves. */
 export function OrgProfilePage() {
   const client = useApiClient();
   const { hasAnyRole } = useSession();
@@ -206,6 +280,7 @@ export function OrgProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const canEdit = hasAnyRole(Role.Owner, Role.Administrator);
+  const editor = useOrgProfileEditor(org, setOrg);
 
   useEffect(() => {
     let active = true;
@@ -230,10 +305,20 @@ export function OrgProfilePage() {
 
   return (
     <PageContainer>
+      <Breadcrumb />
       <PageHeader
-        title="Mi organización"
+        title={PAGE_TITLE}
         description="Perfil institucional de tu organización."
-        actions={org ? <OrgActionBar org={org} /> : undefined}
+        actions={
+          org ? (
+            <OrgTopBarActions
+              org={org}
+              canEdit={canEdit}
+              saving={editor.saving}
+              onSave={editor.handleSubmit}
+            />
+          ) : undefined
+        }
       />
       {loading && <Skeleton className="h-64 w-full" />}
       {error && !loading && <p className="text-sm text-destructive">{error}</p>}
@@ -241,7 +326,7 @@ export function OrgProfilePage() {
         <>
           <ProfileHeaderBanner org={org} />
           {canEdit ? (
-            <OrgProfileForm initial={org} onSaved={setOrg} />
+            <OrgProfileForm editor={editor} formalizationState={org.formalizationState} />
           ) : (
             <ReadOnlyProfile org={org} />
           )}
