@@ -1,19 +1,21 @@
 /**
- * Datos de EJEMPLO del certificado de donación (§M05/RF14) para la MAQUETA del
- * pitch (T-053). CERO backend: nada de esto se genera, calcula ni persiste — el
- * código, el NIT, el hash y el QR son de MUESTRA. La maqueta REPRESENTA el
+ * Datos del certificado de donación (§M05/RF14) para la MAQUETA MEJORADA del pitch
+ * (T-053 → F-CERT-REAL). CERO backend: nada de esto se genera, calcula ni persiste
+ * — el código y el hash siguen siendo de MUESTRA. La maqueta REPRESENTA el
  * mecanismo que fija el documento base (certificado de ESAL con RTE, código
- * único, hash, QR y página pública de verificación), sin implementarlo. El RF14
- * funcional es post-pitch (ver TODO(RF14)).
+ * único, hash y página pública de verificación), sin implementarlo. El RF14
+ * funcional (hash real, verificación pública contra backend) es post-pitch
+ * (ver TODO(RF14)).
  *
- * T-066: el nombre de la organización, el monto y el donante YA SÍ se muestran
- * REALES en `CertificateEmissionPage` cuando llegan por nav-state (la donación
- * real de T-050/T-051) — este objeto solo aporta el resto (código/NIT/hash,
- * y sirve de fallback de ILUSTRACIÓN cuando la maqueta se visita SIN una
- * donación real, p. ej. `CertificateVerificationPage` visitada de forma
- * independiente/directa). El NIT no puede volverse real sin una llamada a
- * backend (la org solo se conoce por id en el flujo de donación, y el endpoint
- * público resuelve por slug) — fuera de alcance de T-066, queda de muestra.
+ * F-CERT-REAL (aprobado por Sebastián, 7-ago): org, NIT, donante y monto son
+ * REALES cuando la donación los trae por nav-state (T-066/F2-03) — tanto en
+ * `CertificateEmissionPage` como, para la MISMA sesión, en
+ * `CertificateVerificationPage` (recibe el mismo certificado por nav-state al
+ * seguir el link "Verificar este certificado" — sin esto, sin backend, cada
+ * pantalla mostraba un set de muestra DISTINTO, la incoherencia que este cambio
+ * elimina). Este objeto solo aporta el fallback de ILUSTRACIÓN para cuando la
+ * maqueta se visita SIN una donación real (p. ej. `CertificateVerificationPage`
+ * visitada de forma independiente/directa, sin nav-state) — código y hash.
  *
  * TODO(RF14): reemplazar por la generación real (plantilla + hash SHA-256 del
  * payload canónico —patrón de adoption-contract-hash—, código único persistido,
@@ -22,12 +24,18 @@
 export interface MockCertificate {
   /** Código único VERIFICABLE de muestra (formato ilustrativo). */
   code: string;
-  /** Organización EMISORA de ejemplo: una ESAL con RTE vigente (fiel a RF14). */
+  /** Organización EMISORA: real si llegó por nav-state; si no, fallback neutro. */
   organizationName: string;
-  organizationNit: string;
-  /** Donante de ejemplo. */
+  /**
+   * NIT REAL de la organización, solo si es pública y la donación lo trajo
+   * (formalizada, vía `organization_public()` — F2-03). NUNCA se fabrica ni se
+   * usa uno de muestra: es un dato legal sensible, y mostrarlo junto a una org
+   * (real o genérica) que no lo tiene sería engañoso. Ausente ⇒ no se muestra.
+   */
+  organizationNit?: string;
+  /** Donante: real si llegó por nav-state; si no, fallback neutro. */
   donorName: string;
-  /** Monto donado en pesos enteros COP (ejemplo). */
+  /** Monto donado en pesos enteros COP (real si llegó por nav-state). */
   amount: number;
   /** Fecha de emisión (ISO-8601 UTC; se presenta en hora Colombia). */
   issuedAt: string;
@@ -38,7 +46,6 @@ export interface MockCertificate {
 export const MOCK_CERTIFICATE: MockCertificate = {
   code: 'ADF-CERT-2026-000742',
   organizationName: 'Fundación Huellas de Esperanza',
-  organizationNit: '901.456.789-0',
   donorName: 'María Restrepo',
   amount: 150000,
   issuedAt: '2026-07-26T15:30:00.000Z',
@@ -46,10 +53,12 @@ export const MOCK_CERTIFICATE: MockCertificate = {
 };
 
 /**
- * Fallback NEUTRO cuando `CertificateEmissionPage` se visita SIN una donación
- * real por nav-state (T-066). Nunca reintroduce una entidad ficticia con nombre
- * propio (p. ej. "Fundación Huellas de Esperanza" / "María Restrepo") — solo
- * texto genérico, honesto sobre la ausencia de datos reales en ese caso.
+ * Fallback NEUTRO cuando `CertificateEmissionPage` O `CertificateVerificationPage`
+ * se visitan SIN datos reales por nav-state (T-066/F-CERT-REAL). Nunca reintroduce
+ * una entidad ficticia con nombre propio (p. ej. "Fundación Huellas de Esperanza" /
+ * "María Restrepo") — solo texto genérico, honesto sobre la ausencia de datos
+ * reales en ese caso. Usar el MISMO fallback en ambas pantallas es lo que las
+ * mantiene consistentes cuando no hay una donación real detrás.
  */
 export const CERTIFICATE_NEUTRAL_FALLBACK = {
   organizationName: 'Organización beneficiaria',

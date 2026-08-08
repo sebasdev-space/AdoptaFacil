@@ -26,7 +26,11 @@ describe('certificate trust-flow (mockup)', () => {
     expect(designPreview.className).not.toContain('border-warning/50');
     expect(screen.getByTestId('certificate-document')).toBeInTheDocument();
     expect(screen.getByTestId('certificate-code')).toHaveTextContent(MOCK_CERTIFICATE.code);
-    expect(screen.getByTestId('sample-qr')).toBeInTheDocument();
+    // F-CERT-REAL: QR REAL a la web (no al código del certificado — no promete
+    // verificación, eso sigue siendo RF14).
+    const qr = screen.getByTestId('certificate-qr');
+    expect(qr).toBeInTheDocument();
+    expect(qr).toHaveAttribute('aria-label', expect.stringContaining('adoptafacil.org'));
     // Gating conceptual RF14: emisor ESAL con RTE.
     expect(screen.getAllByText(/ESAL/).length).toBeGreaterThan(0);
     expect(screen.getByTestId('verify-certificate-cta')).toHaveAttribute(
@@ -47,15 +51,18 @@ describe('certificate trust-flow (mockup)', () => {
     expect(screen.getByTestId('certificate-code')).toHaveTextContent(MOCK_CERTIFICATE.code);
   });
 
-  it('chains emission → public verification → authenticity evidence', async () => {
+  it('chains emission → public verification → authenticity evidence, consistently (F-CERT-REAL)', async () => {
     renderShell({ route: '/certificado', ...AUTH });
     fireEvent.click(await screen.findByTestId('verify-certificate-cta'));
 
     // Landed on the public verification screen, auto-verified by the code in the URL.
     expect(await screen.findByText('Certificado válido')).toBeInTheDocument();
-    expect(screen.getByTestId('authenticity-evidence')).toHaveTextContent(
-      MOCK_CERTIFICATE.organizationName,
-    );
+    // No real donation behind this visit ⇒ SAME neutral fallback as the emission
+    // screen just showed — never the old fictitious sample entity (the
+    // inconsistency this task removes).
+    const evidence = screen.getByTestId('authenticity-evidence');
+    expect(evidence).toHaveTextContent(CERTIFICATE_NEUTRAL_FALLBACK.organizationName);
+    expect(evidence).not.toHaveTextContent(MOCK_CERTIFICATE.organizationName);
     // Still a mock screen → keeps the label.
     expect(screen.getByTestId('design-preview')).toBeInTheDocument();
   });
@@ -139,7 +146,9 @@ describe('certificate trust-flow (mockup)', () => {
     );
 
     renderShell({
-      route: '/donaciones?organizationId=org-catcompany&organizationName=CatCompany',
+      route:
+        '/donaciones?organizationId=org-catcompany&organizationName=CatCompany' +
+        '&organizationNit=900.111.222-3',
       ...AUTH,
     });
 
@@ -150,6 +159,7 @@ describe('certificate trust-flow (mockup)', () => {
 
     const doc = await screen.findByTestId('certificate-document');
     expect(doc).toHaveTextContent('CatCompany');
+    expect(doc).toHaveTextContent('NIT 900.111.222-3');
     expect(doc).toHaveTextContent('Juan Pérez');
     expect(doc).toHaveTextContent('75.000');
     // The fictitious sample entity never appears once real data is available.
@@ -158,5 +168,16 @@ describe('certificate trust-flow (mockup)', () => {
     // Still a mockup: code stays sample and the "vista de diseño" label persists.
     expect(screen.getByTestId('certificate-code')).toHaveTextContent(MOCK_CERTIFICATE.code);
     expect(screen.getByTestId('design-preview')).toBeInTheDocument();
+
+    // F-CERT-REAL: following "Verificar este certificado" from THIS session shows
+    // the SAME real data — the consistency the client saw was missing.
+    fireEvent.click(screen.getByTestId('verify-certificate-cta'));
+    const evidence = await screen.findByTestId('authenticity-evidence');
+    expect(evidence).toHaveTextContent('CatCompany');
+    expect(evidence).toHaveTextContent('NIT 900.111.222-3');
+    expect(evidence).toHaveTextContent('Juan Pérez');
+    expect(evidence).toHaveTextContent('75.000');
+    expect(evidence).not.toHaveTextContent(MOCK_CERTIFICATE.organizationName);
+    expect(evidence).not.toHaveTextContent(CERTIFICATE_NEUTRAL_FALLBACK.organizationName);
   });
 });

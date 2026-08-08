@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import {
   Badge,
   Button,
@@ -11,22 +11,44 @@ import {
   Input,
 } from '@adoptafacil/ui';
 import { DesignPreviewBanner } from '../components/design-preview-banner';
-import { formatBogota, formatCop, MOCK_CERTIFICATE } from '../model/mock-certificate';
+import {
+  CERTIFICATE_NEUTRAL_FALLBACK,
+  formatBogota,
+  formatCop,
+  MOCK_CERTIFICATE,
+  type MockCertificate,
+} from '../model/mock-certificate';
 
 type VerifyState = 'idle' | 'valid' | 'invalid';
 
+/** El certificado real viaja desde la emisión (F-CERT-REAL) por nav-state. */
+interface VerifyNavState {
+  certificate?: MockCertificate;
+}
+
 /**
- * Paso 4-5 del flujo de confianza (§M05/RF14, maqueta T-053): VERIFICACIÓN PÚBLICA.
- * Página SIN sesión (como el portal público de T-052): se ingresa un código y, si es
- * el de muestra, se muestra "certificado válido" + la EVIDENCIA de autenticidad
- * (emisor ESAL-RTE, fecha, hash de muestra) — el sello que pidió el cliente.
+ * Paso 4-5 del flujo de confianza (§M05/RF14, maqueta T-053 → F-CERT-REAL):
+ * VERIFICACIÓN PÚBLICA. Página SIN sesión (como el portal público de T-052): se
+ * ingresa un código y, si es el de muestra, se muestra "certificado válido" + la
+ * EVIDENCIA de autenticidad (emisor ESAL-RTE, fecha, hash de muestra) — el sello
+ * que pidió el cliente.
  *
  * CERO backend: NO valida contra el servidor; compara contra el código de EJEMPLO de
  * forma determinista. En el RF14 real, esto consultará un endpoint público de
  * verificación (patrón SECURITY DEFINER, como el portal/animales público).
+ *
+ * F-CERT-REAL: cuando se llega desde "Verificar este certificado" (misma sesión,
+ * `CertificateEmissionPage`), el certificado REAL viaja por nav-state y esta
+ * pantalla muestra EXACTAMENTE los mismos datos — ya no un segundo set de muestra
+ * incoherente. Sin ese estado (código tecleado a mano, o un deep-link/QR abierto
+ * SIN pasar por la emisión en esta sesión) no hay forma de reconstruir la donación
+ * real sin backend (RF14, post-pitch): se usa el mismo fallback NEUTRO que la
+ * emisión usa en ese mismo caso — nunca la entidad ficticia de muestra.
  */
 export function CertificateVerificationPage() {
   const { code: codeParam } = useParams<{ code: string }>();
+  const location = useLocation();
+  const passedCertificate = (location.state as VerifyNavState | null)?.certificate;
   const [code, setCode] = useState(codeParam ?? '');
   const [state, setState] = useState<VerifyState>('idle');
 
@@ -38,6 +60,19 @@ export function CertificateVerificationPage() {
   useEffect(() => {
     if (codeParam) verify(codeParam);
   }, [codeParam]);
+
+  // Certificado real de la MISMA sesión (nav-state) si llegó por ese código; si no,
+  // el fallback NEUTRO — nunca la entidad ficticia de muestra ("María Restrepo" /
+  // "Fundación Huellas de Esperanza"), consistente con el fallback de la emisión.
+  const shownCertificate: MockCertificate =
+    passedCertificate && passedCertificate.code === MOCK_CERTIFICATE.code
+      ? passedCertificate
+      : {
+          ...MOCK_CERTIFICATE,
+          organizationName: CERTIFICATE_NEUTRAL_FALLBACK.organizationName,
+          organizationNit: undefined,
+          donorName: CERTIFICATE_NEUTRAL_FALLBACK.donorName,
+        };
 
   return (
     <main className="mx-auto w-full max-w-2xl px-4 py-10 sm:px-6">
@@ -80,7 +115,9 @@ export function CertificateVerificationPage() {
                 <div>
                   <dt className="text-xs uppercase text-muted-foreground">Emisor</dt>
                   <dd className="text-sm font-medium">
-                    {MOCK_CERTIFICATE.organizationName}
+                    {shownCertificate.organizationName}
+                    {shownCertificate.organizationNit &&
+                      ` · NIT ${shownCertificate.organizationNit}`}
                     <span className="ml-2 align-middle">
                       <Badge variant="success">ESAL · RTE</Badge>
                     </span>
@@ -88,20 +125,20 @@ export function CertificateVerificationPage() {
                 </div>
                 <div>
                   <dt className="text-xs uppercase text-muted-foreground">Donante</dt>
-                  <dd className="text-sm font-medium">{MOCK_CERTIFICATE.donorName}</dd>
+                  <dd className="text-sm font-medium">{shownCertificate.donorName}</dd>
                 </div>
                 <div>
                   <dt className="text-xs uppercase text-muted-foreground">Monto</dt>
-                  <dd className="text-sm">{formatCop(MOCK_CERTIFICATE.amount)}</dd>
+                  <dd className="text-sm">{formatCop(shownCertificate.amount)}</dd>
                 </div>
                 <div>
                   <dt className="text-xs uppercase text-muted-foreground">Fecha de emisión</dt>
-                  <dd className="text-sm">{formatBogota(MOCK_CERTIFICATE.issuedAt)}</dd>
+                  <dd className="text-sm">{formatBogota(shownCertificate.issuedAt)}</dd>
                 </div>
                 <div className="sm:col-span-2">
                   <dt className="text-xs uppercase text-muted-foreground">Hash del documento</dt>
                   <dd className="break-all font-mono text-xs text-muted-foreground">
-                    {MOCK_CERTIFICATE.contentHash}
+                    {shownCertificate.contentHash}
                   </dd>
                 </div>
               </dl>
