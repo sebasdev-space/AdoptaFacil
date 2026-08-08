@@ -55,10 +55,18 @@ export function buildDonationBreakdown(
       amount: breakdown.amountCharged,
       emphasis: 'charged',
     },
-    { key: 'platformFee', label: 'Comisión AdoptaFácil (4%)', amount: breakdown.platformFee },
-    { key: 'platformIva', label: 'IVA sobre comisión AdoptaFácil', amount: breakdown.platformIva },
+    {
+      key: 'platformFee',
+      label: 'Apoyo de sostenimiento a AdoptaFácil (4%)',
+      amount: breakdown.platformFee,
+    },
+    {
+      key: 'platformIva',
+      label: 'IVA sobre el apoyo de sostenimiento a AdoptaFácil',
+      amount: breakdown.platformIva,
+    },
     { key: 'gatewayFee', label: 'Comisión pasarela', amount: breakdown.gatewayFee },
-    { key: 'gatewayIva', label: 'IVA sobre comisión pasarela', amount: breakdown.gatewayIva },
+    { key: 'gatewayIva', label: 'IVA sobre la comisión pasarela', amount: breakdown.gatewayIva },
     {
       key: 'net',
       label: 'Neto que recibe la organización',

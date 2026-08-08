@@ -58,4 +58,18 @@ describe('donation-breakdown-view', () => {
     expect(out).toMatch(/50\.000/);
     expect(out).not.toMatch(/,\d\d/);
   });
+
+  it('F-NOMENCLATURA: labels the platform fee as "Apoyo de sostenimiento", never "Comisión AdoptaFácil" (indicación fiscal)', () => {
+    const { lines } = buildDonationBreakdown(50000, 'donor');
+    expect(lines.find((l) => l.key === 'platformFee')?.label).toBe(
+      'Apoyo de sostenimiento a AdoptaFácil (4%)',
+    );
+    expect(lines.find((l) => l.key === 'platformIva')?.label).toBe(
+      'IVA sobre el apoyo de sostenimiento a AdoptaFácil',
+    );
+    expect(lines.map((l) => l.label).join(' ')).not.toMatch(/comisión adoptaf[aá]cil/i);
+    // The GATEWAY's own fee (Wompi, a third party) is a real commission and keeps
+    // its name — only AdoptaFácil's own retained percentage was relabeled.
+    expect(lines.find((l) => l.key === 'gatewayFee')?.label).toBe('Comisión pasarela');
+  });
 });
