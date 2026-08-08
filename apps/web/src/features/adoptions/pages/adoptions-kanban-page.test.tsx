@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Role, type AdoptionRequest } from '@adoptafacil/contracts';
 import { renderShell } from '../../../test-utils';
@@ -47,7 +47,8 @@ function stubFetch() {
       let body: unknown = {};
       if (url.includes('/adoptions') && url.includes('/transitions') && method === 'POST') {
         post(url, init);
-        body = { ...REQUEST, status: 'in_review' };
+        const targetStatus = JSON.parse(String(init?.body ?? '{}')).targetStatus ?? 'in_review';
+        body = { ...REQUEST, status: targetStatus };
       } else if (url.endsWith('/adoptions') && method === 'GET') {
         body = [REQUEST];
       }
@@ -84,5 +85,72 @@ describe('AdoptionsKanbanPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'En evaluación' }));
     await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
     expect(post.mock.calls[0][0]).toContain('/adoptions/req-1/transitions');
+  });
+
+  describe('F-MODAL-SOLICITANTE: applicant detail modal', () => {
+    it('opens from the card and shows the REAL applicant/animal data the contract already exposes', async () => {
+      renderShell({ route: '/adopciones', ...sessionWith([Role.Owner]) });
+
+      const card = (await screen.findByText('Firulais')).closest(
+        '[data-testid="adoption-card"]',
+      ) as HTMLElement;
+      fireEvent.click(within(card).getByTestId('open-applicant-detail'));
+
+      const modal = await screen.findByTestId('applicant-detail-modal');
+      expect(within(modal).getByTestId('applicant-name')).toHaveTextContent('Adoptante Uno');
+      expect(within(modal).getByTestId('applicant-email')).toHaveTextContent('a1@test.local');
+      expect(within(modal).getByTestId('applicant-message')).toHaveTextContent(REQUEST.message);
+      expect(within(modal).getByText('Solicitud para adoptar a Firulais')).toBeInTheDocument();
+      // Same status wording as the kanban column (single source: ADOPTION_STATUS_LABELS).
+      expect(within(modal).getByText('Nuevas')).toBeInTheDocument();
+    });
+
+    it('never fabricates a phone number when the applicant did not provide one', async () => {
+      renderShell({ route: '/adopciones', ...sessionWith([Role.Owner]) });
+
+      const card = (await screen.findByText('Firulais')).closest(
+        '[data-testid="adoption-card"]',
+      ) as HTMLElement;
+      fireEvent.click(within(card).getByTestId('open-applicant-detail'));
+
+      const modal = await screen.findByTestId('applicant-detail-modal');
+      expect(within(modal).queryByTestId('applicant-phone')).not.toBeInTheDocument();
+    });
+
+    it('advancing from the modal uses the SAME transition action as the card, and stays open reflecting the new status', async () => {
+      renderShell({ route: '/adopciones', ...sessionWith([Role.Owner]) });
+
+      const card = (await screen.findByText('Firulais')).closest(
+        '[data-testid="adoption-card"]',
+      ) as HTMLElement;
+      fireEvent.click(within(card).getByTestId('open-applicant-detail'));
+
+      const modal = await screen.findByTestId('applicant-detail-modal');
+      fireEvent.click(within(modal).getByRole('button', { name: 'En evaluación' }));
+
+      await waitFor(() => expect(post).toHaveBeenCalledTimes(1));
+      expect(post.mock.calls[0][0]).toContain('/adoptions/req-1/transitions');
+      // Same modal, now showing the request's new status — no need to reopen.
+      await waitFor(() => expect(within(modal).getByText('En evaluación')).toBeInTheDocument());
+      expect(within(modal).getByRole('button', { name: 'Aprobada' })).toBeInTheDocument();
+      expect(within(modal).getByRole('button', { name: 'Rechazada' })).toBeInTheDocument();
+    });
+
+    it('closing the modal does not affect the card underneath (detail-only, no rework)', async () => {
+      renderShell({ route: '/adopciones', ...sessionWith([Role.Owner]) });
+
+      const card = (await screen.findByText('Firulais')).closest(
+        '[data-testid="adoption-card"]',
+      ) as HTMLElement;
+      fireEvent.click(within(card).getByTestId('open-applicant-detail'));
+      await screen.findByTestId('applicant-detail-modal');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }));
+      await waitFor(() =>
+        expect(screen.queryByTestId('applicant-detail-modal')).not.toBeInTheDocument(),
+      );
+      // The card's own direct-action button is still there, untouched.
+      expect(within(card).getByRole('button', { name: 'En evaluación' })).toBeInTheDocument();
+    });
   });
 });

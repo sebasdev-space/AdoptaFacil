@@ -6,6 +6,7 @@ import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
 import { listAdoptionRequests, transitionAdoptionRequest } from '../api/adoptions-api';
 import { AdoptionContractPanel } from '../components/adoption-contract-panel';
+import { ApplicantDetailModal } from '../components/applicant-detail-modal';
 import {
   ADOPTION_COLUMNS,
   ADOPTION_NEXT_STATUSES,
@@ -29,6 +30,11 @@ export function AdoptionsKanbanPage() {
   const [requests, setRequests] = useState<AdoptionRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [movingId, setMovingId] = useState<string | null>(null);
+  // F-MODAL-SOLICITANTE: se guarda el id, no el objeto — así el modal siempre
+  // refleja el estado más reciente de `requests` tras avanzar (p. ej. permite
+  // mover new → in_review → approved sin cerrar y reabrir).
+  const [detailRequestId, setDetailRequestId] = useState<string | null>(null);
+  const detailRequest = requests.find((r) => r.id === detailRequestId) ?? null;
 
   const load = useCallback(() => {
     setLoading(true);
@@ -112,6 +118,16 @@ export function AdoptionsKanbanPage() {
                         {request.message}
                       </p>
                       <div className="flex flex-wrap gap-2 pt-1">
+                        {/* F-MODAL-SOLICITANTE: paso de detalle antes de decidir — no
+                            reemplaza los botones directos de abajo, los complementa. */}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setDetailRequestId(request.id)}
+                          data-testid="open-applicant-detail"
+                        >
+                          Ver detalle
+                        </Button>
                         {ADOPTION_NEXT_STATUSES[request.status].map((target) => (
                           <Button
                             key={target}
@@ -136,6 +152,12 @@ export function AdoptionsKanbanPage() {
           );
         })}
       </div>
+      <ApplicantDetailModal
+        request={detailRequest}
+        onOpenChange={(open) => !open && setDetailRequestId(null)}
+        onAdvance={(request, targetStatus) => void move(request, targetStatus)}
+        movingId={movingId}
+      />
     </PageContainer>
   );
 }
