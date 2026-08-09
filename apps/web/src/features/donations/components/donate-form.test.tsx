@@ -48,6 +48,19 @@ describe('DonateForm', () => {
     expect(screen.queryByText(/Comisión AdoptaFácil/i)).not.toBeInTheDocument();
   });
 
+  it('F-NOMENCLATURA-CHECKBOX: the checkbox names both real components, never calling the platform cut a "comisión"', () => {
+    render(<DonateForm organizationName="Refugio Patitas" onDonate={vi.fn()} />);
+
+    expect(
+      screen.getByText(
+        'Cubro el apoyo de sostenimiento a AdoptaFácil y la comisión de la pasarela para que la organización reciba el monto completo.',
+      ),
+    ).toBeInTheDocument();
+    // The gateway's (Wompi, third party) commission keeps its real name — only
+    // AdoptaFácil's own retained percentage was relabeled (extends #100).
+    expect(screen.queryByText(/^Cubro la comisión /)).not.toBeInTheDocument();
+  });
+
   it('submits the intended amount and the chosen commission payer', () => {
     const onDonate = vi.fn();
     render(<DonateForm organizationName="Refugio Patitas" onDonate={onDonate} />);

@@ -18,8 +18,12 @@ export interface DonateFormProps {
 /**
  * Formulario de donación (§M05, P1). PRESENTACIONAL (sin api/sesión) para poder
  * testearlo directo. Muestra el desglose transparente EN VIVO (misma cuenta que el
- * backend, vía `computeBreakdown`) y ofrece la casilla "cubro la comisión"
- * (commissionPayer = 'donor'). Solo habilita "Donar" con un monto válido (≥ mínimo).
+ * backend, vía `computeBreakdown`) y ofrece la casilla "cubro el apoyo de
+ * sostenimiento y la comisión de la pasarela" (commissionPayer = 'donor';
+ * F-NOMENCLATURA-CHECKBOX: extiende #100 al checkbox — el donante cubre AMBOS
+ * componentes, el % que retiene AdoptaFácil (apoyo, no "comisión" propia por
+ * indicación fiscal) y la comisión real de Wompi (tercero, mantiene su nombre).
+ * Solo habilita "Donar" con un monto válido (≥ mínimo).
  */
 export function DonateForm({ organizationName, submitting = false, onDonate }: DonateFormProps) {
   const [amountText, setAmountText] = useState('');
@@ -51,7 +55,10 @@ export function DonateForm({ organizationName, submitting = false, onDonate }: D
           data-testid="cover-fee"
           onChange={(e) => setCoverFee(e.target.checked)}
         />
-        <span>Cubro la comisión para que la organización reciba el monto completo.</span>
+        <span>
+          Cubro el apoyo de sostenimiento a AdoptaFácil y la comisión de la pasarela para que la
+          organización reciba el monto completo.
+        </span>
       </label>
 
       {preview ? (
