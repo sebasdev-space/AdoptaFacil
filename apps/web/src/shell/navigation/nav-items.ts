@@ -77,6 +77,15 @@ export const SPONSORSHIP_VIEW_ROLES = [
 export const ADOPTIONS_MANAGEMENT_ROLES = [Role.Owner, Role.Administrator, Role.Operator] as const;
 
 /**
+ * F-DONACIONES-RECIBIDAS: "Donaciones recibidas" (gestión de org, la contraparte
+ * de "Mis donaciones" del donante). Copiado VERBATIM de `MANAGE_ROLES` en
+ * `donations.controller.ts` (`GET /donations/received`) — mismo trío que
+ * `ADOPTIONS_MANAGEMENT_ROLES` (Owner/Administrador/Operador), sin
+ * ReadOnlyAuditor (el backend no lo incluye para esta ruta).
+ */
+export const DONATIONS_MANAGEMENT_ROLES = [Role.Owner, Role.Administrator, Role.Operator] as const;
+
+/**
  * "Mi organización" / "Personalización" / "Transparencia" (T-062, fix §13 UX
  * gap): these back onto GET endpoints with NO `@Roles` decorator at all (only
  * `@UseGuards(JwtAuthGuard)` — e.g. `GET /org/profile`, `GET /portals/theme`,
@@ -149,6 +158,16 @@ export const navItems: NavItem[] = [
   // doc en NavItem para por qué no puede expresarse con `roles`.
   { path: '/mis-solicitudes', label: 'Mis solicitudes', icon: PawIcon, personaOnly: true },
   { path: '/donaciones', label: 'Donaciones', icon: HeartIcon },
+  // F-DONACIONES-RECIBIDAS: entrada SEPARADA de "Donaciones" arriba — esa es del
+  // donante (cualquier autenticado, sin @Roles en el backend); esta es de la org
+  // que RECIBE (GET /donations/received, MANAGE_ROLES), igual que "Adopciones"
+  // vs. "Mis solicitudes".
+  {
+    path: '/donaciones-recibidas',
+    label: 'Donaciones recibidas',
+    icon: HeartIcon,
+    roles: DONATIONS_MANAGEMENT_ROLES,
+  },
   // M07 · "mis apadrinamientos" (S2-03, RF17) — apadrinar/ver el propio historial,
   // sin @Roles en el backend (`POST /sponsorships`, `GET /sponsorships/mine`),
   // igual que Donaciones arriba: visible a cualquier usuario autenticado.

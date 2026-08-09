@@ -233,6 +233,62 @@ describe('F1-02 · "/adopciones" route enforces ADOPTIONS_MANAGEMENT_ROLES on a 
   });
 });
 
+describe('F-DONACIONES-RECIBIDAS · "Donaciones recibidas" demands DONATIONS_MANAGEMENT_ROLES (deny-by-default)', () => {
+  function nav() {
+    return screen.getByRole('navigation', { name: 'Navegación principal' });
+  }
+
+  it('shows "Donaciones recibidas" to a management role (Operator), pointing at its route', async () => {
+    renderShell({ route: '/', ...sessionWith([Role.Operator]) });
+    await waitFor(() =>
+      expect(within(nav()).getByRole('link', { name: 'Donaciones recibidas' })).toHaveAttribute(
+        'href',
+        '/donaciones-recibidas',
+      ),
+    );
+  });
+
+  it('hides "Donaciones recibidas" from a Persona (no org role) — "Donaciones" (donor-facing) stays visible', async () => {
+    renderShell({ route: '/', ...sessionWith([]) });
+    await waitFor(() =>
+      expect(within(nav()).getByRole('link', { name: 'Donaciones' })).toBeInTheDocument(),
+    );
+    expect(
+      within(nav()).queryByRole('link', { name: 'Donaciones recibidas' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('hides "Donaciones recibidas" from a role outside MANAGE_ROLES (ReadOnlyAuditor — view-only, not management)', async () => {
+    renderShell({ route: '/', ...sessionWith([Role.ReadOnlyAuditor]) });
+    await waitFor(() =>
+      expect(within(nav()).getByRole('link', { name: 'Mi organización' })).toBeInTheDocument(),
+    );
+    expect(
+      within(nav()).queryByRole('link', { name: 'Donaciones recibidas' }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe('F-DONACIONES-RECIBIDAS · "/donaciones-recibidas" route enforces DONATIONS_MANAGEMENT_ROLES on a direct URL hit, not just the nav', () => {
+  it('denies the view to a Persona typing the URL directly (403 amigable, not a broken screen)', async () => {
+    renderShell({ route: '/donaciones-recibidas', ...sessionWith([]) });
+    expect(await screen.findByText('Sin acceso')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Donaciones recibidas' })).not.toBeInTheDocument();
+  });
+
+  it('denies the view to an org role outside MANAGE_ROLES (ReadOnlyAuditor) on a direct URL hit', async () => {
+    renderShell({ route: '/donaciones-recibidas', ...sessionWith([Role.ReadOnlyAuditor]) });
+    expect(await screen.findByText('Sin acceso')).toBeInTheDocument();
+  });
+
+  it('renders the view for a MANAGE_ROLES member (Owner)', async () => {
+    renderShell({ route: '/donaciones-recibidas', ...sessionWith([Role.Owner]) });
+    expect(
+      await screen.findByRole('heading', { name: 'Donaciones recibidas' }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe('F1-01 · "Mis solicitudes" shows only to a Persona account (personaOnly)', () => {
   function nav() {
     return screen.getByRole('navigation', { name: 'Navegación principal' });
