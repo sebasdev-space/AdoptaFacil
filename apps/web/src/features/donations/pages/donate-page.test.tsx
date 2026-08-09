@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderShell } from '../../../test-utils';
 
@@ -252,6 +252,97 @@ describe('DonatePage — "no target" now shows "Mis donaciones" (T-064)', () => 
     expect(await screen.findByText('Pendiente')).toBeInTheDocument();
     // Absence check: safe as queryBy once the render above is confirmed settled.
     expect(screen.queryByRole('button', { name: 'Ver recibo' })).not.toBeInTheDocument();
+  });
+});
+
+describe('F-MIS-DONACIONES-PLUS: detalle + acceso al certificado desde "Mis donaciones"', () => {
+  function approvedDonationFixture() {
+    return {
+      id: 'd-approved-1',
+      organizationId: '08d734c6-1900-4bf4-b3e5-d6468479cf8b',
+      organizationName: 'Refugio Patitas',
+      donorUserId: 'donor-1',
+      concept: { kind: 'organization', id: '08d734c6-1900-4bf4-b3e5-d6468479cf8b' },
+      commissionPayer: 'organization',
+      intendedAmount: 50000,
+      amountCharged: 50000,
+      currency: 'COP',
+      breakdown: {
+        amountCharged: 50000,
+        gross: 50000,
+        platformFee: 2000,
+        platformIva: 380,
+        gatewayFee: 2025,
+        gatewayIva: 385,
+        net: 45210,
+      },
+      collectionId: 'test_approved',
+      status: 'approved',
+      payer: { fullName: 'Donante Tester', email: 'donante@example.test' },
+      createdAt: '2026-07-28T21:25:22.299Z',
+      updatedAt: '2026-07-28T21:25:22.299Z',
+    };
+  }
+
+  it('opens a detail modal with the REAL persisted breakdown (never recomputed) when "Ver detalle" is clicked', async () => {
+    stubFetch((url) => (url.includes('/donations/mine') ? [approvedDonationFixture()] : []));
+
+    renderShell({ route: '/donaciones', ...personSession() });
+    await screen.findByRole('heading', { name: 'Mis donaciones' });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver detalle' }));
+
+    const modal = await screen.findByTestId('donation-detail-modal');
+    expect(within(modal).getByText('Refugio Patitas')).toBeInTheDocument();
+    expect(within(modal).getByText(/Donación general/)).toBeInTheDocument();
+    expect(within(modal).getByText('Aprobada')).toBeInTheDocument();
+    // The stored breakdown, with the same F-NOMENCLATURA labels as the checkout —
+    // NOT recomputed via computeBreakdown from intendedAmount.
+    expect(within(modal).getByTestId('donation-detail-platformFee')).toHaveTextContent('2.000');
+    expect(within(modal).getByTestId('donation-detail-net')).toHaveTextContent('45.210');
+  });
+
+  it('an APPROVED donation offers "Ver / descargar certificado", landing on the REAL data (not the neutral fallback)', async () => {
+    stubFetch((url) => (url.includes('/donations/mine') ? [approvedDonationFixture()] : []));
+
+    renderShell({ route: '/donaciones', ...personSession() });
+    await screen.findByRole('heading', { name: 'Mis donaciones' });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver detalle' }));
+    const modal = await screen.findByTestId('donation-detail-modal');
+    fireEvent.click(within(modal).getByTestId('view-certificate-from-detail'));
+
+    // Scoped to the document itself: the session user's own name also renders in
+    // the shell header, so an unscoped match on "Donante Tester" is ambiguous.
+    const document = within(await screen.findByTestId('certificate-document'));
+    expect(document.getByText('Refugio Patitas')).toBeInTheDocument();
+    expect(document.getByText('Donante Tester')).toBeInTheDocument();
+    expect(document.getByText(/50\.000/)).toBeInTheDocument();
+    // Never the neutral fallback nor the sample entity — this is a real past donation.
+    expect(document.queryByText('Organización beneficiaria')).not.toBeInTheDocument();
+    expect(document.queryByText('Fundación Huellas de Esperanza')).not.toBeInTheDocument();
+  });
+
+  it('a PENDING donation (no receipt yet) has NO active certificate link — disabled with the reason', async () => {
+    stubFetch((url) => {
+      if (url.includes('/donations/mine')) {
+        return [
+          { ...approvedDonationFixture(), id: 'd-pending-1', status: 'pending', payer: undefined },
+        ];
+      }
+      return [];
+    });
+
+    renderShell({ route: '/donaciones', ...personSession() });
+    await screen.findByRole('heading', { name: 'Mis donaciones' });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver detalle' }));
+    const modal = await screen.findByTestId('donation-detail-modal');
+
+    expect(within(modal).queryByTestId('view-certificate-from-detail')).not.toBeInTheDocument();
+    const disabledButton = within(modal).getByTestId('certificate-unavailable');
+    expect(disabledButton).toBeDisabled();
+    expect(disabledButton).toHaveAttribute('title', expect.stringMatching(/recibo/i));
   });
 });
 

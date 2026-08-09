@@ -39,16 +39,13 @@ export function formatBogota(isoUtc: string): string {
 }
 
 /**
- * Construye el desglose presentable a partir del monto pretendido y de quién asume
- * la comisión. `breakdown` es EXACTAMENTE `computeBreakdown(intendedAmount,
- * commissionPayer)` — misma fuente que el backend y el recibo.
+ * Etiqueta cada cifra de un `PaymentBreakdown` YA CALCULADO (labels compartidas
+ * por `buildDonationBreakdown` —desglose en vivo del checkout— y por
+ * F-MIS-DONACIONES-PLUS —desglose histórico de una donación ya persistida—, para
+ * que ambas pantallas usen EXACTAMENTE el mismo texto sin duplicar los literales).
  */
-export function buildDonationBreakdown(
-  intendedAmount: number,
-  commissionPayer: CommissionPayer,
-): { breakdown: PaymentBreakdown; lines: BreakdownLine[] } {
-  const breakdown = computeBreakdown(intendedAmount, commissionPayer);
-  const lines: BreakdownLine[] = [
+export function breakdownLines(breakdown: PaymentBreakdown): BreakdownLine[] {
+  return [
     {
       key: 'amountCharged',
       label: 'Total que pagas',
@@ -74,7 +71,19 @@ export function buildDonationBreakdown(
       emphasis: 'net',
     },
   ];
-  return { breakdown, lines };
+}
+
+/**
+ * Construye el desglose presentable a partir del monto pretendido y de quién asume
+ * la comisión. `breakdown` es EXACTAMENTE `computeBreakdown(intendedAmount,
+ * commissionPayer)` — misma fuente que el backend y el recibo.
+ */
+export function buildDonationBreakdown(
+  intendedAmount: number,
+  commissionPayer: CommissionPayer,
+): { breakdown: PaymentBreakdown; lines: BreakdownLine[] } {
+  const breakdown = computeBreakdown(intendedAmount, commissionPayer);
+  return { breakdown, lines: breakdownLines(breakdown) };
 }
 
 /**
