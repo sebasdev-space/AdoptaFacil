@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, type Campaign as CampaignRow } from '@prisma/client';
 import {
   type CampaignAccountabilityReport,
   type CampaignCategory,
@@ -44,6 +44,31 @@ function toPublic(raw: RawPublicCampaign): CampaignPublic {
     deadline: raw.deadline,
     status: raw.status as CampaignStatus,
     createdAt: raw.createdAt,
+  };
+}
+
+/** Public org lookup payload from `organization_public(slug)` — only `id`/`name`
+ *  are needed here (S2-07); the rest of that function's fields belong to the org
+ *  profile portal, not this campaigns projection. */
+interface RawPublicOrg {
+  id: string;
+  name: string;
+}
+
+function toPublicFromRow(row: CampaignRow, organizationName: string): CampaignPublic {
+  return {
+    id: row.id,
+    organizationId: row.organizationId,
+    organizationName,
+    title: row.title,
+    description: row.description ?? undefined,
+    category: row.category as CampaignCategory,
+    goalAmount: row.goalAmount,
+    raisedAmount: row.raisedAmount,
+    progress: computeProgress(row.raisedAmount, row.goalAmount),
+    deadline: row.deadline.toISOString(),
+    status: row.status as CampaignStatus,
+    createdAt: row.createdAt.toISOString(),
   };
 }
 
@@ -92,6 +117,55 @@ export class PublicCampaignsService {
       limit: take,
       offset: skip,
     };
+  }
+
+  /**
+   * Active campaigns of ONE organization, looked up by its public portal slug
+   * (S2-07, RF15/RF16) — the `activeCampaign` section of the org public portal
+   * (M14, @fabian). Same shape/pagination as {@link list} (the global feed), just
+   * scoped to one org.
+   *
+   * No new SECURITY DEFINER function needed: this reuses the EXISTING
+   * `organization_public(slug)` function (T-101, already granted to
+   * `adoptafacil_app`) to resolve the slug → `{id, name}`, then reads `campaigns`
+   * through `withOrgContext` — the same RLS-respecting, org-scoped accessor
+   * `PublicAnimalsService.getPublicOrgDirectory` already uses to read one known
+   * org's data from a public (no-session) route without evading RLS. Returns null
+   * for an unknown slug (→ 404 at the controller), mirroring
+   * `public/organizations/:slug/animals`.
+   */
+  async listByOrgSlug(
+    slug: string,
+    limit: number,
+    offset: number,
+  ): Promise<Paginated<CampaignPublic> | null> {
+    const orgRows = await this.prisma.$queryRaw<Array<{ data: RawPublicOrg | null }>>(
+      Prisma.sql`SELECT organization_public(${slug}) AS data`,
+    );
+    const org = orgRows[0]?.data;
+    if (!org) {
+      return null;
+    }
+
+    const take = clampLimit(limit);
+    const skip = Math.max(offset || 0, 0);
+    return this.prisma.withOrgContext(org.id, async (tx) => {
+      const [rows, total] = await Promise.all([
+        tx.campaign.findMany({
+          where: { organizationId: org.id, status: 'active' },
+          orderBy: { createdAt: 'desc' },
+          take,
+          skip,
+        }),
+        tx.campaign.count({ where: { organizationId: org.id, status: 'active' } }),
+      ]);
+      return {
+        items: rows.map((row) => toPublicFromRow(row, org.name)),
+        total,
+        limit: take,
+        offset: skip,
+      };
+    });
   }
 
   /** One public campaign by id (active/closed only), or null. */
