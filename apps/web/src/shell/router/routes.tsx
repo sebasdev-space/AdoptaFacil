@@ -5,6 +5,7 @@ import {
   ADOPTIONS_MANAGEMENT_ROLES,
   ANIMAL_VIEW_ROLES,
   CAMPAIGNS_VIEW_ROLES,
+  DONATIONS_MANAGEMENT_ROLES,
   ORG_DOCUMENTS_ROLES,
   ORG_MEMBER_ROLES,
   PLATFORM_DOCUMENTS_ROLES,
@@ -38,7 +39,7 @@ import {
   AdoptionsKanbanPage,
   MyAdoptionRequestsPage,
 } from '../../features/adoptions';
-import { DonatePage } from '../../features/donations';
+import { DonatePage, ReceivedDonationsPage } from '../../features/donations';
 import { SponsorPage, SponsorshipsPage } from '../../features/sponsorships';
 import { CertificateEmissionPage, CertificateVerificationPage } from '../../features/certificates';
 
@@ -162,11 +163,22 @@ export function AppRoutes() {
               tocar la lógica de donación.
               F1-02: revisado contra el backend — `POST /donations` no lleva `@Roles`
               (cualquier autenticado dona), así que esta ruta se queda sin role-guard,
-              igual que "Adopciones/solicitar". `GET /donations/received` (MANAGE_ROLES:
-              Owner/Administrador/Operador) SÍ es de gestión de org, pero aún no tiene
-              página/ruta en el frontend — no hay nada que gatear todavía; queda como
-              backlog propio (M05, no es cruce con Sebastián). */}
+              igual que "Adopciones/solicitar". */}
           <Route path="donaciones" element={<DonatePage />} />
+          {/* F-DONACIONES-RECIBIDAS: la contraparte de gestión de org de "donaciones"
+              arriba — GET /donations/received (MANAGE_ROLES: Owner/Administrador/
+              Operador) ya existía en el backend sin página/ruta en el frontend (lo
+              que TEST-SWEEP había notado). `DONATIONS_MANAGEMENT_ROLES` está calcada
+              del `@Roles` de ese endpoint; mismo patrón exacto que F1-02 con
+              "Adopciones" vs. "Mis solicitudes". */}
+          <Route
+            path="donaciones-recibidas"
+            element={
+              <RequireRoles roles={DONATIONS_MANAGEMENT_ROLES}>
+                <ReceivedDonationsPage />
+              </RequireRoles>
+            }
+          />
           {/* M07 · apadrinamiento P1 (RF17, S2-03). Mismo SEAM que donaciones: la
               org/animal objetivo llega por query param (animalId [+ animalName,
               organizationName]) desde el detalle público de un animal (§M14,
