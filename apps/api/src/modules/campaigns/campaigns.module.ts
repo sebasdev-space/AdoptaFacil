@@ -8,6 +8,7 @@ import { CampaignsController } from './campaigns.controller';
 import { CampaignsService } from './campaigns.service';
 import { PublicCampaignsController } from './public-campaigns.controller';
 import { PublicCampaignsService } from './public-campaigns.service';
+import { PublicOrgCampaignsController } from './public-org-campaigns.controller';
 
 /**
  * M06 · Fundraising campaigns (RF15) + accountability evidences (RF16, T-054) +
@@ -25,6 +26,7 @@ import { PublicCampaignsService } from './public-campaigns.service';
     CampaignEvidencesController,
     CampaignFundingController,
     PublicCampaignsController,
+    PublicOrgCampaignsController,
   ],
   providers: [
     CampaignsService,
