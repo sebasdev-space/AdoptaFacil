@@ -10,6 +10,7 @@ import {
   normalizeDonations,
   organizationLabel,
 } from '../model/my-donations-view';
+import { DonationDetailModal } from './donation-detail-modal';
 
 /** Inline expandable receipt for ONE approved donation (fetched on demand). */
 function ReceiptDetail({ donationId }: { donationId: string }) {
@@ -77,6 +78,8 @@ export function MyDonationsList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const detailDonation = donations.find((d) => d.id === detailId) ?? null;
 
   useEffect(() => {
     let active = true;
@@ -126,19 +129,22 @@ export function MyDonationsList() {
                   <span className="text-muted-foreground">{formatBogota(donation.createdAt)}</span>
                   <span className="ml-auto font-medium">{formatCop(donation.amountCharged)}</span>
                 </div>
-                {donation.status === 'approved' && (
-                  <div className="mt-2">
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button variant="outline" onClick={() => setDetailId(donation.id)}>
+                    Ver detalle
+                  </Button>
+                  {donation.status === 'approved' && (
                     <Button
                       variant="outline"
                       onClick={() => setExpanded(expanded === donation.id ? null : donation.id)}
                     >
                       {expanded === donation.id ? 'Ocultar recibo' : 'Ver recibo'}
                     </Button>
-                    {expanded === donation.id && (
-                      <div className="mt-2">
-                        <ReceiptDetail donationId={donation.id} />
-                      </div>
-                    )}
+                  )}
+                </div>
+                {donation.status === 'approved' && expanded === donation.id && (
+                  <div className="mt-2">
+                    <ReceiptDetail donationId={donation.id} />
                   </div>
                 )}
               </li>
@@ -146,6 +152,10 @@ export function MyDonationsList() {
           </ul>
         )}
       </CardContent>
+      <DonationDetailModal
+        donation={detailDonation}
+        onOpenChange={(open) => !open && setDetailId(null)}
+      />
     </Card>
   );
 }

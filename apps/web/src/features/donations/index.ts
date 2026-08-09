@@ -6,6 +6,7 @@ export { DonationBreakdown } from './components/donation-breakdown';
 export { MyDonationsList } from './components/my-donations-list';
 export {
   buildDonationBreakdown,
+  breakdownLines,
   safeBuildDonationBreakdown,
   formatCop,
   formatBogota,
