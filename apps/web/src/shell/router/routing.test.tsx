@@ -68,7 +68,7 @@ describe('routing — public vs protected', () => {
     expect(screen.queryByText('Estado del sistema')).not.toBeInTheDocument();
   });
 
-  it('renders a protected module route when authenticated with the required role (F1-02)', () => {
+  it('renders a protected module route when authenticated with the required role (F1-02)', async () => {
     // "/adopciones" is now role-gated at the route level (F1-02, ADOPTIONS_MANAGEMENT_ROLES) —
     // the default mock session carries no roles, so this needs an eval role explicitly.
     renderShell({
@@ -85,7 +85,13 @@ describe('routing — public vs protected', () => {
         },
       },
     });
-    expect(screen.getByRole('heading', { name: 'Adopciones' })).toBeInTheDocument();
+    // FIX-FLAKY-2: the heading renders synchronously, but AdoptionsKanbanPage
+    // also kicks off an async load() on mount (GET /adoptions) that resolves
+    // and calls setRequests/setLoading AFTER a synchronous getBy would have
+    // already returned — outside act(), the same act()-warning signature
+    // already fixed once in FIX-FLAKY. findBy waits for that pending update to
+    // settle before the test (and RTL's cleanup) proceeds.
+    expect(await screen.findByRole('heading', { name: 'Adopciones' })).toBeInTheDocument();
   });
 
   it('renders the 404 page for unknown routes inside the shell', () => {
