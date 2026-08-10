@@ -1,4 +1,4 @@
-import { cn } from '@adoptafacil/ui';
+import { Logo } from '@adoptafacil/ui';
 
 export interface BrandProps {
   className?: string;
@@ -8,24 +8,8 @@ export interface BrandProps {
   inverse?: boolean;
 }
 
-/** AdoptaFácil wordmark used in the sidebar and mobile header. */
+/** AdoptaFácil brand mark used in the sidebar and mobile header — the real
+ * logo asset (see `Logo`), never a text initial. */
 export function Brand({ className, inverse = false }: BrandProps) {
-  return (
-    <div className={cn('flex items-center gap-2', className)}>
-      <span
-        className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground"
-        aria-hidden
-      >
-        <span className="text-base font-bold">A</span>
-      </span>
-      <span
-        className={cn(
-          'text-lg font-semibold tracking-tight',
-          inverse ? 'text-white' : 'text-foreground',
-        )}
-      >
-        Adopta<span className={inverse ? 'text-brand-teal' : 'text-primary'}>Fácil</span>
-      </span>
-    </div>
-  );
+  return <Logo variant="mark" tone={inverse ? 'dark' : 'light'} size="sm" className={className} />;
 }

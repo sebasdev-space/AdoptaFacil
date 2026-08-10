@@ -1,0 +1,76 @@
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 0;
+}
+
+// Cropped icon-only mark (dog+cat heart glyph, top square of the source
+// asset) — used where space is tight (sidebar, topbar, favic-sized slots).
+// The source JPEG has a solid white background, so the mark always sits on
+// a small white chip: on a light page that reads as a subtle bordered tile
+// (same hairline+shadow language as Card); on the navy sidebar it's the
+// plinth that keeps the mark visible against the dark surface.
+.logo__mark {
+  flex-shrink: 0;
+  border-radius: var(--r-md);
+  background-color: #fff;
+  background-repeat: no-repeat;
+  // Crops to the icon (top ~62%, horizontally centered) out of the square
+  // source image — see logo.tsx for the exact size/position math.
+  background-size: 165% auto;
+  background-position: 50% 0%;
+  box-shadow: var(--shadow-xs);
+}
+
+.logo__mark--sm {
+  width: 2rem;
+  height: 2rem;
+}
+
+.logo__mark--md {
+  width: 2.5rem;
+  height: 2.5rem;
+}
+
+.logo__full {
+  display: block;
+  height: auto;
+  object-fit: contain;
+  border-radius: var(--r-lg);
+}
+
+.logo__full--sm {
+  width: 7rem;
+}
+
+.logo__full--md {
+  width: 9rem;
+}
+
+.logo__wordmark {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-h3);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.logo__wordmark--light {
+  color: var(--text-light);
+}
+
+.logo__wordmark--dark {
+  color: var(--text-dark);
+}
+
+.logo__wordmark-accent {
+  color: var(--brand-dark);
+}
+
+.logo__wordmark-accent--light {
+  // Neither --brand (~2.1:1) nor --brand-dark reads clearly on --navy — a
+  // touch lighter than the raw brand teal clears contrast against navy
+  // without needing a whole extra token yet.
+  color: #5ddcc6;
+}

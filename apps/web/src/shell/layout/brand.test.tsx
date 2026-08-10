@@ -3,16 +3,18 @@ import { describe, expect, it } from 'vitest';
 import { Brand } from './brand';
 
 describe('Brand', () => {
-  it('renders the wordmark in the default (dark-text) colors', () => {
+  it('renders the real logo mark plus the "AdoptaFácil" wordmark', () => {
     render(<Brand />);
-    expect(screen.getByText('Fácil')).toHaveClass('text-primary');
+    expect(screen.getByText('Adopta')).toBeInTheDocument();
+    expect(screen.getByText('Fácil')).toBeInTheDocument();
   });
 
-  it('REFACTOR-VISUAL Fase B: "inverse" swaps to light-on-navy colors', () => {
+  it('REFACTOR-VISUAL v2: "inverse" still renders on a dark surface without duplicating the accessible name', () => {
     render(<Brand inverse />);
-    const tealPart = screen.getByText('Fácil');
-    // "Fácil" is the inner span; its parent carries the outer wordmark's color.
-    expect(tealPart.parentElement).toHaveClass('text-white');
-    expect(tealPart).toHaveClass('text-brand-teal');
+    expect(screen.getByText('Adopta')).toBeInTheDocument();
+    expect(screen.getByText('Fácil')).toBeInTheDocument();
+    // The wordmark text is the accessible name; the icon next to it must not
+    // announce "AdoptaFácil" a second time via its own aria-label.
+    expect(screen.queryByRole('img', { name: 'AdoptaFácil' })).not.toBeInTheDocument();
   });
 });
