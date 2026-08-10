@@ -25,4 +25,9 @@ describe('Card', () => {
     render(<Card data-testid="card">x</Card>);
     expect(screen.getByTestId('card')).toHaveClass('bg-card');
   });
+
+  it("REFACTOR-VISUAL: uses the brand's generous corner radius", () => {
+    render(<Card data-testid="card">x</Card>);
+    expect(screen.getByTestId('card')).toHaveClass('rounded-2xl');
+  });
 });

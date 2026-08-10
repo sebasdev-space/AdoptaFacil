@@ -30,11 +30,11 @@ const PET_PLACEHOLDERS = ['🐕', '🐈', '🐕'];
  */
 export function PortalMiniPreview({
   organizationName = 'Tu organización',
-  primary = '142 72% 29%',
+  primary = '172 67% 30%',
   primaryForeground = '0 0% 100%',
-  secondary = '36 38% 94%',
-  accent = '142 40% 94%',
-  accentForeground = '142 72% 20%',
+  secondary = '213 20% 93%',
+  accent = '169 55% 94%',
+  accentForeground = '214 32% 18%',
   logoPosition = 'left',
   socialNavPosition = 'right',
 }: PortalMiniPreviewProps) {

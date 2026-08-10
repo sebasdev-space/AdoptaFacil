@@ -64,6 +64,23 @@ module.exports = {
           DEFAULT: 'hsl(var(--info) / <alpha-value>)',
           foreground: 'hsl(var(--info-foreground) / <alpha-value>)',
         },
+        // Dark navy surface (Button "dark" variant, dark shell surfaces).
+        // Theme-aware — see globals.css for why this differs from `brand.navy`.
+        navy: {
+          DEFAULT: 'hsl(var(--navy) / <alpha-value>)',
+          soft: 'hsl(var(--navy-soft) / <alpha-value>)',
+        },
+        // Raw brand swatches (REFACTOR-VISUAL Fase A) — literal logo colors,
+        // constant across light/dark, for decorative/non-text use only.
+        brand: {
+          teal: 'hsl(var(--brand-teal) / <alpha-value>)',
+          'teal-dark': 'hsl(var(--brand-teal-dark) / <alpha-value>)',
+          'teal-light': 'hsl(var(--brand-teal-light) / <alpha-value>)',
+          navy: 'hsl(var(--brand-navy) / <alpha-value>)',
+          'navy-soft': 'hsl(var(--brand-navy-soft) / <alpha-value>)',
+          coral: 'hsl(var(--brand-coral) / <alpha-value>)',
+          gold: 'hsl(var(--brand-gold) / <alpha-value>)',
+        },
       },
       borderRadius: {
         xl: 'calc(var(--radius) + 4px)',

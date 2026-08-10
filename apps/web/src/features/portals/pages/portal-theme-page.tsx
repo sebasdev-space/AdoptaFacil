@@ -44,13 +44,13 @@ function tokensFromForm(form: FormState): PortalTheme {
  *  written into the form/save payload (an unset field stays omitted, exactly
  *  as before). */
 const DISPLAY_FALLBACK_HSL: Partial<Record<string, string>> = {
-  primary: '142 72% 29%',
+  primary: '172 67% 30%',
   'primary-foreground': '0 0% 100%',
-  secondary: '36 38% 94%',
-  'secondary-foreground': '30 25% 22%',
-  accent: '142 40% 94%',
-  'accent-foreground': '142 72% 20%',
-  ring: '142 72% 29%',
+  secondary: '213 20% 93%',
+  'secondary-foreground': '214 32% 18%',
+  accent: '169 55% 94%',
+  'accent-foreground': '214 32% 18%',
+  ring: '172 67% 30%',
 };
 
 /** Simple external-link glyph (feature-local — no icon library added). */
