@@ -13,6 +13,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  EmptyState,
   Skeleton,
   useToast,
 } from '@adoptafacil/ui';
@@ -20,6 +21,7 @@ import { PageContainer, PageHeader } from '../../_layout';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
 import { TextField } from '../components/profile-fields';
+import styles from './platform-documents-review-page.module.scss';
 
 const TYPE_LABELS: Record<string, string> = {
   [DocumentType.ExistenceRepresentationCertificate]: 'Certificado de existencia y representación',
@@ -95,7 +97,7 @@ export function PlatformDocumentsReviewPage() {
     return (
       <PageContainer>
         <PageHeader title="Revisión de documentos" description="Acceso restringido." />
-        <p className="text-sm text-muted-foreground">No tienes permisos de plataforma.</p>
+        <EmptyState title="Sin acceso" description="No tienes permisos de plataforma." />
       </PageContainer>
     );
   }
@@ -108,9 +110,9 @@ export function PlatformDocumentsReviewPage() {
       />
       {loading && <Skeleton className="h-64 w-full" />}
       {!loading && (
-        <div className="space-y-4">
+        <div className={styles.queue}>
           {queue.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No hay documentos por revisar.</p>
+            <EmptyState title="No hay documentos por revisar." />
           ) : (
             queue.map((item) => (
               <Card key={item.id}>
@@ -120,7 +122,7 @@ export function PlatformDocumentsReviewPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                  <div className={styles['item__meta']}>
                     <Badge variant="secondary">{item.status}</Badge>
                     <span>Subido: {formatCO(item.createdAt)}</span>
                     <span>Vence: {formatCO(item.expiresAt)}</span>
@@ -131,7 +133,7 @@ export function PlatformDocumentsReviewPage() {
                     value={notes[item.id] ?? ''}
                     onChange={(value) => setNotes((prev) => ({ ...prev, [item.id]: value }))}
                   />
-                  <div className="flex flex-wrap gap-2">
+                  <div className={styles['item__actions']}>
                     <Button
                       disabled={busy === item.id}
                       onClick={() => void review(item.id, 'approve')}
