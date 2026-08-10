@@ -30,9 +30,10 @@ export const ADOPTION_NEXT_STATUSES: Record<AdoptionStatus, readonly AdoptionSta
 /**
  * Badge variant per status (semantic, not the brand accent).
  *
- * F1-03-COMPLETO: `'success'` (columna "Aprobada") mide ~4.10:1 en tema claro
- * (bajo el 4.5:1 de AA para texto normal) — token compartido (`--success` en
- * packages/ui/globals.css), no arreglable aquí; reportado como cruce.
+ * F1-03-COMPLETO: el cruce reportado sobre el contraste de `'success'`
+ * (columna "Aprobada", ~4.10:1) ya fue resuelto por F-BADGE en
+ * `packages/ui/src/styles/globals.css` (~4.80:1, verificado de nuevo en
+ * REFACTOR-VISUAL Fase A) — nada que hacer aquí.
  */
 export function adoptionStatusVariant(
   status: AdoptionStatus,
