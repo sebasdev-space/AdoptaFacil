@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AdoptionRequest } from '@adoptafacil/contracts';
-import { Badge, Card, CardContent, Skeleton } from '@adoptafacil/ui';
+import { Badge, Button, Card, CardContent, Skeleton } from '@adoptafacil/ui';
 import { PageContainer, PageHeader } from '../../_layout';
 import { useApiClient } from '../../../shell/api';
 import { listMyAdoptionRequests } from '../api/adoptions-api';
@@ -10,6 +10,7 @@ import {
   formatBogota,
 } from '../model/adoptions-view';
 import { normalizeMine, organizationLabel } from '../model/my-adoption-requests-view';
+import { MyRequestDetailModal } from '../components/my-request-detail-modal';
 
 /**
  * "Mis solicitudes" (F1-01) — historial de solicitudes de adopción de la
@@ -23,6 +24,8 @@ export function MyAdoptionRequestsPage() {
   const [requests, setRequests] = useState<AdoptionRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const detailRequest = requests.find((r) => r.id === detailId) ?? null;
 
   const load = useCallback(() => {
     setLoading(true);
@@ -73,6 +76,11 @@ export function MyAdoptionRequestsPage() {
                       </span>
                     </div>
                     <p className="mt-1 text-muted-foreground">{organizationLabel(request)}</p>
+                    <div className="mt-2">
+                      <Button variant="outline" onClick={() => setDetailId(request.id)}>
+                        Ver detalle
+                      </Button>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -80,6 +88,10 @@ export function MyAdoptionRequestsPage() {
           </CardContent>
         </Card>
       )}
+      <MyRequestDetailModal
+        request={detailRequest}
+        onOpenChange={(open) => !open && setDetailId(null)}
+      />
     </PageContainer>
   );
 }
