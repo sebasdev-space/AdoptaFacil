@@ -13,13 +13,17 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  ProgressStepper,
   Skeleton,
+  StatCard,
 } from '@adoptafacil/ui';
 import { formatCop } from '../../donations';
 import { fetchHealth } from '../../../lib/api';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
 import { fetchOrgSummary } from '../api/dashboard-api';
+import { formatLongDateEs, greetingLabel } from '../model/greeting';
+import { formalizationSteps, formalizationStepIndex } from '../model/formalization-stepper-view';
 import { PageContainer, PageHeader } from '../page';
 
 type LoadState =
@@ -37,31 +41,6 @@ type SummaryState =
   | { status: 'ready'; data: OrganizationDashboardSummary }
   | { status: 'error' };
 
-function SummaryStat({
-  label,
-  value,
-  hint,
-  badge,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  badge?: { text: string; variant: 'warning' | 'destructive' };
-}) {
-  return (
-    <Card>
-      <CardContent className="pt-6">
-        <p className="text-sm text-muted-foreground">{label}</p>
-        <div className="mt-1 flex items-baseline justify-between gap-2">
-          <span className="text-2xl font-bold tracking-tight">{value}</span>
-          {badge && <Badge variant={badge.variant}>{badge.text}</Badge>}
-          {hint && <span className="text-sm text-muted-foreground">{hint}</span>}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 function StatusRow({ label, value, up }: { label: string; value: string; up: boolean }) {
   return (
     <li className="flex items-center justify-between py-1.5">
@@ -75,15 +54,59 @@ function StatusRow({ label, value, up }: { label: string; value: string; up: boo
   );
 }
 
+interface ActionItem {
+  key: string;
+  label: string;
+  href: string;
+  linkLabel: string;
+}
+
+/**
+ * "Requiere tu acción" — SOLO a partir de los conteos reales que YA trae
+ * `GET /org/summary` (S2-08). El mockup de referencia muestra 4 acciones con
+ * detalle específico (montos, nombre de animal, nombre de documento) que ese
+ * endpoint no expone — inventar esos detalles violaría "sin cifras
+ * inventadas". Esta versión es la interpretación honesta: mismo propósito
+ * (qué necesita atención hoy), solo con lo que el backend YA agrega.
+ */
+function deriveActionItems(data: OrganizationDashboardSummary): ActionItem[] {
+  const items: ActionItem[] = [];
+  if (data.adoptionRequestsPending > 0) {
+    items.push({
+      key: 'adoptions',
+      label: `${data.adoptionRequestsPending} solicitud${data.adoptionRequestsPending === 1 ? '' : 'es'} de adopción sin revisar`,
+      href: '/adopciones',
+      linkLabel: 'Ir a la bandeja',
+    });
+  }
+  if (data.documentsExpiringSoon > 0) {
+    items.push({
+      key: 'expiring',
+      label: `${data.documentsExpiringSoon} documento${data.documentsExpiringSoon === 1 ? '' : 's'} institucional${data.documentsExpiringSoon === 1 ? '' : 'es'} por vencer`,
+      href: '/organizacion/documentos',
+      linkLabel: 'Ver documentos',
+    });
+  }
+  if (data.documentsRejected > 0) {
+    items.push({
+      key: 'rejected',
+      label: `${data.documentsRejected} documento${data.documentsRejected === 1 ? '' : 's'} rechazado${data.documentsRejected === 1 ? '' : 's'} · pendiente de subsanar`,
+      href: '/organizacion/documentos',
+      linkLabel: 'Subsanar',
+    });
+  }
+  return items;
+}
+
 /**
  * Portal home ("Inicio"). Two independent, role-gated blocks:
  *
- * - Org summary (M13, S2-08): stat cards from `GET /org/summary`, gated to
- *   Owner/Administrator/Operator (`SUMMARY_ROLES`, mirrors the backend's
- *   `VIEW_ROLES` exactly). Fills the gap REFACTOR-VISUAL Fase C3 flagged as
- *   "no existe todavía" — now that the read-only aggregate exists, this
- *   renders it without inventing any field the endpoint doesn't return (no
- *   time series, no gross/commission/net breakdown).
+ * - Org summary (M13, S2-08): saludo real + "requiere tu acción" (derivado de
+ *   los mismos conteos) + stat cards + formalización, todo desde
+ *   `GET /org/summary`, gated a Owner/Administrator/Operator (`SUMMARY_ROLES`,
+ *   mirrors the backend's `VIEW_ROLES` exactly). Sin serie de tiempo, sin
+ *   desglose bruto/comisión/neto — ese dato no existe en el backend todavía
+ *   (S2-08 lo dejó fuera de alcance a propósito).
  * - System-health check (walking-skeleton, browser → API → Postgres/Redis),
  *   kept for platform admins.
  *
@@ -95,7 +118,7 @@ function StatusRow({ label, value, up }: { label: string; value: string; up: boo
  * fetch entirely for a role that can't see them, not just hide the result.
  */
 export function HomePage() {
-  const { hasAnyRole } = useSession();
+  const { hasAnyRole, user } = useSession();
   const client = useApiClient();
   const isPlatformAdmin = hasAnyRole(...PLATFORM_ROLES);
   const canViewSummary = hasAnyRole(...SUMMARY_ROLES);
@@ -130,12 +153,17 @@ export function HomePage() {
     if (canViewSummary) loadSummary();
   }, [canViewSummary, loadSummary]);
 
+  const now = new Date();
+  const description = canViewSummary
+    ? `${greetingLabel(now)}, ${user?.name} · ${formatLongDateEs(now)}`
+    : 'Portal AdoptaFácil — navegación y transparencia.';
+
   return (
     <PageContainer>
-      <PageHeader title="Inicio" description="Portal AdoptaFácil — navegación y transparencia." />
+      <PageHeader title="Inicio" description={description} />
 
       {canViewSummary && (
-        <div className="mb-6">
+        <div className="mb-6 space-y-6">
           {summary.status === 'loading' && (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {Array.from({ length: 4 }, (_, i) => (
@@ -156,44 +184,86 @@ export function HomePage() {
           )}
 
           {summary.status === 'ready' && (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <SummaryStat label="Animales activos" value={String(summary.data.animalsActive)} />
-              <SummaryStat
-                label="Solicitudes pendientes"
-                value={String(summary.data.adoptionRequestsPending)}
-              />
-              <SummaryStat
-                label="Apadrinamientos activos"
-                value={String(summary.data.sponsorshipsActive)}
-              />
-              <SummaryStat
-                label="Donaciones recibidas"
-                value={formatCop(summary.data.donationsReceivedTotal)}
-              />
-              <SummaryStat
-                label="Documentos por vencer"
-                value={String(summary.data.documentsExpiringSoon)}
-                badge={
-                  summary.data.documentsExpiringSoon > 0
-                    ? { text: 'Revisar', variant: 'warning' }
-                    : undefined
-                }
-              />
-              <SummaryStat
-                label="Documentos rechazados"
-                value={String(summary.data.documentsRejected)}
-                badge={
-                  summary.data.documentsRejected > 0
-                    ? { text: 'Subsanar', variant: 'destructive' }
-                    : undefined
-                }
-              />
-              <SummaryStat
-                label="Formalización"
-                value={`Nivel ${summary.data.formalizationLevel}`}
-                hint={`${summary.data.formalizationPercent}%`}
-              />
-            </div>
+            <>
+              {deriveActionItems(summary.data).length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>
+                      Requiere tu acción · {deriveActionItems(summary.data).length}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {deriveActionItems(summary.data).map((item) => (
+                      <div
+                        key={item.key}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed p-3"
+                      >
+                        <span className="text-sm">{item.label}</span>
+                        <a href={item.href} className="text-sm font-semibold text-primary">
+                          {item.linkLabel} →
+                        </a>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <StatCard label="Animales activos" value={summary.data.animalsActive} />
+                <StatCard
+                  label="Solicitudes pendientes"
+                  value={summary.data.adoptionRequestsPending}
+                />
+                <StatCard label="Apadrinamientos activos" value={summary.data.sponsorshipsActive} />
+                <StatCard
+                  label="Donaciones recibidas"
+                  value={formatCop(summary.data.donationsReceivedTotal)}
+                />
+                <StatCard
+                  label="Documentos por vencer"
+                  value={summary.data.documentsExpiringSoon}
+                  accessory={
+                    summary.data.documentsExpiringSoon > 0 ? (
+                      <Badge variant="warning">Revisar</Badge>
+                    ) : undefined
+                  }
+                />
+                <StatCard
+                  label="Documentos rechazados"
+                  value={summary.data.documentsRejected}
+                  accessory={
+                    summary.data.documentsRejected > 0 ? (
+                      <Badge variant="destructive">Subsanar</Badge>
+                    ) : undefined
+                  }
+                />
+                <StatCard
+                  label="Formalización"
+                  value={`Nivel ${summary.data.formalizationLevel}`}
+                  accessory={
+                    <span className="text-sm text-muted-foreground">
+                      {summary.data.formalizationPercent}%
+                    </span>
+                  }
+                />
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Formalización</CardTitle>
+                  <CardDescription>
+                    Nivel {summary.data.formalizationLevel} · {summary.data.formalizationPercent}%
+                    completado
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ProgressStepper
+                    steps={formalizationSteps()}
+                    currentIndex={formalizationStepIndex(summary.data.formalizationPercent)}
+                  />
+                </CardContent>
+              </Card>
+            </>
           )}
         </div>
       )}
