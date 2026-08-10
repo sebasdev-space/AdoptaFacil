@@ -19,11 +19,11 @@
   font-family: var(--font-sans);
   font-size: var(--fs-sm);
   font-weight: var(--fw-semibold);
-  color: var(--navy-soft);
+  color: hsl(var(--navy-soft));
   transition: var(--transition-base);
 
   &:hover {
-    color: var(--navy);
+    color: hsl(var(--navy));
   }
 
   &:disabled {
@@ -37,7 +37,7 @@
   }
 
   &[data-state='active'] {
-    background-color: var(--navy);
+    background-color: hsl(var(--navy));
     color: var(--text-light);
   }
 }

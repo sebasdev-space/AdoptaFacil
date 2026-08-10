@@ -4,6 +4,7 @@ import {
   useTransparency,
   type AccountabilityState,
 } from './transparency-context';
+import styles from './transparency-indicator.module.scss';
 
 const ACCOUNTABILITY_VARIANT: Record<AccountabilityState, BadgeProps['variant']> = {
   'al-dia': 'success',
@@ -21,8 +22,9 @@ export interface TransparencyIndicatorProps {
  * Persistent transparency indicator (§M14): "Nivel · % formalización · rendición".
  *
  * Rendered in the shell header so it is present on **every** module. Responsive:
- * the labels condense below `md`, keeping the three data points readable on móvil.
- * Data comes from <TransparencyProvider> (placeholder in Ola 0).
+ * the labels condense below `sm`, keeping the three data points readable on móvil.
+ * Data comes from <TransparencyProvider> (placeholder in Ola 0). BEM+SCSS
+ * (REFACTOR-VISUAL v2, Fase 3) — same data/behavior, new look.
  */
 export function TransparencyIndicator({ className }: TransparencyIndicatorProps) {
   const state = useTransparency();
@@ -35,7 +37,7 @@ export function TransparencyIndicator({ className }: TransparencyIndicatorProps)
   if (state.status === 'loading') {
     return (
       <div
-        className={cn('flex items-center gap-2', className)}
+        className={cn(styles.indicator, className)}
         data-testid="transparency-indicator"
         aria-busy="true"
         aria-label="Cargando indicador de transparencia"
@@ -50,7 +52,7 @@ export function TransparencyIndicator({ className }: TransparencyIndicatorProps)
   if (state.status === 'error') {
     return (
       <div
-        className={cn('text-xs text-muted-foreground', className)}
+        className={cn(styles.indicator__error, className)}
         data-testid="transparency-indicator"
         role="status"
       >
@@ -64,35 +66,38 @@ export function TransparencyIndicator({ className }: TransparencyIndicatorProps)
 
   return (
     <div
-      className={cn(
-        'flex items-center gap-1.5 rounded-full border bg-card px-2.5 py-1 text-xs sm:gap-2 sm:text-sm',
-        className,
-      )}
+      className={cn(styles.indicator, className)}
       data-testid="transparency-indicator"
       role="group"
       aria-label={`Transparencia: Nivel ${level}, ${formalizationPct}% de formalización, rendición ${accountabilityLabel}`}
     >
-      <span className="flex items-center gap-1 font-medium">
-        <span className="text-muted-foreground">Nivel</span>
+      <span className={styles.indicator__group}>
+        <span className={styles.indicator__label}>Nivel</span>
         <span aria-hidden>{level}</span>
       </span>
 
-      <span aria-hidden className="text-border">
+      <span aria-hidden className={styles.indicator__divider}>
         ·
       </span>
 
-      <span className="flex items-center gap-1 font-medium tabular-nums">
+      <span className={cn(styles.indicator__group, 'tabular-nums')}>
         {formalizationPct}%
-        <span className="hidden font-normal text-muted-foreground sm:inline">formalización</span>
-        <span className="font-normal text-muted-foreground sm:hidden">form.</span>
+        <span className={cn(styles.indicator__label, styles['indicator__label--long'])}>
+          formalización
+        </span>
+        <span className={cn(styles.indicator__label, styles['indicator__label--short'])}>
+          form.
+        </span>
       </span>
 
-      <span aria-hidden className="text-border">
+      <span aria-hidden className={styles.indicator__divider}>
         ·
       </span>
 
-      <span className="flex items-center gap-1">
-        <span className="hidden text-muted-foreground sm:inline">Rendición</span>
+      <span className={styles.indicator__group}>
+        <span className={cn(styles.indicator__label, styles['indicator__label--long'])}>
+          Rendición
+        </span>
         <Badge variant={ACCOUNTABILITY_VARIANT[accountability]}>{accountabilityLabel}</Badge>
       </span>
     </div>

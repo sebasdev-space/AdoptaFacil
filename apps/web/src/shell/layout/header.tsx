@@ -5,18 +5,26 @@ import { useNav } from '../navigation/nav-context';
 import { useSession } from '../auth';
 import { TransparencyIndicator } from '../transparency';
 import { Brand } from './brand';
+import styles from './header.module.scss';
 
 /**
  * Shell header, present on every module. Left: the drawer toggle (< lg) / brand
  * on móvil. Center–right: the persistent transparency indicator (§M14), theme
- * toggle and session actions.
+ * toggle and session actions. BEM+SCSS (REFACTOR-VISUAL v2, Fase 3).
  */
 export function Header() {
   const { toggleDrawer } = useNav();
   const { user, signOut } = useSession();
 
+  const initials = user?.name
+    ?.split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0]?.toUpperCase())
+    .join('');
+
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6">
+    <header className={styles.topbar}>
       {/* Drawer toggle — móvil/tablet only */}
       <Button
         variant="ghost"
@@ -32,14 +40,17 @@ export function Header() {
       <Brand className="lg:hidden" />
 
       {/* Persistent transparency indicator (§M14) */}
-      <div className="ml-auto flex items-center gap-2 sm:gap-3">
+      <div className={styles.topbar__actions}>
         <TransparencyIndicator />
 
         <ThemeToggle />
 
         {user && (
-          <div className="flex items-center gap-2">
-            <span className="hidden text-sm text-muted-foreground md:inline" title={user.email}>
+          <div className={styles.topbar__user}>
+            <span className={styles.topbar__avatar} aria-hidden>
+              {initials}
+            </span>
+            <span className={styles['topbar__user-name']} title={user.email}>
               {user.name}
             </span>
             <Button

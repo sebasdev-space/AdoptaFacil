@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
@@ -48,7 +48,10 @@ describe('routing — public vs protected', () => {
     expect(
       await screen.findByRole('heading', { name: 'Encuentra a tu próxima mascota' }),
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Iniciar sesión' })).toBeInTheDocument();
+    // "Ingresar" appears in both the navbar (banner) and the footer.
+    expect(
+      within(screen.getByRole('banner')).getByRole('link', { name: 'Ingresar' }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Iniciar sesión' })).not.toBeInTheDocument();
   });
 

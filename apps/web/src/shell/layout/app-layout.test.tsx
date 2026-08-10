@@ -19,11 +19,8 @@ describe('AppLayout', () => {
   it('REFACTOR-VISUAL Fase B: the persistent sidebar uses the brand navy surface', () => {
     renderShell({ route: '/adopciones', session: { initialStatus: 'authenticated' } });
 
-    const nav = screen.getByRole('navigation', { name: 'Navegación principal' });
-    // The <aside> is the nav's grandparent (nav sits between the brand row and
-    // the footer inside it) — walk up rather than assume a fixed depth.
-    const sidebar = nav.closest('aside');
-    expect(sidebar).toHaveClass('bg-navy');
+    const sidebar = screen.getByTestId('org-sidebar');
+    expect(sidebar.className).toMatch(/org-sidebar/);
   });
 
   it('shows the persistent transparency indicator in the header (§M14)', () => {

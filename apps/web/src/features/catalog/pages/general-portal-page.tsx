@@ -1,7 +1,7 @@
 import { Link, Navigate } from 'react-router-dom';
 import { buttonVariants, cn } from '@adoptafacil/ui';
 import { useSession } from '../../../shell/auth';
-import { Brand, FullPageLoading } from '../../../shell/layout';
+import { FullPageLoading, PublicFooter, PublicNavbar } from '../../../shell/layout';
 import {
   GENERAL_CATALOG_HEADING_ID,
   GeneralCatalogSection,
@@ -34,19 +34,7 @@ export function GeneralPortalPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="border-b">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-          <Brand />
-          <div className="flex items-center gap-2">
-            <Link to="/login" className={cn(buttonVariants({ variant: 'outline' }))}>
-              Iniciar sesión
-            </Link>
-            <Link to="/register" className={cn(buttonVariants())}>
-              Crear cuenta
-            </Link>
-          </div>
-        </div>
-      </header>
+      <PublicNavbar />
 
       <main>
         {/* Hero con marca (REFACTOR-VISUAL Fase C1) — franja navy a todo el ancho,
@@ -56,7 +44,7 @@ export function GeneralPortalPage() {
             ningún endpoint público — se omiten en vez de fabricarse). */}
         <section className="bg-navy px-4 py-16 text-white sm:px-6 sm:py-20">
           <div className="mx-auto max-w-6xl space-y-6">
-            <h1 className="max-w-2xl text-3xl font-extrabold tracking-tight sm:text-4xl">
+            <h1 className="max-w-2xl font-display text-3xl font-semibold tracking-tight sm:text-4xl">
               Encuentra a tu <span className="text-brand-teal">próxima mascota</span>
             </h1>
             <p className="max-w-2xl text-white/70">
@@ -88,6 +76,8 @@ export function GeneralPortalPage() {
           <GeneralCatalogSection />
         </div>
       </main>
+
+      <PublicFooter />
     </div>
   );
 }

@@ -1,11 +1,13 @@
 import { useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Button, cn } from '@adoptafacil/ui';
+import { Button, Skeleton, cn } from '@adoptafacil/ui';
 import { CloseIcon } from '../icons';
 import { navItems } from '../navigation';
 import { useNav } from '../navigation/nav-context';
 import { useSession } from '../auth';
 import { Brand } from './brand';
+import { useOrgIdentity } from './use-org-identity';
+import styles from './sidebar.module.scss';
 
 /**
  * The navigation link list, shared by the persistent sidebar and the drawer.
@@ -28,7 +30,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   );
 
   return (
-    <nav aria-label="Navegación principal" className="flex-1 space-y-1 px-3 py-4">
+    <nav aria-label="Navegación principal" className={styles['org-sidebar__nav']}>
       {items.map(({ path, label, icon: Icon, end }) => (
         <NavLink
           key={path}
@@ -36,16 +38,10 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
           end={end}
           onClick={onNavigate}
           className={({ isActive }) =>
-            cn(
-              'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-              isActive
-                ? 'bg-primary text-primary-foreground'
-                : 'text-white/70 hover:bg-white/10 hover:text-white',
-            )
+            cn(styles['org-sidebar__link'], isActive && styles['org-sidebar__link--active'])
           }
         >
-          <Icon className="h-5 w-5 shrink-0" />
+          <Icon />
           <span>{label}</span>
         </NavLink>
       ))}
@@ -53,23 +49,61 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-function SidebarFooter() {
+/** Real org name (never a placeholder) — hidden entirely for a Persona session. */
+function SidebarIdentity() {
+  const identity = useOrgIdentity();
+
+  if (identity.status === 'idle') return null;
+
+  if (identity.status === 'loading') {
+    return (
+      <div className={styles['org-sidebar__identity']}>
+        <Skeleton className="h-9 w-9 rounded-md" />
+        <Skeleton className="h-4 w-28" />
+      </div>
+    );
+  }
+
+  if (identity.status === 'error') return null;
+
+  const initials = identity.name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0]?.toUpperCase())
+    .join('');
+
   return (
-    <div className="border-t border-white/10 px-4 py-3 text-xs text-white/50">
-      <p>AdoptaFácil V2.0</p>
-      <p className="mt-0.5">Portal con transparencia</p>
+    <div className={styles['org-sidebar__identity']}>
+      <span className={styles['org-sidebar__identity-avatar']} aria-hidden>
+        {initials}
+      </span>
+      <span className={styles['org-sidebar__identity-name']}>{identity.name}</span>
     </div>
   );
 }
 
-/** Persistent sidebar shown from `lg` up (escritorio). REFACTOR-VISUAL Fase B:
- * solid navy fill matching the brand mockup's organization-mode sidebar. */
+function SidebarFooter() {
+  const { user } = useSession();
+  return (
+    <div className={styles['org-sidebar__footer']}>
+      {user ? (
+        <span className={styles['org-sidebar__footer-name']}>{user.name}</span>
+      ) : (
+        <span>AdoptaFácil</span>
+      )}
+    </div>
+  );
+}
+
+/** Persistent sidebar shown from `lg` up (escritorio) — navy surface, real logo/org identity (REFACTOR-VISUAL v2, Fase 3). */
 export function Sidebar() {
   return (
-    <aside className="hidden w-64 shrink-0 flex-col bg-navy lg:flex">
-      <div className="flex h-16 items-center border-b border-white/10 px-4">
+    <aside className={styles['org-sidebar']} data-testid="org-sidebar">
+      <div className={styles['org-sidebar__brand']}>
         <Brand inverse />
       </div>
+      <SidebarIdentity />
       <SidebarNav />
       <SidebarFooter />
     </aside>
@@ -98,26 +132,21 @@ export function MobileNavDrawer() {
       className={cn('lg:hidden', isDrawerOpen ? 'pointer-events-auto' : 'pointer-events-none')}
       aria-hidden={!isDrawerOpen}
     >
-      {/* Backdrop */}
       <div
-        className={cn(
-          'fixed inset-0 z-40 bg-foreground/40 transition-opacity duration-200',
-          isDrawerOpen ? 'opacity-100' : 'opacity-0',
-        )}
+        className={cn(styles['mobile-drawer-backdrop'], isDrawerOpen ? 'opacity-100' : 'opacity-0')}
         onClick={closeDrawer}
       />
 
-      {/* Drawer panel — same navy surface as the persistent sidebar (Fase B). */}
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Menú de navegación"
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col bg-navy shadow-xl transition-transform duration-200 ease-out',
+          styles['mobile-drawer-panel'],
           isDrawerOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        <div className="flex h-16 items-center justify-between border-b border-white/10 px-4">
+        <div className={cn(styles['org-sidebar__brand'], styles['org-sidebar__brand--split'])}>
           <Brand inverse />
           <Button
             variant="ghost"
@@ -129,6 +158,7 @@ export function MobileNavDrawer() {
             <CloseIcon className="h-5 w-5" />
           </Button>
         </div>
+        <SidebarIdentity />
         <SidebarNav onNavigate={closeDrawer} />
         <SidebarFooter />
       </div>
