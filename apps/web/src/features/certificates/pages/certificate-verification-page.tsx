@@ -7,6 +7,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  cn,
   EmptyState,
   Input,
 } from '@adoptafacil/ui';
@@ -18,6 +19,7 @@ import {
   MOCK_CERTIFICATE,
   type MockCertificate,
 } from '../model/mock-certificate';
+import styles from './certificate-verification-page.module.scss';
 
 type VerifyState = 'idle' | 'valid' | 'invalid';
 
@@ -84,7 +86,7 @@ export function CertificateVerificationPage() {
             <CardTitle>Verificar un certificado de donación</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
+            <p className={styles.intro}>
               Ingresa el código único del certificado para comprobar su autenticidad.
             </p>
             <div className="flex flex-col gap-2 sm:flex-row">
@@ -100,21 +102,21 @@ export function CertificateVerificationPage() {
         </Card>
 
         {state === 'valid' && (
-          <Card data-testid="verification-result" className="border-success/50 bg-success/5">
+          <Card data-testid="verification-result" className={styles.result}>
             <CardHeader className="gap-2">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className={styles['result__title-row']}>
                 <CardTitle>Certificado válido</CardTitle>
                 <Badge variant="success">Auténtico</Badge>
               </div>
-              <p className="text-sm text-muted-foreground">
+              <p className={styles['result__intro']}>
                 Evidencia de autenticidad emitida por una ESAL con RTE vigente.
               </p>
             </CardHeader>
             <CardContent>
-              <dl className="grid gap-4 sm:grid-cols-2" data-testid="authenticity-evidence">
+              <dl className={styles.evidence} data-testid="authenticity-evidence">
                 <div>
-                  <dt className="text-xs uppercase text-muted-foreground">Emisor</dt>
-                  <dd className="text-sm font-medium">
+                  <dt className={styles['evidence__label']}>Emisor</dt>
+                  <dd className={styles['evidence__value']}>
                     {shownCertificate.organizationName}
                     {shownCertificate.organizationNit &&
                       ` · NIT ${shownCertificate.organizationNit}`}
@@ -124,22 +126,24 @@ export function CertificateVerificationPage() {
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase text-muted-foreground">Donante</dt>
-                  <dd className="text-sm font-medium">{shownCertificate.donorName}</dd>
+                  <dt className={styles['evidence__label']}>Donante</dt>
+                  <dd className={styles['evidence__value']}>{shownCertificate.donorName}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs uppercase text-muted-foreground">Monto</dt>
-                  <dd className="text-sm">{formatCop(shownCertificate.amount)}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs uppercase text-muted-foreground">Fecha de emisión</dt>
-                  <dd className="text-sm">{formatBogota(shownCertificate.issuedAt)}</dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-xs uppercase text-muted-foreground">Hash del documento</dt>
-                  <dd className="break-all font-mono text-xs text-muted-foreground">
-                    {shownCertificate.contentHash}
+                  <dt className={styles['evidence__label']}>Monto</dt>
+                  <dd className={cn(styles['evidence__value'], styles['evidence__value--plain'])}>
+                    {formatCop(shownCertificate.amount)}
                   </dd>
+                </div>
+                <div>
+                  <dt className={styles['evidence__label']}>Fecha de emisión</dt>
+                  <dd className={cn(styles['evidence__value'], styles['evidence__value--plain'])}>
+                    {formatBogota(shownCertificate.issuedAt)}
+                  </dd>
+                </div>
+                <div className={styles['evidence__wide']}>
+                  <dt className={styles['evidence__label']}>Hash del documento</dt>
+                  <dd className={styles['evidence__hash']}>{shownCertificate.contentHash}</dd>
                 </div>
               </dl>
             </CardContent>

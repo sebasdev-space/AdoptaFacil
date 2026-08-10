@@ -9,6 +9,7 @@ import {
   mockVerifyPath,
   type MockCertificate,
 } from '../model/mock-certificate';
+import styles from './certificate-emission-page.module.scss';
 
 /**
  * Datos REALES que la donación (T-050/T-051/F2-03) aporta al empalme, si llegan
@@ -76,7 +77,7 @@ export function CertificateEmissionPage() {
       <div className="space-y-6">
         <DesignPreviewBanner detail="Así se verá el certificado que emitiremos:" />
         <CertificateDocument certificate={certificate} />
-        <div className="flex flex-col items-start gap-1">
+        <div className={styles['cert-cta']}>
           <Link
             to={mockVerifyPath(certificate.code)}
             state={{ certificate }}
@@ -85,7 +86,7 @@ export function CertificateEmissionPage() {
           >
             Verificar este certificado
           </Link>
-          <p className="text-xs text-muted-foreground">
+          <p className={styles['cert-cta__hint']}>
             Vista previa: así podrá cualquiera comprobar su autenticidad con el código, sin iniciar
             sesión.
           </p>

@@ -1,0 +1,41 @@
+.org-logo {
+  height: 2rem;
+  width: 2rem;
+  border-radius: var(--r-full);
+  object-fit: cover;
+}
+
+.org-meta {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.donor-identity {
+  margin-bottom: 1rem;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.donor-identity__name {
+  font-weight: var(--fw-semibold);
+  color: var(--text-dark);
+}
+
+.done {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.done__cert {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  text-align: center;
+}
+
+.done__hint {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}

@@ -3,6 +3,7 @@ import { MIN_DONATION_AMOUNT, type CommissionPayer } from '@adoptafacil/contract
 import { Button, Input } from '@adoptafacil/ui';
 import { DonationBreakdown } from './donation-breakdown';
 import { formatCop, safeBuildDonationBreakdown } from '../model/donation-breakdown-view';
+import styles from './donate-form.module.scss';
 
 export interface DonateFormValues {
   intendedAmount: number;
@@ -35,8 +36,8 @@ export function DonateForm({ organizationName, submitting = false, onDonate }: D
   const canSubmit = preview !== null && !submitting;
 
   return (
-    <div className="space-y-4">
-      <label className="space-y-1.5 text-sm font-medium" htmlFor="donation-amount">
+    <div className={styles.form}>
+      <label className={styles.label} htmlFor="donation-amount">
         Monto de tu donación (COP)
       </label>
       <Input
@@ -47,10 +48,10 @@ export function DonateForm({ organizationName, submitting = false, onDonate }: D
         onChange={(e) => setAmountText(e.target.value.replace(/[^\d]/g, ''))}
       />
 
-      <label className="flex items-start gap-2 text-sm">
+      <label className={styles['checkbox-row']}>
         <input
           type="checkbox"
-          className="mt-1"
+          className={styles['checkbox-row__input']}
           checked={coverFee}
           data-testid="cover-fee"
           onChange={(e) => setCoverFee(e.target.checked)}
@@ -64,7 +65,7 @@ export function DonateForm({ organizationName, submitting = false, onDonate }: D
       {preview ? (
         <DonationBreakdown intendedAmount={amount} commissionPayer={commissionPayer} />
       ) : (
-        <p className="text-xs text-muted-foreground">
+        <p className={styles.hint}>
           Ingresa al menos {formatCop(MIN_DONATION_AMOUNT)} para ver el desglose.
         </p>
       )}

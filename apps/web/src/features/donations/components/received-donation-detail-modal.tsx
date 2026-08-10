@@ -1,6 +1,7 @@
 import type { DonationWithReceipt } from '@adoptafacil/contracts';
 import {
   Badge,
+  cn,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -10,6 +11,7 @@ import {
 import { breakdownLines, formatBogota, formatCop } from '../model/donation-breakdown-view';
 import { DONATION_STATUS_BADGE_VARIANT, DONATION_STATUS_LABELS } from '../model/my-donations-view';
 import { donationConceptLabel, receivedDonorLabel } from '../model/received-donations-view';
+import styles from './donation-detail.module.scss';
 
 export interface ReceivedDonationDetailModalProps {
   /** `null` cierra el modal (mismo patrón controlado de `DonationDetailModal`). */
@@ -45,20 +47,19 @@ export function ReceivedDonationDetailModal({
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4 text-sm">
+            <div className={styles.body}>
               <Badge variant={DONATION_STATUS_BADGE_VARIANT[donation.status]}>
                 {DONATION_STATUS_LABELS[donation.status]}
               </Badge>
 
-              <dl className="space-y-1.5" data-testid="received-donation-detail-breakdown">
+              <dl className={styles.breakdown} data-testid="received-donation-detail-breakdown">
                 {breakdownLines(donation.breakdown).map((line) => (
                   <div
                     key={line.key}
-                    className={
-                      line.emphasis
-                        ? 'flex items-center justify-between font-semibold'
-                        : 'flex items-center justify-between text-muted-foreground'
-                    }
+                    className={cn(
+                      styles.breakdown__line,
+                      line.emphasis && styles['breakdown__line--emphasis'],
+                    )}
                   >
                     <dt>{line.label}</dt>
                     <dd data-testid={`received-donation-detail-${line.key}`}>

@@ -1,0 +1,25 @@
+.breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  font-size: var(--fs-sm);
+}
+
+.breakdown__line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  color: var(--text-muted);
+}
+
+.breakdown__line--emphasis {
+  color: var(--text-dark);
+  font-weight: var(--fw-semibold);
+}
+
+.breakdown__note {
+  padding-top: 0.25rem;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}

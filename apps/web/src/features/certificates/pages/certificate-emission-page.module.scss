@@ -1,0 +1,11 @@
+.cert-cta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+
+.cert-cta__hint {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}

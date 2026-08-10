@@ -12,6 +12,7 @@ import {
   normalizeReceivedDonations,
   receivedDonorLabel,
 } from '../model/received-donations-view';
+import styles from './received-donations-page.module.scss';
 
 /**
  * `/donaciones-recibidas` — donaciones recibidas por LA ORG (§M05, F-DONACIONES-
@@ -77,29 +78,23 @@ export function ReceivedDonationsPage() {
           {!loading && !error && donations.length > 0 && (
             <ul className="space-y-3">
               {donations.map((donation) => (
-                <li
-                  key={donation.id}
-                  className="border-b pb-3 text-sm last:border-b-0"
-                  data-testid="received-donation-row"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium" data-testid="received-donation-donor">
+                <li key={donation.id} className={styles.row} data-testid="received-donation-row">
+                  <div className={styles.row__top}>
+                    <span className={styles.row__donor} data-testid="received-donation-donor">
                       {receivedDonorLabel(donation)}
                     </span>
                     <Badge variant={DONATION_STATUS_BADGE_VARIANT[donation.status]}>
                       {DONATION_STATUS_LABELS[donation.status]}
                     </Badge>
-                    <span className="text-muted-foreground">
+                    <span className={styles.row__meta}>
                       {donationConceptLabel(donation.concept)}
                     </span>
-                    <span className="text-muted-foreground">
-                      {formatBogota(donation.createdAt)}
-                    </span>
-                    <span className="ml-auto font-medium" data-testid="received-donation-amount">
+                    <span className={styles.row__meta}>{formatBogota(donation.createdAt)}</span>
+                    <span className={styles.row__amount} data-testid="received-donation-amount">
                       {formatCop(donation.breakdown.net)}
                     </span>
                   </div>
-                  <div className="mt-2">
+                  <div>
                     <Button variant="outline" onClick={() => setDetailId(donation.id)}>
                       Ver detalle
                     </Button>

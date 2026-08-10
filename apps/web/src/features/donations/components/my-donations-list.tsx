@@ -11,6 +11,7 @@ import {
   organizationLabel,
 } from '../model/my-donations-view';
 import { DonationDetailModal } from './donation-detail-modal';
+import styles from './my-donations-list.module.scss';
 
 /** Inline expandable receipt for ONE approved donation (fetched on demand). */
 function ReceiptDetail({ donationId }: { donationId: string }) {
@@ -41,21 +42,21 @@ function ReceiptDetail({ donationId }: { donationId: string }) {
     return <p className="text-sm text-destructive">No se pudo cargar el recibo.</p>;
   }
   return (
-    <dl className="grid gap-2 text-sm sm:grid-cols-2">
+    <dl className={styles.receipt}>
       <div>
-        <dt className="text-xs uppercase text-muted-foreground">Emitido</dt>
+        <dt className={styles.receipt__label}>Emitido</dt>
         <dd>{formatBogota(receipt.issuedAt)}</dd>
       </div>
       <div>
-        <dt className="text-xs uppercase text-muted-foreground">Monto pretendido</dt>
+        <dt className={styles.receipt__label}>Monto pretendido</dt>
         <dd>{formatCop(receipt.intendedAmount)}</dd>
       </div>
       <div>
-        <dt className="text-xs uppercase text-muted-foreground">Neto para la organización</dt>
+        <dt className={styles.receipt__label}>Neto para la organización</dt>
         <dd>{formatCop(receipt.breakdown.net)}</dd>
       </div>
       <div>
-        <dt className="text-xs uppercase text-muted-foreground">Donante</dt>
+        <dt className={styles.receipt__label}>Donante</dt>
         <dd>{receipt.donor.fullName ?? receipt.donor.email ?? 'Sin datos'}</dd>
       </div>
     </dl>
@@ -120,16 +121,16 @@ export function MyDonationsList() {
         {!error && donations.length > 0 && (
           <ul className="space-y-3">
             {donations.map((donation) => (
-              <li key={donation.id} className="border-b pb-3 text-sm last:border-b-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium">{organizationLabel(donation)}</span>
+              <li key={donation.id} className={styles.row}>
+                <div className={styles.row__top}>
+                  <span className={styles.row__org}>{organizationLabel(donation)}</span>
                   <Badge variant={DONATION_STATUS_BADGE_VARIANT[donation.status]}>
                     {DONATION_STATUS_LABELS[donation.status]}
                   </Badge>
-                  <span className="text-muted-foreground">{formatBogota(donation.createdAt)}</span>
-                  <span className="ml-auto font-medium">{formatCop(donation.amountCharged)}</span>
+                  <span className={styles.row__date}>{formatBogota(donation.createdAt)}</span>
+                  <span className={styles.row__amount}>{formatCop(donation.amountCharged)}</span>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className={styles.row__actions}>
                   <Button variant="outline" onClick={() => setDetailId(donation.id)}>
                     Ver detalle
                   </Button>
@@ -143,9 +144,7 @@ export function MyDonationsList() {
                   )}
                 </div>
                 {donation.status === 'approved' && expanded === donation.id && (
-                  <div className="mt-2">
-                    <ReceiptDetail donationId={donation.id} />
-                  </div>
+                  <ReceiptDetail donationId={donation.id} />
                 )}
               </li>
             ))}

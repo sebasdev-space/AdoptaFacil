@@ -18,6 +18,7 @@ import { createDonation } from '../api/donations-api';
 import { DonateForm, type DonateFormValues } from '../components/donate-form';
 import { MyDonationsList } from '../components/my-donations-list';
 import { formatCop } from '../model/donation-breakdown-view';
+import styles from './donate-page.module.scss';
 
 interface DonationTarget {
   organizationId: string;
@@ -126,7 +127,7 @@ export function DonatePage() {
                 alt=""
                 aria-hidden
                 data-testid="donation-org-logo"
-                className="h-8 w-8 rounded-full object-cover"
+                className={styles['org-logo']}
               />
             )}
             {target.organizationName}
@@ -136,7 +137,7 @@ export function DonatePage() {
               formalizada la org, nunca se fabrica ni se muestra el de muestra
               del certificado (RF14, congelado, no se toca aquí). */}
           {(target.organizationCity || target.organizationNit) && (
-            <p className="text-xs text-muted-foreground" data-testid="donation-org-meta">
+            <p className={styles['org-meta']} data-testid="donation-org-meta">
               {[target.organizationCity, target.organizationNit && `NIT ${target.organizationNit}`]
                 .filter(Boolean)
                 .join(' · ')}
@@ -145,13 +146,13 @@ export function DonatePage() {
         </CardHeader>
         <CardContent>
           {user?.name && (
-            <p className="mb-4 text-sm text-muted-foreground" data-testid="donor-identity">
-              Donando como <span className="font-medium text-foreground">{user.name}</span>
+            <p className={styles['donor-identity']} data-testid="donor-identity">
+              Donando como <span className={styles['donor-identity__name']}>{user.name}</span>
               {user.email && ` (${user.email})`}
             </p>
           )}
           {done ? (
-            <div className="space-y-4">
+            <div className={styles.done}>
               <EmptyState
                 title="¡Gracias por tu donación!"
                 description={`Registramos tu donación de ${formatCop(done.amountCharged)}. Cuando el pago se confirme, te emitiremos el recibo automáticamente.`}
@@ -161,7 +162,7 @@ export function DonatePage() {
                   el nombre de la org (T-066) + su NIT real si está disponible (F2-03, ya
                   en scope como `target.organizationNit`) por nav-state para reflejar
                   datos reales en la maqueta del certificado. */}
-              <div className="flex flex-col items-center gap-1 text-center">
+              <div className={styles['done__cert']}>
                 <Link
                   to="/certificado"
                   state={{
@@ -174,7 +175,7 @@ export function DonatePage() {
                 >
                   Ver tu certificado de donación
                 </Link>
-                <p className="text-xs text-muted-foreground">
+                <p className={styles['done__hint']}>
                   Vista previa: anticipo del certificado verificable.
                 </p>
               </div>

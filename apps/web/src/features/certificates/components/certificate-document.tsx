@@ -1,6 +1,7 @@
-import { Badge, Card, CardContent, CardHeader, CardTitle } from '@adoptafacil/ui';
+import { Badge, Card, CardContent, CardHeader, CardTitle, cn } from '@adoptafacil/ui';
 import { formatBogota, formatCop, type MockCertificate } from '../model/mock-certificate';
 import { CertificateQr } from './certificate-qr';
+import styles from './certificate-document.module.scss';
 
 export interface CertificateDocumentProps {
   certificate: MockCertificate;
@@ -15,8 +16,9 @@ export interface CertificateDocumentProps {
 export function CertificateDocument({ certificate }: CertificateDocumentProps) {
   return (
     <Card data-testid="certificate-document">
+      <div className={styles.accent} />
       <CardHeader className="gap-2">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className={styles['badge-row']}>
           <CardTitle>Certificado de donación</CardTitle>
           {/* Gating conceptual RF14: el certificado es SOLO para ESAL con RTE.
               F1-03-COMPLETO: el cruce reportado sobre el contraste de
@@ -25,45 +27,44 @@ export function CertificateDocument({ certificate }: CertificateDocumentProps) {
               en REFACTOR-VISUAL Fase A) — nada que hacer aquí. */}
           <Badge variant="success">ESAL · RTE vigente</Badge>
         </div>
-        <p className="text-sm text-muted-foreground">
+        <p className={styles.subtitle}>
           {certificate.organizationName}
           {certificate.organizationNit && ` · NIT ${certificate.organizationNit}`}
         </p>
       </CardHeader>
       <CardContent className="space-y-6">
-        <dl className="grid gap-4 sm:grid-cols-2">
+        <dl className={styles.fields}>
           <div>
-            <dt className="text-xs uppercase text-muted-foreground">Donante</dt>
-            <dd className="text-sm font-medium">{certificate.donorName}</dd>
+            <dt className={styles['fields__label']}>Donante</dt>
+            <dd className={styles['fields__value']}>{certificate.donorName}</dd>
           </div>
           <div>
-            <dt className="text-xs uppercase text-muted-foreground">Monto</dt>
-            <dd className="text-sm font-medium">{formatCop(certificate.amount)}</dd>
+            <dt className={styles['fields__label']}>Monto</dt>
+            <dd className={styles['fields__value']}>{formatCop(certificate.amount)}</dd>
           </div>
           <div>
-            <dt className="text-xs uppercase text-muted-foreground">Fecha de emisión</dt>
-            <dd className="text-sm">{formatBogota(certificate.issuedAt)}</dd>
+            <dt className={styles['fields__label']}>Fecha de emisión</dt>
+            <dd className={styles['fields__value']}>{formatBogota(certificate.issuedAt)}</dd>
           </div>
           <div>
-            <dt className="text-xs uppercase text-muted-foreground">Código único</dt>
-            <dd className="font-mono text-sm" data-testid="certificate-code">
+            <dt className={styles['fields__label']}>Código único</dt>
+            <dd
+              className={cn(styles['fields__value'], styles['fields__value--code'])}
+              data-testid="certificate-code"
+            >
               {certificate.code}
             </dd>
           </div>
         </dl>
 
-        <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1">
-            <p className="text-xs uppercase text-muted-foreground">Hash del documento (muestra)</p>
-            <p className="max-w-md break-all font-mono text-xs text-muted-foreground">
-              {certificate.contentHash}
-            </p>
+        <div className={styles['footer-row']}>
+          <div className={styles.hash}>
+            <p className={styles['hash__label']}>Hash del documento (muestra)</p>
+            <p className={styles['hash__value']}>{certificate.contentHash}</p>
           </div>
-          <div className="flex flex-col items-center gap-1">
+          <div className={styles['qr-col']}>
             <CertificateQr />
-            <span className="text-xs text-muted-foreground">
-              Escanéalo para visitar AdoptaFácil
-            </span>
+            <span className={styles['qr-col__caption']}>Escanéalo para visitar AdoptaFácil</span>
           </div>
         </div>
       </CardContent>

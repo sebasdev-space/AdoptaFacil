@@ -1,5 +1,7 @@
 import type { CommissionPayer } from '@adoptafacil/contracts';
+import { cn } from '@adoptafacil/ui';
 import { buildDonationBreakdown, formatCop } from '../model/donation-breakdown-view';
+import styles from './donation-breakdown.module.scss';
 
 export interface DonationBreakdownProps {
   intendedAmount: number;
@@ -14,21 +16,20 @@ export interface DonationBreakdownProps {
 export function DonationBreakdown({ intendedAmount, commissionPayer }: DonationBreakdownProps) {
   const { lines } = buildDonationBreakdown(intendedAmount, commissionPayer);
   return (
-    <dl className="space-y-1.5 text-sm" data-testid="donation-breakdown">
+    <dl className={styles.breakdown} data-testid="donation-breakdown">
       {lines.map((line) => (
         <div
           key={line.key}
-          className={
-            line.emphasis
-              ? 'flex items-center justify-between font-semibold'
-              : 'flex items-center justify-between text-muted-foreground'
-          }
+          className={cn(
+            styles.breakdown__line,
+            line.emphasis && styles['breakdown__line--emphasis'],
+          )}
         >
           <dt>{line.label}</dt>
           <dd data-testid={`breakdown-${line.key}`}>{formatCop(line.amount)}</dd>
         </div>
       ))}
-      <p className="pt-1 text-xs text-muted-foreground">
+      <p className={styles.breakdown__note}>
         {commissionPayer === 'donor'
           ? 'Cubres las comisiones: la organización recibe el monto completo.'
           : 'La organización asume las comisiones sobre tu donación.'}
