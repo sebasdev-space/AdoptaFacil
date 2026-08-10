@@ -1,0 +1,58 @@
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-hairline);
+  font-size: var(--fs-sm);
+
+  &:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+}
+
+.row__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.row__org {
+  font-weight: var(--fw-semibold);
+  color: var(--text-dark);
+}
+
+.row__date {
+  color: var(--text-muted);
+}
+
+.row__amount {
+  margin-left: auto;
+  font-weight: var(--fw-semibold);
+  color: var(--text-dark);
+}
+
+.row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.receipt {
+  display: grid;
+  gap: 0.5rem;
+  font-size: var(--fs-sm);
+
+  @media (min-width: 640px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.receipt__label {
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
