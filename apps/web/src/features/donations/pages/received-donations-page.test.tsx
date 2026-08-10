@@ -1,4 +1,5 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Role } from '@adoptafacil/contracts';
 import { renderShell } from '../../../test-utils';
@@ -102,6 +103,70 @@ describe('ReceivedDonationsPage', () => {
     expect(screen.getByText('Aprobada')).toBeInTheDocument();
     expect(screen.getByText('Donación general')).toBeInTheDocument();
     expect(screen.getByText(/45\.210/)).toBeInTheDocument();
+  });
+
+  it('REFACTOR-VISUAL Fase C3: "Ver detalle" opens the full breakdown in a modal', async () => {
+    const user = userEvent.setup();
+    stubFetch((url) => {
+      if (url.includes('/donations/received')) {
+        return [
+          {
+            id: 'd-1',
+            organizationId: 'org-1',
+            donorUserId: 'donor-1',
+            concept: { kind: 'organization', id: 'org-1' },
+            commissionPayer: 'organization',
+            intendedAmount: 50000,
+            amountCharged: 50000,
+            currency: 'COP',
+            breakdown: {
+              amountCharged: 50000,
+              gross: 50000,
+              platformFee: 2000,
+              platformIva: 380,
+              gatewayFee: 2025,
+              gatewayIva: 385,
+              net: 45210,
+            },
+            collectionId: 'test_abc123',
+            status: 'approved',
+            createdAt: '2026-07-28T21:25:22.299Z',
+            updatedAt: '2026-07-28T21:25:22.299Z',
+            receipt: {
+              id: 'r-1',
+              organizationId: 'org-1',
+              donationId: 'd-1',
+              dedupKey: 'evt-1',
+              donor: { fullName: 'Camilo Torres', email: 'camilo@test.local' },
+              intendedAmount: 50000,
+              breakdown: {
+                amountCharged: 50000,
+                gross: 50000,
+                platformFee: 2000,
+                platformIva: 380,
+                gatewayFee: 2025,
+                gatewayIva: 385,
+                net: 45210,
+              },
+              issuedAt: '2026-07-28T22:00:00.000Z',
+            },
+          },
+        ];
+      }
+      return [];
+    });
+
+    renderShell({ route: '/donaciones-recibidas', ...orgSession() });
+
+    await screen.findByText('Camilo Torres');
+    await user.click(screen.getByRole('button', { name: 'Ver detalle' }));
+
+    const modal = await screen.findByTestId('received-donation-detail-modal');
+    expect(within(modal).getByRole('heading', { name: 'Camilo Torres' })).toBeInTheDocument();
+    expect(within(modal).getByTestId('received-donation-detail-net')).toHaveTextContent('45.210');
+    expect(within(modal).getByTestId('received-donation-detail-platformFee')).toHaveTextContent(
+      '2.000',
+    );
   });
 
   it('never fabricates a donor name for a pending donation (no receipt yet)', async () => {

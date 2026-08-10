@@ -9,10 +9,11 @@ import {
 } from '@adoptafacil/contracts';
 import {
   Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   EmptyState,
   Input,
   Skeleton,
@@ -125,91 +126,11 @@ export function CampaignsPage() {
       <PageHeader
         title="Campañas de recaudación"
         description="Gestiona las campañas de recaudación de tu organización."
-        actions={
-          canManage && (
-            <Button onClick={() => setShowForm((v) => !v)}>
-              {showForm ? 'Cancelar' : 'Crear campaña'}
-            </Button>
-          )
-        }
+        actions={canManage && <Button onClick={() => setShowForm(true)}>Crear campaña</Button>}
       />
       {loading && <Skeleton className="h-64 w-full" />}
       {!loading && (
         <div className="space-y-6">
-          {canManage && showForm && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Nueva campaña</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="campaign-title"
-                    className="block text-sm font-medium text-foreground"
-                  >
-                    Título
-                  </label>
-                  <Input
-                    id="campaign-title"
-                    placeholder="Título de la campaña"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                  />
-                </div>
-                <TextAreaField
-                  id="campaign-description"
-                  label="Descripción"
-                  value={description}
-                  onChange={setDescription}
-                  placeholder="Cuéntale a los donantes para qué es esta campaña…"
-                />
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <SelectField
-                    id="campaign-category"
-                    label="Categoría"
-                    value={category}
-                    onChange={setCategory}
-                    options={CATEGORY_OPTIONS}
-                  />
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="campaign-goal"
-                      className="block text-sm font-medium text-foreground"
-                    >
-                      Meta (COP)
-                    </label>
-                    <Input
-                      id="campaign-goal"
-                      type="number"
-                      min={1}
-                      step={1}
-                      placeholder="Meta en pesos"
-                      value={goalAmount}
-                      onChange={(e) => setGoalAmount(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label
-                    htmlFor="campaign-deadline"
-                    className="block text-sm font-medium text-foreground"
-                  >
-                    Fecha límite
-                  </label>
-                  <Input
-                    id="campaign-deadline"
-                    type="date"
-                    value={deadline}
-                    onChange={(e) => setDeadline(e.target.value)}
-                  />
-                </div>
-                <Button disabled={saving} onClick={() => void submit()}>
-                  {saving ? 'Creando…' : 'Crear campaña'}
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
           {campaigns.length === 0 ? (
             <EmptyState
               icon={<span aria-hidden>📣</span>}
@@ -232,6 +153,85 @@ export function CampaignsPage() {
           )}
         </div>
       )}
+
+      {/* REFACTOR-VISUAL Fase C3: creación en modal, no embebida en la lista
+          (requisito del rediseño) — mismos campos y misma llamada a `submit`,
+          solo cambia dónde vive el formulario. */}
+      <Dialog open={canManage && showForm} onOpenChange={setShowForm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nueva campaña</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label htmlFor="campaign-title" className="block text-sm font-medium text-foreground">
+                Título
+              </label>
+              <Input
+                id="campaign-title"
+                placeholder="Título de la campaña"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+            </div>
+            <TextAreaField
+              id="campaign-description"
+              label="Descripción"
+              value={description}
+              onChange={setDescription}
+              placeholder="Cuéntale a los donantes para qué es esta campaña…"
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <SelectField
+                id="campaign-category"
+                label="Categoría"
+                value={category}
+                onChange={setCategory}
+                options={CATEGORY_OPTIONS}
+              />
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="campaign-goal"
+                  className="block text-sm font-medium text-foreground"
+                >
+                  Meta (COP)
+                </label>
+                <Input
+                  id="campaign-goal"
+                  type="number"
+                  min={1}
+                  step={1}
+                  placeholder="Meta en pesos"
+                  value={goalAmount}
+                  onChange={(e) => setGoalAmount(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label
+                htmlFor="campaign-deadline"
+                className="block text-sm font-medium text-foreground"
+              >
+                Fecha límite
+              </label>
+              <Input
+                id="campaign-deadline"
+                type="date"
+                value={deadline}
+                onChange={(e) => setDeadline(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowForm(false)}>
+              Cancelar
+            </Button>
+            <Button disabled={saving} onClick={() => void submit()}>
+              {saving ? 'Creando…' : 'Crear campaña'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   );
 }

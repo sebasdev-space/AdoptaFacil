@@ -12,6 +12,12 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Skeleton,
   useToast,
 } from '@adoptafacil/ui';
@@ -51,6 +57,12 @@ export function OrgFormalizationPage() {
   const [loading, setLoading] = useState(true);
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
+  // REFACTOR-VISUAL Fase C3: la transición pendiente de confirmar en el modal
+  // (null = modal cerrado). `requiresReason` decide si el modal pide motivo.
+  const [pendingTransition, setPendingTransition] = useState<{
+    targetState: FormalizationState;
+    requiresReason: boolean;
+  } | null>(null);
   const { toast } = useToast();
 
   const load = async (): Promise<void> => {
@@ -107,6 +119,7 @@ export function OrgFormalizationPage() {
         json: { targetState, ...(reason.trim() ? { reason: reason.trim() } : {}) },
       });
       setReason('');
+      setPendingTransition(null);
       await load();
       toast({ title: 'Estado actualizado', description: `Ahora: ${STATE_LABELS[targetState]}.` });
     } catch (error) {
@@ -118,6 +131,11 @@ export function OrgFormalizationPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const closeTransitionModal = (): void => {
+    setPendingTransition(null);
+    setReason('');
   };
 
   return (
@@ -150,30 +168,27 @@ export function OrgFormalizationPage() {
               </ol>
               {status.rteVigente && <Badge>RTE vigente</Badge>}
 
-              {canManage && (
-                <div className="space-y-3 border-t pt-4">
-                  <TextField
-                    id="formalization-reason"
-                    label="Motivo (requerido para retroceder)"
-                    value={reason}
-                    onChange={setReason}
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    {next && (
-                      <Button disabled={saving} onClick={() => void move(next, false)}>
-                        Avanzar a {STATE_LABELS[next]}
-                      </Button>
-                    )}
-                    {previous && (
-                      <Button
-                        variant="outline"
-                        disabled={saving}
-                        onClick={() => void move(previous, true)}
-                      >
-                        Retroceder a {STATE_LABELS[previous]}
-                      </Button>
-                    )}
-                  </div>
+              {canManage && (next || previous) && (
+                <div className="flex flex-wrap gap-2 border-t pt-4">
+                  {next && (
+                    <Button
+                      onClick={() =>
+                        setPendingTransition({ targetState: next, requiresReason: false })
+                      }
+                    >
+                      Avanzar a {STATE_LABELS[next]}
+                    </Button>
+                  )}
+                  {previous && (
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        setPendingTransition({ targetState: previous, requiresReason: true })
+                      }
+                    >
+                      Retroceder a {STATE_LABELS[previous]}
+                    </Button>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -207,6 +222,54 @@ export function OrgFormalizationPage() {
           </Card>
         </div>
       )}
+
+      {/* REFACTOR-VISUAL Fase C3: el motivo (cuando aplica) se pide en modal,
+          no como campo embebido junto a las tarjetas de estado/historial. */}
+      <Dialog
+        open={pendingTransition !== null}
+        onOpenChange={(open) => !open && closeTransitionModal()}
+      >
+        <DialogContent>
+          {pendingTransition && (
+            <>
+              <DialogHeader>
+                <DialogTitle>
+                  {pendingTransition.requiresReason ? 'Retroceder a' : 'Avanzar a'}{' '}
+                  {STATE_LABELS[pendingTransition.targetState]}
+                </DialogTitle>
+                <DialogDescription>
+                  {pendingTransition.requiresReason
+                    ? 'Retroceder el estado de formalización requiere un motivo — quedará en el historial.'
+                    : 'Este cambio de estado quedará registrado en el historial de la organización.'}
+                </DialogDescription>
+              </DialogHeader>
+              {pendingTransition.requiresReason && (
+                <TextField
+                  id="formalization-reason"
+                  label="Motivo"
+                  value={reason}
+                  onChange={setReason}
+                />
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={closeTransitionModal}>
+                  Cancelar
+                </Button>
+                <Button
+                  disabled={saving}
+                  onClick={() =>
+                    void move(pendingTransition.targetState, pendingTransition.requiresReason)
+                  }
+                >
+                  {saving
+                    ? 'Guardando…'
+                    : `${pendingTransition.requiresReason ? 'Retroceder' : 'Avanzar'} a ${STATE_LABELS[pendingTransition.targetState]}`}
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   );
 }
