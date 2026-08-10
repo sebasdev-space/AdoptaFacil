@@ -1,0 +1,25 @@
+.alert {
+  border-radius: var(--r-md);
+  border: 1px solid;
+  padding: 0.625rem 0.875rem;
+  font-family: var(--font-sans);
+  font-size: var(--fs-sm);
+}
+
+.alert--error {
+  border-color: hsl(var(--destructive) / 0.4);
+  background-color: hsl(var(--destructive) / 0.1);
+  color: hsl(var(--destructive));
+}
+
+.alert--success {
+  border-color: hsl(var(--success) / 0.4);
+  background-color: hsl(var(--success) / 0.1);
+  color: hsl(var(--success));
+}
+
+.alert--info {
+  border-color: hsl(var(--info) / 0.4);
+  background-color: hsl(var(--info) / 0.1);
+  color: hsl(var(--info));
+}

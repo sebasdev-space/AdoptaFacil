@@ -1,5 +1,6 @@
 import { forwardRef } from 'react';
 import { Input, cn, type InputProps } from '@adoptafacil/ui';
+import styles from './field.module.scss';
 
 export interface FieldProps extends Omit<InputProps, 'onChange' | 'value' | 'id'> {
   id: string;
@@ -13,7 +14,8 @@ export interface FieldProps extends Omit<InputProps, 'onChange' | 'value' | 'id'
 /**
  * Accessible labeled input: the `<label>` is associated via `htmlFor`, the error
  * is linked through `aria-describedby` and announced (`role="alert"`), and
- * `aria-invalid` drives the error styling in the UI token set.
+ * `aria-invalid` drives the error styling in the UI token set. BEM+SCSS
+ * (REFACTOR-VISUAL v2, Fase 5).
  */
 export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
   { id, label, value, onChange, error, hint, required, className, ...inputProps },
@@ -24,16 +26,10 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
   const describedBy = [error ? errorId : null, hint ? hintId : null].filter(Boolean).join(' ');
 
   return (
-    <div className="space-y-1.5">
+    <div className={styles.field}>
       <label
         htmlFor={id}
-        className={cn(
-          'block text-sm font-medium text-foreground',
-          // Decorative required marker via a pseudo-element, so it stays out of
-          // the label's accessible name/text (required is conveyed to AT by the
-          // input's `required`/`aria-invalid`).
-          required && "after:ml-0.5 after:text-destructive after:content-['*']",
-        )}
+        className={cn(styles.field__label, required && styles['field__label--required'])}
       >
         {label}
       </label>
@@ -49,12 +45,12 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
         {...inputProps}
       />
       {hint && !error && (
-        <p id={hintId} className="text-xs text-muted-foreground">
+        <p id={hintId} className={styles.field__hint}>
           {hint}
         </p>
       )}
       {error && (
-        <p id={errorId} role="alert" className="text-xs font-medium text-destructive">
+        <p id={errorId} role="alert" className={styles.field__error}>
           {error}
         </p>
       )}

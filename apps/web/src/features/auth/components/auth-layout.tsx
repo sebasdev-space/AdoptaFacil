@@ -9,8 +9,9 @@ import {
   CardHeader,
   CardTitle,
   cn,
+  Logo,
 } from '@adoptafacil/ui';
-import { Brand } from '../../../shell/layout';
+import styles from './auth-layout.module.scss';
 
 export interface AuthLayoutProps {
   title: string;
@@ -39,7 +40,7 @@ export interface AuthLayoutProps {
  */
 export function AuthLayout({ title, description, children, footer, wide }: AuthLayoutProps) {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-4 py-10 text-foreground">
+    <div className={styles.shell}>
       <Link
         to="/"
         className={cn(
@@ -50,8 +51,8 @@ export function AuthLayout({ title, description, children, footer, wide }: AuthL
         ← Volver al inicio
       </Link>
       <Card className={wide ? 'w-full max-w-lg' : 'w-full max-w-sm'}>
-        <CardHeader className="items-center text-center">
-          <Brand className="mb-2" />
+        <CardHeader className={cn(styles.header, 'text-center')}>
+          <Logo variant="full" size="sm" />
           <CardTitle>{title}</CardTitle>
           {description && <CardDescription>{description}</CardDescription>}
         </CardHeader>
