@@ -20,6 +20,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fontsource/poppins": "^5.1.1",
     "@radix-ui/react-dialog": "^1.1.19",
     "@radix-ui/react-select": "^2.3.3",
     "@radix-ui/react-slot": "^1.3.0",

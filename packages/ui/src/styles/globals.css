@@ -1,3 +1,9 @@
+@import '@fontsource/poppins/latin-400.css';
+@import '@fontsource/poppins/latin-500.css';
+@import '@fontsource/poppins/latin-600.css';
+@import '@fontsource/poppins/latin-700.css';
+@import '@fontsource/poppins/latin-800.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -14,36 +20,50 @@
  * them with an alpha value: `hsl(var(--primary) / 0.9)`. Dark mode toggles with
  * the `.dark` class on <html> (see apps/web/src/shell/theme).
  *
- * Brand direction: green as the primary action, a warm and trustworthy tone,
- * first-class dark mode.
+ * REFACTOR-VISUAL (Fase A): brand direction now follows the AdoptaFácil logo —
+ * teal (#25BAA6) as the primary action, navy (#202D3E) as the text/ink and dark
+ * surface color, a cool off-white page background. Every value below was
+ * re-derived from the real logo hex codes and re-verified against WCAG AA
+ * (4.5:1 text, 3:1 UI) with the same rigor as the earlier F1-03/F-BORDE/F-BADGE
+ * fixes — see `ejemplos_refactorizacion/` for the source palette and mockup.
+ * The semantic status colors (destructive/success/warning/info) are left
+ * UNCHANGED on purpose: they already carry dedicated AA fixes (F-BORDE,
+ * F-BADGE) and are intentionally a different hue family from the brand primary
+ * so a status badge never looks like a primary CTA.
  */
 @layer base {
   :root {
     /* Surfaces */
-    --background: 40 33% 99%; /* warm off-white, not clinical pure white */
-    --foreground: 150 15% 12%;
+    --background: 180 23% 97%; /* "bg-cool" from the brand palette */
+    --foreground: 214 32% 18%; /* brand navy */
     --card: 0 0% 100%;
-    --card-foreground: 150 15% 12%;
+    --card-foreground: 214 32% 18%;
     --popover: 0 0% 100%;
-    --popover-foreground: 150 15% 12%;
+    --popover-foreground: 214 32% 18%;
 
-    /* Primary — AdoptaFácil green (call to action) */
-    --primary: 142 72% 29%;
+    /* Primary — AdoptaFácil teal (call to action). The true logo hex
+       (#25BAA6, H172 S67 L44) measures only 2.43:1 for white text — darkened
+       to L30 (#198072) so `primary-foreground: white` clears 4.5:1 AA and the
+       focus ring (which reuses --primary) clears the 3:1 UI-contrast floor
+       against both --background and --card. The undarkened hex lives on as
+       --brand-teal below for decorative, non-text use. */
+    --primary: 172 67% 30%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary — warm sand, for supporting actions */
-    --secondary: 36 38% 94%;
-    --secondary-foreground: 30 25% 22%;
+    /* Secondary — soft navy-tinted neutral, for supporting surfaces */
+    --secondary: 213 20% 93%;
+    --secondary-foreground: 214 32% 18%;
 
     /* Muted — low-emphasis surfaces and text */
-    --muted: 142 20% 96%;
-    --muted-foreground: 150 8% 42%;
+    --muted: 213 20% 95%;
+    --muted-foreground: 215 26% 31%; /* brand navy-soft */
 
-    /* Accent — subtle green tint for hover/highlight */
-    --accent: 142 40% 94%;
-    --accent-foreground: 142 72% 20%;
+    /* Accent — teal-light tint for hover/highlight, navy text for AA
+       (the mockup's own teal-dark-on-teal-light pair only measures 3.41:1) */
+    --accent: 169 55% 94%;
+    --accent-foreground: 214 32% 18%;
 
-    /* Semantic status */
+    /* Semantic status — UNCHANGED, see file comment above */
     --destructive: 0 72% 45%;
     --destructive-foreground: 0 0% 100%;
     --success: 142 66% 34%;
@@ -58,47 +78,68 @@
     --info: 205 78% 40%;
     --info-foreground: 0 0% 100%;
 
-    /* Lines & form controls. F-BORDE: L bajado de 88%/86% a 54%/52% — el rango
-       72-75% sugerido en revisión NO alcanza 3:1 (queda en ~1.7-1.9:1 real,
-       ver PR); H/S sin cambios. */
-    --border: 150 12% 54%;
-    --input: 150 12% 52%;
-    --ring: 142 72% 29%;
+    /* Lines & form controls — navy-tinted gray, re-verified at ≥3:1 UI
+       contrast against both --card and --background (F-BORDE methodology). */
+    --border: 213 15% 54%;
+    --input: 213 15% 52%;
+    --ring: 172 67% 30%;
 
-    /* Typography */
+    /* Dark navy surface (Button "dark" variant, future dark shell surfaces).
+       Distinct from --brand-navy below: this one is theme-aware (lighter in
+       dark mode, see .dark) so it still reads as a raised surface there. */
+    --navy: 214 32% 18%;
+    --navy-soft: 215 26% 31%;
+
+    /* Raw brand swatches — literal logo colors for decorative/non-text use
+       (icons, illustrations, marketing accents). Constant across themes; NOT
+       used directly for text or fills that need guaranteed AA contrast. */
+    --brand-teal: 172 67% 44%;
+    --brand-teal-dark: 172 68% 35%;
+    --brand-teal-light: 169 55% 94%;
+    --brand-navy: 214 32% 18%;
+    --brand-navy-soft: 215 26% 31%;
+    --brand-coral: 14 100% 70%;
+    --brand-gold: 39 86% 63%;
+
+    /* Typography — rounded sans matching the logo's lettering, self-hosted
+       via @fontsource (no runtime dependency on a font CDN). */
     --font-sans:
-      'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
-      sans-serif;
+      'Poppins', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
+      Arial, sans-serif;
     --font-display: var(--font-sans);
     --font-mono:
       ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
 
-    /* Radii */
-    --radius: 0.625rem;
+    /* Radii — slightly softer/rounder than before (0.625rem → 0.75rem), so the
+       derived `xl` scale (radius + 4px = 1rem) lines up with Card's rounded-2xl. */
+    --radius: 0.75rem;
 
     /* Focus ring geometry (shared by every focusable control) */
     --ring-offset: 2px;
   }
 
   .dark {
-    --background: 150 18% 7%;
-    --foreground: 40 20% 96%;
-    --card: 150 15% 10%;
-    --card-foreground: 40 20% 96%;
-    --popover: 150 15% 10%;
-    --popover-foreground: 40 20% 96%;
+    --background: 222 20% 9%;
+    --foreground: 180 15% 92%;
+    --card: 222 18% 13%;
+    --card-foreground: 180 15% 92%;
+    --popover: 222 18% 13%;
+    --popover-foreground: 180 15% 92%;
 
-    --primary: 142 65% 45%;
-    --primary-foreground: 150 30% 8%;
+    /* Brighter teal for visibility on a dark background; dark navy text
+       instead of white (same pattern the previous green primary used here —
+       white-on-bright-teal only measures ~2.1:1). */
+    --primary: 172 55% 48%;
+    --primary-foreground: 214 32% 18%;
 
-    --secondary: 150 10% 18%;
-    --secondary-foreground: 40 20% 92%;
+    --secondary: 213 15% 18%;
+    --secondary-foreground: 180 15% 92%;
 
-    --muted: 150 10% 16%;
-    --muted-foreground: 150 8% 62%;
+    --muted: 213 15% 18%;
+    --muted-foreground: 213 10% 65%;
 
-    --accent: 142 30% 20%;
-    --accent-foreground: 40 20% 96%;
+    --accent: 172 30% 20%;
+    --accent-foreground: 180 15% 92%;
 
     --destructive: 0 62% 52%;
     --destructive-foreground: 0 0% 100%;
@@ -112,9 +153,24 @@
     /* F-BORDE: el cálculo mostró que el oscuro TAMBIÉN fallaba (~1.5-1.8:1,
        no "probablemente ya cumple" como se asumió) — L subido de 22%/24% a
        39%/41% para alcanzar 3:1 contra --card (el peor caso en oscuro). */
-    --border: 150 8% 39%;
-    --input: 150 8% 41%;
-    --ring: 142 65% 45%;
+    --border: 213 18% 46%;
+    --input: 213 18% 44%;
+    --ring: 172 55% 48%;
+
+    /* Lighter than --background/--card here on purpose: the raw brand navy
+       (L18%) measures ~1.2:1 against this theme's near-black page (invisible
+       as a "raised" button/surface) — this shade actually reads as a surface. */
+    --navy: 215 24% 40%;
+    --navy-soft: 215 24% 48%;
+
+    /* Raw brand swatches stay constant — literal logo colors, not theme UI. */
+    --brand-teal: 172 67% 44%;
+    --brand-teal-dark: 172 68% 35%;
+    --brand-teal-light: 169 55% 94%;
+    --brand-navy: 214 32% 18%;
+    --brand-navy-soft: 215 26% 31%;
+    --brand-coral: 14 100% 70%;
+    --brand-gold: 39 86% 63%;
   }
 
   * {
