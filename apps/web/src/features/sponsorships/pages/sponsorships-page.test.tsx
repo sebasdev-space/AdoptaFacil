@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   Role,
@@ -206,5 +206,52 @@ describe('SponsorshipsPage — apadrinamientos recibidos por la organización (S
     });
     expect(await screen.findByText('Apadrinamiento suspendido')).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'Reactivar' })).toBeInTheDocument();
+  });
+
+  describe('Fase 9 — "Registrar fallecimiento" (vista próximamente, sin backend real)', () => {
+    it('ofrece la acción solo sobre un apadrinamiento ACTIVO, y abre el modal con datos reales', async () => {
+      stubFetch(baseHandler([sponsorship()]));
+      renderShell({ route: '/organizacion/apadrinamientos', ...sessionWith([Role.Owner]) });
+
+      const trigger = await screen.findByRole('button', { name: 'Registrar fallecimiento' });
+      fireEvent.click(trigger);
+
+      expect(
+        await screen.findByRole('heading', { name: 'Registrar fallecimiento de Firulais' }),
+      ).toBeInTheDocument();
+      expect(screen.getByText('Firulais tiene 1 padrino activo.')).toBeInTheDocument();
+      expect(screen.getByText('Disponible próximamente')).toBeInTheDocument();
+
+      const modal = screen.getByTestId('animal-deceased-modal');
+      fireEvent.click(within(modal).getAllByRole('button', { name: 'Cerrar' })[0]);
+      await waitFor(() =>
+        expect(
+          screen.queryByRole('heading', { name: 'Registrar fallecimiento de Firulais' }),
+        ).not.toBeInTheDocument(),
+      );
+    });
+
+    it('no la ofrece sobre un apadrinamiento ya cancelado (terminal)', async () => {
+      stubFetch(baseHandler([sponsorship({ status: SponsorshipStatus.Cancelled })]));
+      renderShell({ route: '/organizacion/apadrinamientos', ...sessionWith([Role.Owner]) });
+
+      await screen.findByText('Cancelado');
+      expect(
+        screen.queryByRole('button', { name: 'Registrar fallecimiento' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('la oculta para ReadOnlyAuditor, igual que el resto de acciones de gestión', async () => {
+      stubFetch(baseHandler([sponsorship()]));
+      renderShell({
+        route: '/organizacion/apadrinamientos',
+        ...sessionWith([Role.ReadOnlyAuditor]),
+      });
+
+      expect(await screen.findByText('Firulais')).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Registrar fallecimiento' }),
+      ).not.toBeInTheDocument();
+    });
   });
 });

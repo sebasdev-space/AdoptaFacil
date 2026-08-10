@@ -1,0 +1,27 @@
+.hint {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.hint--error {
+  color: hsl(var(--destructive));
+}
+
+.plan-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border-hairline-strong);
+  padding: 0.75rem;
+}
+
+.plan-summary__name {
+  font-weight: var(--fw-semibold);
+  color: var(--text-dark);
+}
+
+.plan-summary__amount {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}

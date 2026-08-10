@@ -18,6 +18,7 @@ import {
   useToast,
 } from '@adoptafacil/ui';
 import { useApiClient } from '../../../shell/api';
+import styles from './animal-sponsorship-plan-modal.module.scss';
 
 /** Feature-local (same duplication convention as `formatBogota`/`formatCop`
  *  elsewhere in the repo, e.g. `features/sponsorships/model/sponsorships-view.ts`)
@@ -167,17 +168,17 @@ export function AnimalSponsorshipPlanModal({
 
         {state === 'loading' && <Skeleton className="h-24 w-full" />}
         {state === 'error' && (
-          <p className="text-sm text-destructive">
+          <p className={styles['hint--error']}>
             No se pudo cargar el plan de apadrinamiento. Inténtalo de nuevo.
           </p>
         )}
 
         {state === 'ready' && plan && (
           <div className="space-y-3">
-            <div className="flex items-center justify-between rounded-md border p-3">
+            <div className={styles['plan-summary']}>
               <div>
-                <p className="font-medium">{plan.name}</p>
-                <p className="text-sm text-muted-foreground">{formatCop(plan.amount)} / mes</p>
+                <p className={styles['plan-summary__name']}>{plan.name}</p>
+                <p className={styles['plan-summary__amount']}>{formatCop(plan.amount)} / mes</p>
               </div>
               <Badge variant={plan.isActive ? 'success' : 'secondary'}>
                 {plan.isActive ? 'Activo' : 'Inactivo'}
@@ -191,7 +192,7 @@ export function AnimalSponsorshipPlanModal({
 
         {state === 'ready' && !plan && (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
+            <p className={styles.hint}>
               {animalName} todavía no tiene un plan de apadrinamiento. Crea uno para que aparezca
               disponible en el portal público.
             </p>
