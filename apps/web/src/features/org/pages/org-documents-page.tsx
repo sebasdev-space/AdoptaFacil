@@ -15,6 +15,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  cn,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -35,6 +36,7 @@ import {
   uploadFileBytes,
   validateUpload,
 } from '../lib/storage';
+import styles from './org-documents-page.module.scss';
 
 const DOC_TYPES = Object.values(DocumentType) as DocumentType[];
 
@@ -67,12 +69,12 @@ const STATUS_BADGE_VARIANT: Record<DocumentStatus, BadgeProps['variant']> = {
 /** Card border/background per status — dashed+muted for "sin subir" is handled
  *  separately (no document yet). */
 const STATUS_CARD_CLASSES: Record<DocumentStatus, string> = {
-  [DocumentStatus.Pending]: 'border-warning/50 bg-warning/5',
-  [DocumentStatus.UnderReview]: 'border-warning/50 bg-warning/5',
-  [DocumentStatus.Observed]: 'border-destructive/50 bg-destructive/5',
-  [DocumentStatus.Approved]: 'border-success/50 bg-success/5',
-  [DocumentStatus.Rejected]: 'border-destructive/50 bg-destructive/5',
-  [DocumentStatus.Expired]: 'border-destructive/50 bg-destructive/5',
+  [DocumentStatus.Pending]: styles['doc-card--pending'],
+  [DocumentStatus.UnderReview]: styles['doc-card--under_review'],
+  [DocumentStatus.Observed]: styles['doc-card--observed'],
+  [DocumentStatus.Approved]: styles['doc-card--approved'],
+  [DocumentStatus.Rejected]: styles['doc-card--rejected'],
+  [DocumentStatus.Expired]: styles['doc-card--expired'],
 };
 
 /** Formatea un instante UTC en hora de Colombia para la UI. */
@@ -244,14 +246,14 @@ export function OrgDocumentsPage() {
               </CardHeader>
               <CardContent className="space-y-2">
                 {showFriendlyVerificationHint ? (
-                  <p className="text-sm text-muted-foreground">
+                  <p className={styles['verification-hint']}>
                     Sube tus documentos para iniciar la verificación.
                   </p>
                 ) : (
                   <>
                     <Badge>{verification.label ?? `Nivel ${verification.level}`}</Badge>
                     {verification.blockedBy && verification.blockedBy.length > 0 && (
-                      <p className="text-sm text-muted-foreground">
+                      <p className={styles['verification-hint']}>
                         Para el nivel {verification.nextLevel} faltan (o están vencidos):{' '}
                         {verification.blockedBy
                           .map((t) => TYPE_LABELS[t as DocumentType] ?? t)
@@ -265,39 +267,40 @@ export function OrgDocumentsPage() {
             </Card>
           )}
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className={styles['doc-grid']}>
             {DOC_TYPES.map((type) => {
               const doc = byType[type];
               return (
                 <Card
                   key={type}
-                  className={doc ? STATUS_CARD_CLASSES[doc.status] : 'border-dashed bg-muted/30'}
+                  className={doc ? STATUS_CARD_CLASSES[doc.status] : styles['doc-card--empty']}
                 >
                   <CardContent className="space-y-3 p-4">
-                    <div className="flex items-center gap-2">
-                      <DocumentTypeIcon type={type} className="h-6 w-6 text-muted-foreground" />
-                      <span className="text-sm font-medium text-foreground">
-                        {TYPE_LABELS[type]}
-                      </span>
+                    <div className={styles['doc-card__header']}>
+                      <DocumentTypeIcon
+                        type={type}
+                        className={cn('h-6 w-6', styles['doc-card__icon'])}
+                      />
+                      <span className={styles['doc-card__label']}>{TYPE_LABELS[type]}</span>
                     </div>
 
                     {doc ? (
                       <>
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className={styles['doc-card__meta']}>
                           <Badge variant={STATUS_BADGE_VARIANT[doc.status]}>
                             {STATUS_LABELS[doc.status]}
                           </Badge>
-                          <span className="text-xs text-muted-foreground">v{doc.version}</span>
+                          <span className={styles['doc-card__version']}>v{doc.version}</span>
                         </div>
                         {doc.expiresAt && (
-                          <p className="text-xs text-muted-foreground">
+                          <p className={styles['doc-card__expiry']}>
                             Vence: {formatCO(doc.expiresAt)}
                           </p>
                         )}
                         {doc.reviewNote && (
-                          <p className="text-xs text-destructive">Motivo: {doc.reviewNote}</p>
+                          <p className={styles['doc-card__note']}>Motivo: {doc.reviewNote}</p>
                         )}
-                        <div className="flex flex-wrap gap-2 pt-1">
+                        <div className={styles['doc-card__actions']}>
                           <Button
                             size="sm"
                             variant="outline"
@@ -317,13 +320,13 @@ export function OrgDocumentsPage() {
                       <button
                         type="button"
                         onClick={() => openUpload(type)}
-                        className="flex w-full flex-col items-center gap-2 rounded-md py-6 text-sm text-muted-foreground transition-colors hover:bg-muted/60"
+                        className={styles['doc-card__upload-btn']}
                       >
                         <UploadCloudIcon className="h-6 w-6" />
                         Sin subir
                       </button>
                     ) : (
-                      <p className="py-6 text-center text-sm text-muted-foreground">Sin subir</p>
+                      <p className={styles['doc-card__empty-text']}>Sin subir</p>
                     )}
                   </CardContent>
                 </Card>
@@ -345,8 +348,8 @@ export function OrgDocumentsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="space-y-1.5">
-              <label htmlFor="doc-file" className="block text-sm font-medium text-foreground">
+            <div className={styles['upload-field']}>
+              <label htmlFor="doc-file" className={styles['upload-field__label']}>
                 Archivo (PDF o imagen, máx. 15 MB)
               </label>
               <input
@@ -354,9 +357,11 @@ export function OrgDocumentsPage() {
                 type="file"
                 accept={DOCUMENT_ACCEPT.join(',')}
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                className="block w-full rounded-md border border-dashed border-input bg-background p-3 text-sm text-foreground file:mr-3 file:rounded-md file:border file:border-input file:bg-background file:px-3 file:py-1.5 file:text-sm"
+                className={styles['upload-field__input']}
               />
-              {file && <p className="text-xs text-muted-foreground">Seleccionado: {file.name}</p>}
+              {file && (
+                <p className={styles['upload-field__selected']}>Seleccionado: {file.name}</p>
+              )}
             </div>
             <TextField
               id="doc-expires"
