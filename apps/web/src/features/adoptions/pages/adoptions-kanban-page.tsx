@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Role, type AdoptionRequest, type AdoptionStatus } from '@adoptafacil/contracts';
-import { Badge, Button, Card, CardContent, EmptyState, Skeleton, useToast } from '@adoptafacil/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  cn,
+  EmptyState,
+  Skeleton,
+  useToast,
+} from '@adoptafacil/ui';
 import { PageContainer, PageHeader } from '../../_layout';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
@@ -14,6 +23,7 @@ import {
   adoptionStatusVariant,
   formatBogota,
 } from '../model/adoptions-view';
+import styles from './adoptions-kanban-page.module.scss';
 
 /**
  * `/adopciones` — tablero de EVALUACIÓN de la organización (§M04, T-028a).
@@ -85,39 +95,35 @@ export function AdoptionsKanbanPage() {
         title="Adopciones"
         description="Tablero de evaluación: mueve cada solicitud por sus estados. Las transiciones quedan auditadas."
       />
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className={styles.board}>
         {ADOPTION_COLUMNS.map((column) => {
           const items = requests.filter((r) => r.status === column);
           return (
             <section
               key={column}
               aria-label={ADOPTION_STATUS_LABELS[column]}
-              className="flex flex-col gap-3 rounded-lg bg-muted/40 p-3"
+              className={styles.column}
             >
-              <header className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold">{ADOPTION_STATUS_LABELS[column]}</h2>
+              <header className={styles.column__header}>
+                <h2 className={styles.column__title}>{ADOPTION_STATUS_LABELS[column]}</h2>
                 <Badge variant={adoptionStatusVariant(column)}>{items.length}</Badge>
               </header>
 
               {loading ? (
                 <Skeleton className="h-24 w-full" />
               ) : items.length === 0 ? (
-                <p className="px-1 text-xs text-muted-foreground">Sin solicitudes.</p>
+                <p className={styles.column__empty}>Sin solicitudes.</p>
               ) : (
                 items.map((request) => (
                   <Card key={request.id} data-testid="adoption-card">
                     <CardContent className="space-y-2 p-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-medium">{request.animalSnapshot.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {formatBogota(request.createdAt)}
-                        </span>
+                      <div className={styles.card__top}>
+                        <span className={styles.card__animal}>{request.animalSnapshot.name}</span>
+                        <span className={styles.card__date}>{formatBogota(request.createdAt)}</span>
                       </div>
-                      <p className="text-sm text-muted-foreground">{request.applicant.fullName}</p>
-                      <p className="line-clamp-3 text-xs text-muted-foreground">
-                        {request.message}
-                      </p>
-                      <div className="flex flex-wrap gap-2 pt-1">
+                      <p className={styles.card__applicant}>{request.applicant.fullName}</p>
+                      <p className={cn('line-clamp-3', styles.card__message)}>{request.message}</p>
+                      <div className={styles.card__actions}>
                         {/* F-MODAL-SOLICITANTE: paso de detalle antes de decidir — no
                             reemplaza los botones directos de abajo, los complementa. */}
                         <Button
