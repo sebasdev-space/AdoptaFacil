@@ -17,6 +17,7 @@ import { fetchAnimalSponsorshipSummary } from '../api/public-sponsorships';
 import { subscribeToPlan } from '../api/sponsorships-api';
 import { formatCop, SPONSORSHIP_PERIODICITY_LABELS } from '../model/sponsorships-view';
 import { MySponsorshipsList } from '../components/my-sponsorships-list';
+import styles from './sponsor-page.module.scss';
 
 interface SponsorTarget {
   animalId: string;
@@ -140,31 +141,28 @@ export function SponsorPage() {
             <>
               {summaryState === 'loading' && <Skeleton className="h-32 w-full" />}
               {summaryState === 'error' && (
-                <p className="text-sm text-destructive">
+                <p className={styles['hint--error']}>
                   No se pudo cargar la información de apadrinamiento. Inténtalo de nuevo más tarde.
                 </p>
               )}
               {summaryState === 'ready' && summary && summary.activePlans.length === 0 && (
-                <p className="text-sm text-muted-foreground">
+                <p className={styles.hint}>
                   Este animal no tiene un plan de apadrinamiento activo por ahora.
                 </p>
               )}
               {summaryState === 'ready' && summary && summary.activePlans.length > 0 && (
                 <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
+                  <p className={styles.hint}>
                     {summary.activeSponsorCount === 1
                       ? 'Ya tiene 1 padrino activo.'
                       : `Ya tiene ${summary.activeSponsorCount} padrinos activos.`}
                   </p>
-                  <ul className="space-y-2">
+                  <ul className={styles.plans}>
                     {summary.activePlans.map((plan) => (
-                      <li
-                        key={plan.id}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
-                      >
+                      <li key={plan.id} className={styles['plan-row']}>
                         <div>
-                          <p className="font-medium">{plan.name}</p>
-                          <p className="text-sm text-muted-foreground">
+                          <p className={styles['plan-row__name']}>{plan.name}</p>
+                          <p className={styles['plan-row__meta']}>
                             {formatCop(plan.amount)} /{' '}
                             {SPONSORSHIP_PERIODICITY_LABELS[plan.periodicity].toLowerCase()}
                           </p>

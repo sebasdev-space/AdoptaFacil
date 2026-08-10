@@ -24,6 +24,7 @@ import {
   reactivateSponsorship,
   suspendSponsorship,
 } from '../api/sponsorships-api';
+import { AnimalDeceasedModal } from '../components/animal-deceased-modal';
 import {
   formatBogota,
   formatCop,
@@ -31,6 +32,7 @@ import {
   SPONSORSHIP_STATUS_LABELS,
   sponsorshipStatusVariant,
 } from '../model/sponsorships-view';
+import styles from './sponsorships-page.module.scss';
 
 /**
  * `/organizacion/apadrinamientos` (S2-03, RF17) — apadrinamientos recibidos por
@@ -63,6 +65,7 @@ export function SponsorshipsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Sponsorship | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [deceasedTarget, setDeceasedTarget] = useState<Sponsorship | null>(null);
 
   const load = async (): Promise<void> => {
     const [sponsorshipRows, planRows, animals] = await Promise.all([
@@ -167,22 +170,22 @@ export function SponsorshipsPage() {
             const plan = plansById.get(sponsorship.planId);
             const animalName = animalNamesById.get(sponsorship.animalId);
             return (
-              <li key={sponsorship.id} className="rounded-md border p-4 text-sm">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium">{animalName ?? shortId(sponsorship.animalId)}</span>
+              <li key={sponsorship.id} className={styles.row}>
+                <div className={styles.row__top}>
+                  <span className={styles.row__name}>
+                    {animalName ?? shortId(sponsorship.animalId)}
+                  </span>
                   <Badge variant={sponsorshipStatusVariant(sponsorship.status)}>
                     {SPONSORSHIP_STATUS_LABELS[sponsorship.status]}
                   </Badge>
-                  {plan && (
-                    <span className="ml-auto font-medium">{formatCop(plan.amount)}/mes</span>
-                  )}
+                  {plan && <span className={styles.row__amount}>{formatCop(plan.amount)}/mes</span>}
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className={styles.row__sub}>
                   {plan ? plan.name : `Plan ${shortId(sponsorship.planId)}`} · Desde{' '}
                   {formatBogota(sponsorship.startedAt)}
                 </p>
                 {canManage && sponsorship.status !== SponsorshipStatus.Cancelled && (
-                  <div className="mt-2 flex flex-wrap gap-2">
+                  <div className={styles.row__actions}>
                     {sponsorship.status === SponsorshipStatus.Active ? (
                       <Button
                         variant="outline"
@@ -202,10 +205,20 @@ export function SponsorshipsPage() {
                         Reactivar
                       </Button>
                     )}
+                    {sponsorship.status === SponsorshipStatus.Active && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={busyId === sponsorship.id}
+                        onClick={() => setDeceasedTarget(sponsorship)}
+                      >
+                        Registrar fallecimiento
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
-                      className="border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                      className={styles['cancel-btn']}
                       disabled={busyId === sponsorship.id}
                       onClick={() => setCancelTarget(sponsorship)}
                     >
@@ -233,7 +246,7 @@ export function SponsorshipsPage() {
               Volver
             </Button>
             <Button
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className={styles['confirm-btn--danger']}
               onClick={() => void confirmCancel()}
               disabled={cancelling}
             >
@@ -242,6 +255,24 @@ export function SponsorshipsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AnimalDeceasedModal
+        open={deceasedTarget !== null}
+        onOpenChange={(open) => !open && setDeceasedTarget(null)}
+        animalName={
+          deceasedTarget
+            ? (animalNamesById.get(deceasedTarget.animalId) ?? shortId(deceasedTarget.animalId))
+            : ''
+        }
+        activeSponsorCount={
+          deceasedTarget
+            ? sponsorships.filter(
+                (s) =>
+                  s.animalId === deceasedTarget.animalId && s.status === SponsorshipStatus.Active,
+              ).length
+            : 0
+        }
+      />
     </PageContainer>
   );
 }

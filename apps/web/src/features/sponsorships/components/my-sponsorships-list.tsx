@@ -11,6 +11,7 @@ import {
   SPONSORSHIP_STATUS_LABELS,
   sponsorshipStatusVariant,
 } from '../model/sponsorships-view';
+import styles from './my-sponsorships-list.module.scss';
 
 /**
  * "Mis apadrinamientos" (S2-03) — historial de apadrinamientos de la Persona
@@ -58,12 +59,12 @@ export function MySponsorshipsList() {
       </CardHeader>
       <CardContent>
         {error && (
-          <p className="text-sm text-destructive">
+          <p className={styles['hint--error']}>
             No se pudieron cargar tus apadrinamientos. Inténtalo de nuevo más tarde.
           </p>
         )}
         {!error && sponsorships.length === 0 && (
-          <p className="text-sm text-muted-foreground">
+          <p className={styles.hint}>
             Aún no apadrinas a ningún animal. Entra al detalle de un animal en el portal público de
             una organización para apadrinarlo.
           </p>
@@ -71,26 +72,26 @@ export function MySponsorshipsList() {
         {!error && sponsorships.length > 0 && (
           <ul className="space-y-3">
             {sponsorships.map((sponsorship) => (
-              <li key={sponsorship.id} className="border-b pb-3 text-sm last:border-b-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium">
+              <li key={sponsorship.id} className={styles.row}>
+                <div className={styles.row__top}>
+                  <span className={styles.row__name}>
                     {sponsorship.animalName ?? sponsorship.animalId}
                   </span>
                   <Badge variant={sponsorshipStatusVariant(sponsorship.status)}>
                     {SPONSORSHIP_STATUS_LABELS[sponsorship.status]}
                   </Badge>
-                  <span className="text-muted-foreground">
+                  <span className={styles.row__meta}>
                     {sponsorship.organizationName ?? sponsorship.organizationId}
                   </span>
                   {sponsorship.planAmount !== undefined && (
-                    <span className="ml-auto font-medium">
+                    <span className={styles.row__amount}>
                       {formatCop(sponsorship.planAmount)}
                       {sponsorship.planPeriodicity &&
                         ` / ${SPONSORSHIP_PERIODICITY_LABELS[sponsorship.planPeriodicity].toLowerCase()}`}
                     </span>
                   )}
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className={styles.row__sub}>
                   Desde {formatBogota(sponsorship.startedAt)}
                   {sponsorship.planName ? ` · ${sponsorship.planName}` : ''}
                 </p>

@@ -1,0 +1,56 @@
+.row {
+  border-radius: var(--r-md);
+  border: 1px solid var(--border-hairline-strong);
+  padding: 1rem;
+  font-size: var(--fs-sm);
+}
+
+.row__top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.row__name {
+  font-weight: var(--fw-semibold);
+  color: var(--text-dark);
+}
+
+.row__amount {
+  margin-left: auto;
+  font-weight: var(--fw-semibold);
+  color: var(--text-dark);
+}
+
+.row__sub {
+  margin-top: 0.25rem;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.cancel-btn {
+  border-color: hsl(var(--destructive));
+  color: hsl(var(--destructive));
+
+  &:hover {
+    background-color: hsl(var(--destructive));
+    color: hsl(var(--destructive-foreground));
+  }
+}
+
+.confirm-btn--danger {
+  background-color: hsl(var(--destructive));
+  color: hsl(var(--destructive-foreground));
+
+  &:hover {
+    background-color: hsl(var(--destructive) / 0.9);
+  }
+}
