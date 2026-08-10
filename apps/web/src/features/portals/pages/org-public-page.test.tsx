@@ -132,14 +132,67 @@ describe('OrgPublicPage — rich public portal', () => {
     renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
     await screen.findByRole('heading', { name: /Refugio Patitas/ });
 
-    // Pulido visual (T-D02): campaña/necesita hoy/transparencia have NO owning
-    // module yet (status stays 'placeholder' forever until one exists) — showing
-    // an empty "Próximamente" card in front of the client reads as unfinished, so
-    // these sections are simply not mounted. Only 'pets' (LIVE since T-052) shows.
-    for (const title of ['Campaña activa', 'Necesita hoy', 'Transparencia']) {
+    // Pulido visual (T-D02): necesita hoy/transparencia have NO owning module yet
+    // (status stays 'placeholder' forever until one exists) — showing an empty
+    // "Próximamente" card in front of the client reads as unfinished, so these
+    // sections are simply not mounted. 'pets' (T-052) and 'activeCampaign'
+    // (F-CAMPANAS-PORTAL-2, S2-07) are LIVE and always show.
+    for (const title of ['Necesita hoy', 'Transparencia']) {
       expect(screen.queryByRole('heading', { name: title })).not.toBeInTheDocument();
     }
     expect(screen.getByRole('heading', { name: 'Mascotas en adopción' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Campaña activa' })).toBeInTheDocument();
+  });
+
+  it('F-CAMPANAS-PORTAL-2: mounts the "Campaña activa" section wired to real data from the org-scoped feed', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith('/theme')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => ({ tokens: {} }) });
+        }
+        if (url.includes('/campaigns')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              items: [
+                {
+                  id: 'c1',
+                  organizationId: 'org-1',
+                  organizationName: 'Refugio Patitas',
+                  title: 'Vacunas para el invierno',
+                  category: 'medications',
+                  goalAmount: 1_000_000,
+                  raisedAmount: 250_000,
+                  progress: 0.25,
+                  deadline: '2027-01-01T00:00:00.000Z',
+                  status: 'active',
+                  createdAt: '2026-07-01T00:00:00.000Z',
+                },
+              ],
+              total: 1,
+              limit: 12,
+              offset: 0,
+            }),
+          });
+        }
+        if (url.includes('/animals')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ items: [], total: 0, limit: 1, offset: 0 }),
+          });
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => ORG });
+      }),
+    );
+    renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+    await screen.findByRole('heading', { name: /Refugio Patitas/ });
+
+    expect(await screen.findByText('Vacunas para el invierno')).toBeInTheDocument();
+    expect(screen.getByTestId('campaign-card')).toBeInTheDocument();
   });
 
   it('shows the transparency indicator with REAL derived data (§M14, T-027)', async () => {

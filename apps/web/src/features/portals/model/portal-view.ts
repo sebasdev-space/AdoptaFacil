@@ -19,7 +19,10 @@ export const PORTAL_SECTION_BLUEPRINT: readonly SectionBlueprint[] = [
     kind: 'activeCampaign',
     title: 'Campaña activa',
     description: 'No hay una campaña de recaudación activa por ahora.',
-    integrationPoint: 'M-campañas · GET /public/organizations/:slug/campaigns/active (pendiente)',
+    // F-CAMPANAS-PORTAL-2 (S2-07): cableada — igual que 'pets' arriba, este
+    // título/descripción quedan sin usar una vez wireado (OrgPublicPage
+    // renderiza `PortalCampaignsSection`, que trae su propio copy).
+    integrationPoint: 'M06 campañas · GET /public/organizations/:slug/campaigns',
   },
   {
     kind: 'needsToday',
