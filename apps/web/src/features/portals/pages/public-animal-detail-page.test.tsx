@@ -103,10 +103,10 @@ describe('PublicAnimalDetailPage', () => {
 
     // F1-03+: hierarchy — "Solicitar adopción" stays the SOLID, protagonist
     // button; "Volver al inicio" is a SECONDARY (outline) button, never solid.
-    expect(cta.className).toContain('bg-primary');
+    expect(cta.className).toContain('button--primary');
     const backLink = screen.getByRole('link', { name: '← Volver al inicio' });
-    expect(backLink.className).toContain('border-input');
-    expect(backLink.className).not.toContain('bg-primary');
+    expect(backLink.className).toContain('button--outline');
+    expect(backLink.className).not.toContain('button--primary');
   });
 
   it('F-CTA-APADRINAR: shows an "Apadrinar" CTA linking to /apadrinar with the animal id and name', () => {
@@ -121,7 +121,7 @@ describe('PublicAnimalDetailPage', () => {
     expect(href).not.toContain('organizationName');
 
     // Secondary CTA (outline) — "Solicitar adopción" stays the sole solid/primary one.
-    expect(cta.className).not.toContain('bg-primary');
+    expect(cta.className).not.toContain('button--primary');
   });
 
   it('F-CTA-APADRINAR: includes organizationName in the href once the org profile resolves', async () => {

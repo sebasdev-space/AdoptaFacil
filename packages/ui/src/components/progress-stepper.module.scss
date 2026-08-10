@@ -1,0 +1,74 @@
+.stepper {
+  display: flex;
+  align-items: flex-start;
+}
+
+.stepper__step {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
+  position: relative;
+}
+
+.stepper__connector {
+  position: absolute;
+  top: 0.875rem; // vertically centered on the 1.75rem dot
+  left: -50%;
+  width: 100%;
+  height: 2px;
+  background-color: var(--border-hairline-strong);
+  z-index: 0;
+}
+
+.stepper__connector--done {
+  background-color: hsl(var(--success));
+}
+
+.stepper__dot {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--r-full);
+  background-color: var(--bg-surface);
+  border: 2px solid var(--border-hairline-strong);
+  color: var(--text-muted);
+
+  svg {
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
+.stepper__dot--done {
+  background-color: hsl(var(--success));
+  border-color: hsl(var(--success));
+  color: hsl(var(--success-foreground));
+}
+
+.stepper__dot--current {
+  border-color: hsl(var(--primary));
+  color: hsl(var(--primary));
+}
+
+.stepper__label {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+}
+
+.stepper__label--done,
+.stepper__label--current {
+  color: var(--text-dark);
+}
+
+.stepper__sublabel {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}

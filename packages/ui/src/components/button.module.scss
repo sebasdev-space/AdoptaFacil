@@ -1,0 +1,90 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  border-radius: var(--r-full);
+  font-family: var(--font-sans);
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-sm);
+  transition: var(--transition-base);
+  cursor: pointer;
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--brand-light);
+  }
+}
+
+// --- Tamaños -----------------------------------------------------------
+.button--sm {
+  height: 2.25rem;
+  padding: 0 0.75rem;
+}
+
+.button--md {
+  height: 2.5rem;
+  padding: 0 1rem;
+}
+
+.button--lg {
+  height: 2.75rem;
+  padding: 0 2rem;
+}
+
+// --- Variantes -----------------------------------------------------------
+// Nota AA: el relleno sólido y el texto en hover reusan hsl(var(--primary))
+// (#198072, ~4.8:1 con blanco) en vez del --brand-dark del mockup (#1C9483,
+// ~3.7:1 con blanco/sobre blanco — insuficiente para texto normal, solo
+// sirve para elementos grandes/decorativos). Mismo tono, ya auditado.
+.button--primary {
+  background-color: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  box-shadow: var(--shadow-xs);
+
+  &:hover:not(:disabled) {
+    filter: brightness(0.93);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+  }
+}
+
+.button--outline {
+  background-color: var(--bg-surface);
+  color: var(--text-dark);
+  border: 1px solid var(--border-hairline-strong);
+
+  &:hover:not(:disabled) {
+    border-color: hsl(var(--primary));
+    color: hsl(var(--primary));
+  }
+}
+
+.button--ghost {
+  background-color: transparent;
+  color: var(--text-dark);
+
+  &:hover:not(:disabled) {
+    background-color: var(--brand-light);
+    color: hsl(var(--primary));
+  }
+}
+
+.button--dark {
+  background-color: var(--navy);
+  color: var(--text-light);
+  box-shadow: var(--shadow-xs);
+
+  &:hover:not(:disabled) {
+    background-color: var(--navy-soft);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+  }
+}

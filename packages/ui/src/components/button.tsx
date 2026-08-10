@@ -1,45 +1,47 @@
 import * as React from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../lib/utils';
+import styles from './button.module.scss';
+
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'default' | 'outline' | 'ghost' | 'dark';
+  size?: 'default' | 'sm' | 'lg';
+}
+
+const VARIANT_CLASS: Record<NonNullable<ButtonProps['variant']>, string> = {
+  default: 'button--primary',
+  outline: 'button--outline',
+  ghost: 'button--ghost',
+  dark: 'button--dark',
+};
+
+const SIZE_CLASS: Record<NonNullable<ButtonProps['size']>, string> = {
+  default: 'button--md',
+  sm: 'button--sm',
+  lg: 'button--lg',
+};
+
+export interface ButtonVariantOptions {
+  variant?: ButtonProps['variant'];
+  size?: ButtonProps['size'];
+}
 
 /**
- * Example shadcn/ui-style component. Fabián expands the design system in Ola 0;
- * this exists so the monorepo compiles and apps/web can consume a shared component.
+ * Class-string helper for non-`<button>` elements styled as a button (e.g. a
+ * `<Link>`) — same call shape the old CVA `buttonVariants` had, so every
+ * existing `buttonVariants({ variant, size })` call site keeps working
+ * unchanged after the BEM+SCSS migration.
  */
-const buttonVariants = cva(
-  'inline-flex items-center justify-center whitespace-nowrap rounded-full text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50',
-  {
-    variants: {
-      variant: {
-        default: 'bg-primary text-primary-foreground hover:bg-primary/90',
-        outline:
-          'border border-input bg-background hover:border-primary hover:bg-accent hover:text-accent-foreground',
-        ghost: 'hover:bg-accent hover:text-accent-foreground',
-        // REFACTOR-VISUAL Fase A: solid navy fill, matching the mockup's
-        // `.btn-dark` (e.g. "Soy una organización"-style secondary CTAs).
-        dark: 'bg-navy text-white hover:bg-navy-soft',
-      },
-      size: {
-        default: 'h-10 px-4 py-2',
-        sm: 'h-9 px-3',
-        lg: 'h-11 px-8',
-      },
-    },
-    defaultVariants: {
-      variant: 'default',
-      size: 'default',
-    },
-  },
-);
+export function buttonVariants({
+  variant = 'default',
+  size = 'default',
+}: ButtonVariantOptions = {}): string {
+  return cn(styles.button, styles[VARIANT_CLASS[variant]], styles[SIZE_CLASS[size]]);
+}
 
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {}
-
+/** Pill-shaped action button (REFACTOR-VISUAL v2, BEM+SCSS). */
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, ...props }, ref) => (
-    <button ref={ref} className={cn(buttonVariants({ variant, size, className }))} {...props} />
+  ({ className, variant = 'default', size = 'default', ...props }, ref) => (
+    <button ref={ref} className={cn(buttonVariants({ variant, size }), className)} {...props} />
   ),
 );
 Button.displayName = 'Button';
-
-export { buttonVariants };

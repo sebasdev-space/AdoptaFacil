@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { cn } from '../lib/utils';
+import styles from './empty-state.module.scss';
 
 export interface EmptyStateProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'title'> {
   /** Optional decorative icon/illustration shown above the title. */
@@ -18,23 +19,15 @@ export interface EmptyStateProps extends Omit<React.HTMLAttributes<HTMLDivElemen
  */
 export const EmptyState = React.forwardRef<HTMLDivElement, EmptyStateProps>(
   ({ className, icon, title, description, action, ...props }, ref) => (
-    <div
-      ref={ref}
-      role="status"
-      className={cn(
-        'flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-card/50 px-6 py-12 text-center',
-        className,
-      )}
-      {...props}
-    >
+    <div ref={ref} role="status" className={cn(styles['empty-state'], className)} {...props}>
       {icon ? (
-        <div aria-hidden className="text-muted-foreground [&_svg]:h-10 [&_svg]:w-10">
+        <div aria-hidden className={styles['empty-state__icon']}>
           {icon}
         </div>
       ) : null}
-      <p className="font-display text-base font-semibold text-foreground">{title}</p>
-      {description ? <p className="max-w-sm text-sm text-muted-foreground">{description}</p> : null}
-      {action ? <div className="mt-2">{action}</div> : null}
+      <p className={styles['empty-state__title']}>{title}</p>
+      {description ? <p className={styles['empty-state__description']}>{description}</p> : null}
+      {action ? <div className={styles['empty-state__action']}>{action}</div> : null}
     </div>
   ),
 );

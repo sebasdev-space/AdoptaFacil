@@ -1,36 +1,32 @@
 import * as React from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '../lib/utils';
+import styles from './badge.module.scss';
 
-const badgeVariants = cva(
-  'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-  {
-    variants: {
-      variant: {
-        default: 'border-transparent bg-primary text-primary-foreground',
-        secondary: 'border-transparent bg-secondary text-secondary-foreground',
-        outline: 'border-border text-foreground',
-        success: 'border-transparent bg-success text-success-foreground',
-        warning: 'border-transparent bg-warning text-warning-foreground',
-        destructive: 'border-transparent bg-destructive text-destructive-foreground',
-        info: 'border-transparent bg-info text-info-foreground',
-      },
-    },
-    defaultVariants: {
-      variant: 'default',
-    },
-  },
-);
+export type BadgeVariant =
+  'default' | 'secondary' | 'outline' | 'success' | 'warning' | 'destructive' | 'info';
 
-export interface BadgeProps
-  extends React.HTMLAttributes<HTMLSpanElement>, VariantProps<typeof badgeVariants> {}
+export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
+  variant?: BadgeVariant;
+}
 
-/** Small status/label pill. Semantic variants map to the status tokens. */
+const VARIANT_CLASS: Record<BadgeVariant, string> = {
+  default: 'status-pill--default',
+  secondary: 'status-pill--secondary',
+  outline: 'status-pill--outline',
+  success: 'status-pill--success',
+  warning: 'status-pill--warning',
+  destructive: 'status-pill--destructive',
+  info: 'status-pill--info',
+};
+
+/** Small status pill — light tint + dark saturated text (REFACTOR-VISUAL v2, BEM+SCSS). */
 export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
-  ({ className, variant, ...props }, ref) => (
-    <span ref={ref} className={cn(badgeVariants({ variant }), className)} {...props} />
+  ({ className, variant = 'default', ...props }, ref) => (
+    <span
+      ref={ref}
+      className={cn(styles['status-pill'], styles[VARIANT_CLASS[variant]], className)}
+      {...props}
+    />
   ),
 );
 Badge.displayName = 'Badge';
-
-export { badgeVariants };

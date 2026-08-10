@@ -8,13 +8,13 @@ describe('Badge', () => {
     expect(screen.getByText('Disponible')).toBeInTheDocument();
   });
 
-  it('applies semantic variant tokens', () => {
+  it('applies semantic variant classes', () => {
     render(<Badge variant="success">Adoptado</Badge>);
-    expect(screen.getByText('Adoptado')).toHaveClass('bg-success');
+    expect(screen.getByText('Adoptado').className).toMatch(/status-pill--success/);
   });
 
-  it('defaults to the primary token', () => {
+  it('defaults to the default pill variant', () => {
     render(<Badge>Nuevo</Badge>);
-    expect(screen.getByText('Nuevo')).toHaveClass('bg-primary');
+    expect(screen.getByText('Nuevo').className).toMatch(/status-pill--default/);
   });
 });
