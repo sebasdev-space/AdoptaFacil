@@ -6,6 +6,8 @@ import { FormalizationController } from './formalization.controller';
 import { FormalizationService } from './formalization.service';
 import { OrgController } from './org.controller';
 import { OrgProfileService } from './org-profile.service';
+import { OrganizationSummaryController } from './organization-summary.controller';
+import { OrganizationSummaryService } from './organization-summary.service';
 import { PlatformDocumentsController } from './platform-documents.controller';
 import { PlatformDocumentsService } from './platform-documents.service';
 import { PlatformSettingsController } from './platform-settings.controller';
@@ -24,6 +26,7 @@ import { PlatformSettingsService } from './platform-settings.service';
     OrgController,
     FormalizationController,
     DocumentsController,
+    OrganizationSummaryController,
     PlatformDocumentsController,
     PlatformSettingsController,
   ],
@@ -31,6 +34,7 @@ import { PlatformSettingsService } from './platform-settings.service';
     OrgProfileService,
     FormalizationService,
     DocumentsService,
+    OrganizationSummaryService,
     PlatformDocumentsService,
     PlatformSettingsService,
   ],

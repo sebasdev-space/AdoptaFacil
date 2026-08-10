@@ -43,6 +43,11 @@ export const envSchema = z.object({
   // Look-ahead window (days) for the scan: events due within this many days
   // (or already overdue) generate a reminder.
   REMINDERS_WINDOW_DAYS: z.coerce.number().int().min(0).max(365).default(30),
+  // S2-08 (M13 organization summary): a document counts toward
+  // `documentsExpiringSoon` when it expires within this many days from now.
+  // TODO(client): 30 is an initial default (no business decision fixes this
+  // threshold yet) — redefine via env, no code change needed.
+  DOCUMENTS_EXPIRING_SOON_WINDOW_DAYS: z.coerce.number().int().min(0).max(365).default(30),
   // T-108 (storage): which StoragePort adapter to bind. `disk` = real filesystem
   // (prod on the VPS); `stub` = in-memory (tests set this via load-env). Default
   // `disk` so production persists real bytes unless explicitly overridden.
