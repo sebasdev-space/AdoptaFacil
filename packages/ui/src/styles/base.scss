@@ -1,0 +1,47 @@
+/**
+ * AdoptaFácil — base styles (REFACTOR-VISUAL v2).
+ *
+ * Resets/defaults de bajo nivel que dependen de tokens.scss. Los primitivos
+ * de /ui aportan su propia apariencia por componente (BEM+SCSS, Fase 2 en
+ * adelante); esto solo cubre elementos base (html/body/encabezados) que no
+ * tienen un componente React propio.
+ */
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-primary);
+  color: var(--text-dark);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+}
+
+/* Números tabulares para montos/cifras — nunca mono para dinero. */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Micro-labels (uppercase, tracking amplio) — encabezados de columna,
+   badges de sección, etc. */
+.micro-label {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

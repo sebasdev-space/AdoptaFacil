@@ -1,0 +1,116 @@
+/**
+ * AdoptaFácil — design tokens (REFACTOR-VISUAL v2, sistema completo).
+ *
+ * Fuente única de verdad para tipografía, color, elevación, radios y
+ * movimiento. Nada en /components hardcodea un color, una sombra o un radio:
+ * todo resuelve a una de estas variables. Extraídas de
+ * `ejemplos_refactorizacion/` (mockup + capturas de referencia).
+ *
+ * Convive con las variables shadcn/HSL de `globals.css` (--background,
+ * --primary, --border, --success, etc.) mientras los primitivos de /ui se
+ * migran uno por uno a BEM+SCSS (Fase 2 en adelante) — no se borran todavía
+ * para no dejar pantallas rotas a mitad de la migración.
+ *
+ * Dos colisiones de nombre deliberadas con el sistema anterior:
+ *   - --font-sans / --font-display / --font-mono: se REDEFINEN aquí a propósito
+ *     (Plus Jakarta Sans / Fraunces / IBM Plex Mono) porque el objetivo de esta
+ *     fase es que la tipografía cambie en TODA la app de inmediato, no solo en
+ *     los componentes ya migrados.
+ *   - --border: el `--border` de shadcn ya está auditado a 3:1 (F-BORDE) para
+ *     controles de formulario (inputs, botones) — NO se toca. El hairline
+ *     decorativo de tarjetas del mockup (#EDF1F1, ~1.2:1) es un separador
+ *     puramente visual, no un control interactivo, así que vive aparte como
+ *     --border-hairline/--border-hairline-strong.
+ */
+:root {
+  /* ---------------------------------------------------------------------
+   * Tipografía — self-hosted vía @fontsource (sin dependencia de red).
+   * --------------------------------------------------------------------- */
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-sans:
+    'Plus Jakarta Sans', -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Escala tipográfica (ratio ~1.25) */
+  --fs-display-xl: 3rem;
+  --lh-display-xl: 3.25rem;
+  --fs-display: 2.25rem;
+  --fs-h1: 1.875rem;
+  --fs-h2: 1.5rem;
+  --fs-h3: 1.25rem;
+  --fs-body-lg: 1.125rem;
+  --fs-body: 1rem;
+  --fs-sm: 0.875rem;
+  --fs-xs: 0.75rem;
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --fw-extra: 800;
+
+  /* ---------------------------------------------------------------------
+   * Color — extraído del mockup (logo real: navy #202D3E / teal #25BAA6).
+   * --------------------------------------------------------------------- */
+  --bg-primary: #f7fafa;
+  --bg-surface: #ffffff;
+
+  /* AA: #25BAA6 sobre blanco mide ~2.4:1 — NO usar --brand para texto/UI
+     sobre superficies claras. Para texto/iconos con contraste real, usa
+     --brand-dark (#1C9483, ~3.9:1 large-text / suficiente para iconos+texto
+     ≥18px negrita; para texto normal usa --text-dark o el navy). --brand
+     queda para fondos decorativos, sobre --navy, o rellenos grandes. */
+  --brand: #25baa6;
+  --brand-dark: #1c9483;
+  --brand-light: #e7f8f5;
+
+  --navy: #202d3e;
+  --navy-soft: #3a4b62;
+
+  --text-dark: #202d3e;
+  --text-muted: #9ca3af;
+  --text-light: #ffffff;
+
+  --accent-gold: #f2b94d;
+  --accent-coral: #ff8a65;
+  --neutral: #9ca3af;
+
+  /* Semánticos de estado (--success/--warning/--danger del mockup): se
+     definen en Fase 2, cuando StatusPill/Badge se migran a BEM — ahí se
+     decide, con matemática AA real, si los valores ya auditados de
+     globals.css (--success/--warning/--destructive) se reusan tal cual o
+     necesitan un tono distinto para este vocabulario. No se listan aquí
+     todavía para no crear un alias circular con esos mismos nombres. */
+
+  /* Hairline decorativo (tarjetas) — DISTINTO del --border de shadcn (ese
+     sigue siendo el de controles de formulario, auditado a 3:1). */
+  --border-hairline: #edf1f1;
+  --border-hairline-strong: #e2e8f0;
+
+  /* ---------------------------------------------------------------------
+   * Elevación — sombras tenues en capas (nada de sombras duras).
+   * --------------------------------------------------------------------- */
+  --shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-sm:
+    0 1px 3px rgba(16, 24, 40, 0.08),
+    0 1px 2px rgba(16, 24, 40, 0.04);
+  --shadow-md:
+    0 4px 12px rgba(16, 24, 40, 0.06),
+    0 2px 4px rgba(16, 24, 40, 0.04);
+  --shadow-lg: 0 16px 32px rgba(16, 24, 40, 0.12);
+
+  /* ---------------------------------------------------------------------
+   * Radios — redondeos suaves y coherentes.
+   * --------------------------------------------------------------------- */
+  --r-sm: 0.375rem;
+  --r-md: 0.625rem;
+  --r-lg: 0.875rem;
+  --r-xl: 1rem;
+  --r-2xl: 1.25rem;
+  --r-full: 9999px;
+
+  /* ---------------------------------------------------------------------
+   * Movimiento
+   * --------------------------------------------------------------------- */
+  --transition-base: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+}

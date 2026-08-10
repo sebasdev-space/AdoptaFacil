@@ -1,8 +1,18 @@
-@import '@fontsource/poppins/latin-400.css';
-@import '@fontsource/poppins/latin-500.css';
-@import '@fontsource/poppins/latin-600.css';
-@import '@fontsource/poppins/latin-700.css';
-@import '@fontsource/poppins/latin-800.css';
+// REFACTOR-VISUAL v2 — Plus Jakarta Sans (UI/cuerpo), Fraunces (display/
+// títulos), IBM Plex Mono (códigos/asientos). Reemplaza el Poppins de Fase A.
+@import '@fontsource/plus-jakarta-sans/latin-400.css';
+@import '@fontsource/plus-jakarta-sans/latin-500.css';
+@import '@fontsource/plus-jakarta-sans/latin-600.css';
+@import '@fontsource/plus-jakarta-sans/latin-700.css';
+@import '@fontsource/plus-jakarta-sans/latin-800.css';
+@import '@fontsource/fraunces/latin-500.css';
+@import '@fontsource/fraunces/latin-600.css';
+@import '@fontsource/fraunces/latin-700.css';
+@import '@fontsource/ibm-plex-mono/latin-400.css';
+@import '@fontsource/ibm-plex-mono/latin-500.css';
+
+@import './tokens.scss';
+@import './base.scss';
 
 @tailwind base;
 @tailwind components;
@@ -30,6 +40,13 @@
  * UNCHANGED on purpose: they already carry dedicated AA fixes (F-BORDE,
  * F-BADGE) and are intentionally a different hue family from the brand primary
  * so a status badge never looks like a primary CTA.
+ *
+ * REFACTOR-VISUAL v2: `tokens.scss` (imported above) now owns typography
+ * (Plus Jakarta Sans / Fraunces / IBM Plex Mono replace Fase A's Poppins) plus
+ * the full mockup vocabulary (--brand, --navy, --shadow-*, --r-*,
+ * --border-hairline, etc.). This file's shadcn/HSL vars stay as the source of
+ * truth for components not yet migrated to BEM+SCSS — see tokens.scss's file
+ * comment for exactly which names are shared vs. deliberately separate.
  */
 @layer base {
   :root {
@@ -101,14 +118,11 @@
     --brand-coral: 14 100% 70%;
     --brand-gold: 39 86% 63%;
 
-    /* Typography — rounded sans matching the logo's lettering, self-hosted
-       via @fontsource (no runtime dependency on a font CDN). */
-    --font-sans:
-      'Poppins', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue',
-      Arial, sans-serif;
-    --font-display: var(--font-sans);
-    --font-mono:
-      ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+    /* Typography — REFACTOR-VISUAL v2: --font-sans/--font-display/--font-mono
+       ahora se definen en tokens.scss (Plus Jakarta Sans / Fraunces / IBM
+       Plex Mono), importado ANTES que este bloque en globals.scss. No los
+       redefinas aquí — la última declaración de una custom property gana la
+       cascada, así que un valor aquí silenciosamente pisaría el de tokens.scss. */
 
     /* Radii — slightly softer/rounder than before (0.625rem → 0.75rem), so the
        derived `xl` scale (radius + 4px = 1rem) lines up with Card's rounded-2xl. */

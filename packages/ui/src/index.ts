@@ -6,6 +6,9 @@ export { cn } from './lib/utils';
 // Button (Sprint 0)
 export { Button, buttonVariants, type ButtonProps } from './components/button';
 
+// Brand
+export { Logo, type LogoProps } from './components/logo';
+
 // Form controls
 export { Input, type InputProps } from './components/input';
 export {
