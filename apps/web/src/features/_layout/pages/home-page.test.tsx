@@ -111,11 +111,53 @@ describe('HomePage — org summary block is Owner/Administrator/Operator only (S
     expect(screen.getByText('Subsanar')).toBeInTheDocument();
   });
 
+  it("shows a real greeting with the user name and today's date instead of the generic subtitle", async () => {
+    renderHome([Role.Owner]);
+    await screen.findByText('Animales activos');
+    expect(
+      screen.getByText(/^(Buenos días|Buenas tardes|Buenas noches), Tester ·/),
+    ).toBeInTheDocument();
+  });
+
+  it('derives "Requiere tu acción" only from real summary counts (no invented detail)', async () => {
+    renderHome([Role.Owner]);
+    expect(await screen.findByText('Requiere tu acción · 3')).toBeInTheDocument();
+    expect(screen.getByText('6 solicitudes de adopción sin revisar')).toBeInTheDocument();
+    expect(screen.getByText('1 documento institucional por vencer')).toBeInTheDocument();
+    expect(screen.getByText('2 documentos rechazados · pendiente de subsanar')).toBeInTheDocument();
+  });
+
+  it('renders the formalization stepper at the step matching the real percent', async () => {
+    renderHome([Role.Owner]);
+    // ORG_SUMMARY_BODY.formalizationPercent = 60 → step index 2 (Formalizada).
+    expect(await screen.findByText('Formalizada')).toBeInTheDocument();
+    expect(screen.getByText('Formalizada').className).toMatch(/stepper__label--current/);
+    expect(screen.getByText('Informal').className).toMatch(/stepper__label--done/);
+    expect(screen.getByText('ESAL + RTE').className).not.toMatch(/stepper__label--(done|current)/);
+  });
+
   it('hides the block for a Volunteer (org role, but outside VIEW_ROLES)', async () => {
     renderHome([Role.Volunteer]);
     expect(screen.getByRole('heading', { name: 'Inicio' })).toBeInTheDocument();
     expect(screen.queryByText('Animales activos')).not.toBeInTheDocument();
     await waitFor(() => expect(fetch).not.toHaveBeenCalled());
+  });
+
+  it('omits "Requiere tu acción" entirely when every real count is zero (no filler)', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      json: async () => ({
+        ...ORG_SUMMARY_BODY,
+        adoptionRequestsPending: 0,
+        documentsExpiringSoon: 0,
+        documentsRejected: 0,
+      }),
+    } as never);
+    renderHome([Role.Owner]);
+    await screen.findByText('Animales activos');
+    expect(screen.queryByText(/Requiere tu acción/)).not.toBeInTheDocument();
   });
 
   it('shows a retry affordance when the summary fetch fails', async () => {
