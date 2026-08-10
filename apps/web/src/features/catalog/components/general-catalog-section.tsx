@@ -19,7 +19,8 @@ import { fetchGlobalPublicAnimals } from '../api/public-animals';
 import { CatalogAnimalCard } from './catalog-animal-card';
 
 const PAGE_SIZE = 12;
-const HEADING_ID = 'general-catalog-heading';
+/** Exported so the hero's "Ver mascotas en adopción" CTA can anchor-scroll here. */
+export const GENERAL_CATALOG_HEADING_ID = 'general-catalog-heading';
 
 type SpeciesFilter = AnimalSpecies | 'all';
 type SectionState = 'loading' | 'ready' | 'error';
@@ -79,10 +80,10 @@ export function GeneralCatalogSection() {
   const filters: readonly SpeciesFilter[] = ['all', ...ANIMAL_SPECIES];
 
   return (
-    <section aria-labelledby={HEADING_ID} data-testid="general-catalog">
+    <section aria-labelledby={GENERAL_CATALOG_HEADING_ID} data-testid="general-catalog">
       <Card>
         <CardHeader className="gap-3">
-          <CardTitle id={HEADING_ID}>Animales en adopción</CardTitle>
+          <CardTitle id={GENERAL_CATALOG_HEADING_ID}>Animales en adopción</CardTitle>
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrar por especie">
               {filters.map((f) => (
