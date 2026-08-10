@@ -64,8 +64,13 @@
   --brand-dark: #1c9483;
   --brand-light: #e7f8f5;
 
-  --navy: #202d3e;
-  --navy-soft: #3a4b62;
+  // --navy/--navy-soft NOT redeclared here on purpose: globals.scss's shadcn
+  // block already defines them (bare HSL channels, "214 32% 18%") for
+  // `hsl(var(--navy))` — same real color (#202D3E), same hex. Two `:root`
+  // declarations of the same custom property collide by CSS cascade order
+  // (last one wins), and a bare-channel string used as a raw color value
+  // (`background-color: var(--navy)` with no `hsl()`) is invalid and gets
+  // silently dropped — always wrap: `hsl(var(--navy))` / `hsl(var(--navy-soft))`.
 
   --text-dark: #202d3e;
   --text-muted: #9ca3af;
