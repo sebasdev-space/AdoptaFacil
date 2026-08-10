@@ -1,0 +1,59 @@
+// Status pill (mockup's `.badge` — light tint bg + dark saturated text, NOT
+// a solid fill). Every pair below is the mockup's OWN literal hex (not a
+// diluted/derived version of the solid --success/--warning/--destructive
+// tokens — a first attempt at deriving light tints from those solid HSL
+// values via alpha blending measured only ~3.45:1, below AA). Recomputed
+// with real sRGB relative-luminance math (WCAG formula), same rigor as
+// F1-03/F-BORDE/F-BADGE:
+//   green  #E7F8F5 bg / #0F766E text → 4.99:1
+//   amber  #FEF3E2 bg / #B45309 text → 4.58:1
+//   red    #FEECEC bg / #B42318 text → 5.77:1
+//   gray   #F1F3F5 bg / #4B5768 text → 6.60:1
+// All ≥4.5:1 AA for normal text. `default`/`info` reuse --brand-light
+// (identical hex to the green pill's bg) with hsl(var(--primary)) text — the
+// SAME pair already audited at ~4.8:1 in globals.scss (Fase A).
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: var(--r-full);
+  padding: 0.2rem 0.6rem;
+  font-family: var(--font-sans);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: 0.01em;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.status-pill--default,
+.status-pill--info {
+  background-color: var(--brand-light);
+  color: hsl(var(--primary));
+}
+
+.status-pill--secondary {
+  background-color: #f1f3f5;
+  color: #4b5768;
+}
+
+.status-pill--outline {
+  background-color: transparent;
+  color: var(--text-dark);
+  border: 1px solid var(--border-hairline-strong);
+}
+
+.status-pill--success {
+  background-color: #e7f8f5;
+  color: #0f766e;
+}
+
+.status-pill--warning {
+  background-color: #fef3e2;
+  color: #b45309;
+}
+
+.status-pill--destructive {
+  background-color: #feecec;
+  color: #b42318;
+}

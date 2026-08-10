@@ -31,7 +31,7 @@ export {
   CardContent,
   CardFooter,
 } from './components/card';
-export { Badge, badgeVariants, type BadgeProps } from './components/badge';
+export { Badge, type BadgeProps, type BadgeVariant } from './components/badge';
 export {
   Table,
   TableHeader,
@@ -43,6 +43,13 @@ export {
   TableCaption,
 } from './components/table';
 export { Tabs, TabsList, TabsTrigger, TabsContent } from './components/tabs';
+export { StatCard, type StatCardProps } from './components/stat-card';
+export {
+  ProgressStepper,
+  type ProgressStepperProps,
+  type ProgressStep,
+} from './components/progress-stepper';
+export { Timeline, type TimelineProps, type TimelineEvent } from './components/timeline';
 
 // Overlays
 export {
@@ -58,6 +65,20 @@ export {
   DialogDescription,
   type DialogContentProps,
 } from './components/dialog';
+export {
+  Drawer,
+  DrawerTrigger,
+  DrawerPortal,
+  DrawerClose,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerHeader,
+  DrawerBody,
+  DrawerFooter,
+  DrawerTitle,
+  DrawerDescription,
+  type DrawerContentProps,
+} from './components/drawer';
 
 // Feedback
 export {
@@ -77,3 +98,5 @@ export { useToast, toast, type ToasterToast, type ToastHandle } from './componen
 // States
 export { Skeleton } from './components/skeleton';
 export { EmptyState, type EmptyStateProps } from './components/empty-state';
+export { ErrorState, type ErrorStateProps } from './components/error-state';
+export { ComingSoon, type ComingSoonProps } from './components/coming-soon';

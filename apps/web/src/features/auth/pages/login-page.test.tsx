@@ -38,11 +38,11 @@ describe('LoginPage', () => {
   it('F1-03+: "Volver al inicio" is a SECONDARY (outline) button, not the primary CTA style', () => {
     renderShell({ route: '/login', session: { initialStatus: 'unauthenticated' } });
     const backLink = screen.getByRole('link', { name: '← Volver al inicio' });
-    expect(backLink.className).toContain('border-input');
-    expect(backLink.className).not.toContain('bg-primary');
+    expect(backLink.className).toContain('button--outline');
+    expect(backLink.className).not.toContain('button--primary');
     // "Iniciar sesión" (the submit button) stays the SOLID protagonist.
     expect(screen.getByRole('button', { name: 'Iniciar sesión' }).className).toContain(
-      'bg-primary',
+      'button--primary',
     );
   });
 });
