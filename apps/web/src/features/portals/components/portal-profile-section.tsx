@@ -1,10 +1,11 @@
-import { Badge, Card, CardContent, CardHeader } from '@adoptafacil/ui';
+import { Badge, Card, CardContent, CardHeader, cn } from '@adoptafacil/ui';
 import {
   FormalizationState,
   type PortalLogoPosition,
   type PortalProfile,
 } from '@adoptafacil/contracts';
 import { OrgTypeBadge } from './org-type-badge';
+import styles from './portal-profile-section.module.scss';
 
 export interface PortalProfileSectionProps {
   profile: PortalProfile;
@@ -44,8 +45,9 @@ function initials(name: string): string {
 
 /**
  * Sección "perfil": identidad pública REAL de la organización (pulido visual
- * T-D02) — hero con portada + logo, nombre, badges de tipo/formalización, y una
- * fila de stats reales (ubicación, animales disponibles, formalización). Lee
+ * T-D02, reestilado BEM+SCSS en REFACTOR-VISUAL v2 Fase 6) — hero navy con
+ * portada opcional + logo, nombre, badges de tipo/formalización, y una fila
+ * de stats reales (ubicación, animales disponibles, formalización). Lee
  * directamente `profile.organization` (contrato `OrganizationPublic`), por lo que
  * hereda por contrato cualquier cambio en los campos públicos que publique
  * @sebastian — sin reproyectar. El nivel de verificación NUNCA se muestra aquí
@@ -70,28 +72,18 @@ export function PortalProfileSection({
   return (
     <section aria-labelledby={HEADING_ID}>
       <Card className="overflow-hidden">
-        {/* Hero: portada + logo circular sobre el borde inferior. */}
-        <div className="relative">
+        {/* Hero: portada navy + logo circular sobre el borde inferior. */}
+        <div className={cn('relative', styles.hero)}>
           {cover ? (
-            <img src={cover} alt="" className="h-48 w-full object-cover sm:h-60" />
+            <img src={cover} alt="" className={styles.hero__cover} />
           ) : (
-            <div
-              aria-hidden
-              className="h-48 w-full bg-gradient-to-br from-primary/30 via-primary/10 to-transparent sm:h-60"
-            />
+            <div aria-hidden className={styles.hero__glow} />
           )}
           <div className={`absolute -bottom-10 ${LOGO_POSITION_CLASSES[logoPosition]}`}>
             {org.logoUrl ? (
-              <img
-                src={org.logoUrl}
-                alt={`Logo de ${org.name}`}
-                className="h-20 w-20 rounded-full border-4 border-card object-cover shadow-md sm:h-24 sm:w-24"
-              />
+              <img src={org.logoUrl} alt={`Logo de ${org.name}`} className={styles['avatar-img']} />
             ) : (
-              <div
-                aria-hidden
-                className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-card bg-primary text-lg font-semibold text-primary-foreground shadow-md sm:h-24 sm:w-24 sm:text-xl"
-              >
+              <div aria-hidden className={styles['avatar-fallback']}>
                 {initials(org.name)}
               </div>
             )}
@@ -100,7 +92,7 @@ export function PortalProfileSection({
 
         <CardHeader className="gap-2 pt-12 sm:pt-14">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 id={HEADING_ID} className="text-2xl font-bold tracking-tight">
+            <h1 id={HEADING_ID} className={styles.name}>
               {org.name}
             </h1>
             <OrgTypeBadge organizationType={organizationType} />
@@ -112,7 +104,7 @@ export function PortalProfileSection({
             {org.rteVigente && <Badge variant="success">RTE vigente</Badge>}
           </div>
           {org.nit && (
-            <p className="text-xs text-muted-foreground">
+            <p className={styles.nit}>
               NIT: <span className="text-foreground">{org.nit}</span>
             </p>
           )}
@@ -120,18 +112,18 @@ export function PortalProfileSection({
 
         <CardContent className="space-y-4">
           {org.description && (
-            <p className="line-clamp-4 text-sm text-muted-foreground">{org.description}</p>
+            <p className={cn('line-clamp-4', styles.description)}>{org.description}</p>
           )}
-          <dl className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+          <dl className={styles.stats}>
             {location && (
-              <div className="flex items-center gap-1.5">
+              <div className={styles.stats__item}>
                 <span aria-hidden>📍</span>
                 <dt className="sr-only">Ubicación</dt>
                 <dd>{location}</dd>
               </div>
             )}
             {typeof animalCount === 'number' && (
-              <div className="flex items-center gap-1.5">
+              <div className={styles.stats__item}>
                 <span aria-hidden>🐾</span>
                 <dt className="sr-only">Animales disponibles</dt>
                 <dd>
@@ -140,7 +132,7 @@ export function PortalProfileSection({
               </div>
             )}
             {formalizationLabel && (
-              <div className="flex items-center gap-1.5">
+              <div className={styles.stats__item}>
                 <span aria-hidden>📄</span>
                 <dt className="sr-only">Estado de formalización</dt>
                 <dd>{formalizationLabel}</dd>
