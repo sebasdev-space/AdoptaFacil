@@ -16,6 +16,16 @@ describe('AppLayout', () => {
     expect(screen.getByRole('button', { name: 'Abrir menú de navegación' })).toBeInTheDocument();
   });
 
+  it('REFACTOR-VISUAL Fase B: the persistent sidebar uses the brand navy surface', () => {
+    renderShell({ route: '/adopciones', session: { initialStatus: 'authenticated' } });
+
+    const nav = screen.getByRole('navigation', { name: 'Navegación principal' });
+    // The <aside> is the nav's grandparent (nav sits between the brand row and
+    // the footer inside it) — walk up rather than assume a fixed depth.
+    const sidebar = nav.closest('aside');
+    expect(sidebar).toHaveClass('bg-navy');
+  });
+
   it('shows the persistent transparency indicator in the header (§M14)', () => {
     // Pin an explicit indicator value; the derivation-from-session path is
     // covered in transparency/session-transparency.test.tsx (T-029).

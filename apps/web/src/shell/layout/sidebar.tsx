@@ -37,11 +37,11 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
           onClick={onNavigate}
           className={({ isActive }) =>
             cn(
-              'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+              'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
               isActive
-                ? 'bg-accent text-accent-foreground'
-                : 'text-muted-foreground hover:bg-accent/60 hover:text-accent-foreground',
+                ? 'bg-primary text-primary-foreground'
+                : 'text-white/70 hover:bg-white/10 hover:text-white',
             )
           }
         >
@@ -55,19 +55,20 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 
 function SidebarFooter() {
   return (
-    <div className="border-t px-4 py-3 text-xs text-muted-foreground">
+    <div className="border-t border-white/10 px-4 py-3 text-xs text-white/50">
       <p>AdoptaFácil V2.0</p>
       <p className="mt-0.5">Portal con transparencia</p>
     </div>
   );
 }
 
-/** Persistent sidebar shown from `lg` up (escritorio). */
+/** Persistent sidebar shown from `lg` up (escritorio). REFACTOR-VISUAL Fase B:
+ * solid navy fill matching the brand mockup's organization-mode sidebar. */
 export function Sidebar() {
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-r bg-card lg:flex">
-      <div className="flex h-16 items-center border-b px-4">
-        <Brand />
+    <aside className="hidden w-64 shrink-0 flex-col bg-navy lg:flex">
+      <div className="flex h-16 items-center border-b border-white/10 px-4">
+        <Brand inverse />
       </div>
       <SidebarNav />
       <SidebarFooter />
@@ -106,24 +107,24 @@ export function MobileNavDrawer() {
         onClick={closeDrawer}
       />
 
-      {/* Drawer panel */}
+      {/* Drawer panel — same navy surface as the persistent sidebar (Fase B). */}
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Menú de navegación"
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col bg-card shadow-xl transition-transform duration-200 ease-out',
+          'fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col bg-navy shadow-xl transition-transform duration-200 ease-out',
           isDrawerOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        <div className="flex h-16 items-center justify-between border-b px-4">
-          <Brand />
+        <div className="flex h-16 items-center justify-between border-b border-white/10 px-4">
+          <Brand inverse />
           <Button
             variant="ghost"
             size="sm"
             onClick={closeDrawer}
             aria-label="Cerrar menú"
-            className="px-2"
+            className="px-2 text-white hover:bg-white/10 hover:text-white"
           >
             <CloseIcon className="h-5 w-5" />
           </Button>
