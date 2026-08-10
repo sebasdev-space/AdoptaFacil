@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import type { DonationWithReceipt } from '@adoptafacil/contracts';
-import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@adoptafacil/ui';
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@adoptafacil/ui';
 import { PageContainer, PageHeader } from '../../_layout';
 import { useApiClient } from '../../../shell/api';
 import { listReceivedDonations } from '../api/donations-api';
+import { ReceivedDonationDetailModal } from '../components/received-donation-detail-modal';
 import { formatBogota, formatCop } from '../model/donation-breakdown-view';
 import { DONATION_STATUS_BADGE_VARIANT, DONATION_STATUS_LABELS } from '../model/my-donations-view';
 import {
@@ -31,6 +32,8 @@ export function ReceivedDonationsPage() {
   const [donations, setDonations] = useState<DonationWithReceipt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const detailDonation = donations.find((d) => d.id === detailId) ?? null;
 
   useEffect(() => {
     let active = true;
@@ -96,12 +99,21 @@ export function ReceivedDonationsPage() {
                       {formatCop(donation.breakdown.net)}
                     </span>
                   </div>
+                  <div className="mt-2">
+                    <Button variant="outline" onClick={() => setDetailId(donation.id)}>
+                      Ver detalle
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>
           )}
         </CardContent>
       </Card>
+      <ReceivedDonationDetailModal
+        donation={detailDonation}
+        onOpenChange={(open) => !open && setDetailId(null)}
+      />
     </PageContainer>
   );
 }

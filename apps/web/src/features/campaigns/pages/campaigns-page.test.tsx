@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CampaignCategory, CampaignStatus, Role, type Campaign } from '@adoptafacil/contracts';
 import { renderShell } from '../../../test-utils';
@@ -111,13 +111,17 @@ describe('CampaignsPage — gestión interna reconectada (S2-01)', () => {
     renderShell({ route: '/organizacion/campanas', ...sessionWith([Role.Owner]) });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Crear campaña' }));
+    const dialog = await screen.findByRole('dialog');
     fireEvent.change(screen.getByLabelText('Título'), { target: { value: 'Cirugía para Max' } });
     fireEvent.change(screen.getByLabelText('Categoría'), {
       target: { value: CampaignCategory.Surgeries },
     });
     fireEvent.change(screen.getByLabelText('Meta (COP)'), { target: { value: '1000000' } });
     fireEvent.change(screen.getByLabelText('Fecha límite'), { target: { value: '2026-12-31' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Crear campaña' }));
+    // REFACTOR-VISUAL Fase C3: creación en modal — el botón de envío vive
+    // DENTRO del dialog, distinto del trigger de la cabecera (mismo texto,
+    // por eso se busca dentro del dialog en vez de por nombre global).
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Crear campaña' }));
 
     await waitFor(() => {
       const post = calls.find((c) => c.init?.method === 'POST');
@@ -133,5 +137,19 @@ describe('CampaignsPage — gestión interna reconectada (S2-01)', () => {
       expect(body.image).toBeUndefined();
     });
     expect(await screen.findByText('Campaña creada')).toBeInTheDocument();
+  });
+
+  it('REFACTOR-VISUAL Fase C3: "Crear campaña" opens a modal, never an inline form', async () => {
+    stubFetch(() => ({ items: [], total: 0, limit: 50, offset: 0 }));
+    renderShell({ route: '/organizacion/campanas', ...sessionWith([Role.Owner]) });
+
+    await screen.findByRole('heading', { name: 'Campañas de recaudación' });
+    // Before opening: no dialog, no stray "Título" field sitting in the list view.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Título')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Crear campaña' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Título')).toBeInTheDocument();
   });
 });
