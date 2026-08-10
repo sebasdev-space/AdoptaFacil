@@ -18,6 +18,7 @@ import { PortalTransparencyBar } from '../components/portal-transparency-bar';
 import { PortalDonateCta } from '../components/portal-donate-cta';
 import { PortalSocialLinks } from '../components/portal-social-links';
 import { PortalAdoptionSection } from '../components/portal-adoption-section';
+import { PortalCampaignsSection } from '../components/portal-campaigns-section';
 import { PortalAboutSection } from '../components/portal-about-section';
 import { PortalContactInfoSection } from '../components/portal-contact-info-section';
 
@@ -47,9 +48,10 @@ const DEFAULT_LAYOUT: Layout = { logoPosition: 'left', socialNavPosition: 'right
  *    than displaying an always-"No disponible" bar.
  *  - two-column layout: animals catalog (main) + sidebar (social links/contact +
  *    the "Donar" CTA).
- *  - aggregated sections still in `status: 'placeholder'` (campaña / necesita hoy
- *    / transparencia — no owning module yet) are simply NOT mounted, instead of
- *    showing an empty "Próximamente" card; only 'pets' is wired to real data
+ *  - aggregated sections still in `status: 'placeholder'` (necesita hoy /
+ *    transparencia — no owning module yet) are simply NOT mounted, instead of
+ *    showing an empty "Próximamente" card; 'pets' and 'activeCampaign'
+ *    (F-CAMPANAS-PORTAL-2, S2-07) are wired to real data
  *    (see docs/TASKS.md · deuda de cableado M14).
  *
  * PERSONALIZATION (T-027): the org's brand tokens are fetched and applied at
@@ -148,12 +150,15 @@ export function OrgPublicPage() {
   // "nunca más" hardcodeado: si el catálogo se puebla, la barra vuelve a aparecer).
   const hasVerificationSignal = (view?.profile.organization.verificationLevel?.level ?? 0) > 0;
 
-  // Secciones agregadas AÚN sin módulo dueño (campaña/necesita hoy/transparencia)
-  // nacen en status:'placeholder' — ocultarlas evita el "Próximamente" vacío frente
-  // al cliente (pulido visual T-D02). 'pets' es la única sección ya cableada a datos
-  // reales y siempre se muestra.
+  // Secciones agregadas AÚN sin módulo dueño (necesita hoy/transparencia) nacen en
+  // status:'placeholder' — ocultarlas evita el "Próximamente" vacío frente al
+  // cliente (pulido visual T-D02). 'pets' y 'activeCampaign' (F-CAMPANAS-PORTAL-2,
+  // S2-07) ya están cableadas a datos reales y siempre se muestran.
   const visibleSections = view?.sections.filter(
-    (section) => section.kind === 'pets' || section.status !== 'placeholder',
+    (section) =>
+      section.kind === 'pets' ||
+      section.kind === 'activeCampaign' ||
+      section.status !== 'placeholder',
   );
 
   // Tabs "Nosotros"/"Información" (S2-PORTAL) solo existen cuando hay contenido
@@ -209,13 +214,16 @@ export function OrgPublicPage() {
                     layout.socialNavPosition === 'left' ? 'lg:order-last' : ''
                   }`}
                 >
-                  {/* La sección "Mascotas en adopción" (kind 'pets') ya está
-                      CABLEADA al catálogo público (§M14/M03, T-052); cualquier
-                      otra sección que algún día deje de ser placeholder
-                      aparecería aquí también. */}
+                  {/* "Mascotas en adopción" (kind 'pets', §M03/T-052) y "Campaña
+                      activa" (kind 'activeCampaign', §M06/S2-07,
+                      F-CAMPANAS-PORTAL-2) ya están CABLEADAS a datos reales;
+                      cualquier otra sección que algún día deje de ser
+                      placeholder aparecería aquí también. */}
                   {visibleSections?.map((section) =>
                     section.kind === 'pets' ? (
                       <PortalAdoptionSection key={section.kind} slug={slug as string} />
+                    ) : section.kind === 'activeCampaign' ? (
+                      <PortalCampaignsSection key={section.kind} slug={slug as string} />
                     ) : (
                       <PortalPlaceholderSection key={section.kind} section={section} />
                     ),
