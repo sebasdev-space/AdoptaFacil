@@ -1,0 +1,32 @@
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-hairline);
+}
+
+.history__row {
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-hairline);
+  font-size: var(--fs-sm);
+
+  &:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+}
+
+.history__transition {
+  font-weight: var(--fw-semibold);
+  color: var(--text-dark);
+}
+
+.history__date {
+  margin-left: 0.5rem;
+  color: var(--text-muted);
+}
+
+.history__reason {
+  color: var(--text-muted);
+}

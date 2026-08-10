@@ -18,14 +18,18 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  EmptyState,
+  ProgressStepper,
   Skeleton,
   useToast,
 } from '@adoptafacil/ui';
 import { PageContainer, PageHeader } from '../../_layout';
+import { formalizationSteps } from '../../_layout/model/formalization-stepper-view';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
 import { Role } from '@adoptafacil/contracts';
 import { TextField } from '../components/profile-fields';
+import styles from './org-formalization-page.module.scss';
 
 const STATE_LABELS: Record<FormalizationState, string> = {
   [FormalizationState.Informal]: 'Informal',
@@ -152,24 +156,11 @@ export function OrgFormalizationPage() {
               <CardTitle>Estado actual</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <ol className="flex flex-wrap items-center gap-2">
-                {FORMALIZATION_SEQUENCE.map((state, index) => (
-                  <li key={state} className="flex items-center gap-2">
-                    <Badge variant={index === currentIndex ? 'default' : 'secondary'}>
-                      {STATE_LABELS[state]}
-                    </Badge>
-                    {index < FORMALIZATION_SEQUENCE.length - 1 && (
-                      <span aria-hidden className="text-muted-foreground">
-                        →
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ol>
+              <ProgressStepper steps={formalizationSteps()} currentIndex={currentIndex} />
               {status.rteVigente && <Badge>RTE vigente</Badge>}
 
               {canManage && (next || previous) && (
-                <div className="flex flex-wrap gap-2 border-t pt-4">
+                <div className={styles.actions}>
                   {next && (
                     <Button
                       onClick={() =>
@@ -200,19 +191,17 @@ export function OrgFormalizationPage() {
             </CardHeader>
             <CardContent>
               {history.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Aún no hay cambios de estado.</p>
+                <EmptyState title="Aún no hay cambios de estado." />
               ) : (
                 <ul className="space-y-3">
                   {[...history].reverse().map((entry) => (
-                    <li key={entry.id} className="border-b pb-2 text-sm last:border-b-0">
-                      <span className="font-medium">
+                    <li key={entry.id} className={styles['history__row']}>
+                      <span className={styles['history__transition']}>
                         {STATE_LABELS[entry.fromState]} → {STATE_LABELS[entry.toState]}
                       </span>
-                      <span className="ml-2 text-muted-foreground">
-                        {formatCO(entry.createdAt)}
-                      </span>
+                      <span className={styles['history__date']}>{formatCO(entry.createdAt)}</span>
                       {entry.reason && (
-                        <p className="text-muted-foreground">Motivo: {entry.reason}</p>
+                        <p className={styles['history__reason']}>Motivo: {entry.reason}</p>
                       )}
                     </li>
                   ))}
