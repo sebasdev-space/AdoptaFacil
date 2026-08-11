@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FormalizationState, type OrganizationPublic } from '@adoptafacil/contracts';
@@ -413,6 +413,141 @@ describe('OrgPublicPage — rich public portal', () => {
 
       const sidebar = screen.getByRole('link', { name: 'Sitio web' }).closest('aside');
       expect(sidebar?.className).toContain('lg:order-first');
+    });
+  });
+
+  describe('pulido visual: KPIs, acciones principales, franja superior y libro público', () => {
+    it('shows a real KPI (animales disponibles) and never a fabricated adopciones/donaciones/calificación tile', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith('/theme')) {
+            return Promise.resolve({ ok: true, status: 200, json: async () => ({ tokens: {} }) });
+          }
+          if (url.includes('/animals')) {
+            return Promise.resolve({
+              ok: true,
+              status: 200,
+              json: async () => ({ items: [], total: 7, limit: 1, offset: 0 }),
+            });
+          }
+          return Promise.resolve({ ok: true, status: 200, json: async () => ORG });
+        }),
+      );
+      renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+      await screen.findByRole('heading', { name: /Refugio Patitas/ });
+
+      const kpis = await screen.findByTestId('portal-kpis');
+      expect(kpis).toHaveTextContent('Animales disponibles');
+      expect(kpis).toHaveTextContent('7');
+      // No fabricated metrics: those fields don't exist in the contract yet.
+      expect(screen.queryByText(/Adopciones/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Calificación/)).not.toBeInTheDocument();
+    });
+
+    it('shows Donar/Adoptar/Apadrinar together at the top, and Adoptar/Apadrinar switch back to the real "Portafolio" catalog tab', async () => {
+      stubFetch({ org: { ...ORG, aboutUs: 'Somos un refugio con 10 años de historia.' } });
+      renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+      await screen.findByRole('heading', { name: /Refugio Patitas/ });
+
+      const actions = screen.getByTestId('portal-header-actions');
+      expect(within(actions).getByTestId('portal-donate-cta')).toBeInTheDocument();
+      const adoptar = within(actions).getByRole('button', { name: 'Adoptar' });
+      const apadrinar = within(actions).getByRole('button', { name: 'Apadrinar' });
+
+      // Neither reimplements a new flow: both just land on the real catalog
+      // tab ("Portafolio"), where the existing per-animal actions live.
+      await userEvent.click(screen.getByRole('tab', { name: 'Nosotros' }));
+      expect(screen.getByRole('tab', { name: 'Portafolio' })).toHaveAttribute(
+        'data-state',
+        'inactive',
+      );
+
+      await userEvent.click(adoptar);
+      expect(screen.getByRole('tab', { name: 'Portafolio' })).toHaveAttribute(
+        'data-state',
+        'active',
+      );
+
+      await userEvent.click(screen.getByRole('tab', { name: 'Nosotros' }));
+      await userEvent.click(apadrinar);
+      expect(screen.getByRole('tab', { name: 'Portafolio' })).toHaveAttribute(
+        'data-state',
+        'active',
+      );
+    });
+
+    it('moves "Campaña activa" and "Síguenos" to the top strip, above the tabs', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((input: RequestInfo | URL) => {
+          const url = String(input);
+          if (url.endsWith('/theme')) {
+            return Promise.resolve({ ok: true, status: 200, json: async () => ({ tokens: {} }) });
+          }
+          if (url.includes('/campaigns')) {
+            return Promise.resolve({
+              ok: true,
+              status: 200,
+              json: async () => ({
+                items: [
+                  {
+                    id: 'c1',
+                    organizationId: 'org-1',
+                    organizationName: 'Refugio Patitas',
+                    title: 'Vacunas para el invierno',
+                    category: 'medications',
+                    goalAmount: 1_000_000,
+                    raisedAmount: 250_000,
+                    progress: 0.25,
+                    deadline: '2027-01-01T00:00:00.000Z',
+                    status: 'active',
+                    createdAt: '2026-07-01T00:00:00.000Z',
+                  },
+                ],
+                total: 1,
+                limit: 12,
+                offset: 0,
+              }),
+            });
+          }
+          if (url.includes('/animals')) {
+            return Promise.resolve({
+              ok: true,
+              status: 200,
+              json: async () => ({ items: [], total: 0, limit: 1, offset: 0 }),
+            });
+          }
+          return Promise.resolve({ ok: true, status: 200, json: async () => ORG });
+        }),
+      );
+      renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+      await screen.findByRole('heading', { name: /Refugio Patitas/ });
+
+      const campaign = await screen.findByTestId('portal-campaigns-section');
+      const social = screen.getByRole('link', { name: 'Sitio web' }).closest('section, aside');
+      const tabsList = screen.getByRole('tablist');
+
+      // Both sit before the tabs in DOM order (top strip), not inside a tab panel.
+      expect(
+        campaign.compareDocumentPosition(tabsList) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+      expect(
+        social!.compareDocumentPosition(tabsList) & Node.DOCUMENT_POSITION_FOLLOWING,
+      ).toBeTruthy();
+    });
+
+    it('shows "Transparencia — libro público" with a ComingSoon modal (no real ledger data)', async () => {
+      renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+      await screen.findByRole('heading', { name: /Refugio Patitas/ });
+
+      expect(
+        screen.getByRole('heading', { name: 'Transparencia — libro público' }),
+      ).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Ver libro completo →' }));
+      expect(await screen.findByText('Libro público')).toBeInTheDocument();
+      expect(screen.getByText('Pronto')).toBeInTheDocument();
     });
   });
 });
