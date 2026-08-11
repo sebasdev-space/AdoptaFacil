@@ -21,9 +21,12 @@ import {
   ResetPasswordPage,
 } from '../../features/auth';
 import {
+  ExogenousReportPage,
+  NationalTransparencyPage,
   OrgDocumentsPage,
   OrgFormalizationPage,
   OrgProfilePage,
+  OrgVolunteeringPage,
   PlatformDocumentsReviewPage,
 } from '../../features/org';
 import { OrgPublicPage, PortalThemePage, PublicAnimalDetailPage } from '../../features/portals';
@@ -273,6 +276,34 @@ export function AppRoutes() {
             element={
               <RequireRoles roles={PLATFORM_DOCUMENTS_ROLES}>
                 <PlatformDocumentsReviewPage />
+              </RequireRoles>
+            }
+          />
+          {/* Fase 12 (REFACTOR-VISUAL v2) · módulos aún no construidos —
+              "ComingSoon", sin backend detrás. Gated a ORG_MEMBER_ROLES como
+              "Mi organización"/"Formalización": una Persona no tiene org que
+              gestionar. */}
+          <Route
+            path="organizacion/voluntariado"
+            element={
+              <RequireRoles roles={ORG_MEMBER_ROLES}>
+                <OrgVolunteeringPage />
+              </RequireRoles>
+            }
+          />
+          <Route
+            path="organizacion/transparencia-nacional"
+            element={
+              <RequireRoles roles={ORG_MEMBER_ROLES}>
+                <NationalTransparencyPage />
+              </RequireRoles>
+            }
+          />
+          <Route
+            path="organizacion/reporte-exogeno"
+            element={
+              <RequireRoles roles={ORG_MEMBER_ROLES}>
+                <ExogenousReportPage />
               </RequireRoles>
             }
           />
