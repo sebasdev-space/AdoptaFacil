@@ -1,4 +1,5 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import type { PublicAnimalSummary } from '@adoptafacil/contracts';
@@ -10,12 +11,17 @@ import { GeneralCatalogSection } from './general-catalog-section';
  * limit }) — never `{ items }` (that's the per-org shape). Must read `.data`,
  * normalize a non-array to [], and never `.map` over a non-array (same
  * anti-regression discipline as T-028c's portal catalog).
+ *
+ * Pulido visual (2da ronda): the catalog is fetched ONCE (server cap: 50) and
+ * species/city/free-text are filtered CLIENT-SIDE in real time — no refetch
+ * per filter change, no debounce needed (no network call in the loop).
  */
 function animal(
   id: string,
   name: string,
   orgSlug: string,
   orgName: string,
+  city: string,
   over: Partial<PublicAnimalSummary> = {},
 ): PublicAnimalSummary {
   return {
@@ -26,7 +32,7 @@ function animal(
     sex: 'male',
     size: 'medium',
     status: 'available',
-    organization: { id: `org-${orgSlug}`, name: orgName, slug: orgSlug },
+    organization: { id: `org-${orgSlug}`, name: orgName, slug: orgSlug, city },
     ...over,
   };
 }
@@ -50,41 +56,33 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+const FIRULAIS = animal('a1', 'Firulais', 'patitas', 'Fundación Patitas', 'Bogotá');
+const MICHI = animal('a2', 'Michi', 'huellas', 'Huellas de Esperanza', 'Medellín', {
+  species: 'cat',
+});
+const ROCKY = animal('a3', 'Rocky', 'patitas', 'Fundación Patitas', 'Bogotá', {
+  breed: 'Labrador',
+});
+
 describe('GeneralCatalogSection', () => {
   it('renders a card per animal, across different organizations, from `.data`', async () => {
-    stubCatalog({
-      data: [
-        animal('a1', 'Firulais', 'patitas', 'Fundación Patitas'),
-        animal('a2', 'Michi', 'huellas', 'Huellas de Esperanza', { species: 'cat' }),
-      ],
-      total: 2,
-      page: 1,
-      limit: 12,
-    });
+    stubCatalog({ data: [FIRULAIS, MICHI], total: 2, page: 1, limit: 50 });
     renderSection();
 
     const cards = await screen.findAllByTestId('animal-card');
     expect(cards).toHaveLength(2);
     expect(screen.getByText('Firulais')).toBeInTheDocument();
     expect(screen.getByText('Michi')).toBeInTheDocument();
-    // Each animal links to its PUBLIC detail (AnimalCard's own link, reused
-    // unchanged — the org slug comes from `animal.organization.slug`).
     expect(cards[0]).toHaveAttribute('href', '/o/patitas/animales/a1');
-    expect(cards[1]).toHaveAttribute('href', '/o/huellas/animales/a2');
-    // Organization attribution + link to its public portal (not the per-animal
-    // detail — that link is AnimalCard's own, unchanged).
-    expect(screen.getByRole('link', { name: 'Fundación Patitas' })).toHaveAttribute(
+    // Organization attribution + link to its public portal.
+    expect(screen.getByRole('link', { name: /Fundación Patitas/ })).toHaveAttribute(
       'href',
       '/o/patitas',
-    );
-    expect(screen.getByRole('link', { name: 'Huellas de Esperanza' })).toHaveAttribute(
-      'href',
-      '/o/huellas',
     );
   });
 
   it('shows an explicit empty state for a wrapped-empty response (no throw)', async () => {
-    stubCatalog({ data: [], total: 0, page: 1, limit: 12 });
+    stubCatalog({ data: [], total: 0, page: 1, limit: 50 });
     renderSection();
     expect(await screen.findByText('No hay animales en adopción ahora')).toBeInTheDocument();
     expect(screen.queryByTestId('animal-card')).not.toBeInTheDocument();
@@ -105,62 +103,137 @@ describe('GeneralCatalogSection', () => {
     expect(await screen.findByText('No se pudo cargar')).toBeInTheDocument();
   });
 
-  it('filters by species using the REAL endpoint param (species=cat), resetting to page 1', async () => {
-    const fetchMock = vi.fn((_url: RequestInfo | URL) =>
-      Promise.resolve({ ok: true, status: 200, json: async () => ({ data: [], total: 0 }) }),
-    );
-    vi.stubGlobal('fetch', fetchMock);
-    renderSection();
-
-    await screen.findByText('No hay animales en adopción ahora');
-    fireEvent.click(screen.getByRole('button', { name: 'Gato' }));
-
-    await waitFor(() => {
-      const urls = fetchMock.mock.calls.map((c) => String(c[0]));
-      expect(urls.some((u) => u.includes('species=cat'))).toBe(true);
-    });
-  });
-
-  it('filters by city on submit (Buscar), using the REAL endpoint param (city=)', async () => {
-    const fetchMock = vi.fn((_url: RequestInfo | URL) =>
-      Promise.resolve({ ok: true, status: 200, json: async () => ({ data: [], total: 0 }) }),
-    );
-    vi.stubGlobal('fetch', fetchMock);
-    renderSection();
-
-    await screen.findByText('No hay animales en adopción ahora');
-    fireEvent.change(screen.getByLabelText('Ciudad'), { target: { value: 'Medellín' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
-
-    await waitFor(() => {
-      const urls = fetchMock.mock.calls.map((c) => String(c[0]));
-      expect(urls.some((u) => u.includes(`city=${encodeURIComponent('Medellín')}`))).toBe(true);
-    });
-  });
-
-  it('paginates using the real page param, disabling "Anterior" on the first page', async () => {
-    const page1 = Array.from({ length: 12 }, (_, i) =>
-      animal(`a${i}`, `Animal ${i}`, 'patitas', 'Fundación Patitas'),
-    );
-    const fetchMock = vi.fn((_url: RequestInfo | URL) =>
+  it('loads the catalog only ONCE and filters species live, client-side (no refetch per click)', async () => {
+    const fetchMock = vi.fn(() =>
       Promise.resolve({
         ok: true,
         status: 200,
-        json: async () => ({ data: page1, total: 20, page: 1, limit: 12 }),
+        json: async () => ({ data: [FIRULAIS, MICHI], total: 2, page: 1, limit: 50 }),
       }),
     );
     vi.stubGlobal('fetch', fetchMock);
     renderSection();
 
-    await screen.findByText('Página 1 de 2');
-    expect(screen.getByRole('button', { name: 'Anterior' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Siguiente' })).toBeEnabled();
+    await screen.findAllByTestId('animal-card');
+    await userEvent.click(screen.getByRole('button', { name: 'Gato' }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+    expect(screen.queryByText('Firulais')).not.toBeInTheDocument();
+    expect(screen.getByText('Michi')).toBeInTheDocument();
+    // A single load — species filtering never re-hits the network.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
 
-    await waitFor(() => {
-      const urls = fetchMock.mock.calls.map((c) => String(c[0]));
-      expect(urls.some((u) => u.includes('page=2'))).toBe(true);
-    });
+  it('groups the city filter with REAL counts computed from the loaded catalog, and filters live on check', async () => {
+    stubCatalog({ data: [FIRULAIS, MICHI, ROCKY], total: 3, page: 1, limit: 50 });
+    renderSection();
+    await screen.findAllByTestId('animal-card');
+
+    // Bogotá has 2 (Firulais + Rocky), Medellín has 1 (Michi) — real counts.
+    const bogotaLabel = screen.getByText('Bogotá').closest('label') as HTMLElement;
+    expect(within(bogotaLabel).getByText('2')).toBeInTheDocument();
+    const medellinLabel = screen.getByText('Medellín').closest('label') as HTMLElement;
+    expect(within(medellinLabel).getByText('1')).toBeInTheDocument();
+
+    await userEvent.click(within(bogotaLabel).getByRole('checkbox'));
+    expect(screen.getByText('Firulais')).toBeInTheDocument();
+    expect(screen.getByText('Rocky')).toBeInTheDocument();
+    expect(screen.queryByText('Michi')).not.toBeInTheDocument();
+  });
+
+  it('filters instantly by free text across name/breed/city/organization — no button, no debounce', async () => {
+    stubCatalog({ data: [FIRULAIS, MICHI, ROCKY], total: 3, page: 1, limit: 50 });
+    renderSection();
+    await screen.findAllByTestId('animal-card');
+
+    const search = screen.getByLabelText(/Buscar por nombre, raza, ciudad/i);
+    await userEvent.type(search, 'Labrador');
+
+    expect(screen.getByText('Rocky')).toBeInTheDocument();
+    expect(screen.queryByText('Firulais')).not.toBeInTheDocument();
+    expect(screen.queryByText('Michi')).not.toBeInTheDocument();
+  });
+
+  it('shows active-filter chips that can be removed individually or all at once', async () => {
+    stubCatalog({ data: [FIRULAIS, MICHI], total: 2, page: 1, limit: 50 });
+    renderSection();
+    await screen.findAllByTestId('animal-card');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Gato' }));
+    expect(screen.getByTestId('active-filter-chip-species')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Limpiar' }));
+    expect(screen.queryByTestId('active-filter-chip-species')).not.toBeInTheDocument();
+    expect(screen.getByText('Firulais')).toBeInTheDocument();
+  });
+
+  it('discloses when the true total exceeds the server cap (never claims to show everything)', async () => {
+    stubCatalog({ data: [FIRULAIS], total: 73, page: 1, limit: 50 });
+    renderSection();
+    expect(await screen.findByText(/mostrando los primeros 50/)).toBeInTheDocument();
+  });
+
+  it('clicking an animal card opens a DETAIL MODAL instead of navigating away', async () => {
+    stubCatalog({ data: [FIRULAIS], total: 1, page: 1, limit: 50 });
+    renderSection();
+    await userEvent.click(await screen.findByTestId('animal-card'));
+
+    // Still on the catalog (never navigated) — the modal shows the same real data.
+    expect(screen.getByTestId('general-catalog')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(within(screen.getByRole('dialog')).getByText('Firulais')).toBeInTheDocument();
+    expect(within(screen.getByRole('dialog')).getByTestId('request-adoption-cta')).toHaveAttribute(
+      'href',
+      expect.stringContaining('organizationId=org-patitas'),
+    );
+  });
+
+  it('shows "¿No encuentras tu nuevo amigo?" and opens the existing "Disponible próximamente" modal on click', async () => {
+    stubCatalog({ data: [FIRULAIS], total: 1, page: 1, limit: 50 });
+    renderSection();
+    await screen.findAllByTestId('animal-card');
+
+    expect(screen.getByText('¿No encuentras tu nuevo amigo?')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Crear alerta' }));
+
+    expect(await screen.findByText('Disponible próximamente')).toBeInTheDocument();
+    // No real alert is created — this is the shared placeholder, not new logic.
+    expect(screen.getByText('Pronto')).toBeInTheDocument();
+  });
+
+  it('QA visual: caps the initial render at 12 cards with "Ver más" — loading/filtering all 50 live does not mean rendering all 50 at once', async () => {
+    const many = Array.from({ length: 20 }, (_, i) =>
+      animal(`a${i}`, `Animal ${i}`, 'patitas', 'Fundación Patitas', 'Bogotá'),
+    );
+    stubCatalog({ data: many, total: 20, page: 1, limit: 50 });
+    renderSection();
+
+    const cards = await screen.findAllByTestId('animal-card');
+    expect(cards).toHaveLength(12);
+    // The "no encuentras a tu amigo" tile only shows once everything is visible.
+    expect(screen.queryByText('¿No encuentras tu nuevo amigo?')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Ver más' }));
+    expect(await screen.findAllByTestId('animal-card')).toHaveLength(20);
+    expect(screen.getByText('¿No encuentras tu nuevo amigo?')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ver más' })).not.toBeInTheDocument();
+  });
+
+  it('resets "Ver más" back to 12 when a filter changes (never leaves a stale, confusing count)', async () => {
+    const many = Array.from({ length: 20 }, (_, i) =>
+      animal(`a${i}`, `Animal ${i}`, 'patitas', 'Fundación Patitas', 'Bogotá', {
+        species: i === 0 ? 'cat' : 'dog',
+      }),
+    );
+    stubCatalog({ data: many, total: 20, page: 1, limit: 50 });
+    renderSection();
+
+    await screen.findAllByTestId('animal-card');
+    await userEvent.click(screen.getByRole('button', { name: 'Ver más' }));
+    expect(await screen.findAllByTestId('animal-card')).toHaveLength(20);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Perro' }));
+    // 19 dogs match, but the view resets to showing only the first 12.
+    expect(await screen.findAllByTestId('animal-card')).toHaveLength(12);
+    expect(screen.getByRole('button', { name: 'Ver más' })).toBeInTheDocument();
   });
 });

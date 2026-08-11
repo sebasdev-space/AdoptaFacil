@@ -83,10 +83,10 @@ export function PublicCampaignDetailPage() {
   }, [id]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
       <PublicNavbar />
 
-      <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-10 sm:px-6">
         <Link to="/campanas" className="text-sm text-primary hover:underline">
           ← Volver a campañas
         </Link>

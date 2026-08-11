@@ -11,6 +11,15 @@ import {
 export interface AnimalCardProps {
   slug: string;
   animal: AnimalSummary;
+  /**
+   * Cuando se pasa, un clic normal (botón izquierdo, sin teclas modificadoras)
+   * NO navega — llama a esto en su lugar (pulido visual: el catálogo general
+   * lo usa para abrir un modal en vez de ir a la página de detalle completa).
+   * El `href` real se conserva siempre: clic derecho/central/Ctrl+clic
+   * (abrir en pestaña nueva) siguen funcionando como un link normal. Sin
+   * este prop, el comportamiento es EXACTAMENTE el de siempre (navegación).
+   */
+  onOpenDetail?: (animal: AnimalSummary) => void;
 }
 
 /** Silueta simple (huella), usada como fallback cuando el animal no tiene foto. */
@@ -37,7 +46,7 @@ function PawPlaceholder() {
  * existe y está cableado — se conserva el enlace tal cual (nav-state con el
  * `AnimalSummary`, para que el detalle no vuelva a pedir la lista).
  */
-export function AnimalCard({ slug, animal }: AnimalCardProps) {
+export function AnimalCard({ slug, animal, onOpenDetail }: AnimalCardProps) {
   const age = ageLabel(animal.computedAge);
 
   return (
@@ -47,6 +56,18 @@ export function AnimalCard({ slug, animal }: AnimalCardProps) {
         state={{ animal }}
         data-testid="animal-card"
         className="block transition hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        onClick={(event) => {
+          if (!onOpenDetail) return;
+          const isPlainLeftClick =
+            event.button === 0 &&
+            !event.metaKey &&
+            !event.ctrlKey &&
+            !event.shiftKey &&
+            !event.altKey;
+          if (!isPlainLeftClick) return; // deja abrir en pestaña nueva/etc. como un link real
+          event.preventDefault();
+          onOpenDetail(animal);
+        }}
       >
         {animal.photoUrl ? (
           <img

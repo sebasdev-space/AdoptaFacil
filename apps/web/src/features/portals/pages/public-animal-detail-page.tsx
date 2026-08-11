@@ -1,26 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import type { AnimalSummary } from '@adoptafacil/contracts';
-import {
-  Badge,
-  buttonVariants,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  cn,
-  EmptyState,
-  Skeleton,
-} from '@adoptafacil/ui';
+import { buttonVariants, Card, CardContent, cn, EmptyState, Skeleton } from '@adoptafacil/ui';
 import { fetchPublicAnimals } from '../api/public-animals';
-import {
-  ageLabel,
-  buildAdoptionRequestHref,
-  buildSponsorHref,
-  SEX_LABELS,
-  SIZE_LABELS,
-  SPECIES_LABELS,
-} from '../model/animals-catalog';
+import { AnimalDetailInfo } from '../components/animal-detail-info';
+import { AnimalDetailActions } from '../components/animal-detail-actions';
 
 // Cap del endpoint público (§RF07). En deep-link buscamos el animal dentro del
 // catálogo (no hay GET público de un animal individual y NO se crean endpoints).
@@ -134,72 +118,9 @@ export function PublicAnimalDetailPage() {
         )}
         {state === 'ready' && animal && (
           <Card className="overflow-hidden" data-testid="public-animal-detail">
-            {animal.photoUrl ? (
-              <img
-                src={animal.photoUrl}
-                alt={animal.name}
-                className="max-h-96 w-full object-cover"
-              />
-            ) : (
-              <div
-                aria-hidden
-                className="flex h-56 w-full items-center justify-center bg-muted text-sm text-muted-foreground"
-              >
-                Sin foto
-              </div>
-            )}
-            <CardHeader>
-              <CardTitle className="flex flex-wrap items-center gap-2">
-                {animal.name}
-                <Badge variant="secondary">{SPECIES_LABELS[animal.species]}</Badge>
-                {animal.breed && <Badge variant="outline">{animal.breed}</Badge>}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <dl className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <dt className="text-xs uppercase text-muted-foreground">Sexo</dt>
-                  <dd className="text-sm">{SEX_LABELS[animal.sex]}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs uppercase text-muted-foreground">Tamaño</dt>
-                  <dd className="text-sm">{SIZE_LABELS[animal.size]}</dd>
-                </div>
-                {animal.computedAge && (
-                  <div>
-                    <dt className="text-xs uppercase text-muted-foreground">Edad aproximada</dt>
-                    {/* F-EDAD-DETALLE: mismo ageLabel() que AnimalCard (catálogo) —
-                        antes imprimía totalMonths crudo ("0 meses"/"36 meses"). */}
-                    <dd className="text-sm">{ageLabel(animal.computedAge)}</dd>
-                  </div>
-                )}
-              </dl>
-
-              <div className="flex flex-col items-start gap-1">
-                <Link
-                  to={buildAdoptionRequestHref(animal.organizationId, animal)}
-                  className={cn(buttonVariants())}
-                  data-testid="request-adoption-cta"
-                >
-                  Solicitar adopción
-                </Link>
-                <p className="text-xs text-muted-foreground">
-                  Necesitarás iniciar sesión como persona para enviar tu solicitud.
-                </p>
-              </div>
-
-              <div className="flex flex-col items-start gap-1">
-                <Link
-                  to={buildSponsorHref(animal, orgName ?? undefined)}
-                  className={cn(buttonVariants({ variant: 'outline' }))}
-                  data-testid="sponsor-animal-cta"
-                >
-                  Apadrinar
-                </Link>
-                <p className="text-xs text-muted-foreground">
-                  Apadrina a {animal.name} con un aporte mensual, sin necesidad de adoptarlo.
-                </p>
-              </div>
+            <AnimalDetailInfo animal={animal} />
+            <CardContent>
+              <AnimalDetailActions animal={animal} orgName={orgName ?? undefined} />
             </CardContent>
           </Card>
         )}
