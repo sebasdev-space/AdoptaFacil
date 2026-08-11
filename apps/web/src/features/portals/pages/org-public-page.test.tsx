@@ -309,7 +309,10 @@ describe('OrgPublicPage — rich public portal', () => {
     renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
     await screen.findByRole('heading', { name: /Refugio Patitas/ });
 
-    expect(await screen.findByText('3 animales disponibles')).toBeInTheDocument();
+    // KPI integrado en el header (3ra iteración): número grande + label
+    // debajo, en elementos separados — no una sola tarjeta/cadena.
+    expect(await screen.findByText('3')).toBeInTheDocument();
+    expect(screen.getByText('animales disponibles')).toBeInTheDocument();
   });
 
   it('shows a clear public 404 for an unknown slug', async () => {
@@ -416,7 +419,7 @@ describe('OrgPublicPage — rich public portal', () => {
     });
   });
 
-  describe('pulido visual: KPIs, acciones principales, franja superior y libro público', () => {
+  describe('pulido visual: KPIs en el header, acciones principales, panel lateral y libro público', () => {
     it('shows a real KPI (animales disponibles) and never a fabricated adopciones/donaciones/calificación tile', async () => {
       vi.stubGlobal(
         'fetch',
@@ -438,9 +441,10 @@ describe('OrgPublicPage — rich public portal', () => {
       renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
       await screen.findByRole('heading', { name: /Refugio Patitas/ });
 
-      const kpis = await screen.findByTestId('portal-kpis');
-      expect(kpis).toHaveTextContent('Animales disponibles');
-      expect(kpis).toHaveTextContent('7');
+      // KPI integrado en el mismo panel del header (3ra iteración) — no una
+      // tarjeta flotante aparte.
+      expect(await screen.findByText('7')).toBeInTheDocument();
+      expect(screen.getByText('animales disponibles')).toBeInTheDocument();
       // No fabricated metrics: those fields don't exist in the contract yet.
       expect(screen.queryByText(/Adopciones/)).not.toBeInTheDocument();
       expect(screen.queryByText(/Calificación/)).not.toBeInTheDocument();
