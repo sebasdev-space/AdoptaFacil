@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Role } from '@adoptafacil/contracts';
 import { renderShell } from '../../../test-utils';
@@ -178,6 +178,50 @@ describe('PortalThemePage — owner personalization (visual only, S2-REORG)', ()
       expect(ratio).not.toBeNull();
       expect(ratio as number).toBeGreaterThanOrEqual(MIN_CONTRAST_RATIO);
     });
+  });
+
+  it('BUG FIX (T-PORTAL-CROSSED-INPUTS): editing one color does NOT live-mutate its paired color — only itself, right away', async () => {
+    // Reported after the contrast fix shipped: dragging the native color
+    // picker on ANY of the 7 inputs seemed to also change the "next"/
+    // "previous" one live, mid-drag. Verified separately (manual + scripted
+    // reproduction) this was never an index/binding bug — every input always
+    // wrote its OWN field correctly. The real cause: `<input type="color">`
+    // fires the native `input` event continuously while dragging, and the
+    // pair-contrast correction used to run synchronously on every one of
+    // those events, visibly changing the paired swatch mid-drag. The fix
+    // defers that correction (debounced) so only the field the user is
+    // actively touching updates live; the pair only settles once they stop.
+    stubFetch(() => ({ tokens: { primary: '172 67% 30%', 'primary-foreground': '0 0% 100%' } }));
+    renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
+
+    const primary = (await screen.findByLabelText('Color principal')) as HTMLInputElement;
+    const primaryFg = screen.getByLabelText('Texto sobre el principal') as HTMLInputElement;
+    const primaryBefore = primary.value;
+    const fgBefore = primaryFg.value;
+
+    vi.useFakeTimers();
+    try {
+      // Pale yellow: will eventually need "Texto sobre el principal"
+      // corrected (insufficient contrast against white) — but not yet.
+      fireEvent.change(primary, { target: { value: '#fef3c7' } });
+
+      // Immediately after — before the debounce settles — the OTHER field's
+      // displayed value must be untouched. This is exactly what was
+      // reported: it used to change live, mid-drag, alongside the touched one.
+      expect(primaryFg.value).toBe(fgBefore);
+      // The touched one updates right away (±1 hex unit of hue/lightness
+      // rounding drift going hex→HSL→hex is expected and fine — T-D03).
+      expect(primary.value).not.toBe(primaryBefore);
+
+      // Once the user stops interacting (debounce elapses), the pair
+      // correction is allowed to apply.
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+      expect(primaryFg.value).not.toBe(fgBefore);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('also allows an Administrator to edit', async () => {
