@@ -224,19 +224,30 @@ export function OrgPublicPage() {
               <PortalTransparencyBar organization={view.profile.organization} />
             </div>
           )}
-          <PortalProfileSection
-            profile={view.profile}
-            animalCount={animalTotal}
-            logoPosition={layout.logoPosition}
-            actions={
-              <PortalHeaderActions
-                organization={view.profile.organization}
-                onBrowseCatalog={goToCatalog}
+          {/* Header + KPI(s) en una sola fila (micro-ajuste): la columna de
+              perfil (nombre/badges/NIT/acciones, sin tocar) toma el espacio
+              disponible y la(s) tarjeta(s) KPI quedan a su derecha, top-
+              alineadas, dentro del mismo ancho del header (no invade la
+              columna lateral de Campaña/Síguenos, que vive en el grid de
+              abajo). En mobile/tablet angosto se apila (flex-col). */}
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+            <div className="min-w-0 flex-1">
+              <PortalProfileSection
+                profile={view.profile}
+                animalCount={animalTotal}
+                logoPosition={layout.logoPosition}
+                actions={
+                  <PortalHeaderActions
+                    organization={view.profile.organization}
+                    onBrowseCatalog={goToCatalog}
+                  />
+                }
               />
-            }
-          />
-
-          <PortalKpis animalCount={animalTotal} />
+            </div>
+            <div className="lg:flex-shrink-0">
+              <PortalKpis animalCount={animalTotal} />
+            </div>
+          </div>
 
           {/* Dos columnas (pulido visual, 2da iteración): columna principal
               con las tabs Portafolio/Nosotros/Información, y UN panel
