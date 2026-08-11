@@ -20,7 +20,6 @@ import { PortalAdoptionSection } from '../components/portal-adoption-section';
 import { PortalCampaignsSection } from '../components/portal-campaigns-section';
 import { PortalAboutSection } from '../components/portal-about-section';
 import { PortalContactInfoSection } from '../components/portal-contact-info-section';
-import { PortalKpis } from '../components/portal-kpis';
 import { PortalHeaderActions } from '../components/portal-header-actions';
 import { PortalPublicLedgerSection } from '../components/portal-public-ledger-section';
 
@@ -224,30 +223,20 @@ export function OrgPublicPage() {
               <PortalTransparencyBar organization={view.profile.organization} />
             </div>
           )}
-          {/* Header + KPI(s) en una sola fila (micro-ajuste): la columna de
-              perfil (nombre/badges/NIT/acciones, sin tocar) toma el espacio
-              disponible y la(s) tarjeta(s) KPI quedan a su derecha, top-
-              alineadas, dentro del mismo ancho del header (no invade la
-              columna lateral de Campaña/Síguenos, que vive en el grid de
-              abajo). En mobile/tablet angosto se apila (flex-col). */}
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-            <div className="min-w-0 flex-1">
-              <PortalProfileSection
-                profile={view.profile}
-                animalCount={animalTotal}
-                logoPosition={layout.logoPosition}
-                actions={
-                  <PortalHeaderActions
-                    organization={view.profile.organization}
-                    onBrowseCatalog={goToCatalog}
-                  />
-                }
+          {/* Header (3ra iteración): perfil + KPI(s) + acciones viven TODOS
+              dentro del mismo panel (`PortalProfileSection`) — ya no hay una
+              tarjeta de KPI flotante aparte ni una fila extra a su lado. */}
+          <PortalProfileSection
+            profile={view.profile}
+            animalCount={animalTotal}
+            logoPosition={layout.logoPosition}
+            actions={
+              <PortalHeaderActions
+                organization={view.profile.organization}
+                onBrowseCatalog={goToCatalog}
               />
-            </div>
-            <div className="lg:flex-shrink-0">
-              <PortalKpis animalCount={animalTotal} />
-            </div>
-          </div>
+            }
+          />
 
           {/* Dos columnas (pulido visual, 2da iteración): columna principal
               con las tabs Portafolio/Nosotros/Información, y UN panel

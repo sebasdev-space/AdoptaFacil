@@ -67,7 +67,13 @@ export function PortalCampaignsSection({ slug }: PortalCampaignsSectionProps) {
             />
           )}
           {state === 'ready' && items.length > 0 && (
-            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+            // Lista de una sola columna (3ra iteración del pulido visual):
+            // esta sección vive en el panel lateral angosto del portal
+            // público, no en un catálogo ancho — un grid de 2-3 columnas
+            // pensado para viewport ancho dejaba cada tarjeta apachurrada
+            // con espacio muerto al lado. Cada campaña ocupa el ancho
+            // completo del panel.
+            <div className="flex flex-col gap-3">
               {items.map((campaign) => (
                 <CampaignCard key={campaign.id} campaign={campaign} />
               ))}

@@ -70,8 +70,8 @@
   letter-spacing: -0.01em;
 }
 
-.nit {
-  font-size: var(--fs-xs);
+.meta {
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
@@ -80,16 +80,26 @@
   color: var(--text-muted);
 }
 
-.stats {
+// KPI(s) reales integrados en el mismo panel del header (3ra iteración del
+// pulido visual) — bloques planos, sin tarjeta/sombra propia (ya están
+// dentro de la Card del header), separados por una línea sutil arriba.
+.kpis {
   display: flex;
   flex-wrap: wrap;
-  gap: 1.5rem 1.5rem;
-  font-size: var(--fs-sm);
+  gap: 2rem;
+  border-top: 1px solid var(--border-hairline);
+  padding-top: 1rem;
 }
 
-.stats__item {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
+.kpi__value {
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-extra);
   color: var(--text-dark);
+}
+
+.kpi__label {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
 }

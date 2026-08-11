@@ -101,58 +101,63 @@ export function PortalProfileSection({
           </div>
         </div>
 
-        <CardHeader className="gap-4 pt-12 sm:flex-row sm:items-start sm:justify-between sm:pt-14">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 id={HEADING_ID} className={styles.name}>
-                {org.name}
-              </h1>
-              <OrgTypeBadge organizationType={organizationType} />
-              {formalizationLabel && (
-                <Badge variant={isEsal ? 'success' : 'secondary'}>
-                  {isEsal ? `✓ ${formalizationLabel}` : formalizationLabel}
-                </Badge>
-              )}
-              {org.rteVigente && <Badge variant="success">RTE vigente</Badge>}
-            </div>
-            {org.nit && (
-              <p className={styles.nit}>
-                NIT: <span className="text-foreground">{org.nit}</span>
+        <CardHeader className="gap-3 pt-12 sm:pt-14">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 id={HEADING_ID} className={styles.name}>
+              {org.name}
+            </h1>
+            <OrgTypeBadge organizationType={organizationType} />
+            {formalizationLabel && (
+              <Badge variant={isEsal ? 'success' : 'secondary'}>
+                {isEsal ? `✓ ${formalizationLabel}` : formalizationLabel}
+              </Badge>
+            )}
+            {org.rteVigente && <Badge variant="success">RTE vigente</Badge>}
+          </div>
+
+          {/* Segunda línea del header: ubicación/NIT a la izquierda, acciones
+              principales (Donar/Adoptar/Apadrinar) a la derecha, mismo
+              renglón — 3ra iteración del pulido visual. En mobile se apilan
+              en columna (no "ml-auto" + "flex-shrink-0": esa combinación le
+              da a las acciones su ancho de contenido COMPLETO sin permitir
+              que su propio flex-wrap interno reaccione, y los 3 botones se
+              recortaban por el `overflow-hidden` de la Card en vez de
+              apilarse — bug real encontrado en QA visual mobile). */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            {(location || org.nit) && (
+              <p className={styles.meta}>
+                {location && <span>{location}</span>}
+                {location && org.nit && ' · '}
+                {org.nit && (
+                  <>
+                    NIT: <span className="text-foreground">{org.nit}</span>
+                  </>
+                )}
               </p>
             )}
+            {actions}
           </div>
-          {actions && <div className="flex-shrink-0">{actions}</div>}
         </CardHeader>
 
         <CardContent className="space-y-4">
+          {/* KPI(s) reales, integrados en el MISMO panel del header (3ra
+              iteración) — ya no una tarjeta flotante aparte. Hoy solo
+              "Animales disponibles" es real (ver PortalKpis, eliminado);
+              cualquier otra métrica de la lista de M01 se agregaría aquí
+              mismo cuando el backend la exponga. */}
+          {typeof animalCount === 'number' && (
+            <div className={styles.kpis}>
+              <div>
+                <p className={styles.kpi__value}>{animalCount}</p>
+                <p className={styles.kpi__label}>
+                  {animalCount === 1 ? 'animal disponible' : 'animales disponibles'}
+                </p>
+              </div>
+            </div>
+          )}
           {org.description && (
             <p className={cn('line-clamp-4', styles.description)}>{org.description}</p>
           )}
-          <dl className={styles.stats}>
-            {location && (
-              <div className={styles.stats__item}>
-                <span aria-hidden>📍</span>
-                <dt className="sr-only">Ubicación</dt>
-                <dd>{location}</dd>
-              </div>
-            )}
-            {typeof animalCount === 'number' && (
-              <div className={styles.stats__item}>
-                <span aria-hidden>🐾</span>
-                <dt className="sr-only">Animales disponibles</dt>
-                <dd>
-                  {animalCount} {animalCount === 1 ? 'animal disponible' : 'animales disponibles'}
-                </dd>
-              </div>
-            )}
-            {formalizationLabel && (
-              <div className={styles.stats__item}>
-                <span aria-hidden>📄</span>
-                <dt className="sr-only">Estado de formalización</dt>
-                <dd>{formalizationLabel}</dd>
-              </div>
-            )}
-          </dl>
         </CardContent>
       </Card>
     </section>
