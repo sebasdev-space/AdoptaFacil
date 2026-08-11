@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import type {
   Organization,
   OrganizationExtendedContact,
   UpdateOrganizationProfileInput,
 } from '@adoptafacil/contracts';
-import { Button, Card, CardContent, CardHeader, CardTitle, useToast } from '@adoptafacil/ui';
+import { useToast } from '@adoptafacil/ui';
 import { useApiClient, type ApiClient } from '../../../shell/api';
 import {
   COLOMBIA,
@@ -13,10 +13,25 @@ import {
   citiesForDepartment,
 } from '../data/colombian-locations';
 import { IMAGE_ACCEPT, uploadFileBytes, validateUpload } from '../lib/storage';
-import { TextAreaField, TextField } from './profile-fields';
+import {
+  OrgSelectField,
+  OrgStaticField,
+  OrgTextAreaField,
+  OrgTextField,
+} from './org-profile-fields';
+import { OrgTabPanel, OrgTabsNav, type OrgTabItem } from './org-tabs';
 import { validateOptionalEmail, validateOptionalSlug, validateOptionalUrl } from '../validation';
+import styles from './org-profile-form.module.scss';
 
 const ABOUT_US_MAX = 2000;
+
+const TABS: OrgTabItem[] = [
+  { value: 'institucional', label: 'Datos institucionales' },
+  { value: 'ubicacion', label: 'Ubicación' },
+  { value: 'contacto', label: 'Contacto' },
+  { value: 'imagenes', label: 'Imágenes y redes' },
+  { value: 'nosotros', label: 'Acerca de nosotros' },
+];
 
 /** "a, b\nc" → ["a", "b", "c"] — separadas por coma O por línea, vacías descartadas. */
 function parsePhones(raw: string): string[] {
@@ -308,390 +323,342 @@ function ImageUploadField({ id, label, value, onChange, shape }: ImageUploadFiel
 export interface OrgProfileFormProps {
   initial: Organization;
   onSaved: (organization: Organization) => void;
+  /** El botón "Guardar cambios" ahora vive en la cabecera de `org-profile-page.tsx`,
+   *  no dentro de este formulario — la página necesita saber cuándo deshabilitarlo. */
+  onSavingChange?: (saving: boolean) => void;
 }
 
-export function OrgProfileForm({ initial, onSaved }: OrgProfileFormProps) {
-  const client = useApiClient();
-  const { toast } = useToast();
-  const [form, setForm] = useState<FormState>(() => initialState(initial));
-  const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
-  const [saving, setSaving] = useState(false);
-  // A department's city list is a short, known set (see colombian-locations.ts);
-  // "custom" tracks whether the CITY select shows the free-text fallback. Derived
-  // once from the loaded record so pre-existing data outside the static catalog
-  // (e.g. this exact demo seed's Cundinamarca/Bogotá pairing) still displays.
-  const [customCity, setCustomCity] = useState(() => {
-    const loaded = initialState(initial);
-    return !!loaded.city && !citiesForDepartment(loaded.department).includes(loaded.city);
-  });
+/** Handle imperativo para que `org-profile-page.tsx` dispare el submit desde
+ *  el botón "Guardar cambios" de la cabecera (S2-VISUAL-TABS). */
+export interface OrgProfileFormHandle {
+  submit: () => void;
+}
 
-  const set = (key: keyof FormState) => (value: string) =>
-    setForm((prev) => ({ ...prev, [key]: value }));
+export const OrgProfileForm = forwardRef<OrgProfileFormHandle, OrgProfileFormProps>(
+  function OrgProfileForm({ initial, onSaved, onSavingChange }, ref) {
+    const client = useApiClient();
+    const { toast } = useToast();
+    const [activeTab, setActiveTab] = useState<string>(TABS[0].value);
+    const [form, setForm] = useState<FormState>(() => initialState(initial));
+    const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
+    const [saving, setSaving] = useState(false);
+    // A department's city list is a short, known set (see colombian-locations.ts);
+    // "custom" tracks whether the CITY select shows the free-text fallback. Derived
+    // once from the loaded record so pre-existing data outside the static catalog
+    // (e.g. this exact demo seed's Cundinamarca/Bogotá pairing) still displays.
+    const [customCity, setCustomCity] = useState(() => {
+      const loaded = initialState(initial);
+      return !!loaded.city && !citiesForDepartment(loaded.department).includes(loaded.city);
+    });
 
-  const validate = (): boolean => {
-    const next: Partial<Record<keyof FormState, string>> = {
-      slug: validateOptionalSlug(form.slug),
-      contactEmail: validateOptionalEmail(form.contactEmail),
-      instagram: validateOptionalUrl(form.instagram),
-      facebook: validateOptionalUrl(form.facebook),
-      tiktok: validateOptionalUrl(form.tiktok),
-      website: validateOptionalUrl(form.website),
-      contactMapUrl: validateOptionalUrl(form.contactMapUrl),
-      name: form.name.trim() ? undefined : 'El nombre es obligatorio.',
+    useEffect(() => {
+      onSavingChange?.(saving);
+    }, [saving, onSavingChange]);
+
+    const set = (key: keyof FormState) => (value: string) =>
+      setForm((prev) => ({ ...prev, [key]: value }));
+
+    const validate = (): boolean => {
+      const next: Partial<Record<keyof FormState, string>> = {
+        slug: validateOptionalSlug(form.slug),
+        contactEmail: validateOptionalEmail(form.contactEmail),
+        instagram: validateOptionalUrl(form.instagram),
+        facebook: validateOptionalUrl(form.facebook),
+        tiktok: validateOptionalUrl(form.tiktok),
+        website: validateOptionalUrl(form.website),
+        contactMapUrl: validateOptionalUrl(form.contactMapUrl),
+        name: form.name.trim() ? undefined : 'El nombre es obligatorio.',
+      };
+      const cleaned = Object.fromEntries(Object.entries(next).filter(([, v]) => v));
+      setErrors(cleaned);
+      if (Object.keys(cleaned).length > 0) {
+        toast({
+          title: 'Completa los campos requeridos',
+          description: 'Revisa los campos marcados en rojo antes de guardar.',
+          variant: 'warning',
+        });
+      }
+      return Object.keys(cleaned).length === 0;
     };
-    const cleaned = Object.fromEntries(Object.entries(next).filter(([, v]) => v));
-    setErrors(cleaned);
-    if (Object.keys(cleaned).length > 0) {
-      toast({
-        title: 'Completa los campos requeridos',
-        description: 'Revisa los campos marcados en rojo antes de guardar.',
-        variant: 'warning',
-      });
-    }
-    return Object.keys(cleaned).length === 0;
-  };
 
-  const handleSubmit = async () => {
-    if (!validate()) return;
-    setSaving(true);
-    try {
-      const updated = await client.request<Organization>('/org/profile', {
-        method: 'PUT',
-        json: buildPayload(form),
-      });
-      toast({
-        title: 'Cambios guardados correctamente',
-        description: 'Tu perfil institucional se actualizó.',
-        variant: 'success',
-      });
-      onSaved(updated);
-    } catch (error) {
-      toast({
-        title: 'Error al guardar',
-        description: error instanceof Error ? error.message : 'Inténtalo de nuevo.',
-        variant: 'destructive',
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
+    const handleSubmit = async () => {
+      if (!validate()) return;
+      setSaving(true);
+      try {
+        const updated = await client.request<Organization>('/org/profile', {
+          method: 'PUT',
+          json: buildPayload(form),
+        });
+        toast({
+          title: 'Cambios guardados correctamente',
+          description: 'Tu perfil institucional se actualizó.',
+          variant: 'success',
+        });
+        onSaved(updated);
+      } catch (error) {
+        toast({
+          title: 'Error al guardar',
+          description: error instanceof Error ? error.message : 'Inténtalo de nuevo.',
+          variant: 'destructive',
+        });
+      } finally {
+        setSaving(false);
+      }
+    };
 
-  const cityOptions = citiesForDepartment(form.department);
-  const departmentOptions = DEPARTMENTS.some((d) => d.value === form.department)
-    ? DEPARTMENTS
-    : form.department
-      ? [...DEPARTMENTS, { value: form.department, label: form.department, cities: [] }]
-      : DEPARTMENTS;
+    useImperativeHandle(ref, () => ({ submit: () => void handleSubmit() }));
 
-  return (
-    <div className="space-y-6 pb-20">
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-6">
-          {/* Card 1 — Datos institucionales */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Datos institucionales</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2">
-              <TextField
-                id="org-name"
-                label="Nombre"
-                value={form.name}
-                onChange={set('name')}
-                error={errors.name}
-              />
-              <TextField
-                id="org-slug"
-                label="Slug del portal"
-                value={form.slug}
-                onChange={set('slug')}
-                error={errors.slug}
-                hint="Se usa en /o/&lt;slug&gt;"
-              />
-              <TextField
-                id="org-nit"
-                label="NIT"
-                value={form.nit}
-                onChange={set('nit')}
-                error={errors.nit}
-              />
-              <TextField
-                id="org-legal"
-                label="Razón social"
-                value={form.legalName}
-                onChange={set('legalName')}
-                error={errors.legalName}
-              />
-              <div className="sm:col-span-2">
-                <TextAreaField
-                  id="org-desc"
-                  label="Descripción"
-                  value={form.description}
-                  onChange={set('description')}
-                  error={errors.description}
-                />
-              </div>
-            </CardContent>
-          </Card>
+    const cityOptions = citiesForDepartment(form.department);
+    const departmentOptions = DEPARTMENTS.some((d) => d.value === form.department)
+      ? DEPARTMENTS
+      : form.department
+        ? [...DEPARTMENTS, { value: form.department, label: form.department, cities: [] }]
+        : DEPARTMENTS;
 
-          {/* Card 3 — Ubicación (fuente única: no se repite en Personalización) */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Ubicación</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <span className="block text-sm font-medium text-foreground">País</span>
-                <p className="flex h-10 items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground">
-                  {COLOMBIA}
-                </p>
-              </div>
-              <div className="space-y-1.5">
-                <label
-                  htmlFor="org-department"
-                  className="block text-sm font-medium text-foreground"
-                >
-                  Departamento
-                </label>
-                <select
-                  id="org-department"
-                  value={form.department}
-                  onChange={(event) => {
-                    const department = event.target.value;
-                    setForm((prev) => ({ ...prev, department, city: '' }));
+    return (
+      <div className={styles['org-form']}>
+        <OrgTabsNav
+          items={TABS}
+          value={activeTab}
+          onValueChange={setActiveTab}
+          ariaLabel="Secciones del perfil de la organización"
+        />
+
+        <OrgTabPanel value="institucional" activeValue={activeTab}>
+          <div className="grid gap-4 md:grid-cols-2">
+            <OrgTextField
+              id="org-name"
+              label="Nombre"
+              value={form.name}
+              onChange={set('name')}
+              error={errors.name}
+            />
+            <OrgTextField
+              id="org-slug"
+              label="Slug del portal"
+              value={form.slug}
+              onChange={set('slug')}
+              error={errors.slug}
+              hint="Se usa en /o/<slug>"
+            />
+            <OrgTextField
+              id="org-nit"
+              label="NIT"
+              value={form.nit}
+              onChange={set('nit')}
+              error={errors.nit}
+            />
+            <OrgTextField
+              id="org-legal"
+              label="Razón social"
+              value={form.legalName}
+              onChange={set('legalName')}
+              error={errors.legalName}
+            />
+            <div className="md:col-span-2">
+              <OrgTextAreaField
+                id="org-desc"
+                label="Descripción corta"
+                value={form.description}
+                onChange={set('description')}
+                error={errors.description}
+              />
+            </div>
+          </div>
+        </OrgTabPanel>
+
+        <OrgTabPanel value="ubicacion" activeValue={activeTab}>
+          <div className="grid gap-4 md:grid-cols-2">
+            <OrgStaticField id="org-country" label="País" value={COLOMBIA} />
+            <OrgSelectField
+              id="org-department"
+              label="Departamento"
+              value={form.department}
+              placeholder="Selecciona un departamento…"
+              options={departmentOptions.map((d) => ({ value: d.value, label: d.label }))}
+              onChange={(department) => {
+                setForm((prev) => ({ ...prev, department, city: '' }));
+                setCustomCity(false);
+              }}
+            />
+            <div>
+              <OrgSelectField
+                id="org-city"
+                label="Ciudad / Municipio"
+                value={customCity ? OTHER_CITY_VALUE : form.city}
+                disabled={!form.department}
+                placeholder={
+                  form.department ? 'Selecciona una ciudad…' : 'Elige un departamento primero'
+                }
+                options={[
+                  ...cityOptions.map((city) => ({ value: city, label: city })),
+                  { value: OTHER_CITY_VALUE, label: 'Otro municipio…' },
+                ]}
+                onChange={(value) => {
+                  if (value === OTHER_CITY_VALUE) {
+                    setCustomCity(true);
+                    set('city')('');
+                  } else {
                     setCustomCity(false);
-                  }}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
-                  <option value="">Selecciona un departamento…</option>
-                  {departmentOptions.map((d) => (
-                    <option key={d.value} value={d.value}>
-                      {d.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <label htmlFor="org-city" className="block text-sm font-medium text-foreground">
-                  Ciudad / Municipio
-                </label>
-                <select
-                  id="org-city"
-                  value={customCity ? OTHER_CITY_VALUE : form.city}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    if (value === OTHER_CITY_VALUE) {
-                      setCustomCity(true);
-                      set('city')('');
-                    } else {
-                      setCustomCity(false);
-                      set('city')(value);
-                    }
-                  }}
-                  disabled={!form.department}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <option value="">
-                    {form.department ? 'Selecciona una ciudad…' : 'Elige un departamento primero'}
-                  </option>
-                  {cityOptions.map((city) => (
-                    <option key={city} value={city}>
-                      {city}
-                    </option>
-                  ))}
-                  <option value={OTHER_CITY_VALUE}>Otro municipio…</option>
-                </select>
-                {customCity && (
-                  <div className="mt-1.5">
-                    <TextField
-                      id="org-city-custom"
-                      label="Municipio"
-                      placeholder="Escribe el municipio"
-                      value={form.city}
-                      onChange={set('city')}
-                    />
-                  </div>
-                )}
-              </div>
-              <TextField
-                id="org-address"
-                label="Dirección"
-                value={form.address}
-                onChange={set('address')}
+                    set('city')(value);
+                  }
+                }}
               />
-            </CardContent>
-          </Card>
+              {customCity && (
+                <div className="mt-3">
+                  <OrgTextField
+                    id="org-city-custom"
+                    label="Municipio"
+                    placeholder="Escribe el municipio"
+                    value={form.city}
+                    onChange={set('city')}
+                  />
+                </div>
+              )}
+            </div>
+            <OrgTextField
+              id="org-address"
+              label="Dirección"
+              value={form.address}
+              onChange={set('address')}
+            />
+          </div>
+        </OrgTabPanel>
 
-          {/* Card 5 — Acerca de nosotros (S2-REORG: movida desde Personalización) */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Acerca de nosotros</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1.5">
-              <label htmlFor="org-about-us" className="block text-sm font-medium text-foreground">
-                Quiénes somos
-              </label>
-              <textarea
-                id="org-about-us"
-                value={form.aboutUs}
-                maxLength={ABOUT_US_MAX}
-                placeholder="Cuéntale al mundo quiénes son, su historia, su misión y por qué hacen lo que hacen..."
-                onChange={(event) => set('aboutUs')(event.target.value)}
-                className="min-h-32 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              />
-              <p className="text-right text-xs text-muted-foreground">
-                {form.aboutUs.length}/{ABOUT_US_MAX}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Este texto aparece en la sección "Nosotros" de tu portal público.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        <OrgTabPanel value="contacto" activeValue={activeTab}>
+          <div className="grid gap-4 md:grid-cols-2">
+            <OrgTextField
+              id="org-email"
+              label="Correo de contacto"
+              value={form.contactEmail}
+              onChange={set('contactEmail')}
+              error={errors.contactEmail}
+            />
+            <OrgTextField
+              id="org-whatsapp"
+              label="WhatsApp"
+              value={form.whatsapp}
+              onChange={set('whatsapp')}
+              error={errors.whatsapp}
+            />
+            <OrgTextField
+              id="org-phone"
+              label="Teléfono"
+              value={form.phone}
+              onChange={set('phone')}
+              error={errors.phone}
+              hint="No se muestra en el portal público."
+            />
+          </div>
 
-        <div className="space-y-6">
-          {/* Card 2 — Contacto */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Contacto</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2">
-              <TextField
-                id="org-email"
-                label="Correo de contacto"
-                value={form.contactEmail}
-                onChange={set('contactEmail')}
-                error={errors.contactEmail}
-              />
-              <TextField
-                id="org-whatsapp"
-                label="WhatsApp"
-                value={form.whatsapp}
-                onChange={set('whatsapp')}
-                error={errors.whatsapp}
-              />
-              <TextField
-                id="org-phone"
-                label="Teléfono"
-                value={form.phone}
-                onChange={set('phone')}
-                error={errors.phone}
-                hint="No se muestra en el portal público."
-              />
-            </CardContent>
-          </Card>
-
-          {/* Card 4 — Imágenes y redes sociales (S2-REORG: solo subida, sin URL de texto) */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Imágenes y redes sociales</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <ImageUploadField
-                id="org-logo-upload"
-                label="Logo"
-                value={form.logoUrl}
-                onChange={set('logoUrl')}
-                shape="circle"
-              />
-              <ImageUploadField
-                id="org-cover-upload"
-                label="Portada"
-                value={form.coverUrl}
-                onChange={set('coverUrl')}
-                shape="rectangle"
-              />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <TextField
-                  id="org-instagram"
-                  label="Instagram"
-                  value={form.instagram}
-                  onChange={set('instagram')}
-                  error={errors.instagram}
-                />
-                <TextField
-                  id="org-facebook"
-                  label="Facebook"
-                  value={form.facebook}
-                  onChange={set('facebook')}
-                  error={errors.facebook}
-                />
-                <TextField
-                  id="org-tiktok"
-                  label="TikTok"
-                  value={form.tiktok}
-                  onChange={set('tiktok')}
-                  error={errors.tiktok}
-                />
-                <TextField
-                  id="org-website"
-                  label="Sitio web"
-                  value={form.website}
-                  onChange={set('website')}
-                  error={errors.website}
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Card 6 — Información de contacto extendida (S2-REORG: movida desde
+          {/* Información de contacto extendida (S2-REORG: movida desde
               Personalización; el mapa se corrige del lado del portal público,
-              ver PortalContactInfoSection/model/google-maps.ts). */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Información de contacto extendida</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <TextField
-                id="org-contact-hours"
-                label="Horario de atención"
-                value={form.contactHours}
-                onChange={set('contactHours')}
-                placeholder="Lun-Vie 9:00am - 5:00pm"
-              />
-              <TextField
-                id="org-contact-address"
-                label="Dirección completa"
-                value={form.contactFullAddress}
-                onChange={set('contactFullAddress')}
-                placeholder="Calle 45 #12-34, Bogotá"
-              />
-              <TextField
-                id="org-contact-map"
-                label="Ubicación en el mapa"
-                type="url"
-                value={form.contactMapUrl}
-                onChange={set('contactMapUrl')}
-                error={errors.contactMapUrl}
-                placeholder="Pega el enlace de Google Maps de tu ubicación"
-                hint="Busca tu ubicación en Google Maps, copia el enlace y pégalo aquí."
-              />
-              <TextField
-                id="org-contact-phones"
-                label="Teléfonos adicionales"
-                value={form.contactPhones}
-                onChange={set('contactPhones')}
-                placeholder="3001234567, 3007654321"
-                hint="Separados por coma o uno por línea."
-              />
-              <p className="text-xs text-muted-foreground">
-                Esta información aparece en la sección "Información" de tu portal público.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+              ver PortalContactInfoSection/model/google-maps.ts). El spec de
+              este refactor no le da tab propio — vive aquí porque es la misma
+              categoría de información (contacto), solo que orientada al
+              portal público en vez del back-office. */}
+          <p className={styles['org-form__section-label']}>Información de contacto extendida</p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <OrgTextField
+              id="org-contact-hours"
+              label="Horario de atención"
+              value={form.contactHours}
+              onChange={set('contactHours')}
+              placeholder="Lun-Vie 9:00am - 5:00pm"
+            />
+            <OrgTextField
+              id="org-contact-address"
+              label="Dirección completa"
+              value={form.contactFullAddress}
+              onChange={set('contactFullAddress')}
+              placeholder="Calle 45 #12-34, Bogotá"
+            />
+            <OrgTextField
+              id="org-contact-map"
+              label="Ubicación en el mapa"
+              type="url"
+              value={form.contactMapUrl}
+              onChange={set('contactMapUrl')}
+              error={errors.contactMapUrl}
+              placeholder="Pega el enlace de Google Maps de tu ubicación"
+              hint="Busca tu ubicación en Google Maps, copia el enlace y pégalo aquí."
+            />
+            <OrgTextField
+              id="org-contact-phones"
+              label="Teléfonos adicionales"
+              value={form.contactPhones}
+              onChange={set('contactPhones')}
+              placeholder="3001234567, 3007654321"
+              hint="Separados por coma o uno por línea."
+            />
+          </div>
+          <p className={styles['org-form__help']}>
+            Esta información aparece en la sección "Información" de tu portal público.
+          </p>
+        </OrgTabPanel>
 
-      {/* `sticky` (not `fixed`) so it never escapes the content column and
-          overlaps the sidebar — it sticks to the bottom of the VIEWPORT while
-          staying within its normal-flow horizontal bounds. */}
-      <div className="sticky inset-x-0 bottom-0 z-40 -mx-4 border-t border-border bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:-mx-6 sm:px-6">
-        <div className="flex justify-end">
-          <Button onClick={() => void handleSubmit()} disabled={saving}>
-            {saving ? 'Guardando…' : 'Guardar cambios'}
-          </Button>
-        </div>
+        <OrgTabPanel value="imagenes" activeValue={activeTab}>
+          <div className="space-y-6">
+            <ImageUploadField
+              id="org-logo-upload"
+              label="Logo"
+              value={form.logoUrl}
+              onChange={set('logoUrl')}
+              shape="circle"
+            />
+            <ImageUploadField
+              id="org-cover-upload"
+              label="Portada"
+              value={form.coverUrl}
+              onChange={set('coverUrl')}
+              shape="rectangle"
+            />
+            <div className="grid gap-4 md:grid-cols-2">
+              <OrgTextField
+                id="org-instagram"
+                label="Instagram"
+                value={form.instagram}
+                onChange={set('instagram')}
+                error={errors.instagram}
+              />
+              <OrgTextField
+                id="org-facebook"
+                label="Facebook"
+                value={form.facebook}
+                onChange={set('facebook')}
+                error={errors.facebook}
+              />
+              <OrgTextField
+                id="org-tiktok"
+                label="TikTok"
+                value={form.tiktok}
+                onChange={set('tiktok')}
+                error={errors.tiktok}
+              />
+              <OrgTextField
+                id="org-website"
+                label="Sitio web"
+                value={form.website}
+                onChange={set('website')}
+                error={errors.website}
+              />
+            </div>
+          </div>
+        </OrgTabPanel>
+
+        <OrgTabPanel value="nosotros" activeValue={activeTab}>
+          <OrgTextAreaField
+            id="org-about-us"
+            label="Quiénes somos"
+            value={form.aboutUs}
+            onChange={set('aboutUs')}
+            rows={8}
+            maxLength={ABOUT_US_MAX}
+            placeholder="Cuéntale al mundo quiénes son, su historia, su misión y por qué hacen lo que hacen..."
+            hint='Este texto aparece en la sección "Nosotros" de tu portal público.'
+          />
+        </OrgTabPanel>
       </div>
-    </div>
-  );
-}
+    );
+  },
+);
