@@ -1,39 +1,18 @@
-.row {
-  border-radius: var(--r-md);
-  border: 1px solid var(--border-hairline-strong);
-  padding: 1rem;
-  font-size: var(--fs-sm);
-}
-
-.row__top {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.row__name {
+.cell__primary {
   font-weight: var(--fw-semibold);
   color: var(--text-dark);
 }
 
-.row__amount {
-  margin-left: auto;
-  font-weight: var(--fw-semibold);
-  color: var(--text-dark);
-}
-
-.row__sub {
-  margin-top: 0.25rem;
+.cell__sub {
+  margin-top: 0.125rem;
   font-size: var(--fs-xs);
   color: var(--text-muted);
 }
 
-.row__actions {
+.actions {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
-  margin-top: 0.5rem;
 }
 
 .cancel-btn {

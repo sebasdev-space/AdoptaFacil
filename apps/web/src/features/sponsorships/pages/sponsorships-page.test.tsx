@@ -93,15 +93,68 @@ function baseHandler(sponsorships: Sponsorship[]) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('SponsorshipsPage — apadrinamientos recibidos por la organización (S2-03)', () => {
-  it('lista con animal/plan resueltos, monto y estado, para Owner (gestiona)', async () => {
-    stubFetch(baseHandler([sponsorship()]));
+  it('lista en tabla con padrino/animal resueltos, monto y estado, para Owner (gestiona)', async () => {
+    stubFetch(baseHandler([sponsorship({ sponsorName: 'Camila Torres' })]));
     renderShell({ route: '/organizacion/apadrinamientos', ...sessionWith([Role.Owner]) });
 
     expect(await screen.findByText('Firulais')).toBeInTheDocument();
-    expect(screen.getByText(/Padrinazgo mensual/)).toBeInTheDocument();
+    expect(screen.getByText('Camila Torres')).toBeInTheDocument();
     expect(screen.getByText('Activo')).toBeInTheDocument();
     expect(screen.getByText(/30\.000\/mes/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Suspender' })).toBeInTheDocument();
+  });
+
+  it('cae a un identificador corto (nunca inventa un nombre) cuando sponsorName no está (apadrinamiento previo a T-057)', async () => {
+    stubFetch(baseHandler([sponsorship({ sponsorUserId: 'padrino-11111111' })]));
+    renderShell({ route: '/organizacion/apadrinamientos', ...sessionWith([Role.Owner]) });
+
+    expect(await screen.findByText('Firulais')).toBeInTheDocument();
+    expect(screen.getByText('Padrino padrino-')).toBeInTheDocument();
+  });
+
+  describe('T-DASH-APADRINAMIENTOS: tarjetas de métricas (reales, ninguna inventada)', () => {
+    it('calcula padrinos activos / ingreso mensual / animales apadrinados a partir de los datos ya cargados', async () => {
+      stubFetch((url) => {
+        if (url.includes('/sponsorships?')) {
+          return {
+            items: [
+              sponsorship({ id: 's-1', sponsorUserId: 'p1', status: SponsorshipStatus.Active }),
+              sponsorship({
+                id: 's-2',
+                sponsorUserId: 'p2',
+                animalId: 'animal-2',
+                status: SponsorshipStatus.Suspended,
+              }),
+            ],
+            total: 2,
+            limit: 50,
+            offset: 0,
+          };
+        }
+        return baseHandler([])(url);
+      });
+      renderShell({ route: '/organizacion/apadrinamientos', ...sessionWith([Role.Owner]) });
+
+      await screen.findByText('Padrinos activos');
+      const padrinosCard = screen.getByText('Padrinos activos').closest('div') as HTMLElement;
+      expect(within(padrinosCard).getByText('1')).toBeInTheDocument();
+
+      const incomeCard = screen.getByText('Ingreso mensual').closest('div') as HTMLElement;
+      expect(within(incomeCard).getByText(/\$\s?30\.000/)).toBeInTheDocument(); // solo s-1 (activo)
+
+      const animalsCard = screen.getByText('Animales apadrinados').closest('div') as HTMLElement;
+      expect(within(animalsCard).getByText('1 / 1')).toBeInTheDocument();
+    });
+
+    it('muestra "Pagos fallidos" como "—" con una nota — el concepto no existe todavía (T-057)', async () => {
+      stubFetch(baseHandler([sponsorship()]));
+      renderShell({ route: '/organizacion/apadrinamientos', ...sessionWith([Role.Owner]) });
+
+      await screen.findByText('Firulais');
+      expect(screen.getByText('Pagos fallidos')).toBeInTheDocument();
+      expect(screen.getByText('—')).toBeInTheDocument();
+      expect(screen.getByText('Próximamente')).toBeInTheDocument();
+    });
   });
 
   it('muestra un estado vacío claro sin apadrinamientos', async () => {

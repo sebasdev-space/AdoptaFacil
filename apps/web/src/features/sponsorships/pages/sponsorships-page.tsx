@@ -12,6 +12,13 @@ import {
   DialogTitle,
   EmptyState,
   Skeleton,
+  StatCard,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   useToast,
 } from '@adoptafacil/ui';
 import { PageContainer, PageHeader } from '../../_layout';
@@ -26,31 +33,37 @@ import {
 } from '../api/sponsorships-api';
 import { AnimalDeceasedModal } from '../components/animal-deceased-modal';
 import {
+  computeSponsorshipMetrics,
   formatBogota,
   formatCop,
   shortId,
   SPONSORSHIP_STATUS_LABELS,
+  sponsorDisplayName,
   sponsorshipStatusVariant,
 } from '../model/sponsorships-view';
 import styles from './sponsorships-page.module.scss';
 
 /**
- * `/organizacion/apadrinamientos` (S2-03, RF17) — apadrinamientos recibidos por
- * la organización, usando SOLO endpoints ya existentes (`GET /sponsorships`,
- * `GET /sponsorship-plans`, `POST /sponsorships/:id/{suspend,reactivate}`).
+ * `/organizacion/apadrinamientos` (S2-03, RF17; rediseño T-DASH-APADRINAMIENTOS)
+ * — apadrinamientos recibidos por la organización, usando SOLO endpoints ya
+ * existentes (`GET /sponsorships`, `GET /sponsorship-plans`, `POST
+ * /sponsorships/:id/{suspend,reactivate,cancel}`) + el nuevo campo
+ * `Sponsorship.sponsorName` (T-057, ver sponsorships.prisma).
  *
- * Gestionar (suspender/reactivar): Owner/Administrator, calcado VERBATIM de
- * `SponsorshipsController.MANAGE_ROLES`. Ver: + ReadOnlyAuditor (`VIEW_ROLES`).
- * ⚠️ Hallazgo (S2-03): el Prompt Spec original asumía que Operator también
- * gestiona/ve apadrinamientos (como en Campañas/Donaciones); el backend REAL
- * de `SponsorshipsController` NO incluye Operator en ninguno de los dos
- * conjuntos — documentado en el reporte de cierre, no corregido por cuenta
- * propia (podría ser intencional: RF17 es dinero recurrente, más sensible).
+ * Gestionar (suspender/reactivar/cancelar): Owner/Administrator, calcado
+ * VERBATIM de `SponsorshipsController.MANAGE_ROLES`. Ver: + ReadOnlyAuditor
+ * (`VIEW_ROLES`). Sin Operator en ninguno de los dos (hallazgo S2-03: RF17 es
+ * dinero recurrente, más sensible que Campañas/Donaciones).
  *
- * `GET /sponsorships` no resuelve nombres de plan/animal (eso solo lo hace
- * `GET /sponsorships/mine` para el padrino) — como la organización SÍ tiene
- * acceso RLS normal a sus propios planes/animales, se resuelven aquí con dos
- * fetches adicionales a endpoints YA existentes (sin nuevo backend).
+ * Tarjetas de métricas — TODAS calculadas de datos ya cargados, ninguna
+ * inventada:
+ *  - Padrinos activos / Ingreso mensual / Animales apadrinados: reales,
+ *    `computeSponsorshipMetrics` sobre los apadrinamientos + planes ya en
+ *    memoria (mismo criterio que el resto del proyecto: sin agregado nuevo de
+ *    backend si se puede derivar del que ya existe).
+ *  - Pagos fallidos: NO existe ese concepto todavía (T-057 no conecta
+ *    PAYMENT_PORT; `SponsorshipStatus` no tiene un estado de pago fallido) —
+ *    se muestra "—" con una nota, nunca un número fabricado.
  */
 export function SponsorshipsPage() {
   const client = useApiClient();
@@ -61,11 +74,23 @@ export function SponsorshipsPage() {
   const [sponsorships, setSponsorships] = useState<Sponsorship[]>([]);
   const [plansById, setPlansById] = useState<Map<string, SponsorshipPlan>>(new Map());
   const [animalNamesById, setAnimalNamesById] = useState<Map<string, string>>(new Map());
+  const [animalsTotalCount, setAnimalsTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Sponsorship | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [deceasedTarget, setDeceasedTarget] = useState<Sponsorship | null>(null);
+
+  const applyLoaded = (
+    sponsorshipRows: Sponsorship[],
+    planRows: SponsorshipPlan[],
+    animals: Animal[],
+  ): void => {
+    setSponsorships(sponsorshipRows);
+    setPlansById(new Map(planRows.map((p) => [p.id, p])));
+    setAnimalNamesById(new Map(animals.map((a) => [a.id, a.name])));
+    setAnimalsTotalCount(animals.filter((a) => a.isActive !== false).length);
+  };
 
   const load = async (): Promise<void> => {
     const [sponsorshipRows, planRows, animals] = await Promise.all([
@@ -73,9 +98,7 @@ export function SponsorshipsPage() {
       listOrgPlans(client),
       client.request<Animal[]>('/animals?includeInactive=true'),
     ]);
-    setSponsorships(sponsorshipRows);
-    setPlansById(new Map(planRows.map((p) => [p.id, p])));
-    setAnimalNamesById(new Map(animals.map((a) => [a.id, a.name])));
+    applyLoaded(sponsorshipRows, planRows, animals);
   };
 
   useEffect(() => {
@@ -87,11 +110,7 @@ export function SponsorshipsPage() {
           listOrgPlans(client),
           client.request<Animal[]>('/animals?includeInactive=true'),
         ]);
-        if (active) {
-          setSponsorships(sponsorshipRows);
-          setPlansById(new Map(planRows.map((p) => [p.id, p])));
-          setAnimalNamesById(new Map(animals.map((a) => [a.id, a.name])));
-        }
+        if (active) applyLoaded(sponsorshipRows, planRows, animals);
       } finally {
         if (active) setLoading(false);
       }
@@ -150,11 +169,13 @@ export function SponsorshipsPage() {
     }
   }
 
+  const metrics = computeSponsorshipMetrics(sponsorships, plansById, animalsTotalCount);
+
   return (
     <PageContainer>
       <PageHeader
         title="Apadrinamientos"
-        description="Apadrinamientos recibidos por tu organización."
+        description="Planes activos por animal y padrinos de tu organización."
       />
       {loading && <Skeleton className="h-64 w-full" />}
       {!loading && sponsorships.length === 0 && (
@@ -165,71 +186,111 @@ export function SponsorshipsPage() {
         />
       )}
       {!loading && sponsorships.length > 0 && (
-        <ul className="space-y-3">
-          {sponsorships.map((sponsorship) => {
-            const plan = plansById.get(sponsorship.planId);
-            const animalName = animalNamesById.get(sponsorship.animalId);
-            return (
-              <li key={sponsorship.id} className={styles.row}>
-                <div className={styles.row__top}>
-                  <span className={styles.row__name}>
-                    {animalName ?? shortId(sponsorship.animalId)}
-                  </span>
-                  <Badge variant={sponsorshipStatusVariant(sponsorship.status)}>
-                    {SPONSORSHIP_STATUS_LABELS[sponsorship.status]}
-                  </Badge>
-                  {plan && <span className={styles.row__amount}>{formatCop(plan.amount)}/mes</span>}
-                </div>
-                <p className={styles.row__sub}>
-                  {plan ? plan.name : `Plan ${shortId(sponsorship.planId)}`} · Desde{' '}
-                  {formatBogota(sponsorship.startedAt)}
-                </p>
-                {canManage && sponsorship.status !== SponsorshipStatus.Cancelled && (
-                  <div className={styles.row__actions}>
-                    {sponsorship.status === SponsorshipStatus.Active ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={busyId === sponsorship.id}
-                        onClick={() => void transition('suspend', sponsorship)}
-                      >
-                        Suspender
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={busyId === sponsorship.id}
-                        onClick={() => void transition('reactivate', sponsorship)}
-                      >
-                        Reactivar
-                      </Button>
+        <div className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard label="Padrinos activos" value={metrics.activePadrinosCount} />
+            <StatCard label="Ingreso mensual" value={formatCop(metrics.monthlyIncomeTotal)} />
+            <StatCard
+              label="Animales apadrinados"
+              value={`${metrics.animalsSponsoredCount} / ${metrics.animalsTotalCount}`}
+            />
+            <StatCard
+              label="Pagos fallidos"
+              value="—"
+              accessory={
+                <span
+                  className="text-xs text-muted-foreground"
+                  title="Próximamente: T-057 conecta el cobro recurrente real (PaymentPort). Hoy ningún apadrinamiento procesa pagos, así que no hay nada que reportar como fallido todavía."
+                >
+                  Próximamente
+                </span>
+              }
+            />
+          </div>
+
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Padrino</TableHead>
+                <TableHead>Animal</TableHead>
+                <TableHead>Aporte / mes</TableHead>
+                <TableHead>Estado</TableHead>
+                {canManage && <TableHead>Acciones</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sponsorships.map((sponsorship) => {
+                const plan = plansById.get(sponsorship.planId);
+                const animalName = animalNamesById.get(sponsorship.animalId);
+                return (
+                  <TableRow key={sponsorship.id}>
+                    <TableCell>
+                      <div>
+                        <p className={styles['cell__primary']}>{sponsorDisplayName(sponsorship)}</p>
+                        <p className={styles['cell__sub']}>
+                          Desde {formatBogota(sponsorship.startedAt)}
+                        </p>
+                      </div>
+                    </TableCell>
+                    <TableCell>{animalName ?? shortId(sponsorship.animalId)}</TableCell>
+                    <TableCell>{plan ? `${formatCop(plan.amount)}/mes` : '—'}</TableCell>
+                    <TableCell>
+                      <Badge variant={sponsorshipStatusVariant(sponsorship.status)}>
+                        {SPONSORSHIP_STATUS_LABELS[sponsorship.status]}
+                      </Badge>
+                    </TableCell>
+                    {canManage && (
+                      <TableCell>
+                        {sponsorship.status !== SponsorshipStatus.Cancelled && (
+                          <div className={styles.actions}>
+                            {sponsorship.status === SponsorshipStatus.Active ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={busyId === sponsorship.id}
+                                onClick={() => void transition('suspend', sponsorship)}
+                              >
+                                Suspender
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={busyId === sponsorship.id}
+                                onClick={() => void transition('reactivate', sponsorship)}
+                              >
+                                Reactivar
+                              </Button>
+                            )}
+                            {sponsorship.status === SponsorshipStatus.Active && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={busyId === sponsorship.id}
+                                onClick={() => setDeceasedTarget(sponsorship)}
+                              >
+                                Registrar fallecimiento
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className={styles['cancel-btn']}
+                              disabled={busyId === sponsorship.id}
+                              onClick={() => setCancelTarget(sponsorship)}
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
                     )}
-                    {sponsorship.status === SponsorshipStatus.Active && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={busyId === sponsorship.id}
-                        onClick={() => setDeceasedTarget(sponsorship)}
-                      >
-                        Registrar fallecimiento
-                      </Button>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className={styles['cancel-btn']}
-                      disabled={busyId === sponsorship.id}
-                      onClick={() => setCancelTarget(sponsorship)}
-                    >
-                      Cancelar
-                    </Button>
-                  </div>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
       )}
 
       <Dialog open={cancelTarget !== null} onOpenChange={(next) => !next && setCancelTarget(null)}>
