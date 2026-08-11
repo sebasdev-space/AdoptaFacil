@@ -6,6 +6,8 @@ import {
   GENERAL_CATALOG_HEADING_ID,
   GeneralCatalogSection,
 } from '../components/general-catalog-section';
+import { GeneralPortalFeaturesSection } from '../components/general-portal-features-section';
+import { HeroPhotoGrid } from '../components/hero-photo-grid';
 
 /**
  * Portal GENERAL de entrada de AdoptaFácil (F-LANDING-01, M14, RF25, documento
@@ -33,44 +35,52 @@ export function GeneralPortalPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
       <PublicNavbar />
 
-      <main>
+      <main className="flex-1">
         {/* Hero con marca (REFACTOR-VISUAL Fase C1) — franja navy a todo el ancho,
             igual que el hero del mockup de referencia. El copy es el mismo que
             ya existía (nunca se inventaron cifras: el mockup ilustra "3.482
             adopciones formalizadas" etc., pero esos números no existen en
             ningún endpoint público — se omiten en vez de fabricarse). */}
         <section className="bg-navy px-4 py-16 text-white sm:px-6 sm:py-20">
-          <div className="mx-auto max-w-6xl space-y-6">
-            <h1 className="max-w-2xl font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-              Encuentra a tu <span className="text-brand-teal">próxima mascota</span>
-            </h1>
-            <p className="max-w-2xl text-white/70">
-              Explora animales en adopción de organizaciones de rescate en toda Colombia. Mirar el
-              catálogo no requiere una cuenta — solo para adoptar o donar te pediremos iniciar
-              sesión.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <a
-                href={`#${GENERAL_CATALOG_HEADING_ID}`}
-                className={cn(buttonVariants({ size: 'lg' }))}
-              >
-                Ver mascotas en adopción
-              </a>
-              <Link
-                to="/register"
-                className={cn(
-                  buttonVariants({ variant: 'outline', size: 'lg' }),
-                  'border-white/20 bg-white/5 text-white hover:border-white hover:bg-white/10 hover:text-white',
-                )}
-              >
-                Soy una organización
-              </Link>
+          <div className="mx-auto grid max-w-6xl gap-10 md:grid-cols-2 md:items-center">
+            <div className="space-y-6">
+              <h1 className="max-w-2xl font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+                Encuentra a tu <span className="text-brand-teal">próxima mascota</span>
+              </h1>
+              <p className="max-w-2xl text-white/70">
+                Explora animales en adopción de organizaciones de rescate en toda Colombia. Mirar el
+                catálogo no requiere una cuenta — solo para adoptar o donar te pediremos iniciar
+                sesión.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <a
+                  href={`#${GENERAL_CATALOG_HEADING_ID}`}
+                  className={cn(buttonVariants({ size: 'lg' }))}
+                >
+                  Ver mascotas en adopción
+                </a>
+                <Link
+                  to="/register"
+                  className={cn(
+                    buttonVariants({ variant: 'outline', size: 'lg' }),
+                    'border-white/20 bg-white/5 text-white hover:border-white hover:bg-white/10 hover:text-white',
+                  )}
+                >
+                  Soy una organización
+                </Link>
+              </div>
             </div>
+
+            {/* Collage decorativo (LANDING-MOCKUP) — NO son datos reales, ver
+                hero-photo-grid.tsx. El catálogo real está más abajo. */}
+            <HeroPhotoGrid />
           </div>
         </section>
+
+        <GeneralPortalFeaturesSection />
 
         <div className="mx-auto w-full max-w-6xl space-y-8 px-4 py-10 sm:px-6">
           <GeneralCatalogSection />
