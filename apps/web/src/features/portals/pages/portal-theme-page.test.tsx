@@ -1,8 +1,7 @@
-import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Role } from '@adoptafacil/contracts';
 import { renderShell } from '../../../test-utils';
-import { contrastRatio, MIN_CONTRAST_RATIO } from '../model/color-conversion';
 
 /**
  * §M14 (T-027) — owner personalization UI at `/organizacion/portal`.
@@ -113,115 +112,104 @@ describe('PortalThemePage — owner personalization (visual only, S2-REORG)', ()
     });
   });
 
-  it('BUG FIX (T-PORTAL-CONTRAST): changing a background color on an org with an EXISTING theme no longer 400s — the paired foreground auto-corrects instead of being resent stale', async () => {
-    // Repro of the reported bug: an org that already saved a full theme
-    // before (NOT a brand-new empty form) — "primary-foreground" stayed
-    // white ("0 0% 100%", the default) from that earlier save. Changing only
-    // "Color principal" to a pale color used to resend that stale white
-    // foreground verbatim, and the real backend (`portals.schemas.ts`
-    // `.superRefine`) rejected the pair with a 400 "Contraste insuficiente".
-    const calls: Array<{ url: string; init?: RequestInit }> = [];
-    stubFetch((url, init) => {
-      calls.push({ url, init });
-      if (init?.method === 'PUT') {
-        const body = JSON.parse(String(init.body));
-        return { tokens: body.tokens };
-      }
-      return { tokens: { primary: '172 67% 30%', 'primary-foreground': '0 0% 100%' } };
-    });
-    renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
+  describe('T-PORTAL-CROSSED-INPUTS: no color input mutates a field it did not touch', () => {
+    // Reported 3 veces seguidas como "cambiar el input N cambia el N-1 (o el
+    // 'siguiente')". Verificado con un log temporal en `onChange`/`setToken`
+    // (con evidencia real del propio usuario) que NUNCA hubo un desfase de
+    // índice: cada input siempre escribía su propio token correctamente. Lo
+    // que sí pasaba (y se decidió QUITAR, no arreglar): el fix de contraste
+    // anterior autoajustaba el color EMPAREJADO cuando hacía falta — dos
+    // campos cambiaban a la vez, y eso se percibía como "el otro cambió en
+    // vez del mío". Decisión de producto: ya no se autoajusta ningún campo
+    // ajeno — este test prueba exactamente eso, para las 7 entradas.
+    const EXISTING_THEME: Record<string, string> = {
+      primary: '172 67% 30%',
+      'primary-foreground': '0 0% 100%',
+      secondary: '213 20% 93%',
+      'secondary-foreground': '214 32% 18%',
+      accent: '169 55% 94%',
+      'accent-foreground': '214 32% 18%',
+      ring: '172 67% 30%',
+    };
 
-    const primary = await screen.findByLabelText('Color principal');
-    // Pale yellow: fine against near-black, fails 4.5:1 against white.
-    fireEvent.change(primary, { target: { value: '#fef3c7' } });
-    fireEvent.click(screen.getByRole('button', { name: /Guardar personalización/ }));
+    // Colores elegidos a propósito para que, tras el cambio, cada par siga
+    // cumpliendo contraste — así el test aísla el binding índice↔campo del
+    // aviso de contraste (probado aparte más abajo).
+    const CASES: Array<{ label: string; token: string; hex: string }> = [
+      { label: 'Color principal', token: 'primary', hex: '#1a2a3a' },
+      { label: 'Texto sobre el principal', token: 'primary-foreground', hex: '#f5f8ff' },
+      { label: 'Color secundario', token: 'secondary', hex: '#e0e0e0' },
+      { label: 'Texto sobre secundario', token: 'secondary-foreground', hex: '#101820' },
+      { label: 'Color de acento', token: 'accent', hex: '#eaf7f0' },
+      { label: 'Texto sobre acento', token: 'accent-foreground', hex: '#12211c' },
+      { label: 'Anillo de foco', token: 'ring', hex: '#336699' },
+    ];
 
-    await waitFor(() => {
-      const put = calls.find((c) => c.init?.method === 'PUT');
-      expect(put).toBeDefined();
-      const body = JSON.parse(String(put?.init?.body));
-      expect(body.tokens.primary).not.toBe('0 0% 100%');
-      // The bug: this used to stay "0 0% 100%" (white) and the backend's real
-      // contrast rule (mirrored here) would have rejected it with a 400.
-      const ratio = contrastRatio(body.tokens.primary, body.tokens['primary-foreground']);
-      expect(ratio).not.toBeNull();
-      expect(ratio as number).toBeGreaterThanOrEqual(MIN_CONTRAST_RATIO);
-    });
-  });
+    it.each(CASES)(
+      'changing "$label" ($token) updates ONLY that field — the other 6 stay byte-identical',
+      async ({ label, token, hex }) => {
+        const calls: Array<{ url: string; init?: RequestInit }> = [];
+        stubFetch((url, init) => {
+          calls.push({ url, init });
+          if (init?.method === 'PUT') {
+            const body = JSON.parse(String(init.body));
+            return { tokens: body.tokens };
+          }
+          return { tokens: EXISTING_THEME };
+        });
+        renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
 
-  it('BUG FIX FOLLOW-UP (T-PORTAL-CONTRAST): editing the TEXT field directly (not the background) also auto-corrects instead of 400ing', async () => {
-    // Reported after the first fix shipped: it only covered background→text.
-    // Editing "Texto sobre secundario" directly against an existing dark
-    // "Color secundario" ("0 56% 42%") to a clashing bright red used to still
-    // 400 — real repro measured ~1.6:1 contrast.
-    const calls: Array<{ url: string; init?: RequestInit }> = [];
-    stubFetch((url, init) => {
-      calls.push({ url, init });
-      if (init?.method === 'PUT') {
-        const body = JSON.parse(String(init.body));
-        return { tokens: body.tokens };
-      }
-      return { tokens: { secondary: '0 56% 42%', 'secondary-foreground': '214 32% 18%' } };
-    });
-    renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
+        const input = await screen.findByLabelText(label);
+        fireEvent.change(input, { target: { value: hex } });
+        fireEvent.click(screen.getByRole('button', { name: /Guardar personalización/ }));
 
-    const secondaryFg = await screen.findByLabelText('Texto sobre secundario');
-    fireEvent.change(secondaryFg, { target: { value: '#f50000' } }); // bright red
-    fireEvent.click(screen.getByRole('button', { name: /Guardar personalización/ }));
+        await waitFor(() => {
+          const put = calls.find((c) => c.init?.method === 'PUT');
+          expect(put).toBeDefined();
+          const body = JSON.parse(String(put?.init?.body));
+          for (const key of Object.keys(EXISTING_THEME)) {
+            if (key === token) {
+              expect(body.tokens[key]).not.toBe(EXISTING_THEME[key]);
+            } else {
+              expect(body.tokens[key]).toBe(EXISTING_THEME[key]);
+            }
+          }
+        });
+      },
+    );
 
-    await waitFor(() => {
-      const put = calls.find((c) => c.init?.method === 'PUT');
-      expect(put).toBeDefined();
-      const body = JSON.parse(String(put?.init?.body));
-      expect(body.tokens.secondary).not.toBe('0 56% 42%'); // the background had to move
-      const ratio = contrastRatio(body.tokens.secondary, body.tokens['secondary-foreground']);
-      expect(ratio).not.toBeNull();
-      expect(ratio as number).toBeGreaterThanOrEqual(MIN_CONTRAST_RATIO);
-    });
-  });
-
-  it('BUG FIX (T-PORTAL-CROSSED-INPUTS): editing one color does NOT live-mutate its paired color — only itself, right away', async () => {
-    // Reported after the contrast fix shipped: dragging the native color
-    // picker on ANY of the 7 inputs seemed to also change the "next"/
-    // "previous" one live, mid-drag. Verified separately (manual + scripted
-    // reproduction) this was never an index/binding bug — every input always
-    // wrote its OWN field correctly. The real cause: `<input type="color">`
-    // fires the native `input` event continuously while dragging, and the
-    // pair-contrast correction used to run synchronously on every one of
-    // those events, visibly changing the paired swatch mid-drag. The fix
-    // defers that correction (debounced) so only the field the user is
-    // actively touching updates live; the pair only settles once they stop.
-    stubFetch(() => ({ tokens: { primary: '172 67% 30%', 'primary-foreground': '0 0% 100%' } }));
-    renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
-
-    const primary = (await screen.findByLabelText('Color principal')) as HTMLInputElement;
-    const primaryFg = screen.getByLabelText('Texto sobre el principal') as HTMLInputElement;
-    const primaryBefore = primary.value;
-    const fgBefore = primaryFg.value;
-
-    vi.useFakeTimers();
-    try {
-      // Pale yellow: will eventually need "Texto sobre el principal"
-      // corrected (insufficient contrast against white) — but not yet.
-      fireEvent.change(primary, { target: { value: '#fef3c7' } });
-
-      // Immediately after — before the debounce settles — the OTHER field's
-      // displayed value must be untouched. This is exactly what was
-      // reported: it used to change live, mid-drag, alongside the touched one.
-      expect(primaryFg.value).toBe(fgBefore);
-      // The touched one updates right away (±1 hex unit of hue/lightness
-      // rounding drift going hex→HSL→hex is expected and fine — T-D03).
-      expect(primary.value).not.toBe(primaryBefore);
-
-      // Once the user stops interacting (debounce elapses), the pair
-      // correction is allowed to apply.
-      act(() => {
-        vi.advanceTimersByTime(500);
+    it('shows a clear, actionable warning (no silent color swap, no raw 400) when a combination lacks contrast, and never calls the API', async () => {
+      const calls: Array<{ url: string; init?: RequestInit }> = [];
+      stubFetch((url, init) => {
+        calls.push({ url, init });
+        if (init?.method === 'PUT') return { tokens: {} };
+        return { tokens: { primary: '172 67% 30%', 'primary-foreground': '0 0% 100%' } };
       });
-      expect(primaryFg.value).not.toBe(fgBefore);
-    } finally {
-      vi.useRealTimers();
-    }
+      renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
+
+      const primary = (await screen.findByLabelText('Color principal')) as HTMLInputElement;
+      const primaryFg = screen.getByLabelText('Texto sobre el principal') as HTMLInputElement;
+      const fgBefore = primaryFg.value;
+
+      // Pale yellow background: fine against near-black, fails 4.5:1 against
+      // the existing white foreground.
+      fireEvent.change(primary, { target: { value: '#fef3c7' } });
+      fireEvent.click(screen.getByRole('button', { name: /Guardar personalización/ }));
+
+      expect(await screen.findByText('Revisa el contraste antes de guardar')).toBeInTheDocument();
+      // Names both conflicting fields by their visible label, in one message
+      // (distinct from the two <label> elements, which each name only one).
+      expect(
+        screen.getByText(
+          /"Color principal" y "Texto sobre el principal" no tienen suficiente contraste/,
+        ),
+      ).toBeInTheDocument();
+
+      // Never even reaches the backend — and the untouched field is NOT
+      // silently moved to "fix" it.
+      expect(calls.some((c) => c.init?.method === 'PUT')).toBe(false);
+      expect(primaryFg.value).toBe(fgBefore);
+    });
   });
 
   it('also allows an Administrator to edit', async () => {
