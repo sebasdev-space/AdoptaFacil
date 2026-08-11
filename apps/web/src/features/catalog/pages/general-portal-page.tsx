@@ -47,7 +47,7 @@ export function GeneralPortalPage() {
         <section className="bg-navy px-4 py-16 text-white sm:px-6 sm:py-20">
           <div className="mx-auto grid max-w-6xl gap-10 md:grid-cols-2 md:items-center">
             <div className="space-y-6">
-              <h1 className="max-w-2xl font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+              <h1 className="max-w-2xl font-display text-3xl font-bold tracking-tight sm:text-4xl">
                 Encuentra a tu <span className="text-brand-teal">próxima mascota</span>
               </h1>
               <p className="max-w-2xl text-white/70">

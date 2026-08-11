@@ -13,9 +13,17 @@
  *
  * Dos colisiones de nombre deliberadas con el sistema anterior:
  *   - --font-sans / --font-display / --font-mono: se REDEFINEN aquí a propósito
- *     (Plus Jakarta Sans / Fraunces / IBM Plex Mono) porque el objetivo de esta
- *     fase es que la tipografía cambie en TODA la app de inmediato, no solo en
- *     los componentes ya migrados.
+ *     (Aptos / IBM Plex Mono) porque el objetivo de esta fase es que la
+ *     tipografía cambie en TODA la app de inmediato, no solo en los
+ *     componentes ya migrados. Aptos es propietaria de Microsoft (fuente por
+ *     defecto de Office/Windows 11 desde 2023) — NO existe en Google Fonts ni
+ *     Fontsource, así que NO se autohospeda como las demás: se nombra tal
+ *     cual y el navegador la usa SOLO si el sistema operativo ya la tiene
+ *     instalada (Windows 11 / Microsoft 365). En cualquier otro sistema
+ *     (macOS, Linux, Windows sin Office, móviles) cae a Calibri → Segoe UI →
+ *     Arial → sans-serif, visualmente parecidas pero no idénticas. Decisión
+ *     confirmada explícitamente (alternativa era sustituir por una fuente
+ *     libre parecida tipo Inter/Lato, autohospedada e idéntica para todos).
  *   - --border: el `--border` de shadcn ya está auditado a 3:1 (F-BORDE) para
  *     controles de formulario (inputs, botones) — NO se toca. El hairline
  *     decorativo de tarjetas del mockup (#EDF1F1, ~1.2:1) es un separador
@@ -24,20 +32,22 @@
  */
 :root {
   /* ---------------------------------------------------------------------
-   * Tipografía — self-hosted vía @fontsource (sin dependencia de red).
+   * Tipografía — Aptos (sistema, ver comentario de arriba) para
+   * sans/display; IBM Plex Mono self-hosted vía @fontsource para mono.
    * --------------------------------------------------------------------- */
-  --font-display: 'Fraunces', Georgia, serif;
-  --font-sans:
-    'Plus Jakarta Sans', -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: 'Aptos', Calibri, 'Segoe UI', Arial, sans-serif;
+  --font-sans: 'Aptos', Calibri, 'Segoe UI', Arial, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  /* Escala tipográfica (ratio ~1.25) */
-  --fs-display-xl: 3rem;
-  --lh-display-xl: 3.25rem;
-  --fs-display: 2.25rem;
-  --fs-h1: 1.875rem;
-  --fs-h2: 1.5rem;
-  --fs-h3: 1.25rem;
+  /* Escala tipográfica (ratio ~1.25). Títulos (h1-h3/display) un poco más
+     grandes que antes, a pedido — solo la escala de encabezados, --fs-body*
+     no cambia. */
+  --fs-display-xl: 3.375rem;
+  --lh-display-xl: 3.625rem;
+  --fs-display: 2.5rem;
+  --fs-h1: 2rem;
+  --fs-h2: 1.625rem;
+  --fs-h3: 1.375rem;
   --fs-body-lg: 1.125rem;
   --fs-body: 1rem;
   --fs-sm: 0.875rem;

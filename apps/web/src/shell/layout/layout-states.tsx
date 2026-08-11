@@ -48,7 +48,7 @@ export function FullPageError({
         <AlertTriangleIcon className="h-6 w-6" />
       </span>
       <div className="space-y-1">
-        <h1 className="text-lg font-semibold">{title}</h1>
+        <h1 className="text-lg font-bold">{title}</h1>
         <p className="max-w-md text-sm text-muted-foreground">{message}</p>
       </div>
       {onRetry && (
@@ -76,7 +76,7 @@ export function ContentError({
         <AlertTriangleIcon className="h-6 w-6" />
       </span>
       <div className="space-y-1">
-        <h2 className="text-base font-semibold">{title}</h2>
+        <h2 className="text-base font-bold">{title}</h2>
         <p className="max-w-md text-sm text-muted-foreground">{message}</p>
       </div>
       {onRetry && (

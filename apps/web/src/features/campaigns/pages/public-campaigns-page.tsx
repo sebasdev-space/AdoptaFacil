@@ -42,7 +42,7 @@ export function PublicCampaignsPage() {
 
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-10 sm:px-6">
         <header className="mb-8 space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Campañas de recaudación</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Campañas de recaudación</h1>
           <p className="text-sm text-muted-foreground">
             Apoya las campañas activas de las organizaciones de rescate.
           </p>

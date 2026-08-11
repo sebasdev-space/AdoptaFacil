@@ -139,7 +139,7 @@ export function PublicCampaignDetailPage() {
                     llega en T-055); solo lo cargado y su total. */}
                 <section aria-labelledby="accountability-heading" className="border-t pt-6">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <h2 id="accountability-heading" className="text-sm font-semibold">
+                    <h2 id="accountability-heading" className="text-sm font-bold">
                       Rendición de cuentas
                     </h2>
                     {report && report.evidences.length > 0 && (

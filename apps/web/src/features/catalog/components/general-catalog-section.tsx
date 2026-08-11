@@ -149,7 +149,7 @@ export function GeneralCatalogSection() {
   return (
     <section aria-labelledby={GENERAL_CATALOG_HEADING_ID} data-testid="general-catalog">
       <div className="space-y-1">
-        <h2 id={GENERAL_CATALOG_HEADING_ID} className="text-2xl font-semibold tracking-tight">
+        <h2 id={GENERAL_CATALOG_HEADING_ID} className="text-2xl font-bold tracking-tight">
           Animales en adopción
         </h2>
         {state === 'ready' && (

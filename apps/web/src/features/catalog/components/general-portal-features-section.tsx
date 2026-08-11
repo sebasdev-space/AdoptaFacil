@@ -139,7 +139,7 @@ export function GeneralPortalFeaturesSection() {
               <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-brand-teal-light">
                 <Icon className="h-[1.15rem] w-[1.15rem] text-brand-teal-dark" />
               </div>
-              <h3 className="mb-1.5 font-semibold">{title}</h3>
+              <h3 className="mb-1.5 font-bold">{title}</h3>
               <p className="text-sm text-brand-navy-soft">{description}</p>
             </CardContent>
           </Card>

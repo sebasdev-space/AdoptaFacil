@@ -1,13 +1,6 @@
-// REFACTOR-VISUAL v2 — Plus Jakarta Sans (UI/cuerpo), Fraunces (display/
-// títulos), IBM Plex Mono (códigos/asientos). Reemplaza el Poppins de Fase A.
-@import '@fontsource/plus-jakarta-sans/latin-400.css';
-@import '@fontsource/plus-jakarta-sans/latin-500.css';
-@import '@fontsource/plus-jakarta-sans/latin-600.css';
-@import '@fontsource/plus-jakarta-sans/latin-700.css';
-@import '@fontsource/plus-jakarta-sans/latin-800.css';
-@import '@fontsource/fraunces/latin-500.css';
-@import '@fontsource/fraunces/latin-600.css';
-@import '@fontsource/fraunces/latin-700.css';
+// Tipografía (pulido visual): Aptos (UI/cuerpo y títulos) es del sistema
+// operativo, no se autohospeda (ver tokens.scss) — nada que importar aquí.
+// IBM Plex Mono (códigos/asientos) sigue self-hosted vía @fontsource.
 @import '@fontsource/ibm-plex-mono/latin-400.css';
 @import '@fontsource/ibm-plex-mono/latin-500.css';
 
