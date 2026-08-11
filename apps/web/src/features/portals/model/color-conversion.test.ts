@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { hexToHslString, hslStringToHex, hslToHex, parseHslString } from './color-conversion';
+import {
+  bestContrastingForeground,
+  contrastRatio,
+  hexToHslString,
+  hslStringToHex,
+  hslToHex,
+  MIN_CONTRAST_RATIO,
+  parseHslString,
+} from './color-conversion';
 
 describe('parseHslString (T-D03)', () => {
   it('parses a bare HSL string ("H S% L%")', () => {
@@ -44,5 +52,34 @@ describe('hexToHslString round-trip (T-D03)', () => {
   it('formats as "H S% L%" — the exact bare format the backend expects', () => {
     expect(hexToHslString('#ffffff')).toBe('0 0% 100%');
     expect(hexToHslString('#000000')).toBe('0 0% 0%');
+  });
+});
+
+describe('contrastRatio (T-PORTAL-CONTRAST) — mirrors the backend formula exactly', () => {
+  it('computes the extremes correctly', () => {
+    expect(contrastRatio('0 0% 0%', '0 0% 100%')).toBeCloseTo(21, 1);
+    expect(contrastRatio('142 72% 29%', '142 72% 29%')).toBeCloseTo(1, 5);
+  });
+
+  it('agrees with the AA threshold used by the backend schema', () => {
+    const ratio = contrastRatio('142 72% 29%', '0 0% 100%');
+    expect(ratio).not.toBeNull();
+    expect(ratio as number).toBeGreaterThanOrEqual(MIN_CONTRAST_RATIO);
+  });
+
+  it('returns null for unparsable input', () => {
+    expect(contrastRatio('nope', '0 0% 100%')).toBeNull();
+  });
+});
+
+describe('bestContrastingForeground (T-PORTAL-CONTRAST bug fix)', () => {
+  it('picks near-black for a pale/light background', () => {
+    const fg = bestContrastingForeground('48 96% 89%'); // pale yellow
+    expect(contrastRatio('48 96% 89%', fg)).toBeGreaterThanOrEqual(MIN_CONTRAST_RATIO);
+  });
+
+  it('picks white for a dark background', () => {
+    const fg = bestContrastingForeground('222 20% 9%'); // near-black
+    expect(contrastRatio('222 20% 9%', fg)).toBeGreaterThanOrEqual(MIN_CONTRAST_RATIO);
   });
 });

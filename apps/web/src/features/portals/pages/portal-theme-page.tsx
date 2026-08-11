@@ -23,7 +23,13 @@ import { PageContainer, PageHeader } from '../../_layout';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
 import { brandTokensToStyle } from '../../../shell/theme';
-import { hexToHslString, hslStringToHex } from '../model/color-conversion';
+import {
+  bestContrastingForeground,
+  contrastRatio,
+  hexToHslString,
+  hslStringToHex,
+  MIN_CONTRAST_RATIO,
+} from '../model/color-conversion';
 import { PORTAL_THEME_FIELDS, safePortalTheme, type PortalThemeField } from '../model/theme';
 import { PortalMiniPreview } from '../components/portal-mini-preview';
 
@@ -51,6 +57,18 @@ const DISPLAY_FALLBACK_HSL: Partial<Record<string, string>> = {
   accent: '169 55% 94%',
   'accent-foreground': '214 32% 18%',
   ring: '172 67% 30%',
+};
+
+/**
+ * Fondo → su token de texto emparejado (T-PORTAL-CONTRAST). Mismos pares que
+ * `PORTAL_COLOR_PAIRS` en `apps/api/.../portals.schemas.ts` — duplicado aquí
+ * porque es una constante de 3 líneas, no un tipo compartido (no toca
+ * `packages/contracts`).
+ */
+const BACKGROUND_TO_FOREGROUND: Partial<Record<string, string>> = {
+  primary: 'primary-foreground',
+  secondary: 'secondary-foreground',
+  accent: 'accent-foreground',
 };
 
 /** Simple external-link glyph (feature-local — no icon library added). */
@@ -237,8 +255,40 @@ export function PortalThemePage() {
   const accentFg = form['accent-foreground'] || DISPLAY_FALLBACK_HSL['accent-foreground'];
   const ringColor = form.ring || DISPLAY_FALLBACK_HSL.ring;
 
+  /**
+   * BUG FIX (T-PORTAL-CONTRAST): cambiar solo un color de fondo (p. ej.
+   * "Color principal") reenviaba tal cual el valor YA GUARDADO de su texto
+   * emparejado ("Texto sobre el principal") — si el nuevo fondo no tenía
+   * contraste suficiente contra ese texto sin tocar, el backend rechazaba
+   * TODO el guardado con 400 (`portals.schemas.ts`'s `.superRefine`, que sí
+   * es correcto: WCAG AA es una regla real, no el bug). Repro confirmado:
+   * cambiar "Color principal" a un tono claro con "Texto sobre el
+   * principal" en blanco (`0 0% 100%`, el default) → 400 "Contraste
+   * insuficiente entre primary y primary-foreground (1.11:1 < 4.5:1)".
+   * Con un tema ya guardado antes (el caso normal, no el de un formulario
+   * recién estrenado) esto pasaba con CUALQUIER color de fondo suficiente-
+   * mente claro/oscuro, calzando con "cambiar cualquier color falla".
+   *
+   * Fix (frontend, sin tocar el schema del backend — esa regla es correcta):
+   * al cambiar un color de FONDO, si el texto emparejado actual no alcanza
+   * el contraste mínimo contra el nuevo fondo, se autoajusta ESE texto
+   * (blanco o casi-negro, el que dé mejor contraste) antes de guardar. Si el
+   * usuario edita el texto directamente, no se toca nada más — sigue
+   * pudiendo elegir un valor que el backend rechace, igual que antes.
+   */
   const setToken = (token: string, value: string) =>
-    setForm((prev) => ({ ...prev, [token]: value }));
+    setForm((prev) => {
+      const next = { ...prev, [token]: value };
+      const fgToken = BACKGROUND_TO_FOREGROUND[token];
+      if (fgToken) {
+        const currentFg = next[fgToken]?.trim() || DISPLAY_FALLBACK_HSL[fgToken];
+        const ratio = currentFg ? contrastRatio(value, currentFg) : null;
+        if (ratio === null || ratio < MIN_CONTRAST_RATIO) {
+          next[fgToken] = bestContrastingForeground(value);
+        }
+      }
+      return next;
+    });
 
   const save = async () => {
     setSaving(true);

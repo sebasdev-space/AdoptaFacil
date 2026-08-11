@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Role } from '@adoptafacil/contracts';
 import { renderShell } from '../../../test-utils';
+import { contrastRatio, MIN_CONTRAST_RATIO } from '../model/color-conversion';
 
 /**
  * §M14 (T-027) — owner personalization UI at `/organizacion/portal`.
@@ -109,6 +110,42 @@ describe('PortalThemePage — owner personalization (visual only, S2-REORG)', ()
       expect(body.logoPosition).toBe('left');
       expect(body.socialNavPosition).toBe('right');
       expect(body.tokens.primary).toMatch(/^\d+(\.\d+)? \d+% \d+%$/); // re-converted to HSL
+    });
+  });
+
+  it('BUG FIX (T-PORTAL-CONTRAST): changing a background color on an org with an EXISTING theme no longer 400s — the paired foreground auto-corrects instead of being resent stale', async () => {
+    // Repro of the reported bug: an org that already saved a full theme
+    // before (NOT a brand-new empty form) — "primary-foreground" stayed
+    // white ("0 0% 100%", the default) from that earlier save. Changing only
+    // "Color principal" to a pale color used to resend that stale white
+    // foreground verbatim, and the real backend (`portals.schemas.ts`
+    // `.superRefine`) rejected the pair with a 400 "Contraste insuficiente".
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    stubFetch((url, init) => {
+      calls.push({ url, init });
+      if (init?.method === 'PUT') {
+        const body = JSON.parse(String(init.body));
+        return { tokens: body.tokens };
+      }
+      return { tokens: { primary: '172 67% 30%', 'primary-foreground': '0 0% 100%' } };
+    });
+    renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
+
+    const primary = await screen.findByLabelText('Color principal');
+    // Pale yellow: fine against near-black, fails 4.5:1 against white.
+    fireEvent.change(primary, { target: { value: '#fef3c7' } });
+    fireEvent.click(screen.getByRole('button', { name: /Guardar personalización/ }));
+
+    await waitFor(() => {
+      const put = calls.find((c) => c.init?.method === 'PUT');
+      expect(put).toBeDefined();
+      const body = JSON.parse(String(put?.init?.body));
+      expect(body.tokens.primary).not.toBe('0 0% 100%');
+      // The bug: this used to stay "0 0% 100%" (white) and the backend's real
+      // contrast rule (mirrored here) would have rejected it with a 400.
+      const ratio = contrastRatio(body.tokens.primary, body.tokens['primary-foreground']);
+      expect(ratio).not.toBeNull();
+      expect(ratio as number).toBeGreaterThanOrEqual(MIN_CONTRAST_RATIO);
     });
   });
 
