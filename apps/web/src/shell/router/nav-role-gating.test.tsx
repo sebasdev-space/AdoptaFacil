@@ -69,7 +69,7 @@ const SURFACES = [
   {
     name: 'Mi organización',
     route: '/organizacion',
-    heading: 'Mi organización',
+    heading: 'Perfil de la organización',
     allow: Role.Operator,
   },
   {

@@ -5,13 +5,14 @@ import { Role } from '@adoptafacil/contracts';
 import { renderShell } from '../../../test-utils';
 
 /**
- * `/organizacion` — S2-REORG: this page is now the hub for ALL organization
- * content, including "Acerca de nosotros"/"Información de contacto extendida"
- * (moved here from Personalización, T-027/S2-PORTAL) and a 3-button action bar
- * (Formalización/Personalización/Ver portal público) replacing the loose
- * "Formalización →" link + the "Ver portal público" that used to live inside
- * `ProfileHeaderBanner`. Everything here still saves through ONE endpoint,
- * `PUT /org/profile` — moving the fields never touched the backend.
+ * `/organizacion` — S2-VISUAL-TABS: this page is the hub for ALL organization
+ * profile content, now organized as 5 tabs (Datos institucionales · Ubicación
+ * · Contacto · Imágenes y redes · Acerca de nosotros) instead of 6 stacked
+ * cards (S2-REORG). "Información de contacto extendida" doesn't get its own
+ * tab — it's a sub-section inside "Contacto" (same category: portal-facing
+ * contact info). Everything still saves through ONE endpoint, `PUT
+ * /org/profile`, now triggered from the header's "Guardar cambios" button
+ * (moved out of the form itself so it sits next to "Ver portal público").
  */
 function sessionWith(roles: Role[]) {
   return {
@@ -52,6 +53,10 @@ function stubFetch(handler: (url: string, init?: RequestInit) => unknown) {
   );
 }
 
+async function goToTab(name: string) {
+  await userEvent.click(await screen.findByRole('tab', { name }));
+}
+
 beforeEach(() => {
   stubFetch(() => BASE_ORG);
 });
@@ -60,10 +65,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('OrgProfilePage — hub central (S2-REORG)', () => {
+describe('OrgProfilePage — hub central en tabs (S2-VISUAL-TABS)', () => {
   it('shows the 3-button action bar: Formalización (with state), Personalización, Ver portal público', async () => {
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
-    await screen.findByRole('heading', { name: 'Mi organización' });
+    await screen.findByRole('heading', { name: 'Perfil de la organización' });
     // Scoped to <main>: the sidebar nav ALSO has a "Personalización" link
     // (different route context) — the action bar's own link must be queried
     // separately from it.
@@ -87,34 +92,51 @@ describe('OrgProfilePage — hub central (S2-REORG)', () => {
   it('hides "Ver portal público" when the org has no slug yet', async () => {
     stubFetch(() => ({ ...BASE_ORG, slug: undefined }));
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
-    await screen.findByRole('heading', { name: 'Mi organización' });
+    await screen.findByRole('heading', { name: 'Perfil de la organización' });
     expect(
       within(screen.getByRole('main')).queryByRole('link', { name: /Ver portal público/ }),
     ).not.toBeInTheDocument();
   });
 
-  it('renders all 6 cards from S2-REORG §3.2, each exactly once', async () => {
+  it('shows the 5 tabs (S2-VISUAL-TABS) and switching tabs keeps a single shared form', async () => {
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
-    await screen.findByRole('heading', { name: 'Mi organización' });
+    await screen.findByRole('heading', { name: 'Perfil de la organización' });
 
-    const titles = [
+    const tabNames = [
       'Datos institucionales',
-      'Contacto',
       'Ubicación',
-      'Imágenes y redes sociales',
+      'Contacto',
+      'Imágenes y redes',
       'Acerca de nosotros',
-      'Información de contacto extendida',
     ];
-    await waitFor(() => {
-      for (const title of titles) {
-        expect(screen.getAllByText(title)).toHaveLength(1);
-      }
-    });
+    for (const name of tabNames) {
+      expect(await screen.findByRole('tab', { name })).toBeInTheDocument();
+    }
+
+    // Default tab: "Datos institucionales".
+    expect(await screen.findByLabelText('Nombre')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Quiénes somos')).not.toBeInTheDocument();
+
+    // Typing, then switching tabs, must not lose what was written.
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Refugio Nuevo' } });
+    await goToTab('Acerca de nosotros');
+    expect(screen.queryByLabelText('Nombre')).not.toBeInTheDocument();
+    expect(await screen.findByLabelText('Quiénes somos')).toBeInTheDocument();
+
+    await goToTab('Datos institucionales');
+    expect(await screen.findByLabelText('Nombre')).toHaveValue('Refugio Nuevo');
+  });
+
+  it('has NO preview panel next to the form — single centered column', async () => {
+    renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
+    await screen.findByRole('heading', { name: 'Perfil de la organización' });
+    expect(screen.queryByText(/Vista previa/i)).not.toBeInTheDocument();
   });
 
   it('has NO URL text fields for logo/cover — upload-only (S2-REORG §5)', async () => {
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
-    await screen.findByRole('heading', { name: 'Mi organización' });
+    await screen.findByRole('heading', { name: 'Perfil de la organización' });
+    await goToTab('Imágenes y redes');
 
     expect(screen.queryByLabelText('URL del logo')).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Fotos de portada/)).not.toBeInTheDocument();
@@ -125,7 +147,8 @@ describe('OrgProfilePage — hub central (S2-REORG)', () => {
   it('shows "Cambiar logo" + a preview once the org already has one', async () => {
     stubFetch(() => ({ ...BASE_ORG, logoUrl: 'https://cdn.test/logo.png' }));
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
-    await screen.findByRole('heading', { name: 'Mi organización' });
+    await screen.findByRole('heading', { name: 'Perfil de la organización' });
+    await goToTab('Imágenes y redes');
 
     expect(await screen.findByLabelText('Cambiar logo')).toBeInTheDocument();
     expect(screen.queryByLabelText('Subir logo')).not.toBeInTheDocument();
@@ -145,7 +168,8 @@ describe('OrgProfilePage — hub central (S2-REORG)', () => {
       return BASE_ORG;
     });
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
-    await screen.findByRole('heading', { name: 'Mi organización' });
+    await screen.findByRole('heading', { name: 'Perfil de la organización' });
+    await goToTab('Imágenes y redes');
 
     const file = new File(['bytes'], 'logo.png', { type: 'image/png' });
     const input = await screen.findByLabelText('Subir logo');
@@ -176,15 +200,20 @@ describe('OrgProfilePage — hub central (S2-REORG)', () => {
       };
     });
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
+    await screen.findByRole('heading', { name: 'Perfil de la organización' });
 
-    const aboutUs = await screen.findByLabelText('Quiénes somos');
-    expect(aboutUs).toHaveValue('Historia real de la fundación.');
-    expect(screen.getByLabelText('Horario de atención')).toHaveValue('Lun-Vie 9am-5pm');
+    await goToTab('Acerca de nosotros');
+    expect(await screen.findByLabelText('Quiénes somos')).toHaveValue(
+      'Historia real de la fundación.',
+    );
+
+    await goToTab('Contacto');
+    expect(await screen.findByLabelText('Horario de atención')).toHaveValue('Lun-Vie 9am-5pm');
     expect(screen.getByLabelText('Teléfonos adicionales')).toHaveValue('3001234567');
-
     fireEvent.change(screen.getByLabelText('Dirección completa'), {
       target: { value: 'Calle 45 #12-34, Bogotá' },
     });
+
     fireEvent.click(screen.getByRole('button', { name: /Guardar cambios/ }));
 
     await waitFor(() => {
@@ -202,7 +231,8 @@ describe('OrgProfilePage — hub central (S2-REORG)', () => {
 
   it('the map field uses the fixed label/placeholder (S2-REORG §6)', async () => {
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
-    await screen.findByRole('heading', { name: 'Mi organización' });
+    await screen.findByRole('heading', { name: 'Perfil de la organización' });
+    await goToTab('Contacto');
 
     expect(screen.queryByLabelText('Enlace a Google Maps')).not.toBeInTheDocument();
     const mapField = await screen.findByLabelText('Ubicación en el mapa');

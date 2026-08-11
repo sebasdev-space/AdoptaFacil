@@ -1,13 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  FormalizationState,
-  OrganizationType,
-  Role,
-  type Organization,
-} from '@adoptafacil/contracts';
+import { FormalizationState, Role, type Organization } from '@adoptafacil/contracts';
 import {
   Badge,
+  Button,
   buttonVariants,
   Card,
   CardContent,
@@ -18,7 +14,8 @@ import {
 import { PageContainer, PageHeader } from '../../_layout';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
-import { OrgProfileForm } from '../components/org-profile-form';
+import { OrgProfileForm, type OrgProfileFormHandle } from '../components/org-profile-form';
+import { computeProfileCompletenessMock } from '../lib/profile-completeness';
 
 /** Same wording as `org-formalization-page.tsx`'s STATE_LABELS (not exported
  *  there — this is a 5-entry, unlikely-to-drift copy, not worth a shared file
@@ -29,18 +26,6 @@ const FORMALIZATION_LABELS: Record<FormalizationState, string> = {
   [FormalizationState.Formalizada]: 'Formalizada',
   [FormalizationState.ESAL]: 'ESAL',
   [FormalizationState.ESAL_RTE]: 'ESAL + RTE',
-};
-
-/** Same enum @sebastian already owns in `org.ts`; reproduced locally (like
- *  `features/portals/components/org-type-badge.tsx` does) to avoid importing
- *  across the features/portals domain boundary for a single label map. */
-const ORG_TYPE_LABELS: Record<OrganizationType, string> = {
-  [OrganizationType.Foundation]: 'Fundación',
-  [OrganizationType.Association]: 'Asociación',
-  [OrganizationType.Corporation]: 'Corporación',
-  [OrganizationType.Shelter]: 'Refugio',
-  [OrganizationType.NaturalPerson]: 'Persona natural',
-  [OrganizationType.Other]: 'Otro',
 };
 
 /** Simple external-link glyph (feature-local, no icon library added — same
@@ -87,12 +72,13 @@ function PaletteIcon() {
 }
 
 /**
- * Barra de acciones (S2-REORG): 3 botones — Formalización (con el estado
- * actual), Personalización, y Ver portal público — reemplaza el link suelto
- * "Formalización →" del header y el botón "Ver portal público" que vivía
- * dentro de `ProfileHeaderBanner` (T-D05), consolidados en un solo lugar.
+ * Barra de acciones de la cabecera (S2-VISUAL-TABS): Formalización (con el
+ * estado actual) y Personalización siguen siendo accesos rápidos útiles desde
+ * aquí (el nuevo spec de tabs no pedía quitarlos); "Ver portal público" pasa a
+ * ser outline y "Guardar cambios" (primary, provisto por el padre — solo
+ * Owner/Administrator lo ven) cierra la fila como acción principal.
  */
-function OrgActionBar({ org }: { org: Organization }) {
+function OrgActionBar({ org, saveButton }: { org: Organization; saveButton?: ReactNode }) {
   const linkClass = buttonVariants({ variant: 'outline', size: 'sm' });
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
@@ -117,46 +103,8 @@ function OrgActionBar({ org }: { org: Organization }) {
           <ExternalLinkIcon />
         </a>
       )}
+      {saveButton}
     </div>
-  );
-}
-
-/** Compact back-office header (T-D05 P2) — logo + name + type/formalization
- *  badges, shown regardless of edit permission. The public-portal link now
- *  lives in `OrgActionBar` (S2-REORG) — not duplicated here. */
-function ProfileHeaderBanner({ org }: { org: Organization }) {
-  return (
-    <Card className="mb-6">
-      <CardContent className="flex flex-wrap items-center gap-4 p-4">
-        {org.logoUrl ? (
-          <img
-            src={org.logoUrl}
-            alt={`Logo de ${org.name}`}
-            className="h-14 w-14 shrink-0 rounded-full border border-border object-cover"
-          />
-        ) : (
-          <div
-            aria-hidden
-            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-muted text-lg font-semibold text-muted-foreground"
-          >
-            {org.name ? org.name.charAt(0).toUpperCase() : '?'}
-          </div>
-        )}
-        <div className="min-w-0 flex-1 space-y-1">
-          <h2 className="truncate text-lg font-semibold text-foreground">{org.name}</h2>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {org.organizationType && (
-              <Badge variant="info">
-                {ORG_TYPE_LABELS[org.organizationType] ?? org.organizationType}
-              </Badge>
-            )}
-            <Badge>
-              {FORMALIZATION_LABELS[org.formalizationState ?? FormalizationState.Informal]}
-            </Badge>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -205,6 +153,8 @@ export function OrgProfilePage() {
   const [org, setOrg] = useState<Organization | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const formRef = useRef<OrgProfileFormHandle>(null);
   const canEdit = hasAnyRole(Role.Owner, Role.Administrator);
 
   useEffect(() => {
@@ -228,20 +178,41 @@ export function OrgProfilePage() {
     };
   }, [client]);
 
+  const completeness = org ? computeProfileCompletenessMock(org) : 0;
+
   return (
     <PageContainer>
       <PageHeader
-        title="Mi organización"
-        description="Perfil institucional de tu organización."
-        actions={org ? <OrgActionBar org={org} /> : undefined}
+        title="Perfil de la organización"
+        description={
+          org ? `Perfil ${completeness}% completo · publicado en tu portal público` : undefined
+        }
+        actions={
+          org ? (
+            <OrgActionBar
+              org={org}
+              saveButton={
+                canEdit ? (
+                  <Button onClick={() => formRef.current?.submit()} disabled={saving}>
+                    {saving ? 'Guardando…' : 'Guardar cambios'}
+                  </Button>
+                ) : undefined
+              }
+            />
+          ) : undefined
+        }
       />
       {loading && <Skeleton className="h-64 w-full" />}
       {error && !loading && <p className="text-sm text-destructive">{error}</p>}
       {org && !loading && (
         <>
-          <ProfileHeaderBanner org={org} />
           {canEdit ? (
-            <OrgProfileForm initial={org} onSaved={setOrg} />
+            <OrgProfileForm
+              ref={formRef}
+              initial={org}
+              onSaved={setOrg}
+              onSavingChange={setSaving}
+            />
           ) : (
             <ReadOnlyProfile org={org} />
           )}

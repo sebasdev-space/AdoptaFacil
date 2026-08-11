@@ -1,0 +1,62 @@
+/**
+ * Tabs con indicador subrayado (underline) en `--brand` — ver el comentario en
+ * `org-tabs.tsx` sobre por qué esto es feature-local en vez de vivir en
+ * `packages/ui` (esa variante todavía no existe ahí).
+ */
+
+.tabs-list {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  border-bottom: 1px solid var(--border-hairline-strong);
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.tabs-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0.75rem 0.125rem;
+  margin-bottom: -1px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font-family: var(--font-sans);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: var(--transition-base);
+
+  &:hover {
+    color: var(--text-dark);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--brand-light);
+    border-radius: var(--r-sm);
+  }
+
+  &[aria-selected='true'] {
+    color: var(--brand-dark);
+    border-bottom-color: var(--brand);
+  }
+}
+
+.tabs-panel {
+  padding-top: 1.5rem;
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--brand-light);
+    border-radius: var(--r-sm);
+  }
+}
