@@ -139,6 +139,12 @@ export interface NavItem {
    * show an org account someone else's UX at all.
    */
   personaOnly?: boolean;
+  /**
+   * Fase 12 (REFACTOR-VISUAL v2): marks an entry whose screen is a
+   * `ComingSoon` placeholder (no backend yet) — the sidebar shows a "Pronto"
+   * badge next to the label instead of hiding the entry outright.
+   */
+  comingSoon?: boolean;
 }
 
 export const navItems: NavItem[] = [
@@ -223,6 +229,31 @@ export const navItems: NavItem[] = [
   // (S2-04A §4): it now lives as a button inside "Mi organización"'s action bar
   // (OrgProfilePage, S2-01/S2-REORG), not as a top-level nav entry. The ROUTE
   // (`/organizacion/portal`) and its guard are UNCHANGED — see routes.tsx.
+  // Fase 12 (REFACTOR-VISUAL v2): tres módulos aún sin backend — entradas
+  // visibles con el badge "Pronto" en vez de ocultarse, siguiendo el patrón
+  // documentado en `ComingSoon` (packages/ui). Gated a ORG_MEMBER_ROLES: una
+  // Persona no tiene organización a la que aplique ninguno de los tres.
+  {
+    path: '/organizacion/voluntariado',
+    label: 'Voluntariado',
+    icon: HeartIcon,
+    roles: ORG_MEMBER_ROLES,
+    comingSoon: true,
+  },
+  {
+    path: '/organizacion/transparencia-nacional',
+    label: 'Transparencia nacional',
+    icon: ShieldIcon,
+    roles: ORG_MEMBER_ROLES,
+    comingSoon: true,
+  },
+  {
+    path: '/organizacion/reporte-exogeno',
+    label: 'Reporte exógeno 2575',
+    icon: ShieldIcon,
+    roles: ORG_MEMBER_ROLES,
+    comingSoon: true,
+  },
   // M01 · revisión documental de PLATAFORMA (T-031, wires T-103). Audiencia de
   // plataforma, no de organización — separada del resto del menú.
   {

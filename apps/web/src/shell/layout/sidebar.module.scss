@@ -93,6 +93,20 @@
   }
 }
 
+.org-sidebar__badge {
+  margin-left: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
+  border-radius: var(--r-full);
+  padding: 0.15rem 0.5rem;
+  background-color: var(--accent-gold);
+  color: hsl(var(--navy));
+  font-size: 0.65rem;
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
 .org-sidebar__link--active {
   background-color: var(--brand);
   color: hsl(var(--navy));

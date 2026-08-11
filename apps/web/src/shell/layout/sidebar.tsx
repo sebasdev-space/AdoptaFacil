@@ -31,7 +31,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <nav aria-label="Navegación principal" className={styles['org-sidebar__nav']}>
-      {items.map(({ path, label, icon: Icon, end }) => (
+      {items.map(({ path, label, icon: Icon, end, comingSoon }) => (
         <NavLink
           key={path}
           to={path}
@@ -43,6 +43,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
         >
           <Icon />
           <span>{label}</span>
+          {comingSoon && <span className={styles['org-sidebar__badge']}>Pronto</span>}
         </NavLink>
       ))}
     </nav>
