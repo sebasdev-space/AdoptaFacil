@@ -98,6 +98,17 @@ describe('PublicCampaignDetailPage', () => {
     expect(screen.getByTestId('campaign-progress')).toBeInTheDocument();
   });
 
+  it('pulido visual: uses the sticky-footer flex layout so the footer never sits mid-screen on short content', () => {
+    stub(CAMPAIGN);
+    renderDetail({ state: { campaign: CAMPAIGN } });
+
+    const main = screen.getByRole('main');
+    expect(main.className).toContain('flex-1');
+    expect(main.parentElement?.className).toContain('flex');
+    expect(main.parentElement?.className).toContain('min-h-screen');
+    expect(main.parentElement?.className).toContain('flex-col');
+  });
+
   it('shows the public accountability report (evidences + declared total)', async () => {
     stub(CAMPAIGN, 200, REPORT);
     renderDetail({ state: { campaign: CAMPAIGN } });

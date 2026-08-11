@@ -91,4 +91,16 @@ describe('PublicCampaignsPage', () => {
     // raisedAmount/progress are 0 until the real collection is wired — shown as 0%.
     expect(screen.getByTestId('campaign-progress')).toHaveTextContent('0%');
   });
+
+  it('pulido visual: uses the sticky-footer flex layout so the footer never sits mid-screen on short content', async () => {
+    stub({ items: [], total: 0, limit: 24, offset: 0 });
+    renderList();
+    await screen.findByText('No hay campañas activas ahora. Vuelve pronto.');
+
+    const main = screen.getByRole('main');
+    expect(main.className).toContain('flex-1');
+    expect(main.parentElement?.className).toContain('flex');
+    expect(main.parentElement?.className).toContain('min-h-screen');
+    expect(main.parentElement?.className).toContain('flex-col');
+  });
 });

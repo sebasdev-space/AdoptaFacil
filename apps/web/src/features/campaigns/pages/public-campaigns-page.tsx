@@ -37,10 +37,10 @@ export function PublicCampaignsPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
       <PublicNavbar />
 
-      <main className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6">
+      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-10 sm:px-6">
         <header className="mb-8 space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Campañas de recaudación</h1>
           <p className="text-sm text-muted-foreground">
