@@ -48,13 +48,16 @@ const DEFAULT_LAYOUT: Layout = { logoPosition: 'left', socialNavPosition: 'right
  *  - the transparency indicator (§M14, T-027) only mounts when it has a REAL
  *    signal to show (verificationLevel > 0) — otherwise it stays unmounted rather
  *    than displaying an always-"No disponible" bar.
- *  - pulido visual (imagen de referencia usada solo como guía): KPIs reales
- *    arriba (`PortalKpis`), acciones principales (Donar/Adoptar/Apadrinar,
- *    `PortalHeaderActions`) justo debajo, y una franja superior con
- *    "Campaña activa" + "Síguenos" (antes vivían al fondo de la primera
- *    tab/columna) — todo con los MISMOS componentes/rutas de siempre, solo
- *    reubicados. El catálogo de mascotas queda a ancho completo dentro de la
- *    tab "Portafolio" (ya no comparte columna con el sidebar).
+ *  - pulido visual (imagen de referencia usada solo como guía, 2 iteraciones):
+ *    KPIs reales arriba (`PortalKpis`); acciones principales
+ *    (Donar/Adoptar/Apadrinar, `PortalHeaderActions`) junto al nombre/badges
+ *    dentro de `PortalProfileSection` (no como barra suelta); y un layout de
+ *    dos columnas debajo — columna principal con las tabs
+ *    Portafolio/Nosotros/Información, y UN panel lateral con "Campaña
+ *    activa" + "Síguenos" juntos, del lado que indique `socialNavPosition`
+ *    (S2-REORG, mismo campo real ya usado para el logo/sidebar). En mobile
+ *    el panel lateral se apila debajo. Todo con los MISMOS
+ *    componentes/rutas de siempre, solo reubicados.
  *  - aggregated sections still in `status: 'placeholder'` (necesita hoy /
  *    transparencia — no owning module yet) are simply NOT mounted, instead of
  *    showing an empty "Próximamente" card; 'pets' and 'activeCampaign'
@@ -225,73 +228,77 @@ export function OrgPublicPage() {
             profile={view.profile}
             animalCount={animalTotal}
             logoPosition={layout.logoPosition}
+            actions={
+              <PortalHeaderActions
+                organization={view.profile.organization}
+                onBrowseCatalog={goToCatalog}
+              />
+            }
           />
 
           <PortalKpis animalCount={animalTotal} />
 
-          <PortalHeaderActions
-            organization={view.profile.organization}
-            onBrowseCatalog={goToCatalog}
-          />
-
-          {/* Franja superior (pulido visual): "Campaña activa" + "Síguenos",
-              antes al fondo de la columna del catálogo — mismos componentes,
-              solo reubicados. `socialNavPosition` (S2-PORTAL) sigue
-              controlando de qué lado queda cada bloque. */}
+          {/* Dos columnas (pulido visual, 2da iteración): columna principal
+              con las tabs Portafolio/Nosotros/Información, y UN panel
+              lateral con "Campaña activa" + "Síguenos" juntos (antes cada
+              uno suelto). El lado lo decide `socialNavPosition`, el mismo
+              campo REAL ya usado arriba para la posición del logo/sidebar
+              (S2-REORG, `PortalThemeConfig.socialNavPosition` —
+              `packages/contracts/src/portals.ts`) — no uno nuevo. En mobile
+              el panel lateral se apila debajo (grid de 1 columna). */}
           <div className="grid gap-6 lg:grid-cols-3">
             <div
-              className={`space-y-6 lg:col-span-2 ${
-                layout.socialNavPosition === 'left' ? 'lg:order-last' : ''
-              }`}
+              ref={tabsRef}
+              className={`lg:col-span-2 ${layout.socialNavPosition === 'left' ? 'lg:order-last' : ''}`}
+            >
+              {/* Menú de tabs (S2-PORTAL, §5.1): "Portafolio" siempre
+                  presente; "Nosotros"/"Información" solo cuando hay
+                  contenido real. */}
+              <Tabs value={activeTab} onValueChange={setActiveTab}>
+                <TabsList>
+                  <TabsTrigger value="portafolio">Portafolio</TabsTrigger>
+                  {aboutUs && <TabsTrigger value="nosotros">Nosotros</TabsTrigger>}
+                  {hasContactInfo && <TabsTrigger value="informacion">Información</TabsTrigger>}
+                </TabsList>
+
+                <TabsContent value="portafolio">
+                  <div className="space-y-6">
+                    {/* "Mascotas en adopción" (kind 'pets', §M03/T-052);
+                        cualquier otra sección que algún día deje de ser
+                        placeholder aparecería aquí también. */}
+                    {portafolioSections?.map((section) =>
+                      section.kind === 'pets' ? (
+                        <PortalAdoptionSection key={section.kind} slug={slug as string} />
+                      ) : (
+                        <PortalPlaceholderSection key={section.kind} section={section} />
+                      ),
+                    )}
+                  </div>
+                </TabsContent>
+
+                {aboutUs && (
+                  <TabsContent value="nosotros">
+                    <PortalAboutSection aboutUs={aboutUs} />
+                  </TabsContent>
+                )}
+
+                {hasContactInfo && contact && (
+                  <TabsContent value="informacion">
+                    <PortalContactInfoSection contact={contact} />
+                  </TabsContent>
+                )}
+              </Tabs>
+            </div>
+
+            <aside
+              className={`space-y-6 ${layout.socialNavPosition === 'left' ? 'lg:order-first' : ''}`}
+              data-testid="portal-side-panel"
             >
               {hasActiveCampaignSection && (
                 <PortalCampaignsSection key="activeCampaign" slug={slug as string} />
               )}
-            </div>
-            <aside
-              className={`space-y-6 ${layout.socialNavPosition === 'left' ? 'lg:order-first' : ''}`}
-            >
               <PortalSocialLinks organization={view.profile.organization} />
             </aside>
-          </div>
-
-          {/* Menú de tabs (S2-PORTAL, §5.1): "Portafolio" siempre presente;
-              "Nosotros"/"Información" solo cuando hay contenido real. */}
-          <div ref={tabsRef}>
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList>
-                <TabsTrigger value="portafolio">Portafolio</TabsTrigger>
-                {aboutUs && <TabsTrigger value="nosotros">Nosotros</TabsTrigger>}
-                {hasContactInfo && <TabsTrigger value="informacion">Información</TabsTrigger>}
-              </TabsList>
-
-              <TabsContent value="portafolio">
-                <div className="space-y-6">
-                  {/* "Mascotas en adopción" (kind 'pets', §M03/T-052) a ancho
-                      completo; cualquier otra sección que algún día deje de
-                      ser placeholder aparecería aquí también. */}
-                  {portafolioSections?.map((section) =>
-                    section.kind === 'pets' ? (
-                      <PortalAdoptionSection key={section.kind} slug={slug as string} />
-                    ) : (
-                      <PortalPlaceholderSection key={section.kind} section={section} />
-                    ),
-                  )}
-                </div>
-              </TabsContent>
-
-              {aboutUs && (
-                <TabsContent value="nosotros">
-                  <PortalAboutSection aboutUs={aboutUs} />
-                </TabsContent>
-              )}
-
-              {hasContactInfo && contact && (
-                <TabsContent value="informacion">
-                  <PortalContactInfoSection contact={contact} />
-                </TabsContent>
-              )}
-            </Tabs>
           </div>
 
           <PortalPublicLedgerSection />

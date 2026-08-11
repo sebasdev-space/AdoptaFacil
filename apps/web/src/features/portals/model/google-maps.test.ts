@@ -34,8 +34,10 @@ describe('toGoogleMapsEmbedUrl (S2-REORG: fixes the "refused to connect" iframe)
     ).toBe('https://maps.google.com/maps?q=Refugio%20Patitas&output=embed');
   });
 
-  it('returns null (no confident conversion) for a bare coordinates URL with no name/query', () => {
-    expect(toGoogleMapsEmbedUrl('https://www.google.com/maps/@4.6,-74.1,15z')).toBeNull();
+  it('converts a bare coordinates URL (no name/query) using the exact lat/lng in the URL (2da iteración)', () => {
+    expect(toGoogleMapsEmbedUrl('https://www.google.com/maps/@4.6,-74.1,15z')).toBe(
+      'https://maps.google.com/maps?q=4.6%2C-74.1&output=embed',
+    );
   });
 
   it('returns null for a non-Google-Maps URL — caller must fall back to a plain link', () => {
@@ -44,5 +46,9 @@ describe('toGoogleMapsEmbedUrl (S2-REORG: fixes the "refused to connect" iframe)
 
   it('returns null for an invalid URL', () => {
     expect(toGoogleMapsEmbedUrl('not a url')).toBeNull();
+  });
+
+  it('returns null for a maps.app.goo.gl SHORT link — cannot be resolved without a network round trip, and embedding it would just hit the "refused to connect" block again (documented limitation, not a bug)', () => {
+    expect(toGoogleMapsEmbedUrl('https://maps.app.goo.gl/AbCdEfGh123')).toBeNull();
   });
 });

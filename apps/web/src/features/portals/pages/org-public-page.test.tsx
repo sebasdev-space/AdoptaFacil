@@ -478,7 +478,7 @@ describe('OrgPublicPage — rich public portal', () => {
       );
     });
 
-    it('moves "Campaña activa" and "Síguenos" to the top strip, above the tabs', async () => {
+    it('2da iteración: "Campaña activa" y "Síguenos" viven juntas en UN panel lateral junto a las tabs (no sueltas arriba)', async () => {
       vi.stubGlobal(
         'fetch',
         vi.fn((input: RequestInfo | URL) => {
@@ -525,17 +525,17 @@ describe('OrgPublicPage — rich public portal', () => {
       renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
       await screen.findByRole('heading', { name: /Refugio Patitas/ });
 
+      const panel = screen.getByTestId('portal-side-panel');
       const campaign = await screen.findByTestId('portal-campaigns-section');
-      const social = screen.getByRole('link', { name: 'Sitio web' }).closest('section, aside');
-      const tabsList = screen.getByRole('tablist');
+      const social = screen.getByRole('link', { name: 'Sitio web' });
 
-      // Both sit before the tabs in DOM order (top strip), not inside a tab panel.
-      expect(
-        campaign.compareDocumentPosition(tabsList) & Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy();
-      expect(
-        social!.compareDocumentPosition(tabsList) & Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy();
+      // Same lateral panel (aside), not two loose blocks in a horizontal strip.
+      expect(panel).toContainElement(campaign);
+      expect(panel).toContainElement(social);
+      // The panel is a sibling of the tabs column, not above/before it —
+      // it's a two-column layout (grid), not a stacked strip.
+      const tabsList = screen.getByRole('tablist');
+      expect(panel.parentElement).toBe(tabsList.closest('[class*="grid"]'));
     });
 
     it('shows "Transparencia — libro público" with a ComingSoon modal (no real ledger data)', async () => {

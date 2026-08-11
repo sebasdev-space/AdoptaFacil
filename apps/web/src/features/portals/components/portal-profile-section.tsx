@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Badge, Card, CardContent, CardHeader, cn } from '@adoptafacil/ui';
 import {
   FormalizationState,
@@ -13,6 +14,9 @@ export interface PortalProfileSectionProps {
   animalCount?: number;
   /** Posición del logo sobre el hero (S2-PORTAL). Default: 'left' (como antes). */
   logoPosition?: PortalLogoPosition;
+  /** Acciones principales (Donar/Adoptar/Apadrinar) — pulido visual 2da
+   *  iteración: viven junto al nombre/badges, no como barra suelta aparte. */
+  actions?: ReactNode;
 }
 
 const HEADING_ID = 'portal-profile-heading';
@@ -58,6 +62,7 @@ export function PortalProfileSection({
   profile,
   animalCount,
   logoPosition = 'left',
+  actions,
 }: PortalProfileSectionProps) {
   const { organization: org, organizationType } = profile;
   const cover = org.coverPhotos?.[0];
@@ -72,14 +77,20 @@ export function PortalProfileSection({
   return (
     <section aria-labelledby={HEADING_ID}>
       <Card className="overflow-hidden">
-        {/* Hero: portada navy + logo circular sobre el borde inferior. */}
-        <div className={cn('relative', styles.hero)}>
-          {cover ? (
-            <img src={cover} alt="" className={styles.hero__cover} />
-          ) : (
-            <div aria-hidden className={styles.hero__glow} />
-          )}
-          <div className={`absolute -bottom-10 ${LOGO_POSITION_CLASSES[logoPosition]}`}>
+        {/* Hero: portada navy. El avatar vive en un wrapper HERMANO (relative,
+            sin overflow) — el `.hero` de abajo SÍ tiene `overflow: hidden`
+            (recorta la portada), así que el avatar NO puede ser hijo suyo o
+            su mitad inferior queda cortada por ese mismo overflow (bug
+            corregido en la 2da iteración del pulido visual). */}
+        <div className="relative">
+          <div className={styles.hero}>
+            {cover ? (
+              <img src={cover} alt="" className={styles.hero__cover} />
+            ) : (
+              <div aria-hidden className={styles.hero__glow} />
+            )}
+          </div>
+          <div className={`absolute -bottom-10 z-10 ${LOGO_POSITION_CLASSES[logoPosition]}`}>
             {org.logoUrl ? (
               <img src={org.logoUrl} alt={`Logo de ${org.name}`} className={styles['avatar-img']} />
             ) : (
@@ -90,24 +101,27 @@ export function PortalProfileSection({
           </div>
         </div>
 
-        <CardHeader className="gap-2 pt-12 sm:pt-14">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 id={HEADING_ID} className={styles.name}>
-              {org.name}
-            </h1>
-            <OrgTypeBadge organizationType={organizationType} />
-            {formalizationLabel && (
-              <Badge variant={isEsal ? 'success' : 'secondary'}>
-                {isEsal ? `✓ ${formalizationLabel}` : formalizationLabel}
-              </Badge>
+        <CardHeader className="gap-4 pt-12 sm:flex-row sm:items-start sm:justify-between sm:pt-14">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 id={HEADING_ID} className={styles.name}>
+                {org.name}
+              </h1>
+              <OrgTypeBadge organizationType={organizationType} />
+              {formalizationLabel && (
+                <Badge variant={isEsal ? 'success' : 'secondary'}>
+                  {isEsal ? `✓ ${formalizationLabel}` : formalizationLabel}
+                </Badge>
+              )}
+              {org.rteVigente && <Badge variant="success">RTE vigente</Badge>}
+            </div>
+            {org.nit && (
+              <p className={styles.nit}>
+                NIT: <span className="text-foreground">{org.nit}</span>
+              </p>
             )}
-            {org.rteVigente && <Badge variant="success">RTE vigente</Badge>}
           </div>
-          {org.nit && (
-            <p className={styles.nit}>
-              NIT: <span className="text-foreground">{org.nit}</span>
-            </p>
-          )}
+          {actions && <div className="flex-shrink-0">{actions}</div>}
         </CardHeader>
 
         <CardContent className="space-y-4">

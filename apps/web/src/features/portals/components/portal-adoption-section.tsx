@@ -114,7 +114,10 @@ export function PortalAdoptionSection({ slug }: PortalAdoptionSectionProps) {
           )}
           {state === 'ready' && items.length > 0 && (
             <>
-              <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+              {/* Grid compacto (pulido visual 2da iteración): 1 columna en
+                  mobile (<768px), 2 en tablet (768–1279px), 4 en desktop
+                  (≥1280px) — mismos breakpoints Tailwind md/xl. */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 {items.map((animal) => (
                   <AnimalCard key={animal.id} slug={slug} animal={animal} />
                 ))}
