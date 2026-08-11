@@ -10,6 +10,7 @@ import {
   EmptyState,
   Skeleton,
 } from '@adoptafacil/ui';
+import { PublicFooter, PublicNavbar } from '../../../shell/layout';
 import { getCampaignAccountability, getPublicCampaign } from '../api/public-campaigns';
 import { CampaignProgress } from '../components/campaign-progress';
 import {
@@ -82,111 +83,119 @@ export function PublicCampaignDetailPage() {
   }, [id]);
 
   return (
-    <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
-      <Link to="/campanas" className="text-sm text-primary hover:underline">
-        ← Volver a campañas
-      </Link>
+    <div className="min-h-screen bg-background text-foreground">
+      <PublicNavbar />
 
-      <div className="mt-4">
-        {state === 'loading' && <Skeleton className="h-72 w-full" />}
-        {state === 'not-found' && (
-          <EmptyState
-            title="Campaña no encontrada"
-            description="Esta campaña no existe o el enlace no es válido."
-          />
-        )}
-        {state === 'error' && (
-          <EmptyState title="No se pudo cargar" description="Inténtalo de nuevo más tarde." />
-        )}
-        {state === 'ready' && campaign && (
-          <Card data-testid="public-campaign-detail">
-            <CardHeader className="gap-2">
-              <CardTitle className="flex flex-wrap items-center gap-2">
-                {campaign.title}
-                <Badge variant="secondary">{CATEGORY_LABELS[campaign.category]}</Badge>
-                <Badge variant={campaignStatusVariant(campaign.status)}>
-                  {STATUS_LABELS[campaign.status]}
-                </Badge>
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">{campaign.organizationName}</p>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {campaign.description && (
-                <p className="text-sm text-foreground">{campaign.description}</p>
-              )}
-              <CampaignProgress
-                raisedAmount={campaign.raisedAmount}
-                goalAmount={campaign.goalAmount}
-                progress={campaign.progress}
-              />
-              <dl className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <dt className="text-xs uppercase text-muted-foreground">Meta</dt>
-                  <dd className="text-sm font-medium">{formatCop(campaign.goalAmount)}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs uppercase text-muted-foreground">Fecha límite</dt>
-                  <dd className="text-sm">{formatBogota(campaign.deadline)}</dd>
-                </div>
-              </dl>
+      <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
+        <Link to="/campanas" className="text-sm text-primary hover:underline">
+          ← Volver a campañas
+        </Link>
 
-              {/* Rendición de cuentas (RF16 · T-054): evidencias públicas de gasto
-                  + suma declarada. NO se muestra "% ejecutado" (el recaudo real
-                  llega en T-055); solo lo cargado y su total. */}
-              <section aria-labelledby="accountability-heading" className="border-t pt-6">
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h2 id="accountability-heading" className="text-sm font-semibold">
-                    Rendición de cuentas
-                  </h2>
-                  {report && report.evidences.length > 0 && (
-                    <span className="text-xs text-muted-foreground">
-                      Gasto declarado:{' '}
-                      <span className="font-medium text-foreground">
-                        {formatCop(report.totalSpent)}
-                      </span>
-                    </span>
-                  )}
-                </div>
-
-                {report && report.evidences.length > 0 ? (
-                  <ul className="mt-4 space-y-3" data-testid="accountability-evidences">
-                    {report.evidences.map((evidence) => (
-                      <li
-                        key={evidence.id}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
-                      >
-                        <div className="min-w-0">
-                          <p className="flex items-center gap-2 text-sm font-medium">
-                            <Badge variant="secondary">{EVIDENCE_TYPE_LABELS[evidence.type]}</Badge>
-                            <span className="truncate">{evidence.concept}</span>
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatBogota(evidence.spentAt)}
-                            {typeof evidence.amount === 'number' &&
-                              ` · ${formatCop(evidence.amount)}`}
-                          </p>
-                        </div>
-                        <a
-                          href={evidence.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-primary hover:underline"
-                        >
-                          Ver soporte
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    Esta campaña aún no ha publicado evidencias de rendición.
-                  </p>
+        <div className="mt-4">
+          {state === 'loading' && <Skeleton className="h-72 w-full" />}
+          {state === 'not-found' && (
+            <EmptyState
+              title="Campaña no encontrada"
+              description="Esta campaña no existe o el enlace no es válido."
+            />
+          )}
+          {state === 'error' && (
+            <EmptyState title="No se pudo cargar" description="Inténtalo de nuevo más tarde." />
+          )}
+          {state === 'ready' && campaign && (
+            <Card data-testid="public-campaign-detail">
+              <CardHeader className="gap-2">
+                <CardTitle className="flex flex-wrap items-center gap-2">
+                  {campaign.title}
+                  <Badge variant="secondary">{CATEGORY_LABELS[campaign.category]}</Badge>
+                  <Badge variant={campaignStatusVariant(campaign.status)}>
+                    {STATUS_LABELS[campaign.status]}
+                  </Badge>
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">{campaign.organizationName}</p>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {campaign.description && (
+                  <p className="text-sm text-foreground">{campaign.description}</p>
                 )}
-              </section>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-    </main>
+                <CampaignProgress
+                  raisedAmount={campaign.raisedAmount}
+                  goalAmount={campaign.goalAmount}
+                  progress={campaign.progress}
+                />
+                <dl className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <dt className="text-xs uppercase text-muted-foreground">Meta</dt>
+                    <dd className="text-sm font-medium">{formatCop(campaign.goalAmount)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs uppercase text-muted-foreground">Fecha límite</dt>
+                    <dd className="text-sm">{formatBogota(campaign.deadline)}</dd>
+                  </div>
+                </dl>
+
+                {/* Rendición de cuentas (RF16 · T-054): evidencias públicas de gasto
+                    + suma declarada. NO se muestra "% ejecutado" (el recaudo real
+                    llega en T-055); solo lo cargado y su total. */}
+                <section aria-labelledby="accountability-heading" className="border-t pt-6">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <h2 id="accountability-heading" className="text-sm font-semibold">
+                      Rendición de cuentas
+                    </h2>
+                    {report && report.evidences.length > 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        Gasto declarado:{' '}
+                        <span className="font-medium text-foreground">
+                          {formatCop(report.totalSpent)}
+                        </span>
+                      </span>
+                    )}
+                  </div>
+
+                  {report && report.evidences.length > 0 ? (
+                    <ul className="mt-4 space-y-3" data-testid="accountability-evidences">
+                      {report.evidences.map((evidence) => (
+                        <li
+                          key={evidence.id}
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"
+                        >
+                          <div className="min-w-0">
+                            <p className="flex items-center gap-2 text-sm font-medium">
+                              <Badge variant="secondary">
+                                {EVIDENCE_TYPE_LABELS[evidence.type]}
+                              </Badge>
+                              <span className="truncate">{evidence.concept}</span>
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatBogota(evidence.spentAt)}
+                              {typeof evidence.amount === 'number' &&
+                                ` · ${formatCop(evidence.amount)}`}
+                            </p>
+                          </div>
+                          <a
+                            href={evidence.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-primary hover:underline"
+                          >
+                            Ver soporte
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      Esta campaña aún no ha publicado evidencias de rendición.
+                    </p>
+                  )}
+                </section>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </main>
+
+      <PublicFooter />
+    </div>
   );
 }

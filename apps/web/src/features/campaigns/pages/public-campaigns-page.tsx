@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { CampaignPublic } from '@adoptafacil/contracts';
 import { EmptyState, Skeleton } from '@adoptafacil/ui';
+import { PublicFooter, PublicNavbar } from '../../../shell/layout';
 import { listPublicCampaigns } from '../api/public-campaigns';
 import { CampaignCard } from '../components/campaign-card';
 
@@ -36,31 +37,37 @@ export function PublicCampaignsPage() {
   }, []);
 
   return (
-    <main className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6">
-      <header className="mb-8 space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">Campañas de recaudación</h1>
-        <p className="text-sm text-muted-foreground">
-          Apoya las campañas activas de las organizaciones de rescate.
-        </p>
-      </header>
+    <div className="min-h-screen bg-background text-foreground">
+      <PublicNavbar />
 
-      {state === 'loading' && <Skeleton className="h-64 w-full" />}
-      {state === 'error' && (
-        <EmptyState title="No se pudo cargar" description="Inténtalo de nuevo más tarde." />
-      )}
-      {state === 'ready' && items.length === 0 && (
-        <EmptyState
-          title="Sin campañas activas"
-          description="No hay campañas activas ahora. Vuelve pronto."
-        />
-      )}
-      {state === 'ready' && items.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {items.map((campaign) => (
-            <CampaignCard key={campaign.id} campaign={campaign} />
-          ))}
-        </div>
-      )}
-    </main>
+      <main className="mx-auto w-full max-w-4xl px-4 py-10 sm:px-6">
+        <header className="mb-8 space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight">Campañas de recaudación</h1>
+          <p className="text-sm text-muted-foreground">
+            Apoya las campañas activas de las organizaciones de rescate.
+          </p>
+        </header>
+
+        {state === 'loading' && <Skeleton className="h-64 w-full" />}
+        {state === 'error' && (
+          <EmptyState title="No se pudo cargar" description="Inténtalo de nuevo más tarde." />
+        )}
+        {state === 'ready' && items.length === 0 && (
+          <EmptyState
+            title="Sin campañas activas"
+            description="No hay campañas activas ahora. Vuelve pronto."
+          />
+        )}
+        {state === 'ready' && items.length > 0 && (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {items.map((campaign) => (
+              <CampaignCard key={campaign.id} campaign={campaign} />
+            ))}
+          </div>
+        )}
+      </main>
+
+      <PublicFooter />
+    </div>
   );
 }

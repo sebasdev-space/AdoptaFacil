@@ -38,6 +38,11 @@
   color: hsl(var(--primary));
 }
 
+.navbar__link--active {
+  color: hsl(var(--primary));
+  font-weight: var(--fw-semibold);
+}
+
 .navbar__actions {
   display: flex;
   align-items: center;
