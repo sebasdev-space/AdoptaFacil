@@ -4,10 +4,12 @@ import { Role, type Animal, type AnimalBreed } from '@adoptafacil/contracts';
 import { renderShell } from '../../../test-utils';
 
 /**
- * S2-04A — rediseño de `/animales`: listado como grid de cards (con
- * editar/eliminar/expediente), registro/edición en modal, tags de
- * personalidad y catálogo de razas con buscador. Ningún endpoint de LECTURA
- * cambia; `DELETE /animals/:id` es nuevo (soft-remove, Owner/Administrator).
+ * Refactor visual maestro-detalle (M03): `/animales` pasó de un grid de
+ * tarjetas a una lista compacta (izquierda) + panel de detalle del animal
+ * seleccionado (derecha), con las acciones (Editar/Expediente médico/
+ * Eliminar/Apadrinamiento) movidas del card a icon-buttons en la cabecera del
+ * panel de detalle. Ningún endpoint/contrato cambia — solo se selecciona una
+ * fila (clic) antes de interactuar con esas acciones.
  */
 function sessionWith(roles: Role[]) {
   return {
@@ -51,7 +53,14 @@ function stubFetch(handler: (url: string, init?: RequestInit) => unknown) {
   vi.stubGlobal(
     'fetch',
     vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const body = handler(String(input), init);
+      const url = String(input);
+      // El panel de detalle dispara fetches del expediente clínico
+      // (clinical-events/carnet/historial) al seleccionar una fila; esos NO
+      // son el objeto de estas pruebas (ver animal-clinical-panel.test.tsx),
+      // así que se responden vacíos aquí en vez de dejar que caigan en el
+      // `handler` de cada test (que solo conoce `/animals`/`/sponsorship-
+      // plans`/etc. y les daría por error la forma equivocada de dato).
+      const body = url.includes('/clinical-events') ? [] : handler(url, init);
       return Promise.resolve({
         ok: true,
         status: 200,
@@ -63,12 +72,19 @@ function stubFetch(handler: (url: string, init?: RequestInit) => unknown) {
   );
 }
 
+/** Selecciona una fila de la lista por nombre — reemplaza el clic directo
+ *  sobre un botón del card (ya no existe; las acciones viven en el panel de
+ *  detalle, que solo aparece tras seleccionar). */
+async function selectRow(name: string) {
+  fireEvent.click(await screen.findByText(name));
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('AnimalsPage — listado + modal (S2-04A)', () => {
-  it('renders a card per animal, with species/breed/tags and an inactive badge', async () => {
+describe('AnimalsPage — lista + detalle maestro-detalle', () => {
+  it('renders a compact row per animal with breed/age/status, and opens the detail with its tags on click', async () => {
     stubFetch((url) => {
       if (url.includes('/animals/breeds')) return [];
       if (url.includes('/animals')) {
@@ -83,10 +99,13 @@ describe('AnimalsPage — listado + modal (S2-04A)', () => {
 
     expect(await screen.findByText('Firulais')).toBeInTheDocument();
     expect(screen.getByText('Michú')).toBeInTheDocument();
-    expect(screen.getByText('Labrador Retriever')).toBeInTheDocument();
+    expect(screen.getByText(/Labrador Retriever/)).toBeInTheDocument();
+    expect(screen.getByText('Inactivo')).toBeInTheDocument();
+    expect(screen.getByText('Selecciona un animal para ver su detalle')).toBeInTheDocument();
+
+    await selectRow('Firulais');
     expect(screen.getByText('Juguetón')).toBeInTheDocument();
     expect(screen.getByText('Cariñoso')).toBeInTheDocument();
-    expect(screen.getByText('Inactivo')).toBeInTheDocument();
   });
 
   it('shows a friendly empty state with a CTA for a manager', async () => {
@@ -97,7 +116,7 @@ describe('AnimalsPage — listado + modal (S2-04A)', () => {
     expect(screen.getByRole('button', { name: /Registrar tu primer animal/ })).toBeInTheDocument();
   });
 
-  it('filters the grid by name (client-side, no extra request)', async () => {
+  it('filters the list by name (client-side, no extra request)', async () => {
     stubFetch((url) => {
       if (url.includes('/animals/breeds')) return [];
       if (url.includes('/animals')) return [animal('a1', 'Firulais'), animal('a2', 'Michú')];
@@ -112,7 +131,7 @@ describe('AnimalsPage — listado + modal (S2-04A)', () => {
     expect(screen.getByText('Michú')).toBeInTheDocument();
   });
 
-  it('hides create/edit/delete actions from a ReadOnlyAuditor (view-only)', async () => {
+  it('hides create/edit actions from a ReadOnlyAuditor (view-only)', async () => {
     stubFetch((url) => {
       if (url.includes('/animals/breeds')) return [];
       if (url.includes('/animals')) return [animal('a1', 'Firulais')];
@@ -120,7 +139,7 @@ describe('AnimalsPage — listado + modal (S2-04A)', () => {
     });
     renderShell({ route: '/animales', ...sessionWith([Role.ReadOnlyAuditor]) });
 
-    await screen.findByText('Firulais');
+    await selectRow('Firulais');
     expect(screen.queryByRole('button', { name: /Registrar animal/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Editar/ })).not.toBeInTheDocument();
   });
@@ -159,7 +178,7 @@ describe('AnimalsPage — listado + modal (S2-04A)', () => {
     expect(await screen.findByText('Expediente creado')).toBeInTheDocument();
   });
 
-  it('opens the edit modal prefilled and PATCHes the update', async () => {
+  it('opens the edit modal prefilled (from the detail panel) and PATCHes the update', async () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     stubFetch((url, init) => {
       calls.push({ url, init });
@@ -170,8 +189,9 @@ describe('AnimalsPage — listado + modal (S2-04A)', () => {
     });
     renderShell({ route: '/animales', ...sessionWith([Role.Owner]) });
 
-    await screen.findByText('Firulais');
-    fireEvent.click(screen.getByRole('button', { name: /Editar/ }));
+    await selectRow('Firulais');
+    expect(screen.getByText('Tímido')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }));
 
     const dialog = await screen.findByRole('dialog');
     const nameInput = within(dialog).getByLabelText('Nombre *');
@@ -206,15 +226,15 @@ describe('AnimalsPage — listado + modal (S2-04A)', () => {
     });
     renderShell({ route: '/animales', ...sessionWith([Role.Owner]) });
 
-    await screen.findByText('Firulais');
-    fireEvent.click(screen.getByRole('button', { name: 'Eliminar Firulais' }));
+    await selectRow('Firulais');
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
 
     const dialog = await screen.findByRole('dialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(calls.some((c) => c.init?.method === 'DELETE')).toBe(false);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Eliminar Firulais' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
     fireEvent.click(
       within(await screen.findByRole('dialog')).getByRole('button', { name: 'Eliminar' }),
     );
@@ -235,9 +255,9 @@ describe('AnimalsPage — listado + modal (S2-04A)', () => {
     });
     renderShell({ route: '/animales', ...sessionWith([Role.Owner]) });
 
-    await screen.findByText('Firulais');
+    await selectRow('Firulais');
     expect(screen.getByRole('button', { name: 'Reactivar' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Eliminar Firulais' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Eliminar' })).not.toBeInTheDocument();
   });
 });
 
@@ -317,7 +337,7 @@ describe('AnimalsPage — importación masiva desde Excel (S2-04B-1)', () => {
   });
 });
 
-describe('AnimalsPage — activar apadrinamiento desde la ficha (S2-03-REV)', () => {
+describe('AnimalsPage — activar apadrinamiento desde el panel de detalle (S2-03-REV)', () => {
   it('hides the "Apadrinamiento" action from an Operator (narrower than canManage)', async () => {
     stubFetch((url) => {
       if (url.includes('/animals/breeds')) return [];
@@ -326,7 +346,7 @@ describe('AnimalsPage — activar apadrinamiento desde la ficha (S2-03-REV)', ()
     });
     renderShell({ route: '/animales', ...sessionWith([Role.Operator]) });
 
-    await screen.findByText('Firulais');
+    await selectRow('Firulais');
     expect(screen.queryByRole('button', { name: /Apadrinamiento/ })).not.toBeInTheDocument();
   });
 
@@ -375,7 +395,7 @@ describe('AnimalsPage — activar apadrinamiento desde la ficha (S2-03-REV)', ()
     });
     renderShell({ route: '/animales', ...sessionWith([Role.Owner]) });
 
-    await screen.findByText('Firulais');
+    await selectRow('Firulais');
     fireEvent.click(screen.getByRole('button', { name: /Apadrinamiento/ }));
 
     const dialog = await screen.findByRole('dialog');
@@ -424,7 +444,7 @@ describe('AnimalsPage — activar apadrinamiento desde la ficha (S2-03-REV)', ()
     });
     renderShell({ route: '/animales', ...sessionWith([Role.Administrator]) });
 
-    await screen.findByText('Firulais');
+    await selectRow('Firulais');
     fireEvent.click(screen.getByRole('button', { name: /Apadrinamiento/ }));
 
     const dialog = await screen.findByRole('dialog');
