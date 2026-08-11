@@ -347,7 +347,11 @@ describe('AnimalsPage — activar apadrinamiento desde el panel de detalle (S2-0
     renderShell({ route: '/animales', ...sessionWith([Role.Operator]) });
 
     await selectRow('Firulais');
-    expect(screen.queryByRole('button', { name: /Apadrinamiento/ })).not.toBeInTheDocument();
+    // Scoped to <main>: the sidebar ALSO has an "Apadrinamientos" submenu
+    // toggle (unrelated) whose accessible name matches this same regex.
+    expect(
+      within(screen.getByRole('main')).queryByRole('button', { name: /Apadrinamiento/ }),
+    ).not.toBeInTheDocument();
   });
 
   it('lets an Owner create a plan for an animal with none yet', async () => {
@@ -396,7 +400,9 @@ describe('AnimalsPage — activar apadrinamiento desde el panel de detalle (S2-0
     renderShell({ route: '/animales', ...sessionWith([Role.Owner]) });
 
     await selectRow('Firulais');
-    fireEvent.click(screen.getByRole('button', { name: /Apadrinamiento/ }));
+    fireEvent.click(
+      within(screen.getByRole('main')).getByRole('button', { name: /Apadrinamiento/ }),
+    );
 
     const dialog = await screen.findByRole('dialog');
     await within(dialog).findByText(/todavía no tiene un plan/);
@@ -445,7 +451,9 @@ describe('AnimalsPage — activar apadrinamiento desde el panel de detalle (S2-0
     renderShell({ route: '/animales', ...sessionWith([Role.Administrator]) });
 
     await selectRow('Firulais');
-    fireEvent.click(screen.getByRole('button', { name: /Apadrinamiento/ }));
+    fireEvent.click(
+      within(screen.getByRole('main')).getByRole('button', { name: /Apadrinamiento/ }),
+    );
 
     const dialog = await screen.findByRole('dialog');
     await within(dialog).findByText('Activo');
