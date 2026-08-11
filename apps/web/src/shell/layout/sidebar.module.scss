@@ -30,6 +30,26 @@
   border-bottom: 1px solid hsl(0 0% 100% / 0.1);
 }
 
+// MENU-SUBMENUS: the identity block now links to "Mi organización" — resets
+// the anchor's UA styling and adds a subtle clickable affordance on top of
+// the same layout above.
+.org-sidebar__identity--link {
+  width: 100%;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: var(--transition-base);
+
+  &:hover {
+    background-color: hsl(0 0% 100% / 0.06);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 3px var(--brand-light);
+  }
+}
+
 .org-sidebar__identity-avatar {
   display: flex;
   align-items: center;
@@ -116,6 +136,102 @@
     background-color: var(--brand);
     color: hsl(var(--navy));
   }
+}
+
+// --- MENU-SUBMENUS: collapsible groups (Donaciones, Apadrinamientos, Documentos) ---
+.org-sidebar__group {
+  display: flex;
+  flex-direction: column;
+}
+
+.org-sidebar__group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.org-sidebar__group-link {
+  flex: 1;
+  min-width: 0;
+}
+
+.org-sidebar__group-link--static {
+  cursor: default;
+
+  &:hover {
+    background-color: transparent;
+    color: hsl(0 0% 100% / 0.7);
+  }
+}
+
+// The whole-row toggle button (Donaciones/Apadrinamientos) reuses `.org-sidebar__link`
+// for layout/color/hover/focus but needs UA button resets on top of it.
+.org-sidebar__group-toggle-row {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.org-sidebar__group-row-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.org-sidebar__group-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2.25rem;
+  border: none;
+  background: none;
+  padding: 0;
+  color: hsl(0 0% 100% / 0.6);
+  cursor: pointer;
+  border-radius: var(--r-md);
+  transition: var(--transition-base);
+
+  svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  &:hover {
+    background-color: hsl(0 0% 100% / 0.08);
+    color: var(--text-light);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--brand-light);
+  }
+}
+
+.org-sidebar__group-chevron {
+  transition: transform 150ms ease-out;
+}
+
+.org-sidebar__group-chevron--open {
+  transform: rotate(180deg);
+}
+
+.org-sidebar__group-children {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-left: 1.75rem;
+  margin-top: 0.125rem;
+}
+
+.org-sidebar__link--child {
+  padding: 0.5rem 0.75rem;
+  font-size: var(--fs-sm);
 }
 
 .org-sidebar__footer {

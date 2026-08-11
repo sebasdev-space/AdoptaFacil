@@ -61,7 +61,9 @@ describe('routing — public vs protected', () => {
     // Landed inside the AUTHENTICATED shell, not the public portal. "Adopciones"
     // is role-gated now (F-NAV-ADOPCIONES); "Donaciones" stays ungated for
     // every authenticated session, so it proves the shell rendered.
-    expect(screen.getByRole('link', { name: 'Donaciones' })).toBeInTheDocument();
+    // MENU-SUBMENUS: "Donaciones" is a collapsible group parent (button), not
+    // a link, now — see nav-items.ts.
+    expect(screen.getByRole('button', { name: 'Donaciones' })).toBeInTheDocument();
     expect(
       screen.queryByRole('heading', { name: 'Encuentra a tu próxima mascota' }),
     ).not.toBeInTheDocument();

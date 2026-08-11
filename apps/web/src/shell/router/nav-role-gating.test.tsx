@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Role } from '@adoptafacil/contracts';
 import { renderShell } from '../../test-utils';
@@ -107,9 +107,33 @@ describe('T-062 · sidebar reflects the org gate (first barrier)', () => {
   }
 
   it('shows the org-management entries and Campañas to an org role, but NEVER Transparencia (T-065) nor Personalización (S2-04A)', async () => {
+    // MENU-SUBMENUS: "Mi organización" is no longer a nav link — it merged
+    // into the org identity block (name + avatar), which now links to the
+    // same `/organizacion` route. `/org/profile` needs a real name here for
+    // that block to render past its loading/error states.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        const body = url.includes('/org/profile') ? { id: 'org-1', name: 'Alas y Huellas' } : [];
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: { get: () => null },
+          json: async () => body,
+        });
+      }),
+    );
     renderShell({ route: '/', ...sessionWith([Role.Owner]) });
+    const sidebar = screen.getByTestId('org-sidebar');
+    expect(await within(sidebar).findByRole('link', { name: /Alas y Huellas/ })).toHaveAttribute(
+      'href',
+      '/organizacion',
+    );
+    // MENU-SUBMENUS: "Documentos" replaces "Mi organización" as the stable
+    // org-gated proof-of-render entry — same ORG_DOCUMENTS_ROLES as before.
     await waitFor(() =>
-      expect(within(nav()).getByRole('link', { name: 'Mi organización' })).toBeInTheDocument(),
+      expect(within(nav()).getByRole('link', { name: 'Documentos' })).toBeInTheDocument(),
     );
     // S2-04A §4: "Personalización" left the sidebar — it's a button inside
     // "Mi organización" now, not a top-level nav entry (the route stays; see
@@ -127,13 +151,17 @@ describe('T-062 · sidebar reflects the org gate (first barrier)', () => {
 
   it('hides the org-management entries AND Campañas from a Persona (no org role); Transparencia absent too', async () => {
     renderShell({ route: '/', ...sessionWith([]) });
-    // Ungated entries stay visible…
+    // Ungated entries stay visible… MENU-SUBMENUS: "Donaciones" is now a
+    // collapsible group parent, rendered as a `button` (it never navigates
+    // itself), not a `link` — see nav-items.ts.
     await waitFor(() =>
-      expect(within(nav()).getByRole('link', { name: 'Donaciones' })).toBeInTheDocument(),
+      expect(within(nav()).getByRole('button', { name: 'Donaciones' })).toBeInTheDocument(),
     );
     // …the org-management surfaces do not — a donor reaches campaigns via the
     // org's public portal (/o/:slug → "Campaña activa"), not this menu (T-063).
-    expect(within(nav()).queryByRole('link', { name: 'Mi organización' })).not.toBeInTheDocument();
+    // MENU-SUBMENUS: "Documentos" stands in for the removed "Mi organización"
+    // link (same ORG_DOCUMENTS_ROLES gate a no-role Persona never satisfies).
+    expect(within(nav()).queryByRole('link', { name: 'Documentos' })).not.toBeInTheDocument();
     expect(within(nav()).queryByRole('link', { name: 'Personalización' })).not.toBeInTheDocument();
     expect(within(nav()).queryByRole('link', { name: 'Transparencia' })).not.toBeInTheDocument();
     expect(within(nav()).queryByRole('link', { name: 'Campañas' })).not.toBeInTheDocument();
@@ -187,8 +215,10 @@ describe('F-NAV-ADOPCIONES · "Adopciones" demands ADOPTIONS_MANAGEMENT_ROLES (d
   it('hides "Adopciones" from a Persona (no org role) — was visible to everyone before this fix', async () => {
     renderShell({ route: '/', ...sessionWith([]) });
     // An ungated entry stays visible, proving the sidebar actually rendered…
+    // MENU-SUBMENUS: "Donaciones" is a collapsible group parent (button), not
+    // a link, now — see nav-items.ts.
     await waitFor(() =>
-      expect(within(nav()).getByRole('link', { name: 'Donaciones' })).toBeInTheDocument(),
+      expect(within(nav()).getByRole('button', { name: 'Donaciones' })).toBeInTheDocument(),
     );
     // …while "Adopciones" is gone.
     expect(within(nav()).queryByRole('link', { name: 'Adopciones' })).not.toBeInTheDocument();
@@ -196,8 +226,10 @@ describe('F-NAV-ADOPCIONES · "Adopciones" demands ADOPTIONS_MANAGEMENT_ROLES (d
 
   it('hides "Adopciones" from a role outside EVAL_ROLES (e.g. ReadOnlyAuditor — view-only, not an evaluator)', async () => {
     renderShell({ route: '/', ...sessionWith([Role.ReadOnlyAuditor]) });
+    // MENU-SUBMENUS: "Documentos" stands in for the removed "Mi organización"
+    // link as the stable org-gated proof-of-render entry.
     await waitFor(() =>
-      expect(within(nav()).getByRole('link', { name: 'Mi organización' })).toBeInTheDocument(),
+      expect(within(nav()).getByRole('link', { name: 'Documentos' })).toBeInTheDocument(),
     );
     expect(within(nav()).queryByRole('link', { name: 'Adopciones' })).not.toBeInTheDocument();
   });
@@ -240,19 +272,25 @@ describe('F-DONACIONES-RECIBIDAS · "Donaciones recibidas" demands DONATIONS_MAN
 
   it('shows "Donaciones recibidas" to a management role (Operator), pointing at its route', async () => {
     renderShell({ route: '/', ...sessionWith([Role.Operator]) });
+    // MENU-SUBMENUS: "Donaciones recibidas" is now a child of the collapsible
+    // "Donaciones" group — expand it before looking for the child link.
     await waitFor(() =>
-      expect(within(nav()).getByRole('link', { name: 'Donaciones recibidas' })).toHaveAttribute(
-        'href',
-        '/donaciones-recibidas',
-      ),
+      expect(within(nav()).getByRole('button', { name: 'Donaciones' })).toBeInTheDocument(),
+    );
+    fireEvent.click(within(nav()).getByRole('button', { name: 'Donaciones' }));
+    expect(within(nav()).getByRole('link', { name: 'Donaciones recibidas' })).toHaveAttribute(
+      'href',
+      '/donaciones-recibidas',
     );
   });
 
   it('hides "Donaciones recibidas" from a Persona (no org role) — "Donaciones" (donor-facing) stays visible', async () => {
     renderShell({ route: '/', ...sessionWith([]) });
     await waitFor(() =>
-      expect(within(nav()).getByRole('link', { name: 'Donaciones' })).toBeInTheDocument(),
+      expect(within(nav()).getByRole('button', { name: 'Donaciones' })).toBeInTheDocument(),
     );
+    fireEvent.click(within(nav()).getByRole('button', { name: 'Donaciones' }));
+    expect(within(nav()).getByRole('link', { name: 'Mis donaciones' })).toBeInTheDocument();
     expect(
       within(nav()).queryByRole('link', { name: 'Donaciones recibidas' }),
     ).not.toBeInTheDocument();
@@ -260,9 +298,12 @@ describe('F-DONACIONES-RECIBIDAS · "Donaciones recibidas" demands DONATIONS_MAN
 
   it('hides "Donaciones recibidas" from a role outside MANAGE_ROLES (ReadOnlyAuditor — view-only, not management)', async () => {
     renderShell({ route: '/', ...sessionWith([Role.ReadOnlyAuditor]) });
+    // MENU-SUBMENUS: "Documentos" stands in for the removed "Mi organización"
+    // link as the stable org-gated proof-of-render entry.
     await waitFor(() =>
-      expect(within(nav()).getByRole('link', { name: 'Mi organización' })).toBeInTheDocument(),
+      expect(within(nav()).getByRole('link', { name: 'Documentos' })).toBeInTheDocument(),
     );
+    fireEvent.click(within(nav()).getByRole('button', { name: 'Donaciones' }));
     expect(
       within(nav()).queryByRole('link', { name: 'Donaciones recibidas' }),
     ).not.toBeInTheDocument();
@@ -316,8 +357,10 @@ describe('F1-01 · "Mis solicitudes" shows only to a Persona account (personaOnl
 
   it('hides "Mis solicitudes" from any other org role (e.g. ReadOnlyAuditor)', async () => {
     renderShell({ route: '/', ...sessionWith([Role.ReadOnlyAuditor]) });
+    // MENU-SUBMENUS: "Documentos" stands in for the removed "Mi organización"
+    // link as the stable org-gated proof-of-render entry.
     await waitFor(() =>
-      expect(within(nav()).getByRole('link', { name: 'Mi organización' })).toBeInTheDocument(),
+      expect(within(nav()).getByRole('link', { name: 'Documentos' })).toBeInTheDocument(),
     );
     expect(within(nav()).queryByRole('link', { name: 'Mis solicitudes' })).not.toBeInTheDocument();
   });

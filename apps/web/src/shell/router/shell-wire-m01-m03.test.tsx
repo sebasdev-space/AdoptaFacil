@@ -128,9 +128,10 @@ describe('T-031 · menu reflects the role (first barrier)', () => {
 
   it('hides every role-gated entry when the session has no roles (deny-by-default)', async () => {
     renderShell({ route: '/', ...sessionWith([]) });
-    // Ungated entries stay visible…
+    // Ungated entries stay visible… MENU-SUBMENUS: "Donaciones" is a
+    // collapsible group parent (button), not a link, now — see nav-items.ts.
     await waitFor(() =>
-      expect(within(nav()).getByRole('link', { name: 'Donaciones' })).toBeInTheDocument(),
+      expect(within(nav()).getByRole('button', { name: 'Donaciones' })).toBeInTheDocument(),
     );
     // …role-gated ones do not — "Adopciones" (F-NAV-ADOPCIONES) included.
     expect(within(nav()).queryByRole('link', { name: 'Animales' })).not.toBeInTheDocument();

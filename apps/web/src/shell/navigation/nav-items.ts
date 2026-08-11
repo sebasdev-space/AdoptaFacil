@@ -145,6 +145,24 @@ export interface NavItem {
    * badge next to the label instead of hiding the entry outright.
    */
   comingSoon?: boolean;
+  /**
+   * MENU-SUBMENUS: when present, this entry renders as a collapsible group —
+   * `children` are the real, independently-gated leaves (each keeps its own
+   * `roles`/`personaOnly`/`comingSoon`, filtered exactly like a top-level
+   * `NavItem` always was). Grouping is PURELY visual: a child's visibility
+   * and destination are unchanged from before this entry existed as a group.
+   */
+  children?: NavItem[];
+  /**
+   * MENU-SUBMENUS: only meaningful on a group (`children` present). `true`
+   * ("Documentos") means the label itself is a real link to `path`, with a
+   * separate chevron control just for expand/collapse — clicking the chevron
+   * never navigates, clicking the label never toggles. Omitted/`false`
+   * ("Donaciones", "Apadrinamientos") means the whole row is a pure
+   * expand/collapse toggle and `path` is only a stable React key, never a
+   * link target (the parent has no page of its own to go to).
+   */
+  navigable?: boolean;
 }
 
 export const navItems: NavItem[] = [
@@ -163,21 +181,28 @@ export const navItems: NavItem[] = [
   // (cualquier autenticado), así que el filtro real es `personaOnly` — ver su
   // doc en NavItem para por qué no puede expresarse con `roles`.
   { path: '/mis-solicitudes', label: 'Mis solicitudes', icon: PawIcon, personaOnly: true },
-  { path: '/donaciones', label: 'Donaciones', icon: HeartIcon },
-  // F-DONACIONES-RECIBIDAS: entrada SEPARADA de "Donaciones" arriba — esa es del
-  // donante (cualquier autenticado, sin @Roles en el backend); esta es de la org
-  // que RECIBE (GET /donations/received, MANAGE_ROLES), igual que "Adopciones"
-  // vs. "Mis solicitudes".
+  // MENU-SUBMENUS: "Donaciones" agrupa las dos entradas planas que existían
+  // (mismas rutas, mismos roles de siempre) — el padre solo expande/colapsa,
+  // nunca navega (no tiene página propia).
   {
-    path: '/donaciones-recibidas',
-    label: 'Donaciones recibidas',
+    path: '/donaciones',
+    label: 'Donaciones',
     icon: HeartIcon,
-    roles: DONATIONS_MANAGEMENT_ROLES,
+    children: [
+      // Antes era el propio ítem "Donaciones" — cualquier autenticado, sin
+      // @Roles en el backend. Se renombra a "Mis donaciones" solo para
+      // distinguirla de "Donaciones recibidas" dentro del grupo.
+      { path: '/donaciones', label: 'Mis donaciones', icon: HeartIcon },
+      // F-DONACIONES-RECIBIDAS: la contraparte de gestión de org (GET
+      // /donations/received, MANAGE_ROLES) — idéntica a como estaba.
+      {
+        path: '/donaciones-recibidas',
+        label: 'Donaciones recibidas',
+        icon: HeartIcon,
+        roles: DONATIONS_MANAGEMENT_ROLES,
+      },
+    ],
   },
-  // M07 · "mis apadrinamientos" (S2-03, RF17) — apadrinar/ver el propio historial,
-  // sin @Roles en el backend (`POST /sponsorships`, `GET /sponsorships/mine`),
-  // igual que Donaciones arriba: visible a cualquier usuario autenticado.
-  { path: '/apadrinar', label: 'Mis apadrinamientos', icon: HeartIcon },
   // S2-01: "Campañas" RESTORED — T-065 removed it because the link pointed at
   // the PUBLIC portal route and exited the shell; the in-shell management
   // screen (/organizacion/campanas) now exists, so the entry points there
@@ -190,14 +215,30 @@ export const navItems: NavItem[] = [
     icon: MegaphoneIcon,
     roles: CAMPAIGNS_VIEW_ROLES,
   },
-  // M07 · apadrinamientos RECIBIDOS por la organización (S2-03, RF17). Gated a
-  // SPONSORSHIP_VIEW_ROLES — calcado VERBATIM de `SponsorshipsController`'s
-  // VIEW_ROLES (sin Operator, a diferencia de Campañas; ver comentario ahí).
+  // MENU-SUBMENUS: "Apadrinamientos" agrupa "Mis apadrinamientos" (donante,
+  // sin @Roles) y la gestión de la org ("Apadrinamientos recibidos", antes
+  // el ítem plano "Apadrinamientos", SPONSORSHIP_VIEW_ROLES) — mismas rutas y
+  // roles de siempre; el padre solo expande/colapsa.
   {
-    path: '/organizacion/apadrinamientos',
+    path: '/apadrinar',
     label: 'Apadrinamientos',
     icon: HeartIcon,
-    roles: SPONSORSHIP_VIEW_ROLES,
+    children: [
+      // M07 · "mis apadrinamientos" (S2-03, RF17) — apadrinar/ver el propio
+      // historial, sin @Roles en el backend, igual que Donaciones: visible a
+      // cualquier usuario autenticado.
+      { path: '/apadrinar', label: 'Mis apadrinamientos', icon: HeartIcon },
+      // M07 · apadrinamientos RECIBIDOS por la organización (S2-03, RF17).
+      // Gated a SPONSORSHIP_VIEW_ROLES — calcado VERBATIM de
+      // `SponsorshipsController`'s VIEW_ROLES (sin Operator, a diferencia de
+      // Campañas; ver comentario histórico en esa constante).
+      {
+        path: '/organizacion/apadrinamientos',
+        label: 'Apadrinamientos recibidos',
+        icon: HeartIcon,
+        roles: SPONSORSHIP_VIEW_ROLES,
+      },
+    ],
   },
   // T-065: "Transparencia" REMOVED from the menu entirely — the screen was only
   // ever a placeholder ("se implementará en la Ola 1..."); the REAL transparency
@@ -214,43 +255,56 @@ export const navItems: NavItem[] = [
     icon: AlertTriangleIcon,
     roles: ANIMAL_VIEW_ROLES,
   },
-  // M01 · organization profile (my line, appended). Reuses ShieldIcon — a
-  // dedicated "organization/building" icon is a reported gap in shell/icons.
-  // T-062: gated to ORG_MEMBER_ROLES — a Persona has no organization to manage.
-  { path: '/organizacion', label: 'Mi organización', icon: ShieldIcon, roles: ORG_MEMBER_ROLES },
-  // M01 · gestión documental de la org (T-031, wires T-103). RF03.
+  // MENU-SUBMENUS: el ítem plano "Mi organización" (T-062, ORG_MEMBER_ROLES)
+  // se retiró de esta lista — el bloque del nombre de la org en la cabecera
+  // del sidebar (SidebarIdentity) ahora navega a esa misma ruta `/organizacion`
+  // (ver sidebar.tsx). Ningún rol ni ruta cambia, solo el punto de entrada.
+  //
+  // "Documentos" es un grupo NAVEGABLE: el texto navega al módulo real
+  // (/organizacion/documentos, ORG_DOCUMENTS_ROLES — sin cambios) y un chevron
+  // aparte despliega los dos placeholders "Pronto". OJO: ORG_DOCUMENTS_ROLES
+  // (Owner/Administrator/ReadOnlyAuditor) es MÁS ANGOSTO que ORG_MEMBER_ROLES
+  // (todos los roles de org) — Operator/Volunteer/TemporaryCollaborator/
+  // Veterinarian pueden ver los hijos "Pronto" sin poder ver ni navegar el
+  // padre. Para no cambiarle el alcance a nadie (criterio "mismos permisos de
+  // siempre"), el sidebar renderiza el grupo si CUALQUIERA de padre/hijos es
+  // visible, y solo activa el link del padre cuando su propio rol lo permite
+  // (ver sidebar.tsx) — así ningún rol pierde ni gana acceso a nada.
   {
     path: '/organizacion/documentos',
     label: 'Documentos',
     icon: ShieldIcon,
     roles: ORG_DOCUMENTS_ROLES,
+    navigable: true,
+    children: [
+      {
+        path: '/organizacion/transparencia-nacional',
+        label: 'Transparencia nacional',
+        icon: ShieldIcon,
+        roles: ORG_MEMBER_ROLES,
+        comingSoon: true,
+      },
+      {
+        path: '/organizacion/reporte-exogeno',
+        label: 'Reporte exógeno 2575',
+        icon: ShieldIcon,
+        roles: ORG_MEMBER_ROLES,
+        comingSoon: true,
+      },
+    ],
   },
   // M14 · portal personalization by tokens (T-027) — REMOVED from the sidebar
   // (S2-04A §4): it now lives as a button inside "Mi organización"'s action bar
   // (OrgProfilePage, S2-01/S2-REORG), not as a top-level nav entry. The ROUTE
   // (`/organizacion/portal`) and its guard are UNCHANGED — see routes.tsx.
-  // Fase 12 (REFACTOR-VISUAL v2): tres módulos aún sin backend — entradas
-  // visibles con el badge "Pronto" en vez de ocultarse, siguiendo el patrón
-  // documentado en `ComingSoon` (packages/ui). Gated a ORG_MEMBER_ROLES: una
-  // Persona no tiene organización a la que aplique ninguno de los tres.
+  // Fase 12 (REFACTOR-VISUAL v2): módulo aún sin backend — entrada visible con
+  // el badge "Pronto" en vez de ocultarse, siguiendo el patrón documentado en
+  // `ComingSoon` (packages/ui). Gated a ORG_MEMBER_ROLES: una Persona no tiene
+  // organización a la que aplique.
   {
     path: '/organizacion/voluntariado',
     label: 'Voluntariado',
     icon: HeartIcon,
-    roles: ORG_MEMBER_ROLES,
-    comingSoon: true,
-  },
-  {
-    path: '/organizacion/transparencia-nacional',
-    label: 'Transparencia nacional',
-    icon: ShieldIcon,
-    roles: ORG_MEMBER_ROLES,
-    comingSoon: true,
-  },
-  {
-    path: '/organizacion/reporte-exogeno',
-    label: 'Reporte exógeno 2575',
-    icon: ShieldIcon,
     roles: ORG_MEMBER_ROLES,
     comingSoon: true,
   },
