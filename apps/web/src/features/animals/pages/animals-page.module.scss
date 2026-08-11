@@ -1,0 +1,90 @@
+/**
+ * BEM/SCSS del layout maestro-detalle de Animales (refactor visual M03).
+ * Grid/breakpoints vía utilidades Tailwind (ver animals-page.tsx); todo lo
+ * demás resuelve a tokens de `packages/ui/src/styles/tokens.scss`.
+ */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid transparent;
+  border-radius: var(--r-lg);
+  background-color: var(--bg-surface);
+  text-align: left;
+  cursor: pointer;
+  transition: var(--transition-base);
+
+  &:hover {
+    background-color: var(--bg-primary);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--brand-light);
+  }
+}
+
+.row--selected {
+  background-color: var(--brand-light);
+  border-color: var(--brand);
+}
+
+.row__avatar {
+  height: 2.75rem;
+  width: 2.75rem;
+  flex-shrink: 0;
+  border-radius: var(--r-full);
+  object-fit: cover;
+  border: 1px solid var(--border-hairline-strong);
+}
+
+.row__avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.75rem;
+  width: 2.75rem;
+  flex-shrink: 0;
+  border-radius: var(--r-full);
+  background-color: var(--bg-primary);
+  color: var(--text-muted);
+}
+
+.row__body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.row__name {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-dark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row__meta {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row__badges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}

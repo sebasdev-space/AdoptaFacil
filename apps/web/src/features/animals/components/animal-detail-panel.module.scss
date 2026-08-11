@@ -1,0 +1,110 @@
+/**
+ * BEM/SCSS del panel de detalle maestro-detalle de Animales (refactor visual
+ * M03). Layout (grid/flex/gap/breakpoints) vía utilidades Tailwind; todo lo
+ * demás resuelve a tokens de `packages/ui/src/styles/tokens.scss`.
+ */
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.detail__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border-hairline-strong);
+}
+
+.detail__avatar {
+  height: 4rem;
+  width: 4rem;
+  flex-shrink: 0;
+  border-radius: var(--r-full);
+  object-fit: cover;
+  border: 1px solid var(--border-hairline-strong);
+}
+
+.detail__avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 4rem;
+  width: 4rem;
+  flex-shrink: 0;
+  border-radius: var(--r-full);
+  background-color: var(--bg-primary);
+  color: var(--text-muted);
+}
+
+.detail__identity {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.detail__name {
+  font-family: var(--font-display);
+  font-size: var(--fs-h3);
+  font-weight: var(--fw-semibold);
+  color: var(--text-dark);
+}
+
+.detail__subline {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.detail__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin-top: 0.375rem;
+}
+
+.detail__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.detail__body {
+  flex: 1 1 auto;
+  padding-top: 1.25rem;
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.timeline__item {
+  position: relative;
+  padding-left: 1.125rem;
+  border-left: 2px solid var(--brand-light);
+}
+
+.timeline__marker {
+  position: absolute;
+  left: -0.3125rem;
+  top: 0.25rem;
+  height: 0.625rem;
+  width: 0.625rem;
+  border-radius: var(--r-full);
+  background-color: var(--brand);
+}
+
+.timeline__title {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-dark);
+}
+
+.timeline__meta {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}

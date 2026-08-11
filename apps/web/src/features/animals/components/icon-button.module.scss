@@ -1,0 +1,41 @@
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.25rem;
+  width: 2.25rem;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border-hairline-strong);
+  background-color: var(--bg-surface);
+  color: var(--text-dark);
+  transition: var(--transition-base);
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background-color: var(--brand-light);
+    border-color: var(--brand);
+    color: var(--brand-dark);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--brand-light);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+}
+
+.icon-button--danger {
+  &:hover:not(:disabled) {
+    background-color: hsl(var(--destructive) / 0.1);
+    border-color: hsl(var(--destructive));
+    color: hsl(var(--destructive));
+  }
+
+  &:focus-visible {
+    box-shadow: 0 0 0 3px hsl(var(--destructive) / 0.16);
+  }
+}
