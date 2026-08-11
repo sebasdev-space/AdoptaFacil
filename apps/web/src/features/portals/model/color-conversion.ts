@@ -89,3 +89,100 @@ export function hexToHslString(hex: string): string {
   const { h, s, l } = hexToHsl(hex);
   return `${h} ${s}% ${l}%`;
 }
+
+/**
+ * WCAG relative luminance + contrast ratio for a bare-HSL color — MIRRORS
+ * `contrastRatio`/`relativeLuminance` in `apps/api/src/modules/portals/
+ * portals.schemas.ts` (same formula, same 4.5:1 minimum for normal text).
+ * Duplicated on purpose (small, self-contained math, same convention as
+ * `ageLabel` elsewhere in this codebase) so the FRONTEND can pre-empt the
+ * exact rejection the backend's `.superRefine()` enforces, instead of only
+ * finding out after a failed save (T-PORTAL-CONTRAST).
+ */
+function relativeLuminance(h: number, s: number, l: number): number {
+  const sN = s / 100;
+  const lN = l / 100;
+  const c = (1 - Math.abs(2 * lN - 1)) * sN;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = lN - c / 2;
+  const [r1, g1, b1] = ((): [number, number, number] => {
+    if (h < 60) return [c, x, 0];
+    if (h < 120) return [x, c, 0];
+    if (h < 180) return [0, c, x];
+    if (h < 240) return [0, x, c];
+    if (h < 300) return [x, 0, c];
+    return [c, 0, x];
+  })();
+  const toLinear = (channel: number): number => {
+    const v = channel + m;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * toLinear(r1) + 0.7152 * toLinear(g1) + 0.0722 * toLinear(b1);
+}
+
+/** WCAG contrast ratio (1..21) between two bare-HSL strings, or `null` if
+ *  either is unparsable. */
+export function contrastRatio(a: string, b: string): number | null {
+  const ca = parseHslString(a);
+  const cb = parseHslString(b);
+  if (!ca || !cb) return null;
+  const la = relativeLuminance(ca.h, ca.s, ca.l);
+  const lb = relativeLuminance(cb.h, cb.s, cb.l);
+  const [hi, lo] = la >= lb ? [la, lb] : [lb, la];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/** Same threshold as the backend's `MIN_CONTRAST_RATIO` (WCAG AA, normal text). */
+export const MIN_CONTRAST_RATIO = 4.5;
+
+const AUTO_FOREGROUND_LIGHT = '0 0% 100%';
+const AUTO_FOREGROUND_DARK = '222 20% 9%';
+
+/**
+ * Picks whichever of pure white/near-black gives the BEST contrast against
+ * `background` — used to auto-correct a color pair's foreground when the
+ * user changes only the background, so the pair never becomes unreadable
+ * (see `pairsWithSufficientContrast` at the call site for when this fires).
+ */
+export function bestContrastingForeground(background: string): string {
+  const vsLight = contrastRatio(background, AUTO_FOREGROUND_LIGHT) ?? 0;
+  const vsDark = contrastRatio(background, AUTO_FOREGROUND_DARK) ?? 0;
+  return vsLight >= vsDark ? AUTO_FOREGROUND_LIGHT : AUTO_FOREGROUND_DARK;
+}
+
+/**
+ * Reverse direction of `bestContrastingForeground`: the user edited the
+ * FOREGROUND ("Texto sobre X") directly, and the CURRENT background no
+ * longer contrasts enough against it. Keeps the background's hue/saturation
+ * (so it still reads as "the same brand color", just re-lit) and only pushes
+ * its LIGHTNESS to whichever extreme (near-white or near-black) gives the
+ * best contrast against the new foreground — never touches hue/saturation,
+ * so this never silently swaps the org's chosen brand color for another one.
+ */
+export function bestContrastingBackground(currentBackground: string, foreground: string): string {
+  const parsed = parseHslString(currentBackground);
+  const candidates: string[] = [];
+  if (parsed) {
+    // Prefer keeping the background's own hue — just re-lit lighter/darker —
+    // so it still reads as "the same brand color".
+    candidates.push(`${parsed.h} ${parsed.s}% 95%`, `${parsed.h} ${parsed.s}% 8%`);
+  }
+  // AUTO_FOREGROUND_DARK is a branded near-black (not TRUE black), which can
+  // fall just short against a very saturated foreground — true pure
+  // black/white are the guaranteed-safe last resort (contrast is symmetric,
+  // so this covers the same extremes `bestContrastingForeground` tries).
+  candidates.push(AUTO_FOREGROUND_LIGHT, AUTO_FOREGROUND_DARK, '0 0% 100%', '0 0% 0%');
+
+  let best = candidates[0];
+  let bestRatio = -1;
+  for (const candidate of candidates) {
+    const ratio = contrastRatio(candidate, foreground);
+    if (ratio === null) continue;
+    if (ratio >= MIN_CONTRAST_RATIO) return candidate; // first one that clears the bar wins
+    if (ratio > bestRatio) {
+      bestRatio = ratio;
+      best = candidate;
+    }
+  }
+  return best;
+}

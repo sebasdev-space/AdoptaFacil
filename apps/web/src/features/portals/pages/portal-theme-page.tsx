@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Role,
   type Organization,
@@ -23,7 +23,14 @@ import { PageContainer, PageHeader } from '../../_layout';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
 import { brandTokensToStyle } from '../../../shell/theme';
-import { hexToHslString, hslStringToHex } from '../model/color-conversion';
+import {
+  bestContrastingBackground,
+  bestContrastingForeground,
+  contrastRatio,
+  hexToHslString,
+  hslStringToHex,
+  MIN_CONTRAST_RATIO,
+} from '../model/color-conversion';
 import { PORTAL_THEME_FIELDS, safePortalTheme, type PortalThemeField } from '../model/theme';
 import { PortalMiniPreview } from '../components/portal-mini-preview';
 
@@ -51,6 +58,27 @@ const DISPLAY_FALLBACK_HSL: Partial<Record<string, string>> = {
   accent: '169 55% 94%',
   'accent-foreground': '214 32% 18%',
   ring: '172 67% 30%',
+};
+
+/**
+ * Pares fondo ↔ texto (T-PORTAL-CONTRAST). Mismos pares que
+ * `PORTAL_COLOR_PAIRS` en `apps/api/.../portals.schemas.ts` — duplicado aquí
+ * porque es una constante de unas líneas, no un tipo compartido (no toca
+ * `packages/contracts`). Bidireccional: cambiar CUALQUIERA de los dos lados
+ * de un par autoajusta el otro si hace falta (ver `setToken` más abajo) — la
+ * primera versión de este fix solo cubría fondo→texto, y "cambiar el texto"
+ * (ej. "Texto sobre secundario") seguía pudiendo fallar contra un fondo sin
+ * tocar.
+ */
+const BACKGROUND_TO_FOREGROUND: Partial<Record<string, string>> = {
+  primary: 'primary-foreground',
+  secondary: 'secondary-foreground',
+  accent: 'accent-foreground',
+};
+const FOREGROUND_TO_BACKGROUND: Partial<Record<string, string>> = {
+  'primary-foreground': 'primary',
+  'secondary-foreground': 'secondary',
+  'accent-foreground': 'accent',
 };
 
 /** Simple external-link glyph (feature-local — no icon library added). */
@@ -237,15 +265,106 @@ export function PortalThemePage() {
   const accentFg = form['accent-foreground'] || DISPLAY_FALLBACK_HSL['accent-foreground'];
   const ringColor = form.ring || DISPLAY_FALLBACK_HSL.ring;
 
-  const setToken = (token: string, value: string) =>
+  /**
+   * BUG FIX (T-PORTAL-CONTRAST): cambiar solo un color de fondo (p. ej.
+   * "Color principal") reenviaba tal cual el valor YA GUARDADO de su texto
+   * emparejado ("Texto sobre el principal") — si el nuevo fondo no tenía
+   * contraste suficiente contra ese texto sin tocar, el backend rechazaba
+   * TODO el guardado con 400 (`portals.schemas.ts`'s `.superRefine`, que sí
+   * es correcto: WCAG AA es una regla real, no el bug). Bidireccional:
+   * cambiar CUALQUIERA de los dos lados de un par autoajusta el OTRO lado
+   * si hace falta, nunca el que el usuario acaba de tocar. Al corregir un
+   * fondo se conserva su matiz/saturación (solo se ajusta la luminosidad)
+   * para no reemplazar en silencio el color de marca elegido.
+   */
+  function correctPair(base: FormState, editedToken: string): FormState {
+    const value = base[editedToken]?.trim();
+    if (!value) return base;
+    const next = { ...base };
+
+    const fgToken = BACKGROUND_TO_FOREGROUND[editedToken];
+    if (fgToken) {
+      const currentFg = next[fgToken]?.trim() || DISPLAY_FALLBACK_HSL[fgToken];
+      const ratio = currentFg ? contrastRatio(value, currentFg) : null;
+      if (ratio === null || ratio < MIN_CONTRAST_RATIO) {
+        next[fgToken] = bestContrastingForeground(value);
+      }
+    }
+
+    const bgToken = FOREGROUND_TO_BACKGROUND[editedToken];
+    if (bgToken) {
+      const currentBg = next[bgToken]?.trim() || DISPLAY_FALLBACK_HSL[bgToken];
+      const ratio = currentBg ? contrastRatio(currentBg, value) : null;
+      if ((ratio === null || ratio < MIN_CONTRAST_RATIO) && currentBg) {
+        next[bgToken] = bestContrastingBackground(currentBg, value);
+      }
+    }
+
+    return next;
+  }
+
+  /**
+   * BUG FIX (T-PORTAL-CROSSED-INPUTS): reportado al verificar el fix de
+   * arriba — "cambiar cualquiera de los 7 inputs también cambia el
+   * siguiente/anterior, en vivo". Verificado con Playwright que NO es un
+   * desfase de índice (cada input SÍ actualiza su propio campo, confirmado
+   * probando los 7 uno por uno): es `correctPair` disparándose en cada
+   * evento nativo `input` de `<input type="color">`, que en Chromium se
+   * dispara CONTINUAMENTE mientras se arrastra el selector nativo (no solo
+   * al soltar) — el usuario ve su par cambiar en vivo, a media selección.
+   *
+   * Fix: el campo tocado se actualiza siempre al instante (`setForm`
+   * inmediato abajo); la corrección del PAR se difiere (debounce) para que
+   * solo se aplique una vez que el usuario deja de mover el selector, nunca
+   * mientras arrastra. `save()` fuerza (`flush`) cualquier corrección
+   * pendiente de forma SÍNCRONA antes de armar el payload, así que un click
+   * en "Guardar" inmediatamente después de elegir un color nunca depende de
+   * que el debounce ya haya disparado — la garantía del fix anterior (nunca
+   * 400) se mantiene igual.
+   */
+  const pendingCorrection = useRef<{
+    timeout: ReturnType<typeof setTimeout>;
+    token: string;
+  } | null>(null);
+
+  useEffect(
+    () => () => {
+      if (pendingCorrection.current) clearTimeout(pendingCorrection.current.timeout);
+    },
+    [],
+  );
+
+  const setToken = (token: string, value: string) => {
     setForm((prev) => ({ ...prev, [token]: value }));
+    if (pendingCorrection.current) clearTimeout(pendingCorrection.current.timeout);
+    const timeout = setTimeout(() => {
+      pendingCorrection.current = null;
+      setForm((prev) => correctPair(prev, token));
+    }, 350);
+    pendingCorrection.current = { timeout, token };
+  };
+
+  /** Aplica de inmediato cualquier corrección de par pendiente y devuelve el
+   *  `FormState` resultante — usado por `save()` para no depender del
+   *  temporizador del debounce ni de un `form` de React todavía sin
+   *  refrescar (los `setState` no son síncronos). */
+  function flushPendingCorrection(): FormState {
+    if (!pendingCorrection.current) return form;
+    clearTimeout(pendingCorrection.current.timeout);
+    const { token } = pendingCorrection.current;
+    pendingCorrection.current = null;
+    const corrected = correctPair(form, token);
+    setForm(corrected);
+    return corrected;
+  }
 
   const save = async () => {
+    const effectiveForm = flushPendingCorrection();
     setSaving(true);
     try {
       const themeConfig = await client.request<PortalThemeConfig>('/portals/theme', {
         method: 'PUT',
-        json: { tokens: tokensFromForm(form), logoPosition, socialNavPosition },
+        json: { tokens: tokensFromForm(effectiveForm), logoPosition, socialNavPosition },
       });
       setForm(safePortalTheme(themeConfig.tokens) as FormState);
       setLogoPosition(themeConfig.logoPosition ?? 'left');

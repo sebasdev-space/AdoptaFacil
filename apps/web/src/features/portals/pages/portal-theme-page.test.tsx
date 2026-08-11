@@ -1,7 +1,8 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Role } from '@adoptafacil/contracts';
 import { renderShell } from '../../../test-utils';
+import { contrastRatio, MIN_CONTRAST_RATIO } from '../model/color-conversion';
 
 /**
  * §M14 (T-027) — owner personalization UI at `/organizacion/portal`.
@@ -110,6 +111,117 @@ describe('PortalThemePage — owner personalization (visual only, S2-REORG)', ()
       expect(body.socialNavPosition).toBe('right');
       expect(body.tokens.primary).toMatch(/^\d+(\.\d+)? \d+% \d+%$/); // re-converted to HSL
     });
+  });
+
+  it('BUG FIX (T-PORTAL-CONTRAST): changing a background color on an org with an EXISTING theme no longer 400s — the paired foreground auto-corrects instead of being resent stale', async () => {
+    // Repro of the reported bug: an org that already saved a full theme
+    // before (NOT a brand-new empty form) — "primary-foreground" stayed
+    // white ("0 0% 100%", the default) from that earlier save. Changing only
+    // "Color principal" to a pale color used to resend that stale white
+    // foreground verbatim, and the real backend (`portals.schemas.ts`
+    // `.superRefine`) rejected the pair with a 400 "Contraste insuficiente".
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    stubFetch((url, init) => {
+      calls.push({ url, init });
+      if (init?.method === 'PUT') {
+        const body = JSON.parse(String(init.body));
+        return { tokens: body.tokens };
+      }
+      return { tokens: { primary: '172 67% 30%', 'primary-foreground': '0 0% 100%' } };
+    });
+    renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
+
+    const primary = await screen.findByLabelText('Color principal');
+    // Pale yellow: fine against near-black, fails 4.5:1 against white.
+    fireEvent.change(primary, { target: { value: '#fef3c7' } });
+    fireEvent.click(screen.getByRole('button', { name: /Guardar personalización/ }));
+
+    await waitFor(() => {
+      const put = calls.find((c) => c.init?.method === 'PUT');
+      expect(put).toBeDefined();
+      const body = JSON.parse(String(put?.init?.body));
+      expect(body.tokens.primary).not.toBe('0 0% 100%');
+      // The bug: this used to stay "0 0% 100%" (white) and the backend's real
+      // contrast rule (mirrored here) would have rejected it with a 400.
+      const ratio = contrastRatio(body.tokens.primary, body.tokens['primary-foreground']);
+      expect(ratio).not.toBeNull();
+      expect(ratio as number).toBeGreaterThanOrEqual(MIN_CONTRAST_RATIO);
+    });
+  });
+
+  it('BUG FIX FOLLOW-UP (T-PORTAL-CONTRAST): editing the TEXT field directly (not the background) also auto-corrects instead of 400ing', async () => {
+    // Reported after the first fix shipped: it only covered background→text.
+    // Editing "Texto sobre secundario" directly against an existing dark
+    // "Color secundario" ("0 56% 42%") to a clashing bright red used to still
+    // 400 — real repro measured ~1.6:1 contrast.
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    stubFetch((url, init) => {
+      calls.push({ url, init });
+      if (init?.method === 'PUT') {
+        const body = JSON.parse(String(init.body));
+        return { tokens: body.tokens };
+      }
+      return { tokens: { secondary: '0 56% 42%', 'secondary-foreground': '214 32% 18%' } };
+    });
+    renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
+
+    const secondaryFg = await screen.findByLabelText('Texto sobre secundario');
+    fireEvent.change(secondaryFg, { target: { value: '#f50000' } }); // bright red
+    fireEvent.click(screen.getByRole('button', { name: /Guardar personalización/ }));
+
+    await waitFor(() => {
+      const put = calls.find((c) => c.init?.method === 'PUT');
+      expect(put).toBeDefined();
+      const body = JSON.parse(String(put?.init?.body));
+      expect(body.tokens.secondary).not.toBe('0 56% 42%'); // the background had to move
+      const ratio = contrastRatio(body.tokens.secondary, body.tokens['secondary-foreground']);
+      expect(ratio).not.toBeNull();
+      expect(ratio as number).toBeGreaterThanOrEqual(MIN_CONTRAST_RATIO);
+    });
+  });
+
+  it('BUG FIX (T-PORTAL-CROSSED-INPUTS): editing one color does NOT live-mutate its paired color — only itself, right away', async () => {
+    // Reported after the contrast fix shipped: dragging the native color
+    // picker on ANY of the 7 inputs seemed to also change the "next"/
+    // "previous" one live, mid-drag. Verified separately (manual + scripted
+    // reproduction) this was never an index/binding bug — every input always
+    // wrote its OWN field correctly. The real cause: `<input type="color">`
+    // fires the native `input` event continuously while dragging, and the
+    // pair-contrast correction used to run synchronously on every one of
+    // those events, visibly changing the paired swatch mid-drag. The fix
+    // defers that correction (debounced) so only the field the user is
+    // actively touching updates live; the pair only settles once they stop.
+    stubFetch(() => ({ tokens: { primary: '172 67% 30%', 'primary-foreground': '0 0% 100%' } }));
+    renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
+
+    const primary = (await screen.findByLabelText('Color principal')) as HTMLInputElement;
+    const primaryFg = screen.getByLabelText('Texto sobre el principal') as HTMLInputElement;
+    const primaryBefore = primary.value;
+    const fgBefore = primaryFg.value;
+
+    vi.useFakeTimers();
+    try {
+      // Pale yellow: will eventually need "Texto sobre el principal"
+      // corrected (insufficient contrast against white) — but not yet.
+      fireEvent.change(primary, { target: { value: '#fef3c7' } });
+
+      // Immediately after — before the debounce settles — the OTHER field's
+      // displayed value must be untouched. This is exactly what was
+      // reported: it used to change live, mid-drag, alongside the touched one.
+      expect(primaryFg.value).toBe(fgBefore);
+      // The touched one updates right away (±1 hex unit of hue/lightness
+      // rounding drift going hex→HSL→hex is expected and fine — T-D03).
+      expect(primary.value).not.toBe(primaryBefore);
+
+      // Once the user stops interacting (debounce elapses), the pair
+      // correction is allowed to apply.
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+      expect(primaryFg.value).not.toBe(fgBefore);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('also allows an Administrator to edit', async () => {

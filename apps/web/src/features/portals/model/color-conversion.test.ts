@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { hexToHslString, hslStringToHex, hslToHex, parseHslString } from './color-conversion';
+import {
+  bestContrastingBackground,
+  bestContrastingForeground,
+  contrastRatio,
+  hexToHslString,
+  hslStringToHex,
+  hslToHex,
+  MIN_CONTRAST_RATIO,
+  parseHslString,
+} from './color-conversion';
 
 describe('parseHslString (T-D03)', () => {
   it('parses a bare HSL string ("H S% L%")', () => {
@@ -44,5 +53,54 @@ describe('hexToHslString round-trip (T-D03)', () => {
   it('formats as "H S% L%" — the exact bare format the backend expects', () => {
     expect(hexToHslString('#ffffff')).toBe('0 0% 100%');
     expect(hexToHslString('#000000')).toBe('0 0% 0%');
+  });
+});
+
+describe('contrastRatio (T-PORTAL-CONTRAST) — mirrors the backend formula exactly', () => {
+  it('computes the extremes correctly', () => {
+    expect(contrastRatio('0 0% 0%', '0 0% 100%')).toBeCloseTo(21, 1);
+    expect(contrastRatio('142 72% 29%', '142 72% 29%')).toBeCloseTo(1, 5);
+  });
+
+  it('agrees with the AA threshold used by the backend schema', () => {
+    const ratio = contrastRatio('142 72% 29%', '0 0% 100%');
+    expect(ratio).not.toBeNull();
+    expect(ratio as number).toBeGreaterThanOrEqual(MIN_CONTRAST_RATIO);
+  });
+
+  it('returns null for unparsable input', () => {
+    expect(contrastRatio('nope', '0 0% 100%')).toBeNull();
+  });
+});
+
+describe('bestContrastingForeground (T-PORTAL-CONTRAST bug fix)', () => {
+  it('picks near-black for a pale/light background', () => {
+    const fg = bestContrastingForeground('48 96% 89%'); // pale yellow
+    expect(contrastRatio('48 96% 89%', fg)).toBeGreaterThanOrEqual(MIN_CONTRAST_RATIO);
+  });
+
+  it('picks white for a dark background', () => {
+    const fg = bestContrastingForeground('222 20% 9%'); // near-black
+    expect(contrastRatio('222 20% 9%', fg)).toBeGreaterThanOrEqual(MIN_CONTRAST_RATIO);
+  });
+});
+
+describe('bestContrastingBackground (T-PORTAL-CONTRAST bug fix, reverse direction)', () => {
+  it('keeps the background hue when a lighter/darker shade of it already works', () => {
+    // A muted blue-ish background against near-black text: darkening the
+    // SAME hue is enough, no need to fall back to flat black.
+    const bg = bestContrastingBackground('213 20% 93%', '214 32% 18%');
+    expect(bg.startsWith('213 20%')).toBe(true);
+    expect(contrastRatio(bg, '214 32% 18%')).toBeGreaterThanOrEqual(MIN_CONTRAST_RATIO);
+  });
+
+  it('falls back to a guaranteed-safe pure black/white when no hue-preserving shade reaches the minimum (real repro)', () => {
+    // Exact case reported after the first fix shipped: a dark, saturated
+    // background ("0 56% 42%") whose foreground was edited directly to a
+    // clashing bright red ("0 100% 48%") — same hue family, low contrast.
+    // Re-lighting/darkening WITHIN that same hue still falls short, so this
+    // must fall back to whichever of pure white/black actually clears 4.5:1.
+    const bg = bestContrastingBackground('0 56% 42%', '0 100% 48%');
+    expect(contrastRatio(bg, '0 100% 48%')).toBeGreaterThanOrEqual(MIN_CONTRAST_RATIO);
   });
 });
