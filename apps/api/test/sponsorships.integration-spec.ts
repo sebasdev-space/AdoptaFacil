@@ -114,7 +114,7 @@ describe('Sponsorships base (RF17 · T-056)', () => {
 
   let sponsorshipId = '';
 
-  it('a Person subscribes to the plan → sponsorship created ACTIVE, audited', async () => {
+  it('a Person subscribes to the plan → sponsorship created ACTIVE, audited, with the sponsor name snapshotted (T-057)', async () => {
     const res = await request(server)
       .post('/sponsorships')
       .set('Authorization', `Bearer ${personToken}`)
@@ -123,12 +123,26 @@ describe('Sponsorships base (RF17 · T-056)', () => {
     expect(res.body.status).toBe('active');
     expect(res.body.planId).toBe(planId);
     expect(res.body.animalId).toBe(animalId);
+    // Snapshotted from `users.display_name` at subscribe time (registered as
+    // "Padrino" above) — the org's own view needs a human name; sponsorUserId
+    // alone is opaque and the sponsor is never a member of this org.
+    expect(res.body.sponsorName).toBe('Padrino');
     sponsorshipId = res.body.id;
 
     const audited = await admin.auditLog.findMany({
       where: { action: 'sponsorship.created', entityId: sponsorshipId },
     });
     expect(audited.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('GET /sponsorships (org-facing list) also includes the snapshotted sponsor name', async () => {
+    const res = await request(server)
+      .get('/sponsorships')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .expect(200);
+    const row = res.body.items.find((s: { id: string }) => s.id === sponsorshipId);
+    expect(row).toBeDefined();
+    expect(row.sponsorName).toBe('Padrino');
   });
 
   it('GET /sponsorships/mine (S2-03): the sponsor sees their own subscription, enriched with names', async () => {

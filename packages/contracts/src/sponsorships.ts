@@ -95,6 +95,18 @@ export interface Sponsorship {
   /** Nombre del animal apadrinado. Solo `mine`. */
   animalName?: string;
   sponsorUserId: string;
+  /**
+   * Nombre del padrino, capturado como SNAPSHOT al momento de apadrinar (mismo
+   * criterio que `DonationDonor` en donations: el padrino no es miembro de esta
+   * organización, así que no hay join en vivo posible sin una función
+   * cross-tenant). A diferencia de `organizationName`/`planName`/`animalName`
+   * (que solo resuelve `GET /sponsorships/mine`), este campo es una COLUMNA
+   * real y viene poblado en TODAS las rutas, incluida la vista interna de la
+   * organización (`GET /sponsorships`). `undefined` en apadrinamientos creados
+   * antes de este campo (T-057, nunca se rellena retroactivamente) y en
+   * `GET /sponsorships/mine` (el propio padrino no necesita ver su nombre).
+   */
+  sponsorName?: string;
   status: SponsorshipStatus;
   /** ISO-8601 UTC. */
   startedAt: string;

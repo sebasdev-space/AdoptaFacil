@@ -32,6 +32,7 @@ interface SponsorshipRawRow {
   plan_id: string;
   animal_id: string;
   sponsor_user_id: string;
+  sponsor_name: string | null;
   status: string;
   started_at: Date;
   suspended_at: Date | null;
@@ -66,6 +67,7 @@ function toSponsorship(row: SponsorshipModel): Sponsorship {
     planId: row.planId,
     animalId: row.animalId,
     sponsorUserId: row.sponsorUserId,
+    sponsorName: row.sponsorName ?? undefined,
     status: row.status as SponsorshipStatus,
     startedAt: row.startedAt.toISOString(),
     suspendedAt: row.suspendedAt?.toISOString(),
@@ -82,6 +84,7 @@ function fromRawRow(row: SponsorshipRawRow): Sponsorship {
     planId: row.plan_id,
     animalId: row.animal_id,
     sponsorUserId: row.sponsor_user_id,
+    sponsorName: row.sponsor_name ?? undefined,
     status: row.status as SponsorshipStatus,
     startedAt: row.started_at.toISOString(),
     suspendedAt: row.suspended_at?.toISOString(),
