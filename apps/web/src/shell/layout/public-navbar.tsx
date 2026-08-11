@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { buttonVariants, cn } from '@adoptafacil/ui';
 import { Brand } from './brand';
 import styles from './public-navbar.module.scss';
@@ -21,12 +21,23 @@ export function PublicNavbar() {
         </Link>
 
         <nav aria-label="Navegación pública" className={styles.navbar__links}>
-          <Link to="/" className={styles.navbar__link}>
+          <NavLink
+            to="/"
+            end
+            className={({ isActive }) =>
+              cn(styles.navbar__link, isActive && styles['navbar__link--active'])
+            }
+          >
             Mascotas
-          </Link>
-          <Link to="/campanas" className={styles.navbar__link}>
+          </NavLink>
+          <NavLink
+            to="/campanas"
+            className={({ isActive }) =>
+              cn(styles.navbar__link, isActive && styles['navbar__link--active'])
+            }
+          >
             Campañas
-          </Link>
+          </NavLink>
         </nav>
 
         <div className={styles.navbar__actions}>

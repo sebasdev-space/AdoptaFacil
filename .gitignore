@@ -44,3 +44,6 @@ Thumbs.db
 # T-108: local disk storage root (runtime data; never commit)
 .storage/
 **/.storage/
+
+# Local AI tooling (personal, not shared with the team)
+.claude/
