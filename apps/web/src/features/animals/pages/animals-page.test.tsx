@@ -327,7 +327,12 @@ describe('AnimalsPage — activar apadrinamiento desde la ficha (S2-03-REV)', ()
     renderShell({ route: '/animales', ...sessionWith([Role.Operator]) });
 
     await screen.findByText('Firulais');
-    expect(screen.queryByRole('button', { name: /Apadrinamiento/ })).not.toBeInTheDocument();
+    // Scoped to <main> (MENU-SUBMENUS): the shell sidebar also renders an
+    // "Apadrinamientos" toggle button (unrelated to this per-animal action),
+    // so an unscoped query would see it in every renderShell()-mounted test.
+    expect(
+      within(screen.getByRole('main')).queryByRole('button', { name: /Apadrinamiento/ }),
+    ).not.toBeInTheDocument();
   });
 
   it('lets an Owner create a plan for an animal with none yet', async () => {
@@ -376,7 +381,10 @@ describe('AnimalsPage — activar apadrinamiento desde la ficha (S2-03-REV)', ()
     renderShell({ route: '/animales', ...sessionWith([Role.Owner]) });
 
     await screen.findByText('Firulais');
-    fireEvent.click(screen.getByRole('button', { name: /Apadrinamiento/ }));
+    // Scoped to <main> — see the note in the "hides the Apadrinamiento action" test above.
+    fireEvent.click(
+      within(screen.getByRole('main')).getByRole('button', { name: /Apadrinamiento/ }),
+    );
 
     const dialog = await screen.findByRole('dialog');
     await within(dialog).findByText(/todavía no tiene un plan/);
@@ -425,7 +433,10 @@ describe('AnimalsPage — activar apadrinamiento desde la ficha (S2-03-REV)', ()
     renderShell({ route: '/animales', ...sessionWith([Role.Administrator]) });
 
     await screen.findByText('Firulais');
-    fireEvent.click(screen.getByRole('button', { name: /Apadrinamiento/ }));
+    // Scoped to <main> — see the note in the "hides the Apadrinamiento action" test above.
+    fireEvent.click(
+      within(screen.getByRole('main')).getByRole('button', { name: /Apadrinamiento/ }),
+    );
 
     const dialog = await screen.findByRole('dialog');
     await within(dialog).findByText('Activo');

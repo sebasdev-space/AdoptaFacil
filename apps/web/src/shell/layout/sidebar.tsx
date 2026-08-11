@@ -1,13 +1,141 @@
-import { useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import { Button, Skeleton, cn } from '@adoptafacil/ui';
-import { CloseIcon } from '../icons';
-import { navItems } from '../navigation';
+import { ChevronDownIcon, CloseIcon } from '../icons';
+import { navItems, ORG_MEMBER_ROLES, type NavItem } from '../navigation';
 import { useNav } from '../navigation/nav-context';
 import { useSession } from '../auth';
 import { Brand } from './brand';
 import { useOrgIdentity } from './use-org-identity';
 import styles from './sidebar.module.scss';
+
+/** Shared visibility check for a leaf entry (top-level or inside a group). */
+function useLeafVisibility() {
+  const { hasAnyRole, user } = useSession();
+  return (leaf: Pick<NavItem, 'roles' | 'personaOnly'>) =>
+    (!leaf.roles || hasAnyRole(...leaf.roles)) &&
+    (!leaf.personaOnly || user?.accountType === 'person');
+}
+
+/**
+ * MENU-SUBMENUS: one collapsible group ("Donaciones", "Apadrinamientos",
+ * "Documentos"). Each child keeps its OWN `roles`/`personaOnly`/`comingSoon`
+ * gate, filtered exactly like a top-level `NavItem` always was — grouping is
+ * purely visual, never a permission change.
+ *
+ * `navigable` groups ("Documentos") render the label as a real link to
+ * `item.path` (only when the current session can see the parent's own
+ * `roles`) plus a separate chevron button that only toggles expand/collapse.
+ * Non-navigable groups ("Donaciones", "Apadrinamientos") render the whole row
+ * as a single toggle `button` — there is no page of their own to go to.
+ */
+function SidebarGroup({
+  item,
+  childItems,
+  onNavigate,
+}: {
+  item: NavItem;
+  childItems: NavItem[];
+  onNavigate?: () => void;
+}) {
+  const location = useLocation();
+  const canSeeLeaf = useLeafVisibility();
+  const [manualOpen, setManualOpen] = useState<boolean | undefined>(undefined);
+  const Icon = item.icon;
+
+  const hasActiveChild = childItems.some((child) => location.pathname === child.path);
+  const isOpen = manualOpen ?? hasActiveChild;
+  const toggle = () => setManualOpen(!isOpen);
+  const canNavigateParent = Boolean(item.navigable) && canSeeLeaf(item);
+
+  const chevronButton = (
+    <button
+      type="button"
+      className={styles['org-sidebar__group-toggle']}
+      aria-expanded={isOpen}
+      aria-label={`${isOpen ? 'Colapsar' : 'Expandir'} ${item.label}`}
+      onClick={toggle}
+    >
+      <ChevronDownIcon
+        className={cn(
+          styles['org-sidebar__group-chevron'],
+          isOpen && styles['org-sidebar__group-chevron--open'],
+        )}
+      />
+    </button>
+  );
+
+  return (
+    <div className={styles['org-sidebar__group']}>
+      {item.navigable ? (
+        <div className={styles['org-sidebar__group-header']}>
+          {canNavigateParent ? (
+            <NavLink
+              to={item.path}
+              onClick={onNavigate}
+              className={({ isActive }) =>
+                cn(
+                  styles['org-sidebar__link'],
+                  styles['org-sidebar__group-link'],
+                  isActive && styles['org-sidebar__link--active'],
+                )
+              }
+            >
+              <Icon />
+              <span>{item.label}</span>
+            </NavLink>
+          ) : (
+            <span
+              className={cn(
+                styles['org-sidebar__link'],
+                styles['org-sidebar__group-link'],
+                styles['org-sidebar__group-link--static'],
+              )}
+            >
+              <Icon />
+              <span>{item.label}</span>
+            </span>
+          )}
+          {chevronButton}
+        </div>
+      ) : (
+        <div className={styles['org-sidebar__group-header']}>
+          <button
+            type="button"
+            className={cn(styles['org-sidebar__link'], styles['org-sidebar__group-toggle-row'])}
+            aria-expanded={isOpen}
+            onClick={toggle}
+          >
+            <Icon />
+            <span className={styles['org-sidebar__group-row-label']}>{item.label}</span>
+          </button>
+          {chevronButton}
+        </div>
+      )}
+      {isOpen && (
+        <div className={styles['org-sidebar__group-children']}>
+          {childItems.map((child) => (
+            <NavLink
+              key={child.path}
+              to={child.path}
+              onClick={onNavigate}
+              className={({ isActive }) =>
+                cn(
+                  styles['org-sidebar__link'],
+                  styles['org-sidebar__link--child'],
+                  isActive && styles['org-sidebar__link--active'],
+                )
+              }
+            >
+              <span>{child.label}</span>
+              {child.comingSoon && <span className={styles['org-sidebar__badge']}>Pronto</span>}
+            </NavLink>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /**
  * The navigation link list, shared by the persistent sidebar and the drawer.
@@ -20,39 +148,66 @@ import styles from './sidebar.module.scss';
  * F1-01: `personaOnly` entries additionally require `accountType === 'person'`
  * — an allow-list of roles can't express "has none of these", so this checks
  * the account kind directly instead (see `NavItem.personaOnly`).
+ *
+ * MENU-SUBMENUS: a group entry (`children` present) is kept whenever the
+ * parent's OWN gate passes OR at least one child's gate passes — e.g. a role
+ * that can't open "Documentos" itself but CAN see its "Pronto" children (see
+ * the long comment on that entry in nav-items.ts) still gets the group, just
+ * without a working link on the parent label.
  */
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
-  const { hasAnyRole, user } = useSession();
-  const items = navItems.filter(
-    (item) =>
-      (!item.roles || hasAnyRole(...item.roles)) &&
-      (!item.personaOnly || user?.accountType === 'person'),
-  );
+  const canSeeLeaf = useLeafVisibility();
 
   return (
     <nav aria-label="Navegación principal" className={styles['org-sidebar__nav']}>
-      {items.map(({ path, label, icon: Icon, end, comingSoon }) => (
-        <NavLink
-          key={path}
-          to={path}
-          end={end}
-          onClick={onNavigate}
-          className={({ isActive }) =>
-            cn(styles['org-sidebar__link'], isActive && styles['org-sidebar__link--active'])
-          }
-        >
-          <Icon />
-          <span>{label}</span>
-          {comingSoon && <span className={styles['org-sidebar__badge']}>Pronto</span>}
-        </NavLink>
-      ))}
+      {navItems.map((item) => {
+        if (item.children) {
+          const visibleChildren = item.children.filter(canSeeLeaf);
+          if (!canSeeLeaf(item) && visibleChildren.length === 0) return null;
+          return (
+            <SidebarGroup
+              key={item.path}
+              item={item}
+              childItems={visibleChildren}
+              onNavigate={onNavigate}
+            />
+          );
+        }
+        if (!canSeeLeaf(item)) return null;
+        const { path, label, icon: Icon, end, comingSoon } = item;
+        return (
+          <NavLink
+            key={path}
+            to={path}
+            end={end}
+            onClick={onNavigate}
+            className={({ isActive }) =>
+              cn(styles['org-sidebar__link'], isActive && styles['org-sidebar__link--active'])
+            }
+          >
+            <Icon />
+            <span>{label}</span>
+            {comingSoon && <span className={styles['org-sidebar__badge']}>Pronto</span>}
+          </NavLink>
+        );
+      })}
     </nav>
   );
 }
 
-/** Real org name (never a placeholder) — hidden entirely for a Persona session. */
-function SidebarIdentity() {
+/**
+ * Real org name (never a placeholder) — hidden entirely for a Persona session.
+ *
+ * MENU-SUBMENUS: this block replaces the old standalone "Mi organización" nav
+ * entry — it now navigates to the SAME route (`/organizacion`) the removed
+ * item used to. Gated the same way that entry was (`hasAnyRole(...ORG_MEMBER_ROLES)`,
+ * T-062): every real org role satisfies it, so in practice this only ever
+ * downgrades to a non-clickable chip if a session somehow has no org role at
+ * all — never a behavior change for a normal org member.
+ */
+function SidebarIdentity({ onNavigate }: { onNavigate?: () => void }) {
   const identity = useOrgIdentity();
+  const { hasAnyRole } = useSession();
 
   if (identity.status === 'idle') return null;
 
@@ -74,13 +229,27 @@ function SidebarIdentity() {
     .map((word) => word[0]?.toUpperCase())
     .join('');
 
-  return (
-    <div className={styles['org-sidebar__identity']}>
+  const content = (
+    <>
       <span className={styles['org-sidebar__identity-avatar']} aria-hidden>
         {initials}
       </span>
       <span className={styles['org-sidebar__identity-name']}>{identity.name}</span>
-    </div>
+    </>
+  );
+
+  if (!hasAnyRole(...ORG_MEMBER_ROLES)) {
+    return <div className={styles['org-sidebar__identity']}>{content}</div>;
+  }
+
+  return (
+    <NavLink
+      to="/organizacion"
+      onClick={onNavigate}
+      className={cn(styles['org-sidebar__identity'], styles['org-sidebar__identity--link'])}
+    >
+      {content}
+    </NavLink>
   );
 }
 
@@ -159,7 +328,7 @@ export function MobileNavDrawer() {
             <CloseIcon className="h-5 w-5" />
           </Button>
         </div>
-        <SidebarIdentity />
+        <SidebarIdentity onNavigate={closeDrawer} />
         <SidebarNav onNavigate={closeDrawer} />
         <SidebarFooter />
       </div>
