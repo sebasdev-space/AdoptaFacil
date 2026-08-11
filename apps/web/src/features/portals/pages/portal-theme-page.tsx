@@ -24,6 +24,7 @@ import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
 import { brandTokensToStyle } from '../../../shell/theme';
 import {
+  bestContrastingBackground,
   bestContrastingForeground,
   contrastRatio,
   hexToHslString,
@@ -60,15 +61,24 @@ const DISPLAY_FALLBACK_HSL: Partial<Record<string, string>> = {
 };
 
 /**
- * Fondo → su token de texto emparejado (T-PORTAL-CONTRAST). Mismos pares que
+ * Pares fondo ↔ texto (T-PORTAL-CONTRAST). Mismos pares que
  * `PORTAL_COLOR_PAIRS` en `apps/api/.../portals.schemas.ts` — duplicado aquí
- * porque es una constante de 3 líneas, no un tipo compartido (no toca
- * `packages/contracts`).
+ * porque es una constante de unas líneas, no un tipo compartido (no toca
+ * `packages/contracts`). Bidireccional: cambiar CUALQUIERA de los dos lados
+ * de un par autoajusta el otro si hace falta (ver `setToken` más abajo) — la
+ * primera versión de este fix solo cubría fondo→texto, y "cambiar el texto"
+ * (ej. "Texto sobre secundario") seguía pudiendo fallar contra un fondo sin
+ * tocar.
  */
 const BACKGROUND_TO_FOREGROUND: Partial<Record<string, string>> = {
   primary: 'primary-foreground',
   secondary: 'secondary-foreground',
   accent: 'accent-foreground',
+};
+const FOREGROUND_TO_BACKGROUND: Partial<Record<string, string>> = {
+  'primary-foreground': 'primary',
+  'secondary-foreground': 'secondary',
+  'accent-foreground': 'accent',
 };
 
 /** Simple external-link glyph (feature-local — no icon library added). */
@@ -272,13 +282,21 @@ export function PortalThemePage() {
    * Fix (frontend, sin tocar el schema del backend — esa regla es correcta):
    * al cambiar un color de FONDO, si el texto emparejado actual no alcanza
    * el contraste mínimo contra el nuevo fondo, se autoajusta ESE texto
-   * (blanco o casi-negro, el que dé mejor contraste) antes de guardar. Si el
-   * usuario edita el texto directamente, no se toca nada más — sigue
-   * pudiendo elegir un valor que el backend rechace, igual que antes.
+   * (blanco o casi-negro, el que dé mejor contraste) antes de guardar.
+   *
+   * ACTUALIZACIÓN: la primera versión solo cubría fondo→texto; "cambiar el
+   * texto" (ej. "Texto sobre secundario") directamente seguía pudiendo
+   * fallar contra un fondo sin tocar — confirmado en producción (par
+   * secundario `0 56% 42%`/`0 100% 48%`, contraste real ~1.6:1). Ahora es
+   * bidireccional: cambiar CUALQUIERA de los dos lados de un par autoajusta
+   * el OTRO lado si hace falta, nunca el que el usuario acaba de tocar. Al
+   * corregir un fondo se conserva su matiz/saturación (solo se ajusta la
+   * luminosidad) para no reemplazar en silencio el color de marca elegido.
    */
   const setToken = (token: string, value: string) =>
     setForm((prev) => {
       const next = { ...prev, [token]: value };
+
       const fgToken = BACKGROUND_TO_FOREGROUND[token];
       if (fgToken) {
         const currentFg = next[fgToken]?.trim() || DISPLAY_FALLBACK_HSL[fgToken];
@@ -287,6 +305,16 @@ export function PortalThemePage() {
           next[fgToken] = bestContrastingForeground(value);
         }
       }
+
+      const bgToken = FOREGROUND_TO_BACKGROUND[token];
+      if (bgToken) {
+        const currentBg = next[bgToken]?.trim() || DISPLAY_FALLBACK_HSL[bgToken];
+        const ratio = currentBg ? contrastRatio(currentBg, value) : null;
+        if ((ratio === null || ratio < MIN_CONTRAST_RATIO) && currentBg) {
+          next[bgToken] = bestContrastingBackground(currentBg, value);
+        }
+      }
+
       return next;
     });
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bestContrastingBackground,
   bestContrastingForeground,
   contrastRatio,
   hexToHslString,
@@ -81,5 +82,25 @@ describe('bestContrastingForeground (T-PORTAL-CONTRAST bug fix)', () => {
   it('picks white for a dark background', () => {
     const fg = bestContrastingForeground('222 20% 9%'); // near-black
     expect(contrastRatio('222 20% 9%', fg)).toBeGreaterThanOrEqual(MIN_CONTRAST_RATIO);
+  });
+});
+
+describe('bestContrastingBackground (T-PORTAL-CONTRAST bug fix, reverse direction)', () => {
+  it('keeps the background hue when a lighter/darker shade of it already works', () => {
+    // A muted blue-ish background against near-black text: darkening the
+    // SAME hue is enough, no need to fall back to flat black.
+    const bg = bestContrastingBackground('213 20% 93%', '214 32% 18%');
+    expect(bg.startsWith('213 20%')).toBe(true);
+    expect(contrastRatio(bg, '214 32% 18%')).toBeGreaterThanOrEqual(MIN_CONTRAST_RATIO);
+  });
+
+  it('falls back to a guaranteed-safe pure black/white when no hue-preserving shade reaches the minimum (real repro)', () => {
+    // Exact case reported after the first fix shipped: a dark, saturated
+    // background ("0 56% 42%") whose foreground was edited directly to a
+    // clashing bright red ("0 100% 48%") — same hue family, low contrast.
+    // Re-lighting/darkening WITHIN that same hue still falls short, so this
+    // must fall back to whichever of pure white/black actually clears 4.5:1.
+    const bg = bestContrastingBackground('0 56% 42%', '0 100% 48%');
+    expect(contrastRatio(bg, '0 100% 48%')).toBeGreaterThanOrEqual(MIN_CONTRAST_RATIO);
   });
 });

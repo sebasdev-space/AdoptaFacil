@@ -149,6 +149,37 @@ describe('PortalThemePage — owner personalization (visual only, S2-REORG)', ()
     });
   });
 
+  it('BUG FIX FOLLOW-UP (T-PORTAL-CONTRAST): editing the TEXT field directly (not the background) also auto-corrects instead of 400ing', async () => {
+    // Reported after the first fix shipped: it only covered background→text.
+    // Editing "Texto sobre secundario" directly against an existing dark
+    // "Color secundario" ("0 56% 42%") to a clashing bright red used to still
+    // 400 — real repro measured ~1.6:1 contrast.
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    stubFetch((url, init) => {
+      calls.push({ url, init });
+      if (init?.method === 'PUT') {
+        const body = JSON.parse(String(init.body));
+        return { tokens: body.tokens };
+      }
+      return { tokens: { secondary: '0 56% 42%', 'secondary-foreground': '214 32% 18%' } };
+    });
+    renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
+
+    const secondaryFg = await screen.findByLabelText('Texto sobre secundario');
+    fireEvent.change(secondaryFg, { target: { value: '#f50000' } }); // bright red
+    fireEvent.click(screen.getByRole('button', { name: /Guardar personalización/ }));
+
+    await waitFor(() => {
+      const put = calls.find((c) => c.init?.method === 'PUT');
+      expect(put).toBeDefined();
+      const body = JSON.parse(String(put?.init?.body));
+      expect(body.tokens.secondary).not.toBe('0 56% 42%'); // the background had to move
+      const ratio = contrastRatio(body.tokens.secondary, body.tokens['secondary-foreground']);
+      expect(ratio).not.toBeNull();
+      expect(ratio as number).toBeGreaterThanOrEqual(MIN_CONTRAST_RATIO);
+    });
+  });
+
   it('also allows an Administrator to edit', async () => {
     renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Administrator]) });
     expect(await screen.findByLabelText('Color principal')).toBeInTheDocument();
