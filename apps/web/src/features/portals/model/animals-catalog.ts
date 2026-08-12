@@ -2,6 +2,7 @@ import type {
   AnimalSex,
   AnimalSize,
   AnimalSpecies,
+  AnimalStatus,
   AnimalSummary,
   ComputedAge,
 } from '@adoptafacil/contracts';
@@ -23,6 +24,13 @@ export const SIZE_LABELS: Record<AnimalSize, string> = {
   small: 'Pequeño',
   medium: 'Mediano',
   large: 'Grande',
+};
+
+export const STATUS_LABELS: Record<AnimalStatus, string> = {
+  available: 'Disponible',
+  in_process: 'En proceso de adopción',
+  adopted: 'Adoptado',
+  unavailable: 'No disponible',
 };
 
 /** Etiqueta legible de la edad DERIVADA (calculada en la API, T-104) — nunca una
