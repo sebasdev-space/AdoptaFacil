@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import {
   ADOPTION_MESSAGE_MIN_LENGTH,
@@ -18,6 +18,7 @@ import {
 import { PageContainer, PageHeader } from '../../_layout';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
+import { validateEmail, validateRequired } from '../../auth/validation';
 import { createAdoptionRequest } from '../api/adoptions-api';
 
 interface AdoptionTarget {
@@ -70,9 +71,16 @@ export function AdoptionRequestPage() {
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [touched, setTouched] = useState<{ fullName?: boolean; email?: boolean }>({});
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+
+  const fullNameError = validateRequired(fullName, 'El nombre completo');
+  const emailError = validateEmail(email);
+  const showFullNameError = touched.fullName || attemptedSubmit ? fullNameError : undefined;
+  const showEmailError = touched.email || attemptedSubmit ? emailError : undefined;
 
   const remaining = Math.max(0, ADOPTION_MESSAGE_MIN_LENGTH - message.trim().length);
-  const canSubmit = Boolean(target) && remaining === 0 && fullName.trim() && email.trim();
+  const canSubmit = Boolean(target) && remaining === 0 && !fullNameError && !emailError;
 
   if (!target) {
     return (
@@ -85,6 +93,12 @@ export function AdoptionRequestPage() {
       </PageContainer>
     );
   }
+
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setAttemptedSubmit(true);
+    void submit();
+  };
 
   const submit = async () => {
     if (!canSubmit || !target) return;
@@ -137,24 +151,54 @@ export function AdoptionRequestPage() {
               description="Tu solicitud quedó en estado «Nuevas». La organización te contactará al evaluarla."
             />
           ) : (
-            <>
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <div className="grid gap-4 sm:grid-cols-2">
-                <label className="space-y-1.5 text-sm font-medium">
+                <label className="space-y-1.5 text-sm font-medium" htmlFor="adoption-full-name">
                   Nombre completo
-                  <Input value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+                  <Input
+                    id="adoption-full-name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    onBlur={() => setTouched((prev) => ({ ...prev, fullName: true }))}
+                    required
+                    aria-invalid={showFullNameError ? true : undefined}
+                    aria-describedby={showFullNameError ? 'adoption-full-name-error' : undefined}
+                  />
+                  {showFullNameError && (
+                    <p
+                      id="adoption-full-name-error"
+                      role="alert"
+                      className="text-xs text-destructive"
+                    >
+                      {showFullNameError}
+                    </p>
+                  )}
                 </label>
-                <label className="space-y-1.5 text-sm font-medium">
+                <label className="space-y-1.5 text-sm font-medium" htmlFor="adoption-email">
                   Correo
                   <Input
+                    id="adoption-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
+                    onBlur={() => setTouched((prev) => ({ ...prev, email: true }))}
                     required
+                    aria-invalid={showEmailError ? true : undefined}
+                    aria-describedby={showEmailError ? 'adoption-email-error' : undefined}
                   />
+                  {showEmailError && (
+                    <p id="adoption-email-error" role="alert" className="text-xs text-destructive">
+                      {showEmailError}
+                    </p>
+                  )}
                 </label>
-                <label className="space-y-1.5 text-sm font-medium">
+                <label className="space-y-1.5 text-sm font-medium" htmlFor="adoption-phone">
                   Teléfono (opcional)
-                  <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+                  <Input
+                    id="adoption-phone"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                  />
                 </label>
               </div>
               <label className="space-y-1.5 text-sm font-medium" htmlFor="adoption-message">
@@ -172,10 +216,10 @@ export function AdoptionRequestPage() {
                   ? `Faltan ${remaining} caracteres (mínimo ${ADOPTION_MESSAGE_MIN_LENGTH}).`
                   : 'Mensaje listo.'}
               </p>
-              <Button disabled={!canSubmit || submitting} onClick={() => void submit()}>
+              <Button type="submit" disabled={!canSubmit || submitting}>
                 {submitting ? 'Enviando…' : 'Enviar solicitud'}
               </Button>
-            </>
+            </form>
           )}
         </CardContent>
       </Card>
