@@ -51,4 +51,31 @@ describe('AdoptionRequestPage', () => {
     });
     expect(submit).toBeEnabled();
   });
+
+  it('blocks submit and shows a specific message for an invalid email (T-URGENT-adoptions-form)', async () => {
+    renderShell({ route: target, ...personSession() });
+    await screen.findByText('Michi');
+
+    const emailInput = screen.getByLabelText('Correo');
+    fireEvent.change(emailInput, { target: { value: 'asdf' } });
+    fireEvent.blur(emailInput);
+
+    expect(await screen.findByText('Ingresa un correo válido.')).toBeInTheDocument();
+    expect(emailInput).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByRole('button', { name: 'Enviar solicitud' })).toBeDisabled();
+  });
+
+  it('the fields are inside a real <form> so a submit attempt cannot bypass validation', async () => {
+    renderShell({ route: target, ...personSession() });
+    await screen.findByText('Michi');
+
+    const fullNameInput = screen.getByLabelText('Nombre completo');
+    fireEvent.change(fullNameInput, { target: { value: '' } });
+    const form = fullNameInput.closest('form');
+    expect(form).toBeInTheDocument();
+
+    fireEvent.submit(form as HTMLFormElement);
+
+    expect(await screen.findByText('El nombre completo es obligatorio.')).toBeInTheDocument();
+  });
 });
