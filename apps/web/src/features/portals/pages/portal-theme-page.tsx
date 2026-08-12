@@ -15,7 +15,11 @@ import {
   CardHeader,
   CardTitle,
   EmptyState,
-  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Skeleton,
   useToast,
 } from '@adoptafacil/ui';
@@ -29,7 +33,12 @@ import {
   hslStringToHex,
   MIN_CONTRAST_RATIO,
 } from '../model/color-conversion';
-import { PORTAL_THEME_FIELDS, safePortalTheme, type PortalThemeField } from '../model/theme';
+import {
+  PORTAL_THEME_FIELDS,
+  RADIUS_OPTIONS,
+  safePortalTheme,
+  type PortalThemeField,
+} from '../model/theme';
 import { PortalMiniPreview } from '../components/portal-mini-preview';
 
 /** Empty string ⇒ "use the default token" (the field is omitted from the payload). */
@@ -271,14 +280,12 @@ export function PortalThemePage() {
     setForm((prev) => ({ ...prev, [token]: value }));
 
   /**
-   * Validación previa de contraste (T-PORTAL-CROSSED-INPUTS): decisión de
-   * producto — cada input SOLO cambia lo que se toca, nunca se autoajusta un
-   * campo ajeno (ver el comentario en `COLOR_PAIRS` arriba). Eso significa
-   * que una combinación inválida puede llegar a "Guardar"; en vez de dejar
-   * que el 400 del backend sea la primera noticia, se revisa aquí ANTES de
-   * llamar a la API (mismos pares y umbral que `portals.schemas.ts`) y se
-   * muestra qué dos campos exactos chocan y su ratio real — el usuario ajusta
-   * el que prefiera, ninguno se mueve solo. Devuelve `null` si todo está bien.
+   * Chequeo de contraste (T-PORTAL-CROSSED-INPUTS): cada input SOLO cambia lo
+   * que se toca, nunca se autoajusta un campo ajeno (ver el comentario en
+   * `COLOR_PAIRS` arriba). El contraste bajo es SOLO una advertencia — nunca
+   * bloquea "Guardar" (feedback de campo: un dueño debe poder guardar un tema
+   * imperfecto en vez de quedar atascado); `save()` la muestra como toast pero
+   * guarda igual. Devuelve `null` si todo está bien.
    */
   function findContrastConflict(current: FormState): string | null {
     const labelFor = (token: string) =>
@@ -297,14 +304,14 @@ export function PortalThemePage() {
   }
 
   const save = async () => {
+    // Advertencia, no bloqueo: se avisa del contraste bajo pero se guarda igual.
     const conflict = findContrastConflict(form);
     if (conflict) {
       toast({
-        title: 'Revisa el contraste antes de guardar',
+        title: 'Contraste bajo — se guardará igual',
         description: conflict,
         variant: 'warning',
       });
-      return;
     }
     setSaving(true);
     try {
@@ -404,13 +411,24 @@ export function PortalThemePage() {
                     >
                       {field.label}
                     </label>
-                    <Input
-                      id={`token-${field.token}`}
-                      value={form[field.token] ?? ''}
-                      placeholder="0.5rem"
-                      aria-describedby={`token-${field.token}-hint`}
-                      onChange={(event) => setToken(field.token, event.target.value)}
-                    />
+                    <Select
+                      value={form[field.token] || RADIUS_OPTIONS[2].value}
+                      onValueChange={(value) => setToken(field.token, value)}
+                    >
+                      <SelectTrigger
+                        id={`token-${field.token}`}
+                        aria-describedby={`token-${field.token}-hint`}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {RADIUS_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <p id={`token-${field.token}-hint`} className="text-xs text-muted-foreground">
                       {field.hint}
                     </p>

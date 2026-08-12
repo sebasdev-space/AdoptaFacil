@@ -178,11 +178,14 @@ describe('PortalThemePage — owner personalization (visual only, S2-REORG)', ()
       },
     );
 
-    it('shows a clear, actionable warning (no silent color swap, no raw 400) when a combination lacks contrast, and never calls the API', async () => {
+    it('shows a warning (no silent color swap) when a combination lacks contrast, but still saves — never blocks the action', async () => {
       const calls: Array<{ url: string; init?: RequestInit }> = [];
       stubFetch((url, init) => {
         calls.push({ url, init });
-        if (init?.method === 'PUT') return { tokens: {} };
+        if (init?.method === 'PUT') {
+          const body = JSON.parse(String(init.body));
+          return { tokens: body.tokens };
+        }
         return { tokens: { primary: '172 67% 30%', 'primary-foreground': '0 0% 100%' } };
       });
       renderShell({ route: '/organizacion/portal', ...sessionWith([Role.Owner]) });
@@ -196,7 +199,7 @@ describe('PortalThemePage — owner personalization (visual only, S2-REORG)', ()
       fireEvent.change(primary, { target: { value: '#fef3c7' } });
       fireEvent.click(screen.getByRole('button', { name: /Guardar personalización/ }));
 
-      expect(await screen.findByText('Revisa el contraste antes de guardar')).toBeInTheDocument();
+      expect(await screen.findByText('Contraste bajo — se guardará igual')).toBeInTheDocument();
       // Names both conflicting fields by their visible label, in one message
       // (distinct from the two <label> elements, which each name only one).
       expect(
@@ -205,9 +208,11 @@ describe('PortalThemePage — owner personalization (visual only, S2-REORG)', ()
         ),
       ).toBeInTheDocument();
 
-      // Never even reaches the backend — and the untouched field is NOT
-      // silently moved to "fix" it.
-      expect(calls.some((c) => c.init?.method === 'PUT')).toBe(false);
+      // The warning does NOT block the save — the API is still called — and
+      // the untouched field is NOT silently moved to "fix" it.
+      await waitFor(() => {
+        expect(calls.some((c) => c.init?.method === 'PUT')).toBe(true);
+      });
       expect(primaryFg.value).toBe(fgBefore);
     });
   });

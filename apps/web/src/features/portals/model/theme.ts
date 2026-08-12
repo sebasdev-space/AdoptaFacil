@@ -29,6 +29,17 @@ export interface PortalThemeField {
   hint: string;
 }
 
+/** Opciones predefinidas para "Radio de esquinas" — reemplaza el input de
+ *  texto libre por un selector cerrado; cada valor ya cumple el formato/rango
+ *  que exige el backend (`RADIUS` en `portals.schemas.ts`, máx. 64px/rem/em). */
+export const RADIUS_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: '0px', label: 'Sin redondeo' },
+  { value: '0.25rem', label: 'Pequeño' },
+  { value: '0.5rem', label: 'Mediano' },
+  { value: '0.75rem', label: 'Grande' },
+  { value: '1rem', label: 'Extra grande' },
+];
+
 /** Campos editables del tema, en orden de presentación. Fuente única de la UI. */
 export const PORTAL_THEME_FIELDS: readonly PortalThemeField[] = [
   // Labels en español simple (S2-REORG) — un dueño no técnico nunca necesita
@@ -56,7 +67,12 @@ export const PORTAL_THEME_FIELDS: readonly PortalThemeField[] = [
     hint: 'HSL: "H S% L%"',
   },
   { token: 'ring', label: 'Anillo de foco', kind: 'color', hint: 'HSL: "H S% L%"' },
-  { token: 'radius', label: 'Radio de esquinas', kind: 'length', hint: 'p. ej. "0.5rem", "8px"' },
+  {
+    token: 'radius',
+    label: 'Radio de esquinas',
+    kind: 'length',
+    hint: 'Qué tan redondeadas se ven las esquinas de botones y tarjetas.',
+  },
 ];
 
 /** Conjunto de tokens permitidos, derivado de la lista de campos. */
