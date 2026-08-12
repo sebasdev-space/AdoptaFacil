@@ -73,3 +73,18 @@ export function progressPercent(progress: number): number {
 export function publicCampaignDetailHref(id: string): string {
   return `/campanas/${encodeURIComponent(id)}`;
 }
+
+/**
+ * Parsea el monto (opcional) de una evidencia de rendición: `''` → `undefined`
+ * (sin monto, válido — una foto puede no tener valor monetario); un entero
+ * positivo válido → ese número; cualquier otra cosa (decimales, negativos,
+ * cero, texto) → `null` (inválido). Espeja la regla real del backend
+ * (`campaign-evidences.schemas.ts`: `z.number().int().positive().optional()`)
+ * para que crear y editar una evidencia validen exactamente lo mismo, en vez
+ * de reimplementar el chequeo en cada formulario.
+ */
+export function parseOptionalEvidenceAmount(value: string): number | undefined | null {
+  if (!value.trim()) return undefined;
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}

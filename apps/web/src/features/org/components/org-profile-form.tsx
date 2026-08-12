@@ -30,6 +30,16 @@ import styles from './org-profile-form.module.scss';
 
 const ABOUT_US_MAX = 2000;
 
+// Mirrors the real backend caps (apps/api/.../org.schemas.ts: shortText(n)) —
+// stopping the user from typing past them here, instead of letting a save
+// attempt fail with no explanation for a limit they never saw.
+const NAME_MAX = 200;
+const NIT_MAX = 50;
+const LEGAL_NAME_MAX = 200;
+const DESCRIPTION_MAX = 5000;
+const WHATSAPP_MAX = 30;
+const PHONE_MAX = 30;
+
 const TABS: OrgTabItem[] = [
   { value: 'institucional', label: 'Datos institucionales' },
   { value: 'ubicacion', label: 'Ubicación' },
@@ -450,6 +460,7 @@ export const OrgProfileForm = forwardRef<OrgProfileFormHandle, OrgProfileFormPro
               value={form.name}
               onChange={set('name')}
               error={errors.name}
+              maxLength={NAME_MAX}
             />
             <div>
               <OrgTextField
@@ -476,6 +487,7 @@ export const OrgProfileForm = forwardRef<OrgProfileFormHandle, OrgProfileFormPro
               value={form.nit}
               onChange={set('nit')}
               error={errors.nit}
+              maxLength={NIT_MAX}
             />
             <OrgTextField
               id="org-legal"
@@ -483,6 +495,7 @@ export const OrgProfileForm = forwardRef<OrgProfileFormHandle, OrgProfileFormPro
               value={form.legalName}
               onChange={set('legalName')}
               error={errors.legalName}
+              maxLength={LEGAL_NAME_MAX}
             />
             <div className="md:col-span-2">
               <OrgTextAreaField
@@ -491,6 +504,7 @@ export const OrgProfileForm = forwardRef<OrgProfileFormHandle, OrgProfileFormPro
                 value={form.description}
                 onChange={set('description')}
                 error={errors.description}
+                maxLength={DESCRIPTION_MAX}
               />
             </div>
           </div>
@@ -569,6 +583,7 @@ export const OrgProfileForm = forwardRef<OrgProfileFormHandle, OrgProfileFormPro
               value={form.whatsapp}
               onChange={set('whatsapp')}
               error={errors.whatsapp}
+              maxLength={WHATSAPP_MAX}
             />
             <OrgTextField
               id="org-phone"
@@ -577,6 +592,7 @@ export const OrgProfileForm = forwardRef<OrgProfileFormHandle, OrgProfileFormPro
               onChange={set('phone')}
               error={errors.phone}
               hint="No se muestra en el portal público."
+              maxLength={PHONE_MAX}
             />
           </div>
 

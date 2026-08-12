@@ -41,6 +41,7 @@ import {
   campaignStatusVariant,
   formatBogota,
   formatCop,
+  parseOptionalEvidenceAmount,
 } from '../model/campaigns-view';
 import { EVIDENCE_ACCEPT, uploadEvidenceFile, validateEvidenceUpload } from '../lib/storage';
 
@@ -212,8 +213,8 @@ export function CampaignDetailPage() {
       toast({ title: 'Archivo no válido', description: invalid, variant: 'warning' });
       return;
     }
-    const amountValue = evAmount ? Number(evAmount) : undefined;
-    if (amountValue !== undefined && (!Number.isInteger(amountValue) || amountValue <= 0)) {
+    const amountValue = parseOptionalEvidenceAmount(evAmount);
+    if (amountValue === null) {
       toast({
         title: 'Monto inválido',
         description: 'El monto (si lo indicas) debe ser un entero COP mayor a 0.',
@@ -580,14 +581,28 @@ interface EvidenceEditRowProps {
   onSave: (patch: UpdateCampaignEvidenceInput) => void;
 }
 
-/** Inline edit row for a single evidence's business fields (the file is immutable). */
+/**
+ * Inline edit row for a single evidence's business fields (the file is
+ * immutable). `amount` MUST be validated the same way `submitEvidence` (the
+ * create path) already does — before this fix it wasn't, so an invalid value
+ * (a decimal, negative, or unparseable amount) went straight to the PATCH
+ * request and only the backend's Zod schema caught it, surfacing a raw
+ * "amount: Expected integer, received float"-style message instead of a
+ * clear one, and losing whatever the user had just typed.
+ */
 function EvidenceEditRow({ evidence, onCancel, onSave }: EvidenceEditRowProps) {
   const [concept, setConcept] = useState(evidence.concept);
   const [amount, setAmount] = useState(evidence.amount ? String(evidence.amount) : '');
   const [spentAt, setSpentAt] = useState(toDateInputValue(evidence.spentAt));
+  const [amountError, setAmountError] = useState<string | null>(null);
 
   const save = (): void => {
-    const amountValue = amount ? Number(amount) : undefined;
+    const amountValue = parseOptionalEvidenceAmount(amount);
+    if (amountValue === null) {
+      setAmountError('El monto (si lo indicas) debe ser un entero COP mayor a 0.');
+      return;
+    }
+    setAmountError(null);
     onSave({
       concept: concept.trim() || undefined,
       amount: amountValue,
@@ -599,14 +614,25 @@ function EvidenceEditRow({ evidence, onCancel, onSave }: EvidenceEditRowProps) {
     <li className="space-y-3 rounded-md border p-3">
       <Input value={concept} onChange={(e) => setConcept(e.target.value)} aria-label="Concepto" />
       <div className="grid gap-3 sm:grid-cols-2">
-        <Input
-          type="number"
-          min={1}
-          step={1}
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          aria-label="Monto (COP)"
-        />
+        <div className="space-y-1">
+          <Input
+            type="number"
+            min={1}
+            step={1}
+            value={amount}
+            onChange={(e) => {
+              setAmount(e.target.value);
+              if (amountError) setAmountError(null);
+            }}
+            aria-label="Monto (COP)"
+            aria-invalid={amountError ? true : undefined}
+          />
+          {amountError && (
+            <p role="alert" className="text-xs font-medium text-destructive">
+              {amountError}
+            </p>
+          )}
+        </div>
         <Input
           type="date"
           value={spentAt}

@@ -24,6 +24,9 @@ export interface OrgTextFieldProps extends LabeledProps {
   onChange: (value: string) => void;
   type?: string;
   placeholder?: string;
+  /** Mirrors a backend `shortText(n)` cap (org.schemas.ts) so typing past it is
+   *  stopped by the browser instead of failing silently at save time. */
+  maxLength?: number;
 }
 
 function fieldAria(id: string, error?: string, hint?: string) {
@@ -46,6 +49,7 @@ export function OrgTextField({
   hint,
   type = 'text',
   placeholder,
+  maxLength,
 }: OrgTextFieldProps) {
   const { errorId, hintId, describedBy } = fieldAria(id, error, hint);
   return (
@@ -58,6 +62,7 @@ export function OrgTextField({
         type={type}
         value={value}
         placeholder={placeholder}
+        maxLength={maxLength}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy}
         onChange={(event) => onChange(event.target.value)}
