@@ -286,7 +286,30 @@ export function AnimalFormModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+      {/*
+       * Layout notes (M03 modal redesign): the base `.dialog-content` (packages/ui,
+       * NOT modified here) is a `display:grid` box with its own padding/gap — that's
+       * exactly what makes the 3-row split below work with zero extra wrapper divs:
+       * DialogHeader / the scrollable body / DialogFooter are its 3 direct grid
+       * children, sized via `grid-rows-[auto_1fr_auto]` so the MIDDLE row alone
+       * absorbs any overflow (`min-h-0` is required for a grid item to shrink below
+       * its content size — without it the scroll area never actually scrolls).
+       * Header and footer stay outside that scroll area, so they're always visible
+       * (no more scrollbar rendered on top of the whole card, cutting across
+       * "Especie" like before) and the footer's Cancelar/Registrar buttons never
+       * require scrolling to reach.
+       */}
+      {/*
+       * `maxWidth`/`width` are set via inline `style`, not a Tailwind className:
+       * the base `.dialog-content` (packages/ui) sets `max-width: 32rem` in its
+       * own SCSS module, and empirically (measured via a real render) a Tailwind
+       * utility class on this consumer does NOT win that cascade — inline style
+       * always does, without touching the shared component's source.
+       */}
+      <DialogContent
+        className="grid-rows-[auto_1fr_auto] overflow-hidden"
+        style={{ maxWidth: '56rem', width: 'calc(100% - 2rem)', maxHeight: '85vh' }}
+      >
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Editar animal' : 'Registrar animal'}</DialogTitle>
           <DialogDescription>
@@ -296,72 +319,77 @@ export function AnimalFormModal({
           </DialogDescription>
         </DialogHeader>
 
-        {showMissingSlugWarning && <MissingSlugBanner />}
+        <div className="min-h-0 space-y-4 overflow-y-auto pr-1">
+          {showMissingSlugWarning && <MissingSlugBanner />}
 
-        <div className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <label htmlFor="animal-name" className="block text-sm font-medium text-foreground">
-                Nombre *
-              </label>
-              <Input
-                id="animal-name"
-                placeholder="Nombre del animal"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+          {/* Foto principal al costado (arriba, alineada con el grid de campos
+           *  cortos) en desktop; apilada antes del grid en tablet/mobile. */}
+          <div className="grid gap-4 lg:grid-cols-[176px_1fr] lg:gap-6">
+            <AnimalPhotoField
+              id="animal-photo"
+              preview={photoPreviewUrl}
+              uploading={photoUploading}
+              onFileSelected={(file) => void handlePhotoSelected(file)}
+            />
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="space-y-1.5">
+                <label htmlFor="animal-name" className="block text-sm font-medium text-foreground">
+                  Nombre *
+                </label>
+                <Input
+                  id="animal-name"
+                  placeholder="Nombre del animal"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+              <SelectField
+                id="animal-species"
+                label="Especie *"
+                value={species}
+                onChange={handleSpeciesChange}
+                options={SPECIES_OPTIONS}
+              />
+              <BreedCombobox
+                id="animal-breed"
+                label="Raza"
+                breeds={breeds}
+                value={breedId}
+                onSelectBreed={setBreedId}
+                customValue={customBreed}
+                onCustomValueChange={setCustomBreed}
+              />
+              <SelectField
+                id="animal-sex"
+                label="Sexo"
+                value={sex}
+                onChange={setSex}
+                options={SEX_OPTIONS}
+              />
+              <div className="space-y-1.5">
+                <label
+                  htmlFor="animal-birthdate"
+                  className="block text-sm font-medium text-foreground"
+                >
+                  Fecha de nacimiento
+                </label>
+                <Input
+                  id="animal-birthdate"
+                  type="date"
+                  value={birthDate}
+                  onChange={(e) => setBirthDate(e.target.value)}
+                />
+                {ageHint && <p className="text-xs text-muted-foreground">{ageHint}</p>}
+              </div>
+              <SelectField
+                id="animal-size"
+                label="Tamaño"
+                value={size}
+                onChange={setSize}
+                options={SIZE_OPTIONS}
               />
             </div>
-            <SelectField
-              id="animal-species"
-              label="Especie *"
-              value={species}
-              onChange={handleSpeciesChange}
-              options={SPECIES_OPTIONS}
-            />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <BreedCombobox
-              id="animal-breed"
-              label="Raza"
-              breeds={breeds}
-              value={breedId}
-              onSelectBreed={setBreedId}
-              customValue={customBreed}
-              onCustomValueChange={setCustomBreed}
-            />
-            <SelectField
-              id="animal-sex"
-              label="Sexo"
-              value={sex}
-              onChange={setSex}
-              options={SEX_OPTIONS}
-            />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <label
-                htmlFor="animal-birthdate"
-                className="block text-sm font-medium text-foreground"
-              >
-                Fecha de nacimiento
-              </label>
-              <Input
-                id="animal-birthdate"
-                type="date"
-                value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
-              />
-              {ageHint && <p className="text-xs text-muted-foreground">{ageHint}</p>}
-            </div>
-            <SelectField
-              id="animal-size"
-              label="Tamaño"
-              value={size}
-              onChange={setSize}
-              options={SIZE_OPTIONS}
-            />
           </div>
 
           <TextAreaField
@@ -378,16 +406,9 @@ export function AnimalFormModal({
             tags={tags}
             onChange={setTags}
           />
-
-          <AnimalPhotoField
-            id="animal-photo"
-            preview={photoPreviewUrl}
-            uploading={photoUploading}
-            onFileSelected={(file) => void handlePhotoSelected(file)}
-          />
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="border-t border-border pt-4">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancelar
           </Button>
