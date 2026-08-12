@@ -26,6 +26,7 @@ import {
   type UpdateAnimalInput,
 } from '@adoptafacil/contracts';
 import { AuditService } from '../../core/audit/audit.service';
+import { isUniqueConstraintViolation } from '../../core/errors/prisma-conflict.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../core/tenant/tenant-context.service';
 import { computeAge } from './animal-age';
@@ -376,9 +377,21 @@ export class AnimalsService {
       if (existing) {
         throw new ConflictException('That breed already exists for this species');
       }
-      const row = await tx.animalBreed.create({
-        data: { organizationId, species: input.species, name: input.name },
-      });
+      let row: BreedRow;
+      try {
+        row = await tx.animalBreed.create({
+          data: { organizationId, species: input.species, name: input.name },
+        });
+      } catch (error) {
+        // Defense-in-depth for the race window the pre-check above can't close
+        // (two concurrent requests both pass `findFirst` before either
+        // `create`s) — same "no global exception filter" gap as org-profile's
+        // slug/subdomain, see core/errors/prisma-conflict.util.ts.
+        if (isUniqueConstraintViolation(error)) {
+          throw new ConflictException('That breed already exists for this species');
+        }
+        throw error;
+      }
       await this.audit.recordWithTx(tx, {
         organizationId,
         actorUserId,

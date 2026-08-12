@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { Organization as OrgRow, OrganizationProfile as ProfileRow } from '@prisma/client';
 import {
@@ -13,6 +13,7 @@ import {
   type VerificationLevel,
 } from '@adoptafacil/contracts';
 import { AuditService } from '../../core/audit/audit.service';
+import { isUniqueConstraintViolation } from '../../core/errors/prisma-conflict.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../core/tenant/tenant-context.service';
 
@@ -112,11 +113,34 @@ export class OrgProfileService {
       if (input.name !== undefined) {
         await tx.organization.update({ where: { id: organizationId }, data: { name: input.name } });
       }
-      await tx.organizationProfile.upsert({
-        where: { organizationId },
-        create: { organizationId, ...profileWrite },
-        update: profileWrite,
-      });
+      try {
+        await tx.organizationProfile.upsert({
+          where: { organizationId },
+          create: { organizationId, ...profileWrite },
+          update: profileWrite,
+        });
+      } catch (error) {
+        // slug/subdomain are the only user-supplied unique columns on this
+        // write — surface a clear 409 instead of letting P2002 propagate as a
+        // raw 500 (no global exception filter exists in this app, see
+        // core/errors/prisma-conflict.util.ts).
+        //
+        // EMPIRICALLY CONFIRMED (org.integration-spec.ts), not assumed:
+        // `error.meta.target` comes back as the literal string
+        // "(not available)" for this exact upsert-inside-withOrgContext shape
+        // — a Prisma/driver limitation on this stack, not something this app
+        // controls — so per-field narrowing via `meta.target` (the "ideal"
+        // path `isUniqueConstraintViolationOn` supports) is NOT reliable
+        // here. `slug` is the only one of the two actually reachable from the
+        // UI today (no form field renders `subdomain` anywhere — confirmed by
+        // grep), so one clear message correctly covers every real case;
+        // revisit with a field-specific message if `subdomain` ever gets its
+        // own UI.
+        if (isUniqueConstraintViolation(error)) {
+          throw new ConflictException('Este nombre de portal ya está en uso. Elige otro.');
+        }
+        throw error;
+      }
       await this.audit.recordWithTx(tx, {
         organizationId,
         actorUserId,

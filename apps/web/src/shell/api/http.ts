@@ -22,6 +22,26 @@ interface ErrorBody {
   message?: unknown;
 }
 
+/**
+ * Nest's `ZodValidationPipe` (apps/api/src/core/auth/zod-validation.pipe.ts)
+ * throws `BadRequestException(string[])` — an array of per-field issue
+ * strings, not a single string. Passed to `HttpException`, that array becomes
+ * `body.message` VERBATIM (never joined into one string by Nest). Before this
+ * fix, `apiErrorFromResponse` only accepted a plain `string` for `message`,
+ * so every one of these validation errors silently fell back to the generic
+ * `response.statusText` ("Bad Request") instead of the actual, specific
+ * message a backend Zod schema already computed — found while wiring the
+ * slug 409 error through and confirmed by reading `zod-validation.pipe.ts`.
+ */
+function extractMessage(rawMessage: unknown): string | undefined {
+  if (typeof rawMessage === 'string' && rawMessage) return rawMessage;
+  if (Array.isArray(rawMessage)) {
+    const joined = rawMessage.filter((item): item is string => typeof item === 'string').join(' ');
+    return joined || undefined;
+  }
+  return undefined;
+}
+
 /** Build a JSON request init, stringifying `json` when provided. */
 export function jsonRequestInit(method: string, json?: unknown): RequestInit {
   const headers: Record<string, string> = { Accept: 'application/json' };
@@ -48,9 +68,7 @@ export async function apiErrorFromResponse(response: Response): Promise<ApiError
   const code =
     typeof body?.code === 'string' ? body.code : (STATUS_CODES[response.status] ?? 'http_error');
   const message =
-    typeof body?.message === 'string' && body.message
-      ? body.message
-      : response.statusText || `HTTP ${response.status}`;
+    extractMessage(body?.message) ?? (response.statusText || `HTTP ${response.status}`);
   return new ApiError(response.status, code, message, body);
 }
 

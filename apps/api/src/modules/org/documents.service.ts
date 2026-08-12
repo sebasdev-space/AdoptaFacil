@@ -1,4 +1,4 @@
-import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import type { Prisma, OrganizationDocument as DocumentRow } from '@prisma/client';
 import {
   DocumentStatus,
@@ -10,6 +10,7 @@ import {
   type VerificationLevel,
 } from '@adoptafacil/contracts';
 import { AuditService } from '../../core/audit/audit.service';
+import { isUniqueConstraintViolation } from '../../core/errors/prisma-conflict.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../core/tenant/tenant-context.service';
 import { STORAGE_PORT, type StoragePort } from '../../core/storage/storage.port';
@@ -87,17 +88,32 @@ export class DocumentsService {
       });
       const version = (latest._max.version ?? 0) + 1;
 
-      const row = await tx.organizationDocument.create({
-        data: {
-          organizationId,
-          type: input.type,
-          storageRef: stored.key,
-          version,
-          status: DocumentStatus.Pending,
-          issuedAt: input.issuedAt ? new Date(input.issuedAt) : null,
-          expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
-        },
-      });
+      let row: DocumentRow;
+      try {
+        row = await tx.organizationDocument.create({
+          data: {
+            organizationId,
+            type: input.type,
+            storageRef: stored.key,
+            version,
+            status: DocumentStatus.Pending,
+            issuedAt: input.issuedAt ? new Date(input.issuedAt) : null,
+            expiresAt: input.expiresAt ? new Date(input.expiresAt) : null,
+          },
+        });
+      } catch (error) {
+        // `[organizationId, type, version]` is unique — two concurrent uploads
+        // of the same document TYPE can both read the same `_max.version` and
+        // race to create the same next version. Same "no global exception
+        // filter" gap as org-profile's slug/subdomain; see
+        // core/errors/prisma-conflict.util.ts.
+        if (isUniqueConstraintViolation(error)) {
+          throw new ConflictException(
+            'Otra persona ya subió una versión de este documento al mismo tiempo. Vuelve a intentarlo.',
+          );
+        }
+        throw error;
+      }
 
       await this.audit.recordWithTx(tx, {
         organizationId,

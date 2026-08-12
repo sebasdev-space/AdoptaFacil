@@ -25,6 +25,7 @@ import { SelectField, TextAreaField } from './animal-form-fields';
 import { BreedCombobox } from './breed-combobox';
 import { TagInput } from './tag-input';
 import { AnimalPhotoField } from './animal-photo-field';
+import { MissingSlugBanner } from './missing-slug-banner';
 import { PHOTO_ACCEPT, uploadFileBytes, validateUpload } from '../lib/storage';
 
 const SPECIES_OPTIONS: { value: AnimalSpecies; label: string }[] = [
@@ -74,9 +75,20 @@ export interface AnimalFormModalProps {
   /** `null` = create; otherwise edit this record. */
   animal: Animal | null;
   onSaved: () => void;
+  /** El padre (`AnimalsPage`) ya sabe si la organización tiene `slug`
+   *  configurado (`GET /org/profile`, un solo fetch compartido) — se repite
+   *  aquí el mismo aviso persistente para que sea visible justo en el
+   *  momento de registrar/editar, no solo en la lista de atrás. */
+  showMissingSlugWarning?: boolean;
 }
 
-export function AnimalFormModal({ open, onOpenChange, animal, onSaved }: AnimalFormModalProps) {
+export function AnimalFormModal({
+  open,
+  onOpenChange,
+  animal,
+  onSaved,
+  showMissingSlugWarning,
+}: AnimalFormModalProps) {
   const client = useApiClient();
   const { toast } = useToast();
   const isEdit = animal !== null;
@@ -283,6 +295,8 @@ export function AnimalFormModal({ open, onOpenChange, animal, onSaved }: AnimalF
               : 'Completa los datos para crear un nuevo expediente.'}
           </DialogDescription>
         </DialogHeader>
+
+        {showMissingSlugWarning && <MissingSlugBanner />}
 
         <div className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">

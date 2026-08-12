@@ -261,6 +261,56 @@ describe('AnimalsPage — lista + detalle maestro-detalle', () => {
   });
 });
 
+describe('AnimalsPage — aviso de dirección pública (portal) no configurada', () => {
+  it('shows a PERSISTENT banner (not a toast) with a link to Mi organización when the org has no slug', async () => {
+    stubFetch((url) => {
+      if (url.includes('/animals/breeds')) return [];
+      if (url.includes('/animals')) return [animal('a1', 'Firulais')];
+      if (url.endsWith('/org/profile')) return { id: 'org-1', name: 'Refugio', slug: undefined };
+      return [];
+    });
+    renderShell({ route: '/animales', ...sessionWith([Role.Owner]) });
+
+    const banner = await screen.findByTestId('missing-slug-banner');
+    expect(banner).toHaveTextContent('dirección pública');
+    expect(within(banner).getByRole('link', { name: /Ir a Mi organización/ })).toHaveAttribute(
+      'href',
+      '/organizacion',
+    );
+    // Never a toast: no dismiss/auto-close affordance, always in the tree
+    // (not gated on any interaction) as long as the org lacks a slug.
+    await selectRow('Firulais');
+    expect(screen.getByTestId('missing-slug-banner')).toBeInTheDocument();
+  });
+
+  it('does NOT show the banner once the organization has a real slug', async () => {
+    stubFetch((url) => {
+      if (url.includes('/animals/breeds')) return [];
+      if (url.includes('/animals')) return [animal('a1', 'Firulais')];
+      if (url.endsWith('/org/profile')) return { id: 'org-1', name: 'Refugio', slug: 'refugio-x' };
+      return [];
+    });
+    renderShell({ route: '/animales', ...sessionWith([Role.Owner]) });
+
+    await screen.findByText('Firulais');
+    expect(screen.queryByTestId('missing-slug-banner')).not.toBeInTheDocument();
+  });
+
+  it('also shows the same warning inside the "Registrar animal" modal', async () => {
+    stubFetch((url) => {
+      if (url.includes('/animals/breeds')) return [];
+      if (url.includes('/animals')) return [];
+      if (url.endsWith('/org/profile')) return { id: 'org-1', name: 'Refugio', slug: undefined };
+      return [];
+    });
+    renderShell({ route: '/animales', ...sessionWith([Role.Owner]) });
+
+    fireEvent.click(await screen.findByRole('button', { name: /Registrar tu primer animal/ }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByTestId('missing-slug-banner')).toBeInTheDocument();
+  });
+});
+
 describe('AnimalsPage — importación masiva desde Excel (S2-04B-1)', () => {
   it('hides "Importar Excel" from a Veterinarian (narrower than canManage)', async () => {
     stubFetch((url) => {
