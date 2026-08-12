@@ -1,5 +1,4 @@
 import { Button } from '@adoptafacil/ui';
-import { ThemeToggle } from '../theme';
 import { MenuIcon, LogOutIcon } from '../icons';
 import { useNav } from '../navigation/nav-context';
 import { useSession } from '../auth';
@@ -9,8 +8,8 @@ import styles from './header.module.scss';
 
 /**
  * Shell header, present on every module. Left: the drawer toggle (< lg) / brand
- * on móvil. Center–right: the persistent transparency indicator (§M14), theme
- * toggle and session actions. BEM+SCSS (REFACTOR-VISUAL v2, Fase 3).
+ * on móvil. Center–right: the persistent transparency indicator (§M14) and
+ * session actions. BEM+SCSS (REFACTOR-VISUAL v2, Fase 3).
  */
 export function Header() {
   const { toggleDrawer } = useNav();
@@ -42,8 +41,6 @@ export function Header() {
       {/* Persistent transparency indicator (§M14) */}
       <div className={styles.topbar__actions}>
         <TransparencyIndicator />
-
-        <ThemeToggle />
 
         {user && (
           <div className={styles.topbar__user}>

@@ -7,8 +7,8 @@ import { cleanup } from '@testing-library/react';
 // Unmount React trees between tests so the drawer/overlay portals don't leak.
 afterEach(() => cleanup());
 
-// jsdom does not implement matchMedia; the ThemeProvider and responsive helpers
-// read it. Default to "no match" (light theme, desktop) unless a test overrides it.
+// jsdom does not implement matchMedia; responsive helpers and some Radix
+// primitives read it. Default to "no match" unless a test overrides it.
 if (!window.matchMedia) {
   window.matchMedia = (query: string) =>
     ({
