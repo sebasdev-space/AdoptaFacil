@@ -18,6 +18,9 @@
     "seed:breeds": "ts-node --transpile-only scripts/seed-breeds.ts",
     "db:deploy": "prisma migrate deploy"
   },
+  "prisma": {
+    "schema": "../../prisma/schema"
+  },
   "dependencies": {
     "@adoptafacil/contracts": "workspace:*",
     "@nestjs/bullmq": "^10.2.3",
