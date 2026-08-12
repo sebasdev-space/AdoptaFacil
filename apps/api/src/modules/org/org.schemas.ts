@@ -14,7 +14,14 @@ const slug = z
   .toLowerCase()
   .min(1)
   .max(63)
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Must be a lowercase slug (letters, digits, hyphens)');
+  .regex(
+    /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
+    // Mismo texto que `validateOptionalSlug` en el frontend (apps/web/src/
+    // features/org/validation.ts) — con el fix de apiErrorFromResponse este
+    // mensaje SÍ puede llegar a la UI, así que debe ser el mismo copy claro,
+    // no jerga de desarrollador.
+    'Solo se permiten letras minúsculas, números y guiones — sin espacios ni tildes.',
+  );
 
 export const updateOrgProfileSchema = z
   .object({

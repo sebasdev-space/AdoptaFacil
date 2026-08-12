@@ -103,6 +103,24 @@ describe('Organization profile (M01: CRUD + RBAC + public endpoint)', () => {
     expect(read.body.socialLinks.instagram).toBe('https://instagram.com/refugioa');
   });
 
+  it('rejects a slug already used by another organization with a clear 409 — never a raw 500', async () => {
+    const other = await registerOrg('Refugio B');
+    const res = await request(server)
+      .put('/org/profile')
+      .set('Authorization', `Bearer ${other.token}`)
+      .send({ slug: slugA })
+      .expect(409);
+    expect(res.body.message).toBe('Este nombre de portal ya está en uso. Elige otro.');
+
+    // The failed write must not have partially applied — Refugio B still has
+    // no slug (the whole upsert rolled back inside the same transaction).
+    const read = await request(server)
+      .get('/org/profile')
+      .set('Authorization', `Bearer ${other.token}`)
+      .expect(200);
+    expect(read.body.slug ?? null).toBeNull();
+  });
+
   it('forbids a user without Owner/Administrator from editing (403)', async () => {
     await request(server)
       .put('/org/profile')

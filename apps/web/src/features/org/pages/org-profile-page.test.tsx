@@ -229,6 +229,83 @@ describe('OrgProfilePage — hub central en tabs (S2-VISUAL-TABS)', () => {
     });
   });
 
+  describe('Dirección de tu portal público (antes "slug") — UX de errores/validación', () => {
+    it('no muestra la palabra "Slug" — usa un label entendible, con vista previa del enlace en vivo', async () => {
+      renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
+      await screen.findByRole('heading', { name: 'Perfil de la organización' });
+
+      expect(screen.queryByText(/^Slug/)).not.toBeInTheDocument();
+      const field = await screen.findByLabelText('Dirección de tu portal público');
+      expect(field).toHaveValue('patitas-felices');
+      expect(
+        screen.getByText(/Así se verá el enlace de tu organización:.*\/o\/patitas-felices/),
+      ).toBeInTheDocument();
+
+      fireEvent.change(field, { target: { value: 'nuevo-nombre' } });
+      expect(
+        screen.getByText(/Así se verá el enlace de tu organización:.*\/o\/nuevo-nombre/),
+      ).toBeInTheDocument();
+    });
+
+    it('valida en VIVO (sin necesidad de guardar) y ofrece una auto-sugerencia corregida', async () => {
+      renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
+      const field = await screen.findByLabelText('Dirección de tu portal público');
+
+      fireEvent.change(field, { target: { value: 'Fundación Huellas' } });
+      expect(
+        await screen.findByText(
+          'Solo se permiten letras minúsculas, números y guiones — sin espacios ni tildes.',
+        ),
+      ).toBeInTheDocument();
+
+      const suggestion = screen.getByRole('button', { name: 'Usar "fundacion-huellas"' });
+      fireEvent.click(suggestion);
+      expect(field).toHaveValue('fundacion-huellas');
+      // El error desaparece de inmediato al usar la sugerencia — sin guardar.
+      expect(
+        screen.queryByText(
+          'Solo se permiten letras minúsculas, números y guiones — sin espacios ni tildes.',
+        ),
+      ).not.toBeInTheDocument();
+    });
+
+    it('muestra el mensaje claro del backend (409) cuando el slug ya está en uso — nunca "Internal Server Error"', async () => {
+      // El helper `stubFetch` de este archivo siempre resuelve `ok:true` — para
+      // simular un 409 real hace falta su propio stub aquí (mismo shape que
+      // `client.request` espera: status/ok/json).
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+          const url = String(input);
+          if (init?.method === 'PUT' && url.endsWith('/org/profile')) {
+            return Promise.resolve({
+              ok: false,
+              status: 409,
+              statusText: 'Conflict',
+              headers: { get: () => null },
+              json: async () => ({ message: 'Este nombre de portal ya está en uso. Elige otro.' }),
+            });
+          }
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: { get: () => null },
+            json: async () => BASE_ORG,
+          });
+        }),
+      );
+      renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
+      await screen.findByRole('heading', { name: 'Perfil de la organización' });
+
+      fireEvent.click(screen.getByRole('button', { name: /Guardar cambios/ }));
+
+      expect(
+        await screen.findByText('Este nombre de portal ya está en uso. Elige otro.'),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/Internal Server Error/i)).not.toBeInTheDocument();
+    });
+  });
+
   it('the map field uses the fixed label/placeholder (S2-REORG §6)', async () => {
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
     await screen.findByRole('heading', { name: 'Perfil de la organización' });

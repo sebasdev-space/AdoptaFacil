@@ -20,7 +20,12 @@ import {
   OrgTextField,
 } from './org-profile-fields';
 import { OrgTabPanel, OrgTabsNav, type OrgTabItem } from './org-tabs';
-import { validateOptionalEmail, validateOptionalSlug, validateOptionalUrl } from '../validation';
+import {
+  slugify,
+  validateOptionalEmail,
+  validateOptionalSlug,
+  validateOptionalUrl,
+} from '../validation';
 import styles from './org-profile-form.module.scss';
 
 const ABOUT_US_MAX = 2000;
@@ -358,6 +363,19 @@ export const OrgProfileForm = forwardRef<OrgProfileFormHandle, OrgProfileFormPro
     const set = (key: keyof FormState) => (value: string) =>
       setForm((prev) => ({ ...prev, [key]: value }));
 
+    /** Validación EN VIVO (mientras escribe), no solo al enviar — a
+     *  diferencia de `validate()` de abajo, que solo corre en el submit. */
+    const setSlug = (value: string) => {
+      setForm((prev) => ({ ...prev, slug: value }));
+      setErrors((prev) => ({ ...prev, slug: validateOptionalSlug(value) }));
+    };
+    const slugSuggestion = errors.slug && form.slug.trim() ? slugify(form.slug) : '';
+    const showSlugSuggestion = slugSuggestion !== '' && slugSuggestion !== form.slug.trim();
+    /** Vista previa real del enlace público — mismo origen que el navegador
+     *  ya está usando (funciona en dev y en cualquier dominio de producción,
+     *  sin hardcodear uno). */
+    const slugPreviewUrl = `${window.location.origin}/o/${form.slug.trim() || 'tu-organizacion'}`;
+
     const validate = (): boolean => {
       const next: Partial<Record<keyof FormState, string>> = {
         slug: validateOptionalSlug(form.slug),
@@ -433,14 +451,25 @@ export const OrgProfileForm = forwardRef<OrgProfileFormHandle, OrgProfileFormPro
               onChange={set('name')}
               error={errors.name}
             />
-            <OrgTextField
-              id="org-slug"
-              label="Slug del portal"
-              value={form.slug}
-              onChange={set('slug')}
-              error={errors.slug}
-              hint="Se usa en /o/<slug>"
-            />
+            <div>
+              <OrgTextField
+                id="org-slug"
+                label="Dirección de tu portal público"
+                value={form.slug}
+                onChange={setSlug}
+                error={errors.slug}
+                hint={`Así se verá el enlace de tu organización: ${slugPreviewUrl}`}
+              />
+              {showSlugSuggestion && (
+                <button
+                  type="button"
+                  onClick={() => setSlug(slugSuggestion)}
+                  className="mt-1 text-xs font-medium text-primary hover:underline"
+                >
+                  Usar "{slugSuggestion}"
+                </button>
+              )}
+            </div>
             <OrgTextField
               id="org-nit"
               label="NIT"

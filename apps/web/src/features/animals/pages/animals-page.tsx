@@ -4,6 +4,7 @@ import {
   type AnimalSpecies,
   type AnimalStatus,
   type ComputedAge,
+  type Organization,
   Role,
 } from '@adoptafacil/contracts';
 import {
@@ -29,6 +30,7 @@ import { AnimalDetailPanel } from '../components/animal-detail-panel';
 import { AnimalFormModal } from '../components/animal-form-modal';
 import { AnimalSponsorshipPlanModal } from '../components/animal-sponsorship-plan-modal';
 import { BulkImportDialog } from '../components/bulk-import-dialog';
+import { MissingSlugBanner } from '../components/missing-slug-banner';
 import { PawEmptyIcon, PlusIcon, SearchIcon, UploadIcon } from '../components/icons';
 import styles from './animals-page.module.scss';
 
@@ -104,6 +106,13 @@ export function AnimalsPage() {
   const [deleting, setDeleting] = useState(false);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [sponsorshipTarget, setSponsorshipTarget] = useState<Animal | null>(null);
+  // Problema real detectado (sin ningún aviso previo): un animal registrado
+  // sin que la organización tenga `slug` configurado no aparece en el
+  // catálogo público. `GET /org/profile` ya lo puede leer cualquier miembro
+  // autenticado (sin RolesGuard) — mismo endpoint que usa `org-profile-page`,
+  // ningún dato nuevo. `hasOrgSlug === null` mientras carga (no se asume "sin
+  // slug" antes de tener la respuesta real).
+  const [hasOrgSlug, setHasOrgSlug] = useState<boolean | null>(null);
 
   const load = async (): Promise<void> => {
     const items = await client.request<Animal[]>('/animals?includeInactive=true');
@@ -120,6 +129,15 @@ export function AnimalsPage() {
         if (active) setLoading(false);
       }
     })();
+    void client
+      .request<Organization>('/org/profile')
+      .then((org) => {
+        if (active) setHasOrgSlug(Boolean(org.slug));
+      })
+      .catch(() => {
+        // Best-effort: si falla, simplemente no se muestra el aviso — nunca
+        // se bloquea la pantalla de Animales por esto.
+      });
     return () => {
       active = false;
     };
@@ -213,6 +231,8 @@ export function AnimalsPage() {
           </div>
         }
       />
+
+      {hasOrgSlug === false && <MissingSlugBanner />}
 
       {loading && <Skeleton className="h-64 w-full" />}
 
@@ -334,6 +354,7 @@ export function AnimalsPage() {
         onOpenChange={setModalOpen}
         animal={editingAnimal}
         onSaved={() => void load()}
+        showMissingSlugWarning={hasOrgSlug === false}
       />
 
       <BulkImportDialog
