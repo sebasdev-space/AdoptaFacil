@@ -1,4 +1,5 @@
-import { Module } from '@nestjs/common';
+import cookieParser from 'cookie-parser';
+import { type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AUTH_CONFIG, loadAuthConfig } from './auth.config';
@@ -32,4 +33,10 @@ import { TokenService } from './token.service';
   ],
   exports: [AUTH_CONFIG, JwtAuthGuard],
 })
-export class AuthModule {}
+export class AuthModule implements NestModule {
+  // Only the `auth` routes read a cookie (the silent-refresh bootstrap) — no
+  // need to parse cookies app-wide for every other module's requests.
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(cookieParser()).forRoutes('auth');
+  }
+}

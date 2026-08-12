@@ -42,10 +42,17 @@ function extractMessage(rawMessage: unknown): string | undefined {
   return undefined;
 }
 
-/** Build a JSON request init, stringifying `json` when provided. */
+/**
+ * Build a JSON request init, stringifying `json` when provided. `credentials:
+ * 'include'` is required here (not the fetch default) so the browser sends/
+ * stores the httpOnly `af_refresh` cookie on these auth calls even though the
+ * web app and API are cross-origin (different ports in dev, different domains
+ * in production) — without it, a cross-origin `Set-Cookie` response header is
+ * silently ignored by the browser.
+ */
 export function jsonRequestInit(method: string, json?: unknown): RequestInit {
   const headers: Record<string, string> = { Accept: 'application/json' };
-  const init: RequestInit = { method, headers };
+  const init: RequestInit = { method, headers, credentials: 'include' };
   if (json !== undefined) {
     headers['Content-Type'] = 'application/json';
     init.body = JSON.stringify(json);

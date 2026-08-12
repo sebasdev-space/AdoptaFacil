@@ -32,6 +32,14 @@ export interface AuthApi {
   confirmPasswordReset(request: ResetPasswordRequest): Promise<void>;
   /** Exchange a refresh token for a fresh pair (no access token required). */
   refresh(refreshToken: string): Promise<AuthTokens>;
+  /**
+   * Bootstrap-only: try to resume a session using ONLY the httpOnly refresh
+   * cookie (no token in memory yet) — used once on app start so a reload/new
+   * tab doesn't force a re-login. Never throws; resolves `null` when there is
+   * no session to resume (no cookie, or it's invalid/expired). Optional: the
+   * mock transport and test fakes have nothing to resume, so they omit it.
+   */
+  refreshSilent?(): Promise<AuthTokens | null>;
   /** Best-effort server-side revocation; must not throw for the caller. */
   logout(refreshToken: string | null): Promise<void>;
   /** The current principal (authenticated request). */
@@ -129,6 +137,20 @@ export class HttpAuthApi implements AuthApi {
 
   refresh(refreshToken: string): Promise<AuthTokens> {
     return requestRefresh(this.baseUrl, this.fetchFn, refreshToken);
+  }
+
+  async refreshSilent(): Promise<AuthTokens | null> {
+    try {
+      const response = await this.fetchFn(endpoint(this.baseUrl, '/auth/refresh/silent'), {
+        method: 'POST',
+        headers: { Accept: 'application/json' },
+        credentials: 'include',
+      });
+      if (!response.ok) return null;
+      return ((await response.json()) as AuthTokens | null) ?? null;
+    } catch {
+      return null;
+    }
   }
 
   async logout(refreshToken: string | null): Promise<void> {

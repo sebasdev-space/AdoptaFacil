@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import type {
   FormalizationState,
   FormalizationStatus,
@@ -19,6 +27,7 @@ import {
   type ResetPasswordRequest,
   type ShellApi,
 } from '../api';
+import { IDLE_TIMEOUT_MS, useIdleLogout } from './use-idle-logout';
 
 /**
  * Session layer of the app shell (T-022).
@@ -31,6 +40,12 @@ import {
  *
  * NO browser storage — the session lives only in React state + an in-memory
  * token store. Tokens are never logged.
+ *
+ * Reload/new-tab persistence (T-session-persistence) does NOT relax that: the
+ * ONLY thing that survives is an httpOnly refresh cookie the browser controls
+ * (unreadable by this or any page JS), used once on mount to silently resume a
+ * session via `POST /auth/refresh/silent` before falling back to the login
+ * screen. See the `shouldBootstrapSession` effect below.
  */
 export type SessionStatus = 'loading' | 'authenticated' | 'unauthenticated';
 
@@ -171,9 +186,12 @@ function toSessionUser(user: AuthenticatedUser): SessionUser {
 export interface SessionProviderProps {
   children: ReactNode;
   /**
-   * Initial status. Defaults to 'unauthenticated' — with no persistence a fresh
-   * load has no session, so the app starts at the login route. Tests may bootstrap
-   * 'authenticated'/'loading' to exercise the guard without a login round-trip.
+   * Initial status. Left undefined (the real app's usage) in 'http' mode with no
+   * injected `authApi`, this triggers a ONE-TIME silent-refresh bootstrap against
+   * the httpOnly refresh cookie (T-session-persistence) before falling back to
+   * 'unauthenticated' — so a reload/new tab resumes an existing session instead
+   * of forcing a re-login. Tests bootstrap 'authenticated'/'unauthenticated'/
+   * 'loading' explicitly to exercise the guard without any of that.
    */
   initialStatus?: SessionStatus;
   /** Initial user when bootstrapping an authenticated session (tests). */
@@ -192,13 +210,22 @@ export interface SessionProviderProps {
 
 export function SessionProvider({
   children,
-  initialStatus = 'unauthenticated',
+  initialStatus,
   initialUser = MOCK_USER,
   authApi,
   mode,
   fetchFn,
 }: SessionProviderProps) {
-  const [status, setStatus] = useState<SessionStatus>(initialStatus);
+  // Only the real app's own usage (http transport, no explicit status/authApi
+  // override — those are exclusively a test/story concern) attempts the
+  // cookie-based silent-refresh bootstrap. Computed once; `initialStatus`/
+  // `mode`/`authApi` are never expected to change across a provider's lifetime.
+  const [shouldBootstrapSession] = useState(
+    () => mode === 'http' && initialStatus === undefined && !authApi,
+  );
+  const [status, setStatus] = useState<SessionStatus>(
+    initialStatus ?? (shouldBootstrapSession ? 'loading' : 'unauthenticated'),
+  );
   const [user, setUser] = useState<SessionUser | null>(
     initialStatus === 'authenticated' ? initialUser : null,
   );
@@ -291,6 +318,40 @@ export function SessionProvider({
     [api, mode, loadRoles, loadTransparency],
   );
 
+  // One-time silent-refresh bootstrap (T-session-persistence): try to resume a
+  // session from the httpOnly refresh cookie alone, before ever showing the
+  // login screen. A missing/expired/invalid cookie is not an error — it just
+  // falls back to 'unauthenticated', same as a first-ever visit.
+  useEffect(() => {
+    if (!shouldBootstrapSession) return;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const tokens = await api.authApi.refreshSilent?.();
+        if (!tokens) {
+          if (!cancelled) setStatus('unauthenticated');
+          return;
+        }
+        // `me()` needs a token in the store to authenticate; `establish()`
+        // below sets it again with the same value right after (idempotent).
+        api.tokenStore.set(tokensFromContract(tokens));
+        const me = await api.authApi.me();
+        if (cancelled) return;
+        await establish({ user: me, tokens });
+      } catch {
+        if (!cancelled) {
+          api.tokenStore.clear();
+          setStatus('unauthenticated');
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [shouldBootstrapSession, api, establish]);
+
   const signIn = useCallback(
     async (credentials?: LoginRequest) => {
       await establish(await api.authApi.login(credentials ?? DEMO_CREDENTIALS));
@@ -345,6 +406,11 @@ export function SessionProvider({
     setTransparencyStatus('idle');
     await api.authApi.logout(refreshToken);
   }, [api]);
+
+  // 20 minutes of REAL inactivity (no click/keypress/scroll/touch) — never a
+  // fixed deadline from sign-in — auto-signs-out. Only active while a session
+  // is actually authenticated; a no-op otherwise.
+  useIdleLogout(status === 'authenticated', () => void signOut(), IDLE_TIMEOUT_MS);
 
   const value = useMemo<SessionContextValue>(
     () => ({
