@@ -35,6 +35,7 @@
     "bullmq": "^5.34.5",
     "exceljs": "^4.4.0",
     "ioredis": "^5.4.2",
+    "multer": "^2.0.2",
     "nodemailer": "^9.0.3",
     "pdf-lib": "^1.17.1",
     "reflect-metadata": "^0.2.2",
