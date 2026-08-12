@@ -306,6 +306,31 @@ describe('OrgProfilePage — hub central en tabs (S2-VISUAL-TABS)', () => {
     });
   });
 
+  describe('límites de longitud alineados con el backend (org.schemas.ts)', () => {
+    it('topa Nombre/NIT/Razón social/Descripción/WhatsApp/Teléfono en el mismo límite que el backend', async () => {
+      renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
+      await screen.findByRole('heading', { name: 'Perfil de la organización' });
+
+      expect(screen.getByLabelText('Nombre')).toHaveAttribute('maxLength', '200');
+      expect(screen.getByLabelText('NIT')).toHaveAttribute('maxLength', '50');
+      expect(screen.getByLabelText('Razón social')).toHaveAttribute('maxLength', '200');
+      expect(screen.getByLabelText('Descripción corta')).toHaveAttribute('maxLength', '5000');
+
+      await goToTab('Contacto');
+      expect(screen.getByLabelText('WhatsApp')).toHaveAttribute('maxLength', '30');
+      expect(screen.getByLabelText('Teléfono')).toHaveAttribute('maxLength', '30');
+    });
+
+    it('la Descripción corta muestra el contador visible (ya existía en OrgTextAreaField, solo faltaba activarlo)', async () => {
+      renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
+      const description = await screen.findByLabelText('Descripción corta');
+      expect(screen.getByText('0/5000')).toBeInTheDocument();
+
+      fireEvent.change(description, { target: { value: 'Refugio sin fines de lucro' } });
+      expect(screen.getByText('26/5000')).toBeInTheDocument();
+    });
+  });
+
   it('the map field uses the fixed label/placeholder (S2-REORG §6)', async () => {
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
     await screen.findByRole('heading', { name: 'Perfil de la organización' });

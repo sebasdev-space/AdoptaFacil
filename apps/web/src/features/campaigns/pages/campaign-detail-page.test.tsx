@@ -172,6 +172,39 @@ describe('CampaignDetailPage (S2-01)', () => {
     expect(await screen.findByText('Evidencia agregada')).toBeInTheDocument();
   });
 
+  it('blocks saving an evidence edit with an invalid amount — never sends the PATCH (regression: previously reached the backend as a raw NaN/decimal and only surfaced its unfriendly 400)', async () => {
+    const calls = stubCampaignApi();
+    renderShell({ route: '/organizacion/campanas/c1', ...sessionWith([Role.Owner]) });
+
+    const row = (await screen.findByText('Compra de insumos quirúrgicos')).closest('li');
+    fireEvent.click(within(row as HTMLElement).getByRole('button', { name: 'Editar' }));
+
+    const amountInput = screen.getByLabelText('Monto (COP)');
+    fireEvent.change(amountInput, { target: { value: '12.5' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+
+    expect(
+      await screen.findByText('El monto (si lo indicas) debe ser un entero COP mayor a 0.'),
+    ).toBeInTheDocument();
+    expect(amountInput).toHaveAttribute('aria-invalid', 'true');
+    // The invalid amount never left the browser as a PATCH request.
+    expect(calls.some((c) => c.init?.method === 'PATCH' && c.url.includes('/evidences/e1'))).toBe(
+      false,
+    );
+
+    // Fixing the value clears the error and the PATCH goes through normally.
+    fireEvent.change(amountInput, { target: { value: '75000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
+
+    await waitFor(() => {
+      const patch = calls.find(
+        (c) => c.init?.method === 'PATCH' && c.url.includes('/evidences/e1'),
+      );
+      expect(patch).toBeDefined();
+      expect(JSON.parse(String(patch?.init?.body)).amount).toBe(75000);
+    });
+  });
+
   it('deletes an evidence and toasts success', async () => {
     const calls = stubCampaignApi();
     renderShell({ route: '/organizacion/campanas/c1', ...sessionWith([Role.Owner]) });
