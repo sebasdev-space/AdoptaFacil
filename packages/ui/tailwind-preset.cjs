@@ -8,14 +8,12 @@
  * whole library themeable by overriding CSS vars (§M14).
  *
  * Consumed by apps/web via `presets: [require('@adoptafacil/ui/tailwind-preset')]`.
- * Dark mode toggles with the `.dark` class on <html>.
  *
  * `hsl(var(--token) / <alpha-value>)` lets Tailwind's opacity modifiers
  * (e.g. `bg-primary/90`) compose with token colors.
  */
 /** @type {Partial<import('tailwindcss').Config>} */
 module.exports = {
-  darkMode: ['class'],
   theme: {
     extend: {
       colors: {

@@ -231,10 +231,21 @@ function SidebarIdentity({ onNavigate }: { onNavigate?: () => void }) {
 
   const content = (
     <>
-      <span className={styles['org-sidebar__identity-avatar']} aria-hidden>
-        {initials}
+      {identity.logoUrl ? (
+        <img
+          src={identity.logoUrl}
+          alt={`Logo de ${identity.name}`}
+          className={styles['org-sidebar__identity-avatar']}
+        />
+      ) : (
+        <span className={styles['org-sidebar__identity-avatar']} aria-hidden>
+          {initials}
+        </span>
+      )}
+      <span className={styles['org-sidebar__identity-text']}>
+        <span className={styles['org-sidebar__identity-name']}>{identity.name}</span>
+        <span className={styles['org-sidebar__identity-label']}>Organización</span>
       </span>
-      <span className={styles['org-sidebar__identity-name']}>{identity.name}</span>
     </>
   );
 

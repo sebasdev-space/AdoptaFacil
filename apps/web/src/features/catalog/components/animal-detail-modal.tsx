@@ -15,13 +15,17 @@ export interface AnimalDetailModalProps {
  * `AnimalDetailActions` TAL CUAL (mismos datos/rutas que la página completa,
  * que sigue existiendo para deep-links) — solo cambia el contenedor visual.
  *
- * Layout pedido: todas las acciones (Solicitar adopción/Apadrinar) ancladas
- * abajo, en una franja separada por una línea; el único control en la
- * esquina superior derecha es la X para cerrar — ya es el comportamiento
- * POR DEFECTO de `DialogContent` (no se agrega ningún otro botón de header).
- * El animal ya trae su organización embebida (`PublicAnimalSummary.organization`,
- * catálogo global S1-07) — no hace falta el fetch aparte que sí necesita la
- * página completa para resolver el nombre de la organización.
+ * Layout pedido: todas las acciones (Solicitar adopción/Apadrinar/Acceder a
+ * la organización) ancladas abajo, en fila alineada a la derecha, en una
+ * franja separada por una línea; el único control en la esquina superior
+ * derecha es la X para cerrar — ya es el comportamiento POR DEFECTO de
+ * `DialogContent` (no se agrega ningún otro botón de header). El animal ya
+ * trae su organización embebida (`PublicAnimalSummary.organization`, catálogo
+ * global S1-07) — no hace falta el fetch aparte que sí necesita la página
+ * completa para resolver el nombre de la organización, y de paso permite el
+ * botón "Acceder a la organización" (slug ya disponible) que la página
+ * completa ya resuelve por su cuenta (el link "Ver {org}" fuera de este
+ * componente compartido).
  */
 export function AnimalDetailModal({ animal, onOpenChange }: AnimalDetailModalProps) {
   return (
@@ -36,10 +40,14 @@ export function AnimalDetailModal({ animal, onOpenChange }: AnimalDetailModalPro
         {animal && (
           <>
             <div className="overflow-y-auto">
-              <AnimalDetailInfo animal={animal} />
+              <AnimalDetailInfo animal={animal} city={animal.organization.city} />
             </div>
             <div className="border-t border-border p-4" data-testid="animal-detail-modal-actions">
-              <AnimalDetailActions animal={animal} orgName={animal.organization.name} />
+              <AnimalDetailActions
+                animal={animal}
+                orgName={animal.organization.name}
+                organizationSlug={animal.organization.slug}
+              />
             </div>
           </>
         )}

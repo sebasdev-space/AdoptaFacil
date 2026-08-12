@@ -23,6 +23,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../core/tenant/tenant-context.service';
 import { AuditService } from '../../core/audit/audit.service';
+import { isUniqueConstraintViolation } from '../../core/errors/prisma-conflict.util';
 import type { RequestUser } from '../../core/auth/auth.types';
 import { checkContractTransition } from './adoption-contract-status';
 import { computeContractHash } from './adoption-contract-hash';
@@ -140,17 +141,29 @@ export class AdoptionContractsService {
         terms: input.terms?.trim() || DEFAULT_TERMS,
       };
 
-      const row = await tx.adoptionContract.create({
-        data: {
-          organizationId,
-          requestId: input.requestId,
-          animalId: req.animalId,
-          version: 1,
-          status: 'draft',
-          signers: signers as unknown as Prisma.InputJsonValue,
-          payload: payload as unknown as Prisma.InputJsonValue,
-        },
-      });
+      // TOCTOU: dos requests concurrentes para el mismo `requestId` pueden pasar
+      // ambas el `findFirst` de arriba y llegar aquí — la segunda dispara la
+      // constraint única `@@unique([requestId, version])` (P2002), que se
+      // traduce al mismo 409 controlado en vez de un 500 crudo.
+      let row;
+      try {
+        row = await tx.adoptionContract.create({
+          data: {
+            organizationId,
+            requestId: input.requestId,
+            animalId: req.animalId,
+            version: 1,
+            status: 'draft',
+            signers: signers as unknown as Prisma.InputJsonValue,
+            payload: payload as unknown as Prisma.InputJsonValue,
+          },
+        });
+      } catch (error) {
+        if (isUniqueConstraintViolation(error)) {
+          throw new ConflictException('Ya existe un contrato para esta solicitud.');
+        }
+        throw error;
+      }
 
       // Materialize the T-028a seam: the request now points at its contract.
       await tx.adoptionRequest.update({

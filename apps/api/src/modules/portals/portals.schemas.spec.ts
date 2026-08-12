@@ -1,8 +1,8 @@
 import { contrastRatio, MIN_CONTRAST_RATIO, updatePortalThemeSchema } from './portals.schemas';
 
 /** T-027 · token validation is the deny-by-default gate for M14 personalization
- *  (tokens only, never arbitrary CSS): format, range, unknown keys and minimum
- *  contrast between each color and its foreground pair. */
+ *  (tokens only, never arbitrary CSS): format, range and unknown keys. Contrast
+ *  is intentionally NOT part of this gate — see `contrastRatio` below. */
 describe('portal theme token validation', () => {
   const parse = (tokens: Record<string, unknown>) => updatePortalThemeSchema.safeParse({ tokens });
 
@@ -44,10 +44,11 @@ describe('portal theme token validation', () => {
     expect(parse({ radius: 'calc(1px)' }).success).toBe(false);
   });
 
-  it('rejects a color/foreground pair below the minimum contrast', () => {
-    // Light green on white → unreadable.
+  it('accepts a color/foreground pair below the minimum contrast (warning-only, never blocks save)', () => {
+    // Light green on white → hard to read, but saving must still succeed —
+    // low contrast is surfaced as a client-side warning, not a validation error.
     const result = parse({ primary: '142 72% 85%', 'primary-foreground': '0 0% 100%' });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
   });
 
   it('accepts a color/foreground pair that meets the minimum contrast', () => {

@@ -63,6 +63,14 @@
   font-family: var(--font-sans);
   font-size: var(--fs-xs);
   font-weight: var(--fw-bold);
+  object-fit: cover;
+}
+
+.org-sidebar__identity-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.1rem;
 }
 
 .org-sidebar__identity-name {
@@ -73,6 +81,14 @@
   font-size: var(--fs-sm);
   font-weight: var(--fw-semibold);
   color: var(--text-light);
+}
+
+.org-sidebar__identity-label {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  color: hsl(0 0% 100% / 0.55);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .org-sidebar__nav {

@@ -1,4 +1,11 @@
-import { ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
   computeBreakdown,
@@ -120,21 +127,34 @@ export class DonationsService {
       idempotencyKey: input.idempotencyKey,
     });
 
-    const rows = await this.prisma.$queryRaw<DonationRow[]>(Prisma.sql`
-      SELECT * FROM create_donation(
-        ${input.organizationId}::uuid,
-        ${actor.id}::uuid,
-        ${concept.kind},
-        ${concept.id}::uuid,
-        ${input.commissionPayer},
-        ${input.intendedAmount}::int,
-        ${breakdown.amountCharged}::int,
-        ${JSON.stringify(breakdown)}::jsonb,
-        ${collection.collectionId},
-        ${input.idempotencyKey},
-        ${input.payer ? JSON.stringify(input.payer) : null}::jsonb
-      )
-    `);
+    let rows: DonationRow[];
+    try {
+      rows = await this.prisma.$queryRaw<DonationRow[]>(Prisma.sql`
+        SELECT * FROM create_donation(
+          ${input.organizationId}::uuid,
+          ${actor.id}::uuid,
+          ${concept.kind},
+          ${concept.id}::uuid,
+          ${input.commissionPayer},
+          ${input.intendedAmount}::int,
+          ${breakdown.amountCharged}::int,
+          ${JSON.stringify(breakdown)}::jsonb,
+          ${collection.collectionId},
+          ${input.idempotencyKey},
+          ${input.payer ? JSON.stringify(input.payer) : null}::jsonb
+        )
+      `);
+    } catch (error) {
+      // `create_donation` only guards (organizationId, idempotencyKey) with
+      // ON CONFLICT DO NOTHING — a repeated `collectionId` (the OTHER unique
+      // constraint on `donations`) still hits Postgres and propagates as a raw
+      // query error (typically P2010, real code/constraint in `meta`), same
+      // class of bug as the Organizaciones slug 500.
+      if (this.isCollectionConflict(error)) {
+        throw new ConflictException('Ya existe una donación con este recaudo.');
+      }
+      throw error;
+    }
     const row = rows[0];
 
     await this.audit.record({
@@ -298,6 +318,19 @@ export class DonationsService {
       throw new NotFoundException('Recibo no encontrado o no eres el donante.');
     }
     return this.fromReceiptRow(receipt);
+  }
+
+  /** A raw-query error caused by the `donations_collection_id_key` unique index. */
+  private isCollectionConflict(error: unknown): boolean {
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      const meta = JSON.stringify(error.meta ?? {});
+      return (
+        error.code === 'P2002' ||
+        meta.includes('donations_collection_id_key') ||
+        meta.includes('23505')
+      );
+    }
+    return false;
   }
 
   /** Cross-tenant idempotency read: a donation by (org, key), or null. */

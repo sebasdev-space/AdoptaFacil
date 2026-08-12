@@ -7,9 +7,13 @@ import type { PortalColorToken, PortalTheme, PortalThemeToken } from '@adoptafac
  * SECURITY: personalization is by TOKENS ONLY (never arbitrary CSS/HTML), so this
  * is the deny-by-default gate. `.strict()` rejects unknown token keys; color
  * values must be bare HSL channels within range; `radius` is a bounded CSS length.
- * A cross-field refinement enforces a MINIMUM CONTRAST between each color and its
- * `-foreground` pair (WCAG AA for normal text) so a tenant cannot ship an
- * unreadable (or intentionally hostile) portal.
+ *
+ * Contrast between each color and its `-foreground` pair is intentionally NOT
+ * enforced here — low contrast is a UX warning surfaced by the web client
+ * (`findContrastConflict`), never a save-blocking validation error (feedback:
+ * an org must be able to save an imperfect theme rather than get stuck). See
+ * `contrastRatio`/`MIN_CONTRAST_RATIO` below, kept for that client-facing check
+ * and for the equivalent computation done by `apps/web/.../color-conversion.ts`.
  */
 
 /** Minimum contrast ratio required between a color and its foreground pair. */
@@ -99,25 +103,7 @@ export const portalThemeTokensSchema = z
     ring: colorToken.optional(),
     radius: radiusToken.optional(),
   } satisfies Record<PortalThemeToken, z.ZodTypeAny>)
-  .strict()
-  .superRefine((tokens, ctx) => {
-    // Minimum contrast for each color/foreground pair present in the SAME update.
-    for (const [base, fg] of PORTAL_COLOR_PAIRS) {
-      const baseValue = tokens[base];
-      const fgValue = tokens[fg];
-      if (baseValue === undefined || fgValue === undefined) continue;
-      const ratio = contrastRatio(baseValue, fgValue);
-      if (ratio !== null && ratio < MIN_CONTRAST_RATIO) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: [fg],
-          message: `Contraste insuficiente entre ${base} y ${fg} (${ratio.toFixed(
-            2,
-          )}:1 < ${MIN_CONTRAST_RATIO}:1)`,
-        });
-      }
-    }
-  });
+  .strict();
 
 /** S2-PORTAL: layout positions, validated as closed enums (never free CSS). */
 const logoPositionSchema = z.enum(['left', 'center', 'right']);

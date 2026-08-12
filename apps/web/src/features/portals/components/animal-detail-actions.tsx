@@ -6,18 +6,30 @@ import { buildAdoptionRequestHref, buildSponsorHref } from '../model/animals-cat
 export interface AnimalDetailActionsProps {
   animal: Pick<AnimalSummary, 'id' | 'name' | 'species' | 'photoUrl' | 'organizationId'>;
   orgName?: string;
+  /** Slug del portal público de la organización — solo lo trae el catálogo
+   *  general (`PublicAnimalSummary.organization.slug`, vía `AnimalDetailModal`).
+   *  Cuando está presente se agrega el botón "Acceder a la organización". */
+  organizationSlug?: string;
 }
 
 /**
- * "Solicitar adopción" + "Apadrinar" — extraído de `PublicAnimalDetailPage`
- * (pulido visual: reutilizado TAL CUAL, mismas rutas/`RequireAuth`, dentro de
- * `AnimalDetailModal`). No se reimplementa ninguna lógica de negocio, solo se
- * mueve la presentación a un componente compartido.
+ * "Solicitar adopción" + "Apadrinar" (+ "Acceder a la organización" cuando se
+ * conoce su slug) — extraído de `PublicAnimalDetailPage` (pulido visual:
+ * reutilizado TAL CUAL, mismas rutas/`RequireAuth`, dentro de
+ * `AnimalDetailModal`). No se reimplementa ninguna lógica de negocio.
+ *
+ * Fila única, alineada a la derecha (antes: apiladas verticalmente en la
+ * esquina inferior izquierda, ocupando espacio de más) — se envuelve en
+ * pantallas angostas en vez de recortarse.
  */
-export function AnimalDetailActions({ animal, orgName }: AnimalDetailActionsProps) {
+export function AnimalDetailActions({
+  animal,
+  orgName,
+  organizationSlug,
+}: AnimalDetailActionsProps) {
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col items-start gap-1">
+    <div className="space-y-2">
+      <div className="flex flex-wrap justify-end gap-2">
         <Link
           to={buildAdoptionRequestHref(animal.organizationId, animal)}
           className={cn(buttonVariants())}
@@ -25,12 +37,6 @@ export function AnimalDetailActions({ animal, orgName }: AnimalDetailActionsProp
         >
           Solicitar adopción
         </Link>
-        <p className="text-xs text-muted-foreground">
-          Necesitarás iniciar sesión como persona para enviar tu solicitud.
-        </p>
-      </div>
-
-      <div className="flex flex-col items-start gap-1">
         <Link
           to={buildSponsorHref(animal, orgName)}
           className={cn(buttonVariants({ variant: 'outline' }))}
@@ -38,10 +44,19 @@ export function AnimalDetailActions({ animal, orgName }: AnimalDetailActionsProp
         >
           Apadrinar
         </Link>
-        <p className="text-xs text-muted-foreground">
-          Apadrina a {animal.name} con un aporte mensual, sin necesidad de adoptarlo.
-        </p>
+        {organizationSlug && (
+          <Link
+            to={`/o/${encodeURIComponent(organizationSlug)}`}
+            className={cn(buttonVariants({ variant: 'outline' }))}
+            data-testid="visit-organization-cta"
+          >
+            Acceder a la organización
+          </Link>
+        )}
       </div>
+      <p className="text-right text-xs text-muted-foreground">
+        Necesitarás iniciar sesión como persona para solicitar adopción o apadrinar a {animal.name}.
+      </p>
     </div>
   );
 }

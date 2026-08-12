@@ -88,7 +88,7 @@ describe('Portal theme (M14: tokens + RBAC + public read)', () => {
     expect(read.body.tokens.radius).toBe('0.5rem');
   });
 
-  it('rejects unsafe/invalid tokens with 400 (tokens only, format + contrast)', async () => {
+  it('rejects unsafe/invalid tokens with 400 (tokens only, format — never contrast)', async () => {
     // Unknown key.
     await request(server)
       .put('/portals/theme')
@@ -101,12 +101,26 @@ describe('Portal theme (M14: tokens + RBAC + public read)', () => {
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({ tokens: { primary: '#ff0000' } })
       .expect(400);
-    // Insufficient contrast between a color and its foreground.
-    await request(server)
+  });
+
+  it('accepts (never blocks) a color/foreground pair below the minimum contrast — a warning, not a save-blocker', async () => {
+    const res = await request(server)
       .put('/portals/theme')
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({ tokens: { primary: '142 72% 90%', 'primary-foreground': '0 0% 100%' } })
-      .expect(400);
+      .expect(200);
+    expect(res.body.tokens.primary).toBe('142 72% 90%');
+
+    // Restore the valid pair so downstream assertions (audit/public read) keep
+    // seeing the theme this suite set up — this test only proves contrast
+    // never blocks the save, not the org's final theme state.
+    await request(server)
+      .put('/portals/theme')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({
+        tokens: { primary: '142 72% 29%', 'primary-foreground': '0 0% 100%', radius: '0.5rem' },
+      })
+      .expect(200);
   });
 
   it('forbids a user without Owner/Administrator from editing (403, deny-by-default)', async () => {
