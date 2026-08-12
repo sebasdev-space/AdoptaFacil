@@ -6,7 +6,7 @@ import { useSession } from '../auth';
 export type OrgIdentityState =
   | { status: 'idle' }
   | { status: 'loading' }
-  | { status: 'ready'; name: string }
+  | { status: 'ready'; name: string; logoUrl?: string }
   | { status: 'error' };
 
 /**
@@ -38,7 +38,12 @@ export function useOrgIdentity(): OrgIdentityState {
         // Defensive: an unexpected/empty body (e.g. a test's generic mock)
         // becomes an error state, never a crash on `undefined.split(...)`.
         if (org && typeof org.name === 'string' && org.name.trim()) {
-          setState({ status: 'ready', name: org.name });
+          setState({
+            status: 'ready',
+            name: org.name,
+            logoUrl:
+              typeof org.logoUrl === 'string' && org.logoUrl.trim() ? org.logoUrl : undefined,
+          });
         } else {
           setState({ status: 'error' });
         }
