@@ -5,6 +5,7 @@ import { ApiError, type RegisterOrganizationRequest } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
 import { Field } from '../components/field';
 import { FormAlert } from '../components/form-alert';
+import { PasswordRequirements } from '../components/password-requirements';
 import {
   collectErrors,
   validateEmail,
@@ -130,6 +131,7 @@ export function RegisterOrganizationForm() {
         error={errors.password}
         required
       />
+      <PasswordRequirements password={password} />
       <Field
         ref={refs.confirm}
         id="org-confirm"

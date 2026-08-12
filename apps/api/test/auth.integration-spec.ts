@@ -154,4 +154,37 @@ describe('Auth endpoints (register/login/refresh/logout)', () => {
       .send({ email: `missing-${randomUUID()}@test.local` })
       .expect(202);
   });
+
+  describe('session persistence via the httpOnly refresh cookie (silent bootstrap)', () => {
+    it('sets an httpOnly cookie on login and silently resumes the session with it alone', async () => {
+      const agent = request.agent(server);
+      const login = await agent
+        .post('/auth/login')
+        .send({ email: personEmail, password })
+        .expect(200);
+
+      const setCookie = login.headers['set-cookie'];
+      const cookieHeader = Array.isArray(setCookie) ? setCookie.join(';') : String(setCookie);
+      expect(cookieHeader).toMatch(/af_refresh=/);
+      expect(cookieHeader).toMatch(/HttpOnly/i);
+
+      // No refreshToken in the body at all — only the ambient cookie the agent
+      // already holds from the login response above.
+      const silent = await agent.post('/auth/refresh/silent').expect(200);
+      expect(silent.body.accessToken).toEqual(expect.any(String));
+      expect(silent.body.refreshToken).toEqual(expect.any(String));
+      expect(silent.body.refreshToken).not.toBe(login.body.tokens.refreshToken);
+
+      // Logout clears the cookie, so a later silent refresh finds nothing —
+      // never an error, just the same "no session" shape as a first visit.
+      await agent.post('/auth/logout').send({ refreshToken: silent.body.refreshToken }).expect(204);
+      const afterLogout = await agent.post('/auth/refresh/silent').expect(200);
+      expect(afterLogout.body).toBeNull();
+    });
+
+    it('resolves to null (never an error) when there is no refresh cookie at all', async () => {
+      const res = await request(server).post('/auth/refresh/silent').expect(200);
+      expect(res.body).toBeNull();
+    });
+  });
 });

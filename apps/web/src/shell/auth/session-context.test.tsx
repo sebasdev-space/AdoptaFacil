@@ -83,6 +83,79 @@ describe('SessionProvider — session state without browser storage', () => {
   });
 });
 
+/** A `fetchFn` that routes by pathname to a canned JSON body, for the http-mode bootstrap tests. */
+function routedFetch(responses: Record<string, unknown>): typeof fetch {
+  return vi.fn(async (input: RequestInfo | URL) => {
+    const url = typeof input === 'string' ? input : input.toString();
+    const path = new URL(url).pathname;
+    if (!(path in responses)) {
+      return new Response('not found', { status: 404 });
+    }
+    return new Response(JSON.stringify(responses[path]), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }) as unknown as typeof fetch;
+}
+
+describe('SessionProvider — bootstrap silencioso desde la cookie httpOnly (T-session-persistence)', () => {
+  it('restaura la sesión al montar usando SOLO el refresh silencioso, sin pasar por signIn', async () => {
+    const tokens = {
+      accessToken: 'acc-1',
+      refreshToken: 'ref-1',
+      tokenType: 'Bearer',
+      expiresIn: 900,
+    };
+    const user = {
+      id: 'u1',
+      email: 'demo@adoptafacil.org',
+      displayName: 'Demo Restaurado',
+      accountType: 'person',
+      organizationId: 'org-1',
+    };
+    const fetchFn = routedFetch({
+      '/auth/refresh/silent': tokens,
+      '/auth/me': user,
+      '/rbac/my-roles': [],
+    });
+
+    render(
+      <SessionProvider mode="http" fetchFn={fetchFn}>
+        <Consumer />
+      </SessionProvider>,
+    );
+
+    // Arranca en 'loading' (no en 'unauthenticated') mientras el bootstrap corre.
+    expect(screen.getByTestId('status')).toHaveTextContent('loading');
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('authenticated'));
+    expect(screen.getByTestId('user')).toHaveTextContent('Demo Restaurado');
+  });
+
+  it('sin cookie válida (refresh/silent → null) cae a unauthenticated, nunca a un error', async () => {
+    const fetchFn = routedFetch({ '/auth/refresh/silent': null });
+
+    render(
+      <SessionProvider mode="http" fetchFn={fetchFn}>
+        <Consumer />
+      </SessionProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated'));
+    expect(screen.getByTestId('user')).toHaveTextContent('—');
+  });
+
+  it('con authApi inyectado explícitamente (fakes de test), NO intenta el bootstrap y arranca unauthenticated', () => {
+    // Mismo caso que el resto de la suite: pasar un authApi (aunque sea con
+    // mode="http") es la señal de "esto es un test", no la app real.
+    render(
+      <SessionProvider mode="http" authApi={new MockAuthApi()}>
+        <Consumer />
+      </SessionProvider>,
+    );
+    expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated');
+  });
+});
+
 describe('logout redirects protected routes', () => {
   it('sends the user to /login after signing out', async () => {
     const user = userEvent.setup();
