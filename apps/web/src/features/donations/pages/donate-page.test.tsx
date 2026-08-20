@@ -302,8 +302,26 @@ describe('F-MIS-DONACIONES-PLUS: detalle + acceso al certificado desde "Mis dona
     expect(within(modal).getByTestId('donation-detail-net')).toHaveTextContent('45.210');
   });
 
-  it('an APPROVED donation offers "Ver / descargar certificado", landing on the REAL data (not the neutral fallback)', async () => {
-    stubFetch((url) => (url.includes('/donations/mine') ? [approvedDonationFixture()] : []));
+  it('an APPROVED donation offers "Ver / descargar certificado", landing on the REAL certificate (RF14, F-3)', async () => {
+    stubFetch((url) => {
+      if (url.includes('/donations/mine')) return [approvedDonationFixture()];
+      if (url.includes('/certificate')) {
+        return {
+          id: 'cert-1',
+          organizationId: '08d734c6-1900-4bf4-b3e5-d6468479cf8b',
+          donationId: 'd-approved-1',
+          code: 'ADF-CERT-2026-000456',
+          organizationName: 'Refugio Patitas',
+          organizationNit: '900123456-1',
+          donorName: 'Donante Tester',
+          amount: 50000,
+          currency: 'COP',
+          issuedAt: '2026-07-28T22:00:00.000Z',
+          contentHash: 'b'.repeat(64),
+        };
+      }
+      return [];
+    });
 
     renderShell({ route: '/donaciones', ...personSession() });
     await screen.findByRole('heading', { name: 'Mis donaciones' });
@@ -315,12 +333,10 @@ describe('F-MIS-DONACIONES-PLUS: detalle + acceso al certificado desde "Mis dona
     // Scoped to the document itself: the session user's own name also renders in
     // the shell header, so an unscoped match on "Donante Tester" is ambiguous.
     const document = within(await screen.findByTestId('certificate-document'));
-    expect(document.getByText('Refugio Patitas')).toBeInTheDocument();
+    expect(document.getByText('Refugio Patitas', { exact: false })).toBeInTheDocument();
     expect(document.getByText('Donante Tester')).toBeInTheDocument();
     expect(document.getByText(/50\.000/)).toBeInTheDocument();
-    // Never the neutral fallback nor the sample entity — this is a real past donation.
-    expect(document.queryByText('Organización beneficiaria')).not.toBeInTheDocument();
-    expect(document.queryByText('Fundación Huellas de Esperanza')).not.toBeInTheDocument();
+    expect(document.getByText('ADF-CERT-2026-000456')).toBeInTheDocument();
   });
 
   it('a PENDING donation (no receipt yet) has NO active certificate link — disabled with the reason', async () => {

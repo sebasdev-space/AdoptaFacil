@@ -3,6 +3,8 @@ import { AuthModule } from '../../core/auth/auth.module';
 import { CampaignsModule } from '../campaigns/campaigns.module';
 import { DonationsController } from './donations.controller';
 import { DonationsService } from './donations.service';
+import { DonationCertificatePublicController } from './donation-certificate-public.controller';
+import { DonationCertificatesService } from './donation-certificates.service';
 
 /**
  * M05 · Donations (T-050, P1). A Person donates to an organization, sees the
@@ -20,10 +22,16 @@ import { DonationsService } from './donations.service';
  * `CampaignFundingService` — the webhook enganche calls
  * `applyApprovedCollection(collectionId)` for campaign-concept donations. No
  * campaigns internals are touched; this module owns no campaign logic.
+ *
+ * `DonationCertificatesService` (F-3, RF14): the certificate is issued
+ * automatically inside the same webhook approval, best-effort (never fails
+ * the webhook), only when the beneficiary org is an ESAL with RTE vigente.
+ * Owns `donation_certificates` (RLS + immutable) and its two SECURITY
+ * DEFINER reads (donor, cross-tenant; and public, by code — no auth).
  */
 @Module({
   imports: [AuthModule, CampaignsModule],
-  controllers: [DonationsController],
-  providers: [DonationsService],
+  controllers: [DonationsController, DonationCertificatePublicController],
+  providers: [DonationsService, DonationCertificatesService],
 })
 export class DonationsModule {}

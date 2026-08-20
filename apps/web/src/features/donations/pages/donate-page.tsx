@@ -157,26 +157,21 @@ export function DonatePage() {
                 title="¡Gracias por tu donación!"
                 description={`Registramos tu donación de ${formatCop(done.amountCharged)}. Cuando el pago se confirme, te emitiremos el recibo automáticamente.`}
               />
-              {/* Empalme al recorrido del certificado (§M05/RF14, T-053 → F-CERT-REAL).
-                  Solo un ENLACE: la lógica de donación no cambia. Lleva la donación real +
-                  el nombre de la org (T-066) + su NIT real si está disponible (F2-03, ya
-                  en scope como `target.organizationNit`) por nav-state para reflejar
-                  datos reales en la maqueta del certificado. */}
+              {/* Empalme al certificado REAL (§M05/RF14, F-3): solo un ENLACE, la
+                  lógica de donación no cambia. Lleva únicamente el id de la
+                  donación — el certificado se lee del backend, no se reconstruye
+                  desde nav-state. */}
               <div className={styles['done__cert']}>
                 <Link
                   to="/certificado"
-                  state={{
-                    donation: done,
-                    organizationName: target.organizationName,
-                    organizationNit: target.organizationNit,
-                  }}
+                  state={{ donationId: done.id }}
                   className={cn(buttonVariants())}
                   data-testid="view-certificate-cta"
                 >
                   Ver tu certificado de donación
                 </Link>
                 <p className={styles['done__hint']}>
-                  Vista previa: anticipo del certificado verificable.
+                  Disponible una vez se confirme tu pago (organizaciones ESAL con RTE vigente).
                 </p>
               </div>
             </div>

@@ -1,22 +1,18 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { CertificateVerificationPage } from './certificate-verification-page';
-import { CERTIFICATE_NEUTRAL_FALLBACK, MOCK_CERTIFICATE } from '../model/mock-certificate';
 
 /**
- * §M05/RF14 (maqueta T-053 → F-CERT-REAL) — public certificate verification. No
- * backend: verifies the sample code deterministically. Without nav-state (deep
- * link / manual entry, i.e. a "cold" visit with no real donation behind it) it
- * shows the NEUTRAL fallback — never the old fictitious sample entity, since that
- * was exactly the inconsistency F-CERT-REAL removes. With nav-state (same-session
- * hand-off from `CertificateEmissionPage`) it shows the REAL donation data. Every
- * mock screen carries the "vista de diseño" label.
+ * §M05/RF14 (F-3) — public certificate verification against the REAL backend
+ * (replaces the T-053 mockup suite): queries
+ * `GET /public/donations/certificates/:code`, no session, no local sample
+ * comparison.
  */
-function renderVerify(initialPath: string, state?: unknown) {
+function renderVerify(initialPath: string) {
   return render(
     <MemoryRouter
-      initialEntries={[{ pathname: initialPath, state }]}
+      initialEntries={[initialPath]}
       future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
     >
       <Routes>
@@ -27,64 +23,93 @@ function renderVerify(initialPath: string, state?: unknown) {
   );
 }
 
-describe('CertificateVerificationPage', () => {
-  it('always shows the "vista de diseño" label (mock screen)', () => {
+function jsonResponse(body: unknown, status: number): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+const VALID_CERTIFICATE = {
+  code: 'ADF-CERT-2026-000123',
+  organizationName: 'Refugio Patitas',
+  organizationNit: '900123456-1',
+  donorName: 'María Restrepo',
+  amount: 150000,
+  currency: 'COP',
+  issuedAt: '2026-08-20T15:30:00.000Z',
+  contentHash: 'a'.repeat(64),
+};
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe('CertificateVerificationPage (RF14, F-3 — real backend)', () => {
+  it('shows only the search form when no code is given', () => {
     renderVerify('/verificar');
-    expect(screen.getByTestId('design-preview')).toBeInTheDocument();
+    expect(screen.getByLabelText('Código del certificado')).toBeInTheDocument();
+    expect(screen.queryByTestId('verification-result')).not.toBeInTheDocument();
   });
 
-  it('F-CERT-REAL: a "cold" deep link (no nav-state) shows the NEUTRAL fallback, never the fictitious sample entity', () => {
-    renderVerify(`/verificar/${MOCK_CERTIFICATE.code}`);
+  it('deep-link with :code auto-verifies against the real endpoint', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(jsonResponse(VALID_CERTIFICATE, 200))),
+    );
 
-    expect(screen.getByTestId('verification-result')).toBeInTheDocument();
-    expect(screen.getByText('Certificado válido')).toBeInTheDocument();
-    const evidence = screen.getByTestId('authenticity-evidence');
-    expect(evidence).toHaveTextContent(CERTIFICATE_NEUTRAL_FALLBACK.organizationName);
-    expect(evidence).toHaveTextContent(CERTIFICATE_NEUTRAL_FALLBACK.donorName);
-    expect(evidence).not.toHaveTextContent(MOCK_CERTIFICATE.organizationName);
-    expect(evidence).not.toHaveTextContent(MOCK_CERTIFICATE.donorName);
-    // The sample hash/code stay — RF14 real generation is post-pitch either way.
-    expect(evidence).toHaveTextContent(MOCK_CERTIFICATE.contentHash);
+    renderVerify(`/verificar/${VALID_CERTIFICATE.code}`);
+
+    const evidence = await screen.findByTestId('authenticity-evidence');
+    expect(evidence).toHaveTextContent('Refugio Patitas');
+    expect(evidence).toHaveTextContent('900123456-1');
+    expect(evidence).toHaveTextContent('María Restrepo');
+    expect(evidence).toHaveTextContent('150.000');
   });
 
-  it('F-CERT-REAL: with the real certificate via nav-state (same-session hand-off from emission), shows those exact real data — consistent with the certificate', () => {
-    renderVerify(`/verificar/${MOCK_CERTIFICATE.code}`, {
-      certificate: {
-        ...MOCK_CERTIFICATE,
-        organizationName: 'CatCompany',
-        organizationNit: '900.111.222-3',
-        donorName: 'Juan Pérez',
-        amount: 75000,
-      },
-    });
-
-    const evidence = screen.getByTestId('authenticity-evidence');
-    expect(evidence).toHaveTextContent('CatCompany');
-    expect(evidence).toHaveTextContent('NIT 900.111.222-3');
-    expect(evidence).toHaveTextContent('Juan Pérez');
-    expect(evidence).toHaveTextContent('75.000');
-    // The fictitious sample entity and the neutral fallback never appear once
-    // the real certificate is available — this is THE consistency fix.
-    expect(evidence).not.toHaveTextContent(MOCK_CERTIFICATE.organizationName);
-    expect(evidence).not.toHaveTextContent(CERTIFICATE_NEUTRAL_FALLBACK.organizationName);
-  });
-
-  it('verifies the sample code entered manually', () => {
+  it('verifies a code entered manually', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(jsonResponse(VALID_CERTIFICATE, 200))),
+    );
     renderVerify('/verificar');
+
     fireEvent.change(screen.getByLabelText('Código del certificado'), {
-      target: { value: MOCK_CERTIFICATE.code },
+      target: { value: VALID_CERTIFICATE.code },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Verificar' }));
-    expect(screen.getByText('Certificado válido')).toBeInTheDocument();
+
+    expect(await screen.findByText('Certificado válido')).toBeInTheDocument();
   });
 
-  it('shows a not-found state for an unknown code (no false positives)', () => {
+  it('shows a not-found state for an unknown code (no false positives, never fabricated)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(jsonResponse({ message: 'not found' }, 404))),
+    );
     renderVerify('/verificar');
+
     fireEvent.change(screen.getByLabelText('Código del certificado'), {
       target: { value: 'ADF-CERT-0000-000000' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Verificar' }));
-    expect(screen.getByText('Código no encontrado')).toBeInTheDocument();
+
+    expect(await screen.findByText('Código no encontrado')).toBeInTheDocument();
     expect(screen.queryByTestId('verification-result')).not.toBeInTheDocument();
+  });
+
+  it('shows a generic error state on a network/server failure (never a false "valid")', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.reject(new Error('network down'))),
+    );
+    renderVerify('/verificar');
+
+    fireEvent.change(screen.getByLabelText('Código del certificado'), {
+      target: { value: VALID_CERTIFICATE.code },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Verificar' }));
+
+    expect(await screen.findByText('No se pudo verificar')).toBeInTheDocument();
   });
 });
