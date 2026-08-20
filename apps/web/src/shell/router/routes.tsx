@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { EmptyState, Skeleton } from '@adoptafacil/ui';
 import { RequireAuth, RequireRoles } from '../auth';
 import { AppLayout } from '../layout';
 import {
@@ -29,7 +30,12 @@ import {
   OrgVolunteeringPage,
   PlatformDocumentsReviewPage,
 } from '../../features/org';
-import { OrgPublicPage, PortalThemePage, PublicAnimalDetailPage } from '../../features/portals';
+import {
+  OrgPublicPage,
+  PortalThemePage,
+  PublicAnimalDetailPage,
+  usePortalSubdomainSlug,
+} from '../../features/portals';
 import {
   CampaignDetailPage,
   CampaignsPage,
@@ -70,10 +76,44 @@ import { CertificateEmissionPage, CertificateVerificationPage } from '../../feat
  * <MemoryRouter initialEntries={…}> to exercise public vs protected routing.
  */
 export function AppRoutes() {
+  // Real portal subdomains (F-1, M14): when the current host resolves to an
+  // organization (`<subdomain>.<VITE_PORTAL_BASE_DOMAIN>`), "/" renders that
+  // org's rich portal instead of the general consolidated catalog. Every
+  // other route (including `/o/:slug` itself) is UNCHANGED — a portal-internal
+  // link like `/o/<slug>/animales/<id>` still resolves normally on that same
+  // host, so nothing downstream needs to know about subdomains at all. Hosts
+  // that don't resolve to an org (`status: 'none'` — bare domain, www/app,
+  // localhost, staging previews, or no `VITE_PORTAL_BASE_DOMAIN` configured)
+  // render the app exactly as before.
+  const portalSubdomain = usePortalSubdomainSlug();
+
+  if (portalSubdomain.status === 'loading') {
+    return <Skeleton className="h-screen w-full" />;
+  }
+  if (portalSubdomain.status === 'not-found') {
+    return (
+      <EmptyState
+        title="Organización no encontrada"
+        description="Este subdominio no corresponde a ninguna organización activa."
+      />
+    );
+  }
+
   return (
     <Routes>
-      {/* Public general portal (F-LANDING-01) — the platform's entry point. */}
-      <Route path="/" element={<GeneralPortalPage />} />
+      {/* Public general portal (F-LANDING-01) — the platform's entry point.
+          On a real organization subdomain (portalSubdomain.status === 'ready')
+          this renders that org's rich portal instead (F-1, M14). */}
+      <Route
+        path="/"
+        element={
+          portalSubdomain.status === 'ready' ? (
+            <OrgPublicPage slugOverride={portalSubdomain.slug} />
+          ) : (
+            <GeneralPortalPage />
+          )
+        }
+      />
       {/* Public auth screens */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />

@@ -59,6 +59,14 @@ function parsePhones(raw: string): string[] {
 interface FormState {
   name: string;
   slug: string;
+  // F-1 (M14, @fabian): subdominio real del portal (`<subdominio>.<dominio>`),
+  // hermano de `slug` en el mismo endpoint (PUT /org/profile) y con el MISMO
+  // formato/validación (`validateOptionalSlug`/`org.schemas.ts`) — este campo
+  // ya existía en Organization desde T-101b, pero ningún formulario lo
+  // exponía todavía (confirmado por grep). Se agrega aquí, junto a `slug`,
+  // porque es el mismo endpoint y el mismo formulario que ya edita ese campo
+  // hermano — no una pantalla nueva.
+  subdomain: string;
   nit: string;
   legalName: string;
   description: string;
@@ -90,6 +98,7 @@ function initialState(org: Organization): FormState {
   return {
     name: org.name ?? '',
     slug: org.slug ?? '',
+    subdomain: org.subdomain ?? '',
     nit: org.nit ?? '',
     legalName: org.legalName ?? '',
     description: org.description ?? '',
@@ -180,6 +189,7 @@ function buildPayload(form: FormState): UpdateOrganizationProfileInput {
     // `validate()` already blocks submission unless `name` is non-empty.
     name: form.name.trim(),
     slug: cleanFormatted(form.slug),
+    subdomain: cleanFormatted(form.subdomain),
     nit: cleanText(form.nit),
     legalName: cleanText(form.legalName),
     description: cleanText(form.description),
@@ -386,9 +396,27 @@ export const OrgProfileForm = forwardRef<OrgProfileFormHandle, OrgProfileFormPro
      *  sin hardcodear uno). */
     const slugPreviewUrl = `${window.location.origin}/o/${form.slug.trim() || 'tu-organizacion'}`;
 
+    /** Mismo patrón que `setSlug`/`slugPreviewUrl` (F-1, M14): validación en
+     *  vivo + vista previa. El subdominio REAL solo funciona una vez exista
+     *  el DNS de producción (`VITE_PORTAL_BASE_DOMAIN`); sin esa variable la
+     *  vista previa explica la ruta alterna `/o/:slug`, que siempre funciona. */
+    const setSubdomain = (value: string) => {
+      setForm((prev) => ({ ...prev, subdomain: value }));
+      setErrors((prev) => ({ ...prev, subdomain: validateOptionalSlug(value) }));
+    };
+    const subdomainSuggestion =
+      errors.subdomain && form.subdomain.trim() ? slugify(form.subdomain) : '';
+    const showSubdomainSuggestion =
+      subdomainSuggestion !== '' && subdomainSuggestion !== form.subdomain.trim();
+    const portalBaseDomain = import.meta.env.VITE_PORTAL_BASE_DOMAIN as string | undefined;
+    const subdomainHint = portalBaseDomain
+      ? `Tu portal se verá en https://${form.subdomain.trim() || 'tu-organizacion'}.${portalBaseDomain} — mientras tanto, ${slugPreviewUrl} siempre funciona.`
+      : `Se activará cuando la plataforma configure el dominio (por ahora, ${slugPreviewUrl} es tu enlace real).`;
+
     const validate = (): boolean => {
       const next: Partial<Record<keyof FormState, string>> = {
         slug: validateOptionalSlug(form.slug),
+        subdomain: validateOptionalSlug(form.subdomain),
         contactEmail: validateOptionalEmail(form.contactEmail),
         instagram: validateOptionalUrl(form.instagram),
         facebook: validateOptionalUrl(form.facebook),
@@ -478,6 +506,25 @@ export const OrgProfileForm = forwardRef<OrgProfileFormHandle, OrgProfileFormPro
                   className="mt-1 text-xs font-medium text-primary hover:underline"
                 >
                   Usar "{slugSuggestion}"
+                </button>
+              )}
+            </div>
+            <div>
+              <OrgTextField
+                id="org-subdomain"
+                label="Subdominio de tu portal (opcional)"
+                value={form.subdomain}
+                onChange={setSubdomain}
+                error={errors.subdomain}
+                hint={subdomainHint}
+              />
+              {showSubdomainSuggestion && (
+                <button
+                  type="button"
+                  onClick={() => setSubdomain(subdomainSuggestion)}
+                  className="mt-1 text-xs font-medium text-primary hover:underline"
+                >
+                  Usar "{subdomainSuggestion}"
                 </button>
               )}
             </div>

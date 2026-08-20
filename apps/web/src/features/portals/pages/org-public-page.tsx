@@ -68,8 +68,19 @@ const DEFAULT_LAYOUT: Layout = { logoPosition: 'left', socialNavPosition: 'right
  * the portal re-brands without affecting anything else and without arbitrary CSS —
  * only the safe, validated token subset is ever applied.
  */
-export function OrgPublicPage() {
-  const { slug } = useParams<{ slug: string }>();
+export interface OrgPublicPageProps {
+  /**
+   * Real-subdomain portal (F-1, M14): when the app resolves the current host
+   * to an organization slug (`usePortalSubdomainSlug`), the shell renders this
+   * page at `/` with the resolved slug instead of the `:slug` route param —
+   * everything below behaves identically either way.
+   */
+  slugOverride?: string;
+}
+
+export function OrgPublicPage({ slugOverride }: OrgPublicPageProps = {}) {
+  const { slug: slugParam } = useParams<{ slug: string }>();
+  const slug = slugOverride ?? slugParam;
   const [view, setView] = useState<PortalView | null>(null);
   const [theme, setTheme] = useState<PortalTheme>({});
   const [layout, setLayout] = useState<Layout>(DEFAULT_LAYOUT);

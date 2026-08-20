@@ -72,6 +72,18 @@ export interface PortalView {
   sections: PortalSection[];
 }
 
+/**
+ * Resultado de resolver un subdominio real del portal
+ * (`<subdominio>.adoptafacil.com`) a su slug de organización. Superficie
+ * pública mínima — SOLO el slug, nada más — para que el frontend reutilice
+ * sin cambios cada endpoint público ya existente que se indexa por slug
+ * (`organization_public`, `organization_portal_theme`, animales, campañas...)
+ * en vez de duplicar su proyección pública para una segunda llave.
+ */
+export interface OrganizationSlugLookup {
+  slug: string;
+}
+
 // ============================================================================
 // M14 — PERSONALIZACIÓN POR TOKENS (T-027)
 //
