@@ -6,10 +6,12 @@ import {
   type CollectionResult,
   type CreateCollectionInput,
   type CreatePayoutInput,
+  type NormalizedPayoutWebhookEvent,
   type NormalizedWebhookEvent,
   type PaymentPort,
   type PaymentStatus,
   type PayoutResult,
+  type PayoutStatus,
 } from '@adoptafacil/contracts';
 import type { Env } from '../../config/env.validation';
 
@@ -50,6 +52,30 @@ interface WompiWebhookPayload {
   timestamp?: number;
 }
 
+/** Response shape of `POST /v1/payouts` (fields we depend on). */
+interface WompiPayoutCreated {
+  data: { id: string; status?: string };
+}
+
+/** The payout sub-object Wompi embeds in a payout confirmation webhook.
+ *  TODO(validate against the real sandbox, M15b manual step): confirmed the
+ *  event/field names against the public Payouts docs at write time; the
+ *  real sandbox credentials are needed to verify the exact shape (same
+ *  caveat already documented on `WompiPaymentLinkFetched` for collections). */
+interface WompiWebhookPayout {
+  id?: string;
+  status?: string;
+  [key: string]: unknown;
+}
+
+/** Shape of a Wompi payout webhook event body (fields we depend on). */
+interface WompiPayoutWebhookPayload {
+  event?: string;
+  data?: { payout?: WompiWebhookPayout };
+  signature?: { properties?: string[]; checksum?: string };
+  timestamp?: number;
+}
+
 /** Wompi transaction status strings → our PaymentStatus (unknown ⇒ 'error'). */
 const WOMPI_STATUS_MAP: Record<string, PaymentStatus> = {
   PENDING: 'pending',
@@ -61,6 +87,27 @@ const WOMPI_STATUS_MAP: Record<string, PaymentStatus> = {
 
 function mapWompiStatus(raw: string | undefined): PaymentStatus {
   return (raw && WOMPI_STATUS_MAP[raw]) || 'error';
+}
+
+/** Wompi payout status strings → our PayoutStatus. */
+const WOMPI_PAYOUT_STATUS_MAP: Record<string, PayoutStatus> = {
+  PENDING: 'scheduled',
+  IN_PROGRESS: 'scheduled',
+  PAID: 'paid',
+  FAILED: 'failed',
+  REJECTED: 'failed',
+};
+
+/** Used for `POST /payouts` responses: an unrecognized/absent status still
+ *  means the payout was ACCEPTED (the call itself succeeded) ⇒ 'scheduled'. */
+function mapWompiPayoutCreatedStatus(raw: string | undefined): PayoutStatus {
+  return (raw && WOMPI_PAYOUT_STATUS_MAP[raw]) || 'scheduled';
+}
+
+/** Used for webhook EVENTS: an unrecognized status is fail-safe ⇒ 'failed'
+ *  (never silently treated as a successful confirmation). */
+function mapWompiPayoutWebhookStatus(raw: string | undefined): PayoutStatus {
+  return (raw && WOMPI_PAYOUT_STATUS_MAP[raw]) || 'failed';
 }
 
 /**
@@ -98,10 +145,12 @@ function resolvePath(source: unknown, path: string): unknown {
  * adapter only turns that breakdown into a Wompi payment link and back; it
  * never recomputes fees.
  *
- * Scope (M15a): {@link createCollection}, {@link getCollectionStatus},
- * {@link verifyAndNormalizeWebhook}. {@link createPayout} (dispersión T+1) is
- * M15b — this adapter throws for it, same "not implemented yet" pattern the
- * PaymentModule already uses for the whole driver today.
+ * Scope: {@link createCollection}/{@link getCollectionStatus}/
+ * {@link verifyAndNormalizeWebhook} are the recaudo side (M15a, T-060).
+ * {@link createPayout}/{@link verifyAndNormalizePayoutWebhook} are dispersión
+ * T+1 (M15b) — real `POST /payouts` against the org's registered bank
+ * account; the batch `/payouts/file` mode is an explicit `TODO(client)`, not
+ * implemented (see {@link createPayout}'s doc).
  */
 @Injectable()
 export class WompiPaymentAdapter implements PaymentPort {
@@ -198,28 +247,7 @@ export class WompiPaymentAdapter implements PaymentPort {
    */
   verifyAndNormalizeWebhook(payload: unknown, _signature: string): NormalizedWebhookEvent {
     const body = payload as WompiWebhookPayload;
-    const properties = body?.signature?.properties;
-    const checksum = body?.signature?.checksum;
-    const timestamp = body?.timestamp;
-
-    if (!properties?.length || !checksum || timestamp === undefined) {
-      throw new Error('Wompi webhook rejected: missing signature/timestamp.');
-    }
-
-    const values = properties.map((path) => {
-      const value = resolvePath(body.data, path);
-      if (value === undefined || value === null) {
-        throw new Error(`Wompi webhook rejected: signature property "${path}" is missing.`);
-      }
-      return String(value);
-    });
-
-    const concatenated = `${values.join('')}${timestamp}${this.eventsSecret}`;
-    const computed = createHash('sha256').update(concatenated).digest('hex');
-
-    if (computed !== checksum) {
-      throw new Error('Wompi webhook rejected: checksum mismatch.');
-    }
+    this.verifyChecksum(body.signature, body.timestamp, body.data);
 
     const transaction = body.data?.transaction;
     const collectionId = transaction?.payment_link_id;
@@ -232,8 +260,114 @@ export class WompiPaymentAdapter implements PaymentPort {
     return { eventId, collectionId, status, dedupKey: eventId };
   }
 
-  /** Dispersión T+1 — OUT OF SCOPE for M15a (T-060). M15b implements this. */
-  async createPayout(_input: CreatePayoutInput): Promise<PayoutResult> {
-    throw new Error('WompiPaymentAdapter.createPayout is not implemented yet (M15b).');
+  /**
+   * Real Wompi Payouts adapter (M15b): dispersión T+1 directa a la cuenta
+   * bancaria REGISTRADA de la organización (`input.bankAccount`) — nunca a un
+   * saldo intermedio propio de la plataforma (invariante "no custodia"). El
+   * `reference` se deriva del `idempotencyKey` (mismo patrón que
+   * `createCollection`): un reintento con la misma clave nunca disperse dos
+   * veces, porque Wompi rechaza una referencia repetida.
+   *
+   * Alcance (Consolidación operativa §4): solo el payout INDIVIDUAL
+   * (`POST /payouts`). El modo por lote (`POST /payouts/file`, multipart) NO
+   * se implementa aquí — su formato exacto no está verificado contra la API
+   * real y el documento base no lo exige para operar; queda como
+   * `TODO(client)` explícito en vez de inventarlo.
+   */
+  async createPayout(input: CreatePayoutInput): Promise<PayoutResult> {
+    const reference = `af-payout-${input.idempotencyKey}`;
+    const { bankAccount } = input;
+
+    const response = await this.fetchFn(`${this.baseUrl}/payouts`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.privateKey}`,
+      },
+      body: JSON.stringify({
+        reference,
+        amount_in_cents: pesosToCents(input.amount),
+        currency: 'COP',
+        description: `Dispersión AdoptaFácil — ${input.beneficiaryOrgId}`,
+        bank_account: {
+          type: bankAccount.accountType === 'savings' ? 'SAVINGS' : 'CHECKING',
+          number: bankAccount.accountNumber,
+          bank_code: bankAccount.bankCode,
+          holder_name: bankAccount.accountHolderName,
+          holder_document_number: bankAccount.accountHolderDocument,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      throw new Error(`Wompi payouts create failed (${response.status}): ${body}`);
+    }
+
+    const body = (await response.json()) as WompiPayoutCreated;
+    this.logger.log(`payout created id=${body.data.id} reference=${reference}`);
+    return {
+      payoutId: body.data.id,
+      status: mapWompiPayoutCreatedStatus(body.data.status),
+    };
+  }
+
+  /**
+   * Verify a Wompi payout-confirmation webhook and normalize it. Same checksum
+   * scheme as {@link verifyAndNormalizeWebhook} (Wompi signs every event the
+   * same way regardless of kind) — reused via {@link verifyChecksum}.
+   * `eventId`/`dedupKey` mirror the collection webhook's `<id>-<status>` pair.
+   */
+  verifyAndNormalizePayoutWebhook(
+    payload: unknown,
+    _signature: string,
+  ): NormalizedPayoutWebhookEvent {
+    const body = payload as WompiPayoutWebhookPayload;
+    this.verifyChecksum(body.signature, body.timestamp, body.data);
+
+    const payout = body.data?.payout;
+    if (!payout?.id) {
+      throw new Error('Wompi payout webhook rejected: payload has no payout.id.');
+    }
+
+    const status = mapWompiPayoutWebhookStatus(payout.status);
+    const eventId = `${payout.id}-${payout.status}`;
+    return { eventId, payoutId: payout.id, status, dedupKey: eventId };
+  }
+
+  /**
+   * Shared checksum verification (Wompi docs, §Eventos): SHA-256(hex) of the
+   * values named in `signature.properties` (resolved against `data`, in
+   * order) + `timestamp` + `WOMPI_EVENTS_SECRET`, compared against
+   * `signature.checksum`. Throws on any missing/mismatched piece — used by
+   * BOTH the collection and payout webhook verifiers, since Wompi signs every
+   * event type with the same scheme.
+   */
+  private verifyChecksum(
+    signature: { properties?: string[]; checksum?: string } | undefined,
+    timestamp: number | undefined,
+    data: unknown,
+  ): void {
+    const properties = signature?.properties;
+    const checksum = signature?.checksum;
+
+    if (!properties?.length || !checksum || timestamp === undefined) {
+      throw new Error('Wompi webhook rejected: missing signature/timestamp.');
+    }
+
+    const values = properties.map((path) => {
+      const value = resolvePath(data, path);
+      if (value === undefined || value === null) {
+        throw new Error(`Wompi webhook rejected: signature property "${path}" is missing.`);
+      }
+      return String(value);
+    });
+
+    const concatenated = `${values.join('')}${timestamp}${this.eventsSecret}`;
+    const computed = createHash('sha256').update(concatenated).digest('hex');
+
+    if (computed !== checksum) {
+      throw new Error('Wompi webhook rejected: checksum mismatch.');
+    }
   }
 }

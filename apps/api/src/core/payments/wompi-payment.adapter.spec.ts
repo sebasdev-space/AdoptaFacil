@@ -41,6 +41,24 @@ function signedWebhook(transaction: Record<string, unknown>, timestamp = 1_700_0
   };
 }
 
+/** Build a VALID Wompi payout webhook body + compute its checksum. */
+function signedPayoutWebhook(payout: Record<string, unknown>, timestamp = 1_700_000_000) {
+  const properties = ['payout.id', 'payout.status'];
+  const values = properties.map((path) => {
+    const [, field] = path.split('.');
+    return String((payout as Record<string, unknown>)[field]);
+  });
+  const checksum = createHash('sha256')
+    .update(`${values.join('')}${timestamp}${ENV.WOMPI_EVENTS_SECRET as string}`)
+    .digest('hex');
+  return {
+    event: 'payout.updated',
+    data: { payout },
+    signature: { properties, checksum },
+    timestamp,
+  };
+}
+
 describe('pesosToCents (T-060)', () => {
   it('converts integer pesos to integer cents (×100), no float drift', () => {
     expect(pesosToCents(1)).toBe(100);
@@ -199,6 +217,156 @@ describe('WompiPaymentAdapter (T-060, M15a — recaudo via Payment Links)', () =
       });
 
       expect(() => adapter.verifyAndNormalizeWebhook(webhook, '')).toThrow(/payment_link_id/);
+    });
+  });
+
+  describe('createPayout (M15b — dispersión T+1)', () => {
+    const bankAccount = {
+      bankCode: '001',
+      accountType: 'savings' as const,
+      accountNumber: '1234567890',
+      accountHolderName: 'Refugio Patitas',
+      accountHolderDocument: '900123456-1',
+    };
+    const payoutInput = {
+      beneficiaryOrgId: 'org-1',
+      amount: 100_000,
+      idempotencyKey: 'payout-abc',
+      bankAccount,
+    };
+
+    it('POSTs /payouts with amount_in_cents + the destination bank account + a reference derived from idempotencyKey', async () => {
+      const fetchFn = jest.fn<ReturnType<WompiFetch>, Parameters<WompiFetch>>(() =>
+        Promise.resolve(jsonResponse({ data: { id: 'payout-123', status: 'PENDING' } }, 201)),
+      ) as unknown as WompiFetch;
+      const adapter = new WompiPaymentAdapter(makeConfig(), fetchFn);
+
+      const result = await adapter.createPayout(payoutInput);
+
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+      const [url, init] = (fetchFn as jest.Mock).mock.calls[0];
+      expect(url).toBe('https://sandbox.wompi.co/v1/payouts');
+      expect(init.method).toBe('POST');
+      expect(init.headers.Authorization).toBe('Bearer prv_test_dummy');
+      const body = JSON.parse(init.body as string);
+      expect(body.amount_in_cents).toBe(100_000 * 100);
+      expect(body.currency).toBe('COP');
+      expect(body.reference).toBe('af-payout-payout-abc');
+      expect(body.bank_account).toEqual({
+        type: 'SAVINGS',
+        number: '1234567890',
+        bank_code: '001',
+        holder_name: 'Refugio Patitas',
+        holder_document_number: '900123456-1',
+      });
+
+      expect(result).toEqual({ payoutId: 'payout-123', status: 'scheduled' });
+    });
+
+    it('is idempotent by reference: the SAME idempotencyKey always produces the SAME reference', async () => {
+      const fetchFn = jest.fn<ReturnType<WompiFetch>, Parameters<WompiFetch>>(() =>
+        Promise.resolve(jsonResponse({ data: { id: 'payout-same' } }, 201)),
+      ) as unknown as WompiFetch;
+      const adapter = new WompiPaymentAdapter(makeConfig(), fetchFn);
+
+      const first = await adapter.createPayout(payoutInput);
+      const second = await adapter.createPayout(payoutInput);
+
+      const refs = (fetchFn as jest.Mock).mock.calls.map(
+        ([, init]: [string, RequestInit]) => JSON.parse(init.body as string).reference,
+      );
+      expect(refs[0]).toBe(refs[1]);
+      expect(first.payoutId).toBe(second.payoutId);
+    });
+
+    it("maps a savings/checking account type to Wompi's SAVINGS/CHECKING", async () => {
+      const fetchFn = jest.fn<ReturnType<WompiFetch>, Parameters<WompiFetch>>(() =>
+        Promise.resolve(jsonResponse({ data: { id: 'payout-1' } }, 201)),
+      ) as unknown as WompiFetch;
+      const adapter = new WompiPaymentAdapter(makeConfig(), fetchFn);
+
+      await adapter.createPayout({
+        ...payoutInput,
+        bankAccount: { ...bankAccount, accountType: 'checking' },
+      });
+
+      const [, init] = (fetchFn as jest.Mock).mock.calls[0];
+      expect(JSON.parse(init.body as string).bank_account.type).toBe('CHECKING');
+    });
+
+    it('throws a clear error when Wompi rejects the payouts call', async () => {
+      const fetchFn = jest.fn<ReturnType<WompiFetch>, Parameters<WompiFetch>>(() =>
+        Promise.resolve(jsonResponse({ error: { messages: {} } }, 422)),
+      ) as unknown as WompiFetch;
+      const adapter = new WompiPaymentAdapter(makeConfig(), fetchFn);
+
+      await expect(adapter.createPayout(payoutInput)).rejects.toThrow(/422/);
+    });
+
+    it('an unrecognized/absent created status still means ACCEPTED ⇒ scheduled', async () => {
+      const fetchFn = jest.fn<ReturnType<WompiFetch>, Parameters<WompiFetch>>(() =>
+        Promise.resolve(jsonResponse({ data: { id: 'payout-1' } }, 201)),
+      ) as unknown as WompiFetch;
+      const adapter = new WompiPaymentAdapter(makeConfig(), fetchFn);
+
+      const result = await adapter.createPayout(payoutInput);
+      expect(result.status).toBe('scheduled');
+    });
+  });
+
+  describe('verifyAndNormalizePayoutWebhook', () => {
+    it('normalizes a VALID checksum to {eventId, payoutId, status, dedupKey}', () => {
+      const adapter = new WompiPaymentAdapter(makeConfig(), jest.fn() as unknown as WompiFetch);
+      const webhook = signedPayoutWebhook({ id: 'payout-1', status: 'PAID' });
+
+      const event = adapter.verifyAndNormalizePayoutWebhook(webhook, '');
+      expect(event).toEqual({
+        eventId: 'payout-1-PAID',
+        payoutId: 'payout-1',
+        status: 'paid',
+        dedupKey: 'payout-1-PAID',
+      });
+    });
+
+    it('maps FAILED/REJECTED to our failed status', () => {
+      const adapter = new WompiPaymentAdapter(makeConfig(), jest.fn() as unknown as WompiFetch);
+      const webhook = signedPayoutWebhook({ id: 'payout-1', status: 'REJECTED' });
+
+      expect(adapter.verifyAndNormalizePayoutWebhook(webhook, '').status).toBe('failed');
+    });
+
+    it('rejects an INVALID checksum', () => {
+      const adapter = new WompiPaymentAdapter(makeConfig(), jest.fn() as unknown as WompiFetch);
+      const webhook = signedPayoutWebhook({ id: 'payout-1', status: 'PAID' });
+      webhook.signature.checksum = 'tampered';
+
+      expect(() => adapter.verifyAndNormalizePayoutWebhook(webhook, '')).toThrow(
+        /checksum mismatch/,
+      );
+    });
+
+    it('rejects a payload missing the signature block', () => {
+      const adapter = new WompiPaymentAdapter(makeConfig(), jest.fn() as unknown as WompiFetch);
+      expect(() =>
+        adapter.verifyAndNormalizePayoutWebhook({ event: 'payout.updated', data: {} }, ''),
+      ).toThrow(/missing signature/);
+    });
+
+    it('rejects a payload with no payout.id (valid signature over status alone)', () => {
+      const adapter = new WompiPaymentAdapter(makeConfig(), jest.fn() as unknown as WompiFetch);
+      const properties = ['payout.status'];
+      const timestamp = 1_700_000_000;
+      const checksum = createHash('sha256')
+        .update(`PAID${timestamp}${ENV.WOMPI_EVENTS_SECRET as string}`)
+        .digest('hex');
+      const webhook = {
+        event: 'payout.updated',
+        data: { payout: { status: 'PAID' } },
+        signature: { properties, checksum },
+        timestamp,
+      };
+
+      expect(() => adapter.verifyAndNormalizePayoutWebhook(webhook, '')).toThrow(/payout\.id/);
     });
   });
 });
