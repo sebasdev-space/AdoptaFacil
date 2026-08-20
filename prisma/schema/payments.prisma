@@ -2,3 +2,61 @@
 // TODO: models defined by @fabian. The real PaymentPort/Wompi integration is
 // Ola 2 and lives behind a port/adapter. Every business model MUST carry
 // organization_id and enable RLS following the _rls_probe reference in org.prisma.
+//
+// M15b (dispersión T+1 vía Wompi Payouts): igual que donations.prisma, NO se
+// declara relación Prisma con `Organization` (org.prisma, de @sebastian) — la
+// org se referencia por organization_id (uuid) y la FK + RLS se añaden a mano
+// en el SQL de la migración.
+
+/// La cuenta bancaria REGISTRADA de la organización — único destino de sus
+/// payouts (invariante "no custodia": AdoptaFácil nunca agrupa fondos de
+/// terceros en un saldo propio, siempre dispersa contra esta cuenta). Datos
+/// sensibles (SARLAFT/KYC); nunca se auditan en claro (solo la referencia del
+/// payout). Una organización tiene UNA sola cuenta activa (PK = organization_id;
+/// registrar de nuevo la reemplaza).
+model OrganizationBankAccount {
+  organizationId        String   @id @map("organization_id") @db.Uuid
+  /// Código del banco en el catálogo de Wompi.
+  bankCode               String   @map("bank_code")
+  /// BankAccountType: 'savings' | 'checking'.
+  accountType            String   @map("account_type")
+  accountNumber          String   @map("account_number")
+  accountHolderName      String   @map("account_holder_name")
+  /// Cédula/NIT del titular (SARLAFT/KYC).
+  accountHolderDocument  String   @map("account_holder_document")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  @@map("organization_bank_accounts")
+}
+
+/// Un intento de dispersión T+1 (M15b). Idempotente por (organization_id,
+/// idempotency_key): un reintento con la misma clave nunca duplica el payout.
+/// `attempts`/`lastError` alimentan el reintento escalonado de BullMQ; el
+/// estado final (`PayoutStatus`) lo confirma el webhook de Wompi, no la
+/// respuesta síncrona de creación. Esta es la tabla que @sebastian leerá desde
+/// el dashboard financiero (M13/RF28) — solo lectura desde su lado.
+model Payout {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  /// Pesos enteros COP a dispersar.
+  amount         Int
+  currency       String   @default("COP")
+  idempotencyKey String   @map("idempotency_key")
+  /// Id del payout en Wompi (null hasta que el dispatch tenga éxito).
+  wompiPayoutId  String?  @map("wompi_payout_id")
+  /// PayoutStatus como texto: 'scheduled' | 'paid' | 'failed'.
+  status         String   @default("scheduled")
+  /// Intentos de dispatch realizados (BullMQ `attemptsMade`, reflejado aquí).
+  attempts       Int      @default(0)
+  /// Mensaje del último fallo de dispatch (diagnóstico; nunca datos bancarios).
+  lastError      String?  @map("last_error")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([organizationId, idempotencyKey])
+  @@unique([wompiPayoutId])
+  @@index([organizationId])
+  @@index([status])
+  @@map("payouts")
+}

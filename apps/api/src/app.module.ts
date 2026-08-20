@@ -15,6 +15,7 @@ import { AnimalsModule } from './modules/animals/animals.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { DonationsModule } from './modules/donations/donations.module';
 import { OrgModule } from './modules/org/org.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 import { PortalsModule } from './modules/portals/portals.module';
 import { SponsorshipsModule } from './modules/sponsorships/sponsorships.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -61,6 +62,8 @@ import { RedisModule } from './redis/redis.module';
     CampaignsModule,
     // M07 · recurring sponsorships base (RF17 / T-056, no payment yet).
     SponsorshipsModule,
+    // M15b · dispersión T+1 vía Wompi Payouts (RF26, F-4).
+    PaymentsModule,
   ],
 })
 export class AppModule {}

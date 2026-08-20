@@ -90,17 +90,89 @@ export interface NormalizedWebhookEvent {
   dedupKey: string;
 }
 
+/** Colombian bank account type (RF26 payouts — ahorros/corriente). */
+export type BankAccountType = 'savings' | 'checking';
+
+/**
+ * The organization's OWN bank account, registered once and used as the ONLY
+ * payout destination (no custody: AdoptaFácil never pools organization funds —
+ * every payout disperses directly to this account, never to an intermediate
+ * platform-owned balance).
+ */
+export interface PayoutBankAccount {
+  /** Wompi bank code (financial-institution catalog). */
+  bankCode: string;
+  accountType: BankAccountType;
+  accountNumber: string;
+  accountHolderName: string;
+  /** Cédula/NIT of the account holder (SARLAFT/KYC context; validated in M15). */
+  accountHolderDocument: string;
+}
+
 export interface CreatePayoutInput {
   beneficiaryOrgId: string;
   /** Integer COP pesos to disperse (T+1). */
   amount: number;
   /** Caller-supplied key: a retry with the same key must NOT double-pay. */
   idempotencyKey: string;
+  /** Destination account — resolved by M15 from the org's registration, never
+   *  supplied by the caller of a higher layer. */
+  bankAccount: PayoutBankAccount;
 }
 
 export interface PayoutResult {
   payoutId: string;
   status: PayoutStatus;
+}
+
+/** Normalized, idempotent payout webhook event (dedup by `dedupKey`). */
+export interface NormalizedPayoutWebhookEvent {
+  eventId: string;
+  payoutId: string;
+  status: PayoutStatus;
+  dedupKey: string;
+}
+
+// ============================================================================
+// M15b API-facing DTOs (dispersión T+1, RF26) — Owner/Administrator register
+// their org's OWN bank account; PlatformAdmin/PlatformSuperAdmin trigger a
+// payout (treasury operation). Separate from PayoutBankAccount/CreatePayoutInput
+// above, which are the PORT's internal shape (fed FROM this registered data).
+// ============================================================================
+
+/** Register/replace the org's bank account (Owner/Administrator only). */
+export type RegisterBankAccountInput = PayoutBankAccount;
+
+/** The org's own registered bank account (read back verbatim — it is the
+ *  org's own data, not third-party PII exposed to someone else). */
+export interface OrganizationBankAccountView extends PayoutBankAccount {
+  organizationId: string;
+  updatedAt: string;
+}
+
+/** Trigger a payout for an organization (PlatformAdmin/PlatformSuperAdmin —
+ *  a treasury operation, not something an org self-triggers in Ola 1). */
+export interface RequestPayoutInput {
+  organizationId: string;
+  /** Integer COP pesos to disperse. */
+  amount: number;
+  /** Caller-supplied key: a retry with the same key must NOT double-pay. */
+  idempotencyKey: string;
+}
+
+/** A payout attempt as read back by the API (M13 dashboard reads this shape). */
+export interface PayoutView {
+  id: string;
+  organizationId: string;
+  amount: number;
+  currency: PaymentCurrency;
+  idempotencyKey: string;
+  wompiPayoutId?: string;
+  status: PayoutStatus;
+  attempts: number;
+  lastError?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /**
@@ -118,6 +190,11 @@ export interface PaymentPort {
   verifyAndNormalizeWebhook(payload: unknown, signature: string): NormalizedWebhookEvent;
   /** Schedule a payout (T+1). SARLAFT/KYC is checked in M15 before calling this. */
   createPayout(input: CreatePayoutInput): Promise<PayoutResult>;
+  /** Verify a payout-confirmation webhook and normalize it to a dedup-able event. */
+  verifyAndNormalizePayoutWebhook(
+    payload: unknown,
+    signature: string,
+  ): NormalizedPayoutWebhookEvent;
 }
 
 // ============================================================================
@@ -218,6 +295,13 @@ interface FakeWebhookPayload {
   eventId?: string;
 }
 
+/** Shape a fake payout webhook payload is expected to carry. */
+interface FakePayoutWebhookPayload {
+  payoutId?: string;
+  status?: PayoutStatus;
+  eventId?: string;
+}
+
 /**
  * Deterministic {@link PaymentPort} for development and tests: no network, no
  * randomness, no clock. The same `idempotencyKey` always yields the same ids and
@@ -255,6 +339,21 @@ export class FakePaymentAdapter implements PaymentPort {
     return {
       payoutId: `fake-pay-${stableHash(input.idempotencyKey)}`,
       status: 'scheduled',
+    };
+  }
+
+  verifyAndNormalizePayoutWebhook(
+    payload: unknown,
+    _signature: string,
+  ): NormalizedPayoutWebhookEvent {
+    const body = (payload ?? {}) as FakePayoutWebhookPayload;
+    const payoutId = body.payoutId ?? 'fake-pay-unknown';
+    const eventId = body.eventId ?? `fake-pevt-${stableHash(payoutId)}`;
+    return {
+      eventId,
+      payoutId,
+      status: body.status ?? 'paid',
+      dedupKey: eventId,
     };
   }
 }
