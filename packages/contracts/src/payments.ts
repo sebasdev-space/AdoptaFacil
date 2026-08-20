@@ -357,3 +357,91 @@ export class FakePaymentAdapter implements PaymentPort {
     };
   }
 }
+
+// ============================================================================
+// M15b conciliación (F-5, RF26) — cruza lo recaudado (donaciones aprobadas)
+// contra lo dispersado (payouts, F-4), por organización y por período
+// calendario (mes, UTC). Reporte de SOLO LECTURA: no muta nada, es el primer
+// dato real que el dashboard financiero de Super Administración (M13/RF28,
+// @sebastian) consumirá — la forma de este contrato debe revisarse con él
+// antes de que construya su vista.
+// ============================================================================
+
+/** Por qué una fila necesita revisión manual. */
+export type ReconciliationFlagReason = 'overpaid' | 'failed_payout';
+
+/**
+ * Una fila = una organización en un período (mes calendario UTC, 'YYYY-MM').
+ *
+ * DECISIÓN DE ALCANCE: `collected` es la suma de `breakdown.net` (lo que le
+ * corresponde a la organización DESPUÉS de comisión) de sus donaciones
+ * aprobadas — NO `amountCharged` (lo que se le cobró al donante). Comparar
+ * `amountCharged` contra lo dispersado marcaría una "diferencia" permanente
+ * en TODA organización (la comisión siempre reduce lo dispersado respecto a
+ * lo cobrado), lo que no es una anomalía real — es el modelo de negocio. La
+ * comparación que sí tiene sentido para detectar problemas reales es
+ * neto-adeudado vs. efectivamente dispersado.
+ */
+export interface ReconciliationPeriodRow {
+  organizationId: string;
+  organizationName: string;
+  /** Mes calendario UTC, formato 'YYYY-MM'. */
+  period: string;
+  /** Suma de `breakdown.net` de donaciones `approved` en el período. */
+  collected: number;
+  /** Suma de `payouts.amount` con status `paid` en el período. */
+  dispersedPaid: number;
+  /** Suma de `payouts.amount` con status `scheduled` (en vuelo, aún sin
+   *  confirmar por el webhook) en el período. */
+  dispersedScheduled: number;
+  /** Suma de `payouts.amount` con status `failed` en el período. */
+  dispersedFailed: number;
+  /** `collected - dispersedPaid` — lo adeudado que todavía no se dispersó
+   *  con éxito (puede ser negativo, ver `flagReason: 'overpaid'`). */
+  pending: number;
+  /** true cuando la fila necesita revisión manual (ver `flagReason`). */
+  flagged: boolean;
+  /** Presente solo cuando `flagged` es true. */
+  flagReason?: ReconciliationFlagReason;
+}
+
+export interface ReconciliationReport {
+  generatedAt: string;
+  /** Ventana de tiempo del reporte (ISO, límites usados en la consulta). */
+  from: string;
+  to: string;
+  rows: ReconciliationPeriodRow[];
+}
+
+/** Insumo crudo de una fila — los 4 montos ya agregados por SQL (por
+ *  organización + período), antes de derivar `pending`/`flagged`. */
+export interface ReconciliationRawRow {
+  organizationId: string;
+  organizationName: string;
+  period: string;
+  collected: number;
+  dispersedPaid: number;
+  dispersedScheduled: number;
+  dispersedFailed: number;
+}
+
+/**
+ * Deriva `pending`/`flagged`/`flagReason` de los 4 montos crudos — la ÚNICA
+ * fuente de qué cuenta como "necesita revisión manual" (RNF12-style: una
+ * sola función, reutilizable por el servicio y por quien construya encima).
+ *
+ * Reglas (conciliación básica, F-5):
+ *   - `overpaid`: se dispersó (`paid`) MÁS de lo que se recaudó — siempre una
+ *     anomalía real, sin importar el monto.
+ *   - `failed_payout`: hubo al menos un intento de dispersión fallido en el
+ *     período — necesita que alguien revise por qué (p. ej. cuenta bancaria
+ *     inválida) aunque `pending` en sí no sea negativo.
+ *   - Un `pending > 0` simple (recaudado, aún no dispersado) NO se marca:
+ *     es el estado normal mientras el T+1 no ha corrido todavía.
+ */
+export function computeReconciliationRow(raw: ReconciliationRawRow): ReconciliationPeriodRow {
+  const pending = raw.collected - raw.dispersedPaid;
+  const flagReason: ReconciliationFlagReason | undefined =
+    pending < 0 ? 'overpaid' : raw.dispersedFailed > 0 ? 'failed_payout' : undefined;
+  return { ...raw, pending, flagged: flagReason !== undefined, flagReason };
+}

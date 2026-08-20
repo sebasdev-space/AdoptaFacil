@@ -7,6 +7,8 @@ import { PayoutsController } from './payouts.controller';
 import { PayoutsProcessor } from './payouts.processor';
 import { PayoutsService } from './payouts.service';
 import { PAYOUTS_QUEUE } from './payouts.constants';
+import { ReconciliationController } from './reconciliation.controller';
+import { ReconciliationService } from './reconciliation.service';
 
 /**
  * M15b · Dispersión T+1 vía Wompi Payouts (RF26). Owns:
@@ -17,6 +19,9 @@ import { PAYOUTS_QUEUE } from './payouts.constants';
  *     Wompi payout webhook (`/payments/payouts/webhook`, public).
  *   - `/platform/payouts` — PlatformAdmin/PlatformSuperAdmin trigger + inspect
  *     (treasury operation; an org never self-triggers its own payout).
+ *   - `/platform/reconciliation` (F-5, RF26) — read-only report crossing
+ *     recaudo (donations) vs. dispersión (payouts), by org and calendar
+ *     month; no table of its own, aggregates over the two above.
  *
  * PaymentPort: consumed from the GLOBAL `PAYMENT_PORT` provider (core
  * `PaymentModule`, @Global) — no local binding, same convention as
@@ -25,7 +30,7 @@ import { PAYOUTS_QUEUE } from './payouts.constants';
  */
 @Module({
   imports: [AuthModule, BullModule.registerQueue({ name: PAYOUTS_QUEUE })],
-  controllers: [BankAccountsController, PayoutsController],
-  providers: [BankAccountsService, PayoutsService, PayoutsProcessor],
+  controllers: [BankAccountsController, PayoutsController, ReconciliationController],
+  providers: [BankAccountsService, PayoutsService, PayoutsProcessor, ReconciliationService],
 })
 export class PaymentsModule {}
