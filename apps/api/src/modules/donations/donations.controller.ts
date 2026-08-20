@@ -13,6 +13,7 @@ import {
   Role,
   type CreateDonationInput,
   type Donation,
+  type DonationCertificate,
   type DonationReceipt,
   type DonationWithReceipt,
 } from '@adoptafacil/contracts';
@@ -23,6 +24,7 @@ import { ZodValidationPipe } from '../../core/auth/zod-validation.pipe';
 import { Roles } from '../../core/rbac/roles.decorator';
 import { RolesGuard } from '../../core/rbac/roles.guard';
 import { DonationsService, type WebhookOutcome } from './donations.service';
+import { DonationCertificatesService } from './donation-certificates.service';
 import { createDonationSchema } from './donations.schemas';
 
 /** Roles that VIEW the org's received donations/receipts (§13) — org set
@@ -42,7 +44,10 @@ const MANAGE_ROLES = [Role.Owner, Role.Administrator, Role.Operator] as const;
  */
 @Controller('donations')
 export class DonationsController {
-  constructor(private readonly service: DonationsService) {}
+  constructor(
+    private readonly service: DonationsService,
+    private readonly certificates: DonationCertificatesService,
+  ) {}
 
   /** Create a donation (authenticated person). */
   @Post()
@@ -77,6 +82,21 @@ export class DonationsController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<DonationReceipt> {
     return this.service.getReceiptForDonor(actor, id);
+  }
+
+  /**
+   * The donor's certificate for THEIR OWN donation (F-3, RF14). 404 covers
+   * three cases on purpose (never distinguished to the caller, same as
+   * `getReceipt`): not the donor, not yet approved, or the beneficiary
+   * organization isn't an ESAL with RTE vigente (so nothing was ever issued).
+   */
+  @Get(':id/certificate')
+  @UseGuards(JwtAuthGuard)
+  getCertificate(
+    @CurrentUser() actor: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<DonationCertificate> {
+    return this.certificates.getForDonor(id, actor.id);
   }
 
   /**

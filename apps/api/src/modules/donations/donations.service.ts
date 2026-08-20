@@ -26,6 +26,7 @@ import { AuditService } from '../../core/audit/audit.service';
 import { PAYMENT_PORT } from '../../core/payments/payment.port';
 import type { RequestUser } from '../../core/auth/auth.types';
 import { CampaignFundingService } from '../campaigns/campaign-funding.service';
+import { DonationCertificatesService } from './donation-certificates.service';
 
 /** Row shape returned by the SECURITY DEFINER donation functions (snake_case). */
 interface DonationRow {
@@ -79,6 +80,7 @@ export class DonationsService {
     private readonly audit: AuditService,
     @Inject(PAYMENT_PORT) private readonly payment: PaymentPort,
     private readonly campaignFunding: CampaignFundingService,
+    private readonly certificates: DonationCertificatesService,
   ) {}
 
   private requireOrgId(): string {
@@ -227,6 +229,17 @@ export class DonationsService {
       if (donation.concept_kind === 'campaign') {
         await this.applyCampaignFunding(donation.organization_id, donation.id, event.collectionId);
       }
+
+      // F-3 (RF14): certificado real, emitido junto al recibo. Best-effort y
+      // sin gating aquí — el servicio decide si la org es ESAL-RTE elegible;
+      // si no lo es, simplemente no emite nada (no es un fallo del webhook).
+      await this.certificates.tryIssueForApprovedDonation({
+        donationId: donation.id,
+        organizationId: donation.organization_id,
+        donorName: donation.payer?.fullName,
+        amount: donation.intended_amount,
+        currency: donation.currency,
+      });
     }
 
     return { applied: true, status, donationId: donation.id };

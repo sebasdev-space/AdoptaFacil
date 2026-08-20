@@ -154,3 +154,48 @@ export interface DonationWebhookInput {
   payload: unknown;
   signature: string;
 }
+
+/**
+ * Certificado de donación real (RF14, F-3). Documento con validez tributaria de
+ * una ESAL con RTE vigente: plantilla + hash SHA-256 del payload canónico +
+ * código único verificable públicamente. Se emite automáticamente junto al
+ * recibo (al aprobarse la donación), SOLO si la organización beneficiaria es
+ * ESAL con RTE vigente en ese momento — si no lo es, sencillamente no existe
+ * para esa donación (nunca un certificado marcado como "inválido").
+ *
+ * Inmutable: una vez emitido, el hash y el código nunca cambian (mismo
+ * principio que `AdoptionContract.contentHash`).
+ */
+export interface DonationCertificate {
+  id: string;
+  organizationId: string;
+  donationId: string;
+  /** Código único verificable públicamente (formato `ADF-CERT-<año>-<secuencia>`). */
+  code: string;
+  organizationName: string;
+  /** Siempre presente: solo se emite para organizaciones ESAL con RTE, que ya implica NIT. */
+  organizationNit: string;
+  /** Nombre del donante sellado en el certificado (fallback genérico si no dejó su nombre). */
+  donorName: string;
+  amount: number;
+  currency: PaymentCurrency;
+  issuedAt: string;
+  contentHash: string;
+}
+
+/**
+ * Proyección PÚBLICA de verificación (misma forma hoy que `DonationCertificate`
+ * menos los ids internos; tipo propio para que la superficie pública pueda
+ * divergir sin romper la privada — mismo patrón que `OrganizationPublic` vs
+ * `Organization`). Nunca expone `id`/`organizationId`/`donationId`.
+ */
+export interface DonationCertificateVerification {
+  code: string;
+  organizationName: string;
+  organizationNit: string;
+  donorName: string;
+  amount: number;
+  currency: PaymentCurrency;
+  issuedAt: string;
+  contentHash: string;
+}

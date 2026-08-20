@@ -34,23 +34,15 @@ export interface DonationDetailModalProps {
  * `breakdownLines` — nunca se recalcula con `computeBreakdown`: si la tarifa
  * cambiara en el futuro, una donación histórica debe seguir mostrando el
  * desglose con el que realmente se cobró, no uno recalculado a la tarifa
- * vigente). El acceso al certificado (F-CERT-REAL, #101) solo se ofrece para
- * donaciones `approved` (el certificado se emite junto al recibo automático;
- * para pending/declined no existe recibo aún, así que el botón queda
- * deshabilitado con el motivo explícito, nunca oculto sin explicación ni
- * activo sin datos reales detrás).
+ * vigente).
  *
- * El nav-state hacia `/certificado` reconstruye EXACTAMENTE la forma que
- * `CertificateEmissionPage` ya sabe leer (mismo shape que `DonatePage` usa al
- * completarse una donación nueva): `donation` completa (de donde lee
- * `intendedAmount` y `payer.fullName`, el contacto real capturado al donar) +
- * `organizationName` (que `GET /donations/mine` SÍ resuelve). El NIT de la
- * organización NO viaja aquí a propósito: ese dato solo lo trae el portal
- * público de la org en el momento de donar (`DonationTarget.organizationNit`,
- * F2-03) y `/donations/mine` no lo re-resuelve para donaciones pasadas — el
- * certificado ya trata el NIT como opcional (`organizationNit?: string`) y lo
- * omite con elegancia cuando no llega, exactamente el caso aquí. No se
- * inventa ni se reutiliza el NIT de muestra.
+ * El acceso al certificado REAL (RF14, F-3) solo se ofrece para donaciones
+ * `approved` (el certificado se emite junto al recibo automático — y solo si
+ * la organización es una ESAL con RTE vigente; `CertificateEmissionPage`
+ * decide eso al leerlo del backend, este botón solo evita mostrarlo cuando
+ * ni siquiera hay recibo todavía). El nav-state hacia `/certificado` solo
+ * lleva el id de la donación — el certificado se lee del backend, nunca se
+ * reconstruye desde aquí.
  */
 export function DonationDetailModal({ donation, onOpenChange }: DonationDetailModalProps) {
   return (
@@ -90,7 +82,7 @@ export function DonationDetailModal({ donation, onOpenChange }: DonationDetailMo
               {donation.status === 'approved' ? (
                 <Link
                   to="/certificado"
-                  state={{ donation, organizationName: donation.organizationName }}
+                  state={{ donationId: donation.id }}
                   className={cn(buttonVariants())}
                   data-testid="view-certificate-from-detail"
                 >

@@ -129,9 +129,8 @@ export function AppRoutes() {
           AnimalSummary fields only (no clinical data). The "Solicitar adopción"
           button links to the /adopciones/solicitar flow, itself under RequireAuth. */}
       <Route path="/o/:slug/animales/:animalId" element={<PublicAnimalDetailPage />} />
-      {/* Public certificate VERIFICATION — trust-flow mockup (§M05/RF14, T-053).
-          "Vista de diseño": no backend; verifies a sample code deterministically,
-          like the future public verification page. Public (no session). */}
+      {/* Public certificate VERIFICATION, REAL (§M05/RF14, F-3) — no session,
+          queries `GET /public/donations/certificates/:code`. */}
       <Route path="/verificar" element={<CertificateVerificationPage />} />
       <Route path="/verificar/:code" element={<CertificateVerificationPage />} />
       {/* Public campaigns portal (§M14/M06, T-055) — no auth, active campaigns from
@@ -227,8 +226,8 @@ export function AppRoutes() {
               organizationName]) desde el detalle público de un animal (§M14,
               fuera de alcance de S2-03); sin objetivo, "mis apadrinamientos". */}
           <Route path="apadrinar" element={<SponsorPage />} />
-          {/* M05/RF14 · certificate EMISSION mockup (T-053). Trust-flow step 2-3,
-              reached from the real donation receipt. "Vista de diseño": no backend. */}
+          {/* M05/RF14 (F-3) · certificado de donación REAL, leído por donationId
+              (nav-state) desde el recibo real de la donación. */}
           <Route path="certificado" element={<CertificateEmissionPage />} />
           {/* /campanas ahora es PÚBLICO (portal de campañas, T-055) — declarado
               arriba fuera de RequireAuth; ya no es un placeholder protegido. */}

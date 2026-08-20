@@ -48,7 +48,8 @@ model Donation {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
-  receipt DonationReceipt?
+  receipt     DonationReceipt?
+  certificate DonationCertificate?
 
   @@unique([organizationId, idempotencyKey])
   @@unique([collectionId])
@@ -82,4 +83,34 @@ model DonationReceipt {
   @@unique([donationId])
   @@index([organizationId])
   @@map("donation_receipts")
+}
+
+/// Certificado de donación (RF14, F-3). Se emite automáticamente junto al recibo
+/// (dentro de la aprobación del webhook), solo cuando la organización beneficiaria
+/// es una ESAL con RTE vigente (formalizationState + rteVigente, leídos de
+/// @sebastian en tenant context — solo lectura, sin relación Prisma con
+/// Organization, mismo patrón de organizationId de arriba). INMUTABLE una vez
+/// emitido: el rol de la app no tiene UPDATE/DELETE (mismo patrón que
+/// formalization_transitions/organization_documents).
+///
+/// El firmante (representante legal / revisor fiscal) NO se modela todavía: el
+/// contrato lo expone como placeholder de texto hasta que exista un
+/// LegalRepresentative real (S-1, @sebastian) — ver TODO(client) en el contrato.
+model DonationCertificate {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  donationId     String   @unique @map("donation_id") @db.Uuid
+  /// Código único verificable públicamente (formato ADF-CERT-<año>-<secuencia>).
+  code           String   @unique
+  /// Payload canónico sellado (organización, donante, monto, fecha) — fuente del hash.
+  payload        Json
+  /// SHA-256 hex del payload canónico (mismo patrón que adoption-contract-hash).
+  contentHash    String   @map("content_hash")
+  issuedAt       DateTime @default(now()) @map("issued_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  donation Donation @relation(fields: [donationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("donation_certificates")
 }

@@ -77,30 +77,22 @@ Pasos:
 
 ### F-2 · M14 — Completar personalización del portal individual
 
-**Por qué:** el documento exige redes sociales, ubicación con mapa y contacto en el portal
-individual; hoy solo hay colores, logo y banner.
-**⚠️ Afectación cruzada condicional:** solo si terminas guardando estos campos en la tabla de
-`Organization` (de Sebastián) en vez de en tu propia tabla de portal. Si es así, avísale ANTES de
-migrar.
+**✅ Cerrado sin PR (verificado 2026-08-20) — ya estaba hecho.** Al empezar a implementarlo se
+encontró que el código ya cubre exactamente lo que este ítem pedía, construido en un pase previo
+(comentarios "S2-PORTAL"/"S2-REORG") que la auditoría original no capturó por ser un barrido de
+alto nivel, no una lectura profunda:
 
-```
-Módulo M14 (tuyo, completo). Vas a extender la personalización del portal individual con las
-secciones que el documento pide y que hoy faltan: redes sociales, ubicación con mapa, contacto.
+| Campo de RF32                            | Se edita en                                | Se renderiza en                                                   |
+| ---------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------- |
+| Redes sociales (IG/FB/TikTok/web)        | `org-profile-form.tsx`                     | `PortalSocialLinks` (+ WhatsApp/email)                            |
+| Contacto (horario, dirección, teléfonos) | `org-profile-form.tsx` (`extendedContact`) | `PortalContactInfoSection`                                        |
+| Ubicación con mapa                       | `org-profile-form.tsx` (`contactMapUrl`)   | iframe embebido vía `toGoogleMapsEmbedUrl`, con fallback a enlace |
+| Ubicación (ciudad/depto)                 | `org-profile-form.tsx` (`location`)        | fila de stats de `PortalProfileSection`                           |
 
-Pasos:
-1. Rama `feat/fab/m14-personalizacion-completa`.
-2. Revisa `packages/contracts/src/portals.ts` y extiende `OrganizationPortal`/`PortalTheme` de
-   forma ADITIVA (nunca rompas la forma ya publicada) para incluir redes sociales, coordenadas de
-   ubicación y contacto.
-3. Backend: persiste esos campos, preferiblemente en tu propia tabla de portal (`PortalTheme` o
-   similar) para no tocar el modelo de Organization. Si por diseño necesitas guardarlos ahí,
-   avisa a @sebastian antes de tocar `prisma/schema/org.prisma`.
-4. Frontend: sección de edición en el panel de personalización + render en el portal público (un
-   embed estático o imagen con pin basta para el mapa; no hace falta una librería pesada).
-5. Pruebas de integración del nuevo endpoint/campo.
-6. `pnpm turbo run lint typecheck build test` completo.
-7. PR `feat(m14): personalización completa del portal individual`.
-```
+Ningún campo de RF32 quedó sin edición ni sin render — no se abrió PR porque no había nada que
+construir. Única mejora real pendiente, y es una decisión de producto nueva, no parte de este
+ítem: el mapa depende de que el dueño pegue una URL de Google Maps a mano, en vez de un selector
+de ubicación interactivo.
 
 ---
 
