@@ -14,6 +14,7 @@ import { AdoptionsModule } from './modules/adoptions/adoptions.module';
 import { AnimalsModule } from './modules/animals/animals.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
 import { DonationsModule } from './modules/donations/donations.module';
+import { MarketplaceModule } from './modules/marketplace/marketplace.module';
 import { OrgModule } from './modules/org/org.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { PortalsModule } from './modules/portals/portals.module';
@@ -67,6 +68,8 @@ import { RedisModule } from './redis/redis.module';
     PaymentsModule,
     // M09 · banco de recursos: necesidades, ofertas y entregas (Ola 3, F-6).
     ResourcesModule,
+    // M10 · marketplace simplificado: catálogo por organización (Ola 3, F-7).
+    MarketplaceModule,
   ],
 })
 export class AppModule {}

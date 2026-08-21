@@ -83,6 +83,16 @@ export function BoxIcon(props: IconProps) {
   );
 }
 
+/** M10 · marketplace simplificado (una bolsa de compras). */
+export function ShoppingBagIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M6 8h12l-1 12a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L6 8Z" />
+      <path d="M9 8V6a3 3 0 0 1 6 0v2" />
+    </svg>
+  );
+}
+
 export function MenuIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>

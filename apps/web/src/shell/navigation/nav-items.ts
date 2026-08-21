@@ -8,6 +8,7 @@ import {
   MegaphoneIcon,
   PawIcon,
   ShieldIcon,
+  ShoppingBagIcon,
   type IconProps,
 } from '../icons';
 
@@ -93,6 +94,20 @@ export const DONATIONS_MANAGEMENT_ROLES = [Role.Owner, Role.Administrator, Role.
  * ReadOnlyAuditor solo ve — mismo trío que `CAMPAIGNS_VIEW_ROLES`.
  */
 export const RESOURCE_VIEW_ROLES = [
+  Role.Owner,
+  Role.Administrator,
+  Role.Operator,
+  Role.ReadOnlyAuditor,
+] as const;
+
+/**
+ * F-7 (M10, marketplace simplificado) — "Marketplace" (gestión de org).
+ * Copiado VERBATIM de `MARKETPLACE_VIEW_ROLES` en
+ * `marketplace-products.controller.ts` (`GET /marketplace/products`):
+ * Owner/Administrator/Operator gestionan; ReadOnlyAuditor solo ve — mismo
+ * trío que `CAMPAIGNS_VIEW_ROLES`/`RESOURCE_VIEW_ROLES`.
+ */
+export const MARKETPLACE_VIEW_ROLES = [
   Role.Owner,
   Role.Administrator,
   Role.Operator,
@@ -271,6 +286,15 @@ export const navItems: NavItem[] = [
         roles: RESOURCE_VIEW_ROLES,
       },
     ],
+  },
+  // F-7 (M10, marketplace simplificado): catálogo de productos de la
+  // organización, contacto por WhatsApp — mismo patrón plano que "Campañas"
+  // arriba, gated a MARKETPLACE_VIEW_ROLES (calcado del @Roles real).
+  {
+    path: '/organizacion/marketplace',
+    label: 'Marketplace',
+    icon: ShoppingBagIcon,
+    roles: MARKETPLACE_VIEW_ROLES,
   },
   // T-065: "Transparencia" REMOVED from the menu entirely — the screen was only
   // ever a placeholder ("se implementará en la Ola 1..."); the REAL transparency

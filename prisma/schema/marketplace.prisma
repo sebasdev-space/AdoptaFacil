@@ -1,3 +1,58 @@
-// Module: marketplace · Owner: @fabian (Ola 0)
-// TODO: models defined by @fabian. Every business model MUST carry
-// organization_id and enable RLS following the _rls_probe reference in org.prisma.
+// Module: marketplace (M10) · Owner: @fabian
+// Simplified marketplace (Consolidación operativa, M10): a per-organization
+// catalog of physical products, contacted OFF-PLATFORM via WhatsApp — no
+// cart, no checkout, no PaymentPort dependency. Every business model carries
+// organization_id and is protected by RLS (ENABLE+FORCE + tenant_isolation),
+// mirroring the _rls_probe reference in org.prisma.
+//
+// NOTE (module boundary): the FK to `organizations` is intentionally NOT
+// modeled as a Prisma @relation here — that would require adding a
+// back-relation field to the Organization model in org.prisma (another
+// owner's file). Instead `organizationId` is a plain scalar and the FK
+// (ON DELETE CASCADE) is declared in the migration SQL. The intra-module
+// relation to ProductImage IS modeled.
+
+/// A physical product listed by an organization (M10). Tenant-scoped
+/// (organization_id + RLS ENABLE+FORCE + tenant_isolation). Money in INTEGER
+/// COP pesos (`price` > 0); `stock` >= 0. Soft-managed via `is_active` (never
+/// physically deleted by the app role) — mirrors Animal/Campaign. Duplicate
+/// prevention: unique (organization_id, name).
+model Product {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String
+  description    String?
+  category       String
+  price          Int
+  stock          Int      @default(0)
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  images ProductImage[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([organizationId, category])
+  @@index([organizationId, isActive])
+  @@map("products")
+}
+
+/// Photo attached to a product (M10). Tenant-scoped (organization_id + RLS
+/// ENABLE+FORCE + tenant_isolation). Only METADATA is persisted (storage_ref +
+/// order); the bytes live behind the StoragePort adapter. Deleted physically
+/// only when a photo is replaced/removed — mirrors AnimalPhoto.
+model ProductImage {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  productId      String   @map("product_id") @db.Uuid
+  storageRef     String   @map("storage_ref")
+  order          Int      @default(0)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([productId])
+  @@map("product_images")
+}
