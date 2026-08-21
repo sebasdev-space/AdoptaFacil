@@ -10,6 +10,7 @@ import {
   ORG_DOCUMENTS_ROLES,
   ORG_MEMBER_ROLES,
   PLATFORM_DOCUMENTS_ROLES,
+  RESOURCE_VIEW_ROLES,
   SPONSORSHIP_VIEW_ROLES,
 } from '../navigation';
 import { AnimalDetailPage } from '../pages/animal-detail-page';
@@ -42,6 +43,14 @@ import {
   PublicCampaignDetailPage,
   PublicCampaignsPage,
 } from '../../features/campaigns';
+import {
+  MyResourceOffersPage,
+  OfferResourcePage,
+  PublicResourceDetailPage,
+  PublicResourcesPage,
+  ResourceNeedDetailPage,
+  ResourcesPage,
+} from '../../features/resources';
 import { AnimalsPage, RemindersInboxPage } from '../../features/animals';
 import {
   AdoptionRequestPage,
@@ -138,6 +147,12 @@ export function AppRoutes() {
           screen lives at /organizacion/campanas below (S2-01), a separate surface. */}
       <Route path="/campanas" element={<PublicCampaignsPage />} />
       <Route path="/campanas/:id" element={<PublicCampaignDetailPage />} />
+      {/* Public resource bank (M09, F-6) — no auth, needs still accepting help
+          from /public/resources/needs + public detail by id. Offering itself
+          requires auth (see /ofrecer below, RequireAuth); the AUTHENTICATED
+          org management screen lives at /organizacion/recursos below. */}
+      <Route path="/recursos" element={<PublicResourcesPage />} />
+      <Route path="/recursos/:id" element={<PublicResourceDetailPage />} />
 
       {/* Protected — guard first, then the shell layout */}
       <Route element={<RequireAuth />}>
@@ -226,6 +241,15 @@ export function AppRoutes() {
               organizationName]) desde el detalle público de un animal (§M14,
               fuera de alcance de S2-03); sin objetivo, "mis apadrinamientos". */}
           <Route path="apadrinar" element={<SponsorPage />} />
+          {/* M09 · ofrecer ayuda / mis ofertas (F-6). Mismo SEAM que
+              donaciones/apadrinamientos: `POST /resources/offers` y
+              `GET /resources/offers/mine` no llevan `@Roles` (cualquier
+              autenticado), así que ninguna de las dos rutas lleva
+              <RequireRoles>. El objetivo llega por query param
+              (needId + needTitle + unit + organizationName) desde el
+              detalle público de una necesidad (/recursos/:id). */}
+          <Route path="ofrecer" element={<OfferResourcePage />} />
+          <Route path="mis-ofertas" element={<MyResourceOffersPage />} />
           {/* M05/RF14 (F-3) · certificado de donación REAL, leído por donationId
               (nav-state) desde el recibo real de la donación. */}
           <Route path="certificado" element={<CertificateEmissionPage />} />
@@ -294,6 +318,25 @@ export function AppRoutes() {
             element={
               <RequireRoles roles={CAMPAIGNS_VIEW_ROLES}>
                 <CampaignDetailPage />
+              </RequireRoles>
+            }
+          />
+          {/* M09 · gestión del banco de recursos de la organización (F-6).
+              Gated a RESOURCE_VIEW_ROLES, calcado del @Roles real de
+              `ResourceNeedsController` (GET /resources/needs). */}
+          <Route
+            path="organizacion/recursos"
+            element={
+              <RequireRoles roles={RESOURCE_VIEW_ROLES}>
+                <ResourcesPage />
+              </RequireRoles>
+            }
+          />
+          <Route
+            path="organizacion/recursos/:id"
+            element={
+              <RequireRoles roles={RESOURCE_VIEW_ROLES}>
+                <ResourceNeedDetailPage />
               </RequireRoles>
             }
           />

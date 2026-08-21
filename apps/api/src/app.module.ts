@@ -17,6 +17,7 @@ import { DonationsModule } from './modules/donations/donations.module';
 import { OrgModule } from './modules/org/org.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { PortalsModule } from './modules/portals/portals.module';
+import { ResourcesModule } from './modules/resources/resources.module';
 import { SponsorshipsModule } from './modules/sponsorships/sponsorships.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { QueueModule } from './queues/queue.module';
@@ -64,6 +65,8 @@ import { RedisModule } from './redis/redis.module';
     SponsorshipsModule,
     // M15b · dispersión T+1 vía Wompi Payouts (RF26, F-4).
     PaymentsModule,
+    // M09 · banco de recursos: necesidades, ofertas y entregas (Ola 3, F-6).
+    ResourcesModule,
   ],
 })
 export class AppModule {}

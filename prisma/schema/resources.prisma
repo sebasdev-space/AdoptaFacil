@@ -1,3 +1,136 @@
-// Module: resources · Owner: @fabian (Ola 0)
-// TODO: models defined by @fabian. Every business model MUST carry
-// organization_id and enable RLS following the _rls_probe reference in org.prisma.
+// Module: resources (M09) · Owner: @fabian (Ola 3)
+//
+// Banco de recursos: una organización publica una NECESIDAD; un donante
+// (persona u otra organización) OFRECE cubrirla; al aceptarse la oferta se
+// crea una ENTREGA que la organización coordina y cierra con evidencia
+// (StoragePort). Es donación FÍSICA — nunca dinero, así que este módulo NO
+// depende de payments.prisma (M15).
+//
+// FRONTERA (mismo patrón que donations.prisma/campaigns.prisma): NO se
+// declara relación Prisma con `Organization` (org.prisma, de @sebastian) —
+// `organizationId` es siempre un campo plano (uuid); la FK + RLS se añaden a
+// mano en el SQL de la migración. Las relaciones INTRA-módulo (need→offer→
+// delivery→evidence/ledger) SÍ se modelan con @relation.
+
+/// Necesidad publicada por una organización (tenant-scoped, RLS). `status` y
+/// `quantityFulfilled` son mutables solo por el backend (nunca a mano por el
+/// cliente vía update directo) — se derivan al completar entregas.
+model ResourceNeed {
+  id                String   @id @default(uuid()) @db.Uuid
+  organizationId    String   @map("organization_id") @db.Uuid
+  title             String
+  description       String?
+  /// ResourceCategory como texto (sin enum en runtime).
+  category          String
+  quantityNeeded    Int      @map("quantity_needed")
+  unit              String
+  quantityFulfilled Int      @default(0) @map("quantity_fulfilled")
+  /// ResourceNeedStatus como texto.
+  status            String   @default("needed")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  offers ResourceOffer[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@map("resource_needs")
+}
+
+/// Oferta de donación física (cross-tenant por identidad, mismo patrón que
+/// `Donation`): `organizationId` es la organización BENEFICIARIA (dueña de la
+/// necesidad), no la del donante. Creada vía función SECURITY DEFINER
+/// (`create_resource_offer`) porque el tenant del donante nunca coincide con
+/// el de la fila. Sin idempotencyKey: no hay reintento de gateway que
+/// duplicar (a diferencia de M05).
+model ResourceOffer {
+  id              String   @id @default(uuid()) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  needId          String   @map("need_id") @db.Uuid
+  donorUserId     String   @map("donor_user_id") @db.Uuid
+  quantityOffered Int      @map("quantity_offered")
+  message         String?
+  /// ResourceOfferStatus como texto.
+  status          String   @default("offered")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  need     ResourceNeed      @relation(fields: [needId], references: [id], onDelete: Cascade)
+  delivery ResourceDelivery?
+
+  @@index([organizationId])
+  @@index([needId])
+  @@index([donorUserId])
+  @@map("resource_offers")
+}
+
+/// Entrega coordinada por la organización (tenant-scoped, RLS) — se crea
+/// automáticamente al aceptar la oferta (`scheduled`); la organización fija
+/// método/fecha y la cierra (`completed`/`cancelled`, ambos terminales). Al
+/// completarla, su cantidad se aplica UNA SOLA VEZ a `ResourceNeed` (ver
+/// `ResourceFulfillmentApplication`) — la propia organización ya tiene
+/// contexto de tenant aquí (acción autenticada, no un webhook), así que esa
+/// aplicación NO necesita una función SECURITY DEFINER, a diferencia de
+/// `apply_donation_webhook`.
+model ResourceDelivery {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  offerId        String    @unique @map("offer_id") @db.Uuid
+  needId         String    @map("need_id") @db.Uuid
+  /// ResourceDeliveryMethod como texto; null hasta que la org lo fije.
+  method         String?
+  scheduledAt    DateTime? @map("scheduled_at")
+  /// ResourceDeliveryStatus como texto.
+  status         String    @default("scheduled")
+  completedAt    DateTime? @map("completed_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  offer                  ResourceOffer                   @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  evidences              ResourceDeliveryEvidence[]
+  fulfillmentApplication ResourceFulfillmentApplication?
+
+  @@index([organizationId])
+  @@index([needId])
+  @@map("resource_deliveries")
+}
+
+/// Evidencia fotográfica de una entrega (tenant-scoped, RLS). Borrado LÓGICO
+/// (`deletedAt`), nunca físico — mismo patrón que `CampaignEvidence`.
+model ResourceDeliveryEvidence {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  deliveryId     String    @map("delivery_id") @db.Uuid
+  caption        String?
+  /// Clave de StoragePort (nunca la ruta de disco ni una URL firmada).
+  storageRef     String    @map("storage_ref")
+  order          Int       @default(0)
+  deletedAt      DateTime? @map("deleted_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  delivery ResourceDelivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([deliveryId])
+  @@map("resource_delivery_evidences")
+}
+
+/// Ledger de idempotencia (mismo patrón que `CampaignFundingApplication`):
+/// aplica la cantidad de UNA entrega completada a su necesidad EXACTAMENTE
+/// una vez. Append-only — el rol de la app nunca hace UPDATE/DELETE; el
+/// backend lo inserta dentro de la misma transacción que completa la
+/// entrega, atrapando la violación de unicidad como señal de "ya aplicado".
+model ResourceFulfillmentApplication {
+  id              String   @id @default(uuid()) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  deliveryId      String   @unique @map("delivery_id") @db.Uuid
+  needId          String   @map("need_id") @db.Uuid
+  quantityApplied Int      @map("quantity_applied")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  delivery ResourceDelivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("resource_fulfillment_applications")
+}

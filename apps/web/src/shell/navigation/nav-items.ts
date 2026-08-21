@@ -2,6 +2,7 @@ import type { ComponentType } from 'react';
 import { ORG_ROLES, Role } from '@adoptafacil/contracts';
 import {
   AlertTriangleIcon,
+  BoxIcon,
   HeartIcon,
   HomeIcon,
   MegaphoneIcon,
@@ -84,6 +85,19 @@ export const ADOPTIONS_MANAGEMENT_ROLES = [Role.Owner, Role.Administrator, Role.
  * ReadOnlyAuditor (el backend no lo incluye para esta ruta).
  */
 export const DONATIONS_MANAGEMENT_ROLES = [Role.Owner, Role.Administrator, Role.Operator] as const;
+
+/**
+ * F-6 (M09, banco de recursos) — "Necesidades recibidas" (gestión de org).
+ * Copiado VERBATIM de `RESOURCE_VIEW_ROLES` en `resource-needs.controller.ts`
+ * (`GET /resources/needs`): Owner/Administrator/Operator gestionan;
+ * ReadOnlyAuditor solo ve — mismo trío que `CAMPAIGNS_VIEW_ROLES`.
+ */
+export const RESOURCE_VIEW_ROLES = [
+  Role.Owner,
+  Role.Administrator,
+  Role.Operator,
+  Role.ReadOnlyAuditor,
+] as const;
 
 /**
  * "Mi organización" / "Personalización" / "Transparencia" (T-062, fix §13 UX
@@ -237,6 +251,24 @@ export const navItems: NavItem[] = [
         label: 'Apadrinamientos recibidos',
         icon: HeartIcon,
         roles: SPONSORSHIP_VIEW_ROLES,
+      },
+    ],
+  },
+  // MENU-SUBMENUS: "Banco de recursos" agrupa "Mis ofertas" (donante, sin
+  // @Roles — cualquier autenticado, igual que "Mis donaciones") y la gestión
+  // de la org ("Necesidades recibidas", RESOURCE_VIEW_ROLES) — mismo patrón
+  // que el grupo "Donaciones" (F-6, M09).
+  {
+    path: '/mis-ofertas',
+    label: 'Banco de recursos',
+    icon: BoxIcon,
+    children: [
+      { path: '/mis-ofertas', label: 'Mis ofertas', icon: BoxIcon },
+      {
+        path: '/organizacion/recursos',
+        label: 'Necesidades recibidas',
+        icon: BoxIcon,
+        roles: RESOURCE_VIEW_ROLES,
       },
     ],
   },
