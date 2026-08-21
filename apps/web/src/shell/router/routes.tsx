@@ -7,6 +7,7 @@ import {
   ANIMAL_VIEW_ROLES,
   CAMPAIGNS_VIEW_ROLES,
   DONATIONS_MANAGEMENT_ROLES,
+  MARKETPLACE_VIEW_ROLES,
   ORG_DOCUMENTS_ROLES,
   ORG_MEMBER_ROLES,
   PLATFORM_DOCUMENTS_ROLES,
@@ -51,6 +52,12 @@ import {
   ResourceNeedDetailPage,
   ResourcesPage,
 } from '../../features/resources';
+import {
+  MarketplacePage,
+  ProductDetailPage,
+  PublicMarketplacePage,
+  PublicProductDetailPage,
+} from '../../features/marketplace';
 import { AnimalsPage, RemindersInboxPage } from '../../features/animals';
 import {
   AdoptionRequestPage,
@@ -153,6 +160,12 @@ export function AppRoutes() {
           org management screen lives at /organizacion/recursos below. */}
       <Route path="/recursos" element={<PublicResourcesPage />} />
       <Route path="/recursos/:id" element={<PublicResourceDetailPage />} />
+      {/* Public marketplace (M10, F-7) — no auth, active products from
+          /public/marketplace/products. Contact happens via WhatsApp, off-platform
+          (no cart/checkout). The AUTHENTICATED org management screen lives at
+          /organizacion/marketplace below. */}
+      <Route path="/marketplace" element={<PublicMarketplacePage />} />
+      <Route path="/marketplace/:id" element={<PublicProductDetailPage />} />
 
       {/* Protected — guard first, then the shell layout */}
       <Route element={<RequireAuth />}>
@@ -337,6 +350,25 @@ export function AppRoutes() {
             element={
               <RequireRoles roles={RESOURCE_VIEW_ROLES}>
                 <ResourceNeedDetailPage />
+              </RequireRoles>
+            }
+          />
+          {/* M10 · gestión del marketplace de la organización (F-7). Gated a
+              MARKETPLACE_VIEW_ROLES, calcado del @Roles real de
+              `MarketplaceProductsController` (GET /marketplace/products). */}
+          <Route
+            path="organizacion/marketplace"
+            element={
+              <RequireRoles roles={MARKETPLACE_VIEW_ROLES}>
+                <MarketplacePage />
+              </RequireRoles>
+            }
+          />
+          <Route
+            path="organizacion/marketplace/:id"
+            element={
+              <RequireRoles roles={MARKETPLACE_VIEW_ROLES}>
+                <ProductDetailPage />
               </RequireRoles>
             }
           />
