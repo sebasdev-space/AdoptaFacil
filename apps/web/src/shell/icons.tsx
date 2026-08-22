@@ -93,6 +93,15 @@ export function ShoppingBagIcon(props: IconProps) {
   );
 }
 
+/** M11 · comunidad (un globo de conversación). */
+export function ChatIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M4 5h16v11H9l-5 4V5Z" />
+    </svg>
+  );
+}
+
 export function MenuIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>

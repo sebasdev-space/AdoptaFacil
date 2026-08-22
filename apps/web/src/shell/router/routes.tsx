@@ -6,6 +6,7 @@ import {
   ADOPTIONS_MANAGEMENT_ROLES,
   ANIMAL_VIEW_ROLES,
   CAMPAIGNS_VIEW_ROLES,
+  COMMUNITY_MODERATION_ROLES,
   DONATIONS_MANAGEMENT_ROLES,
   MARKETPLACE_VIEW_ROLES,
   ORG_DOCUMENTS_ROLES,
@@ -58,6 +59,12 @@ import {
   PublicMarketplacePage,
   PublicProductDetailPage,
 } from '../../features/marketplace';
+import {
+  CommunityFeedPage,
+  CommunityModerationPage,
+  MyPostsPage,
+  PostDetailPage,
+} from '../../features/community';
 import { AnimalsPage, RemindersInboxPage } from '../../features/animals';
 import {
   AdoptionRequestPage,
@@ -263,6 +270,14 @@ export function AppRoutes() {
               detalle público de una necesidad (/recursos/:id). */}
           <Route path="ofrecer" element={<OfferResourcePage />} />
           <Route path="mis-ofertas" element={<MyResourceOffersPage />} />
+          {/* M11 · comunidad (F-8). Ninguna de estas rutas lleva `@Roles` en el
+              backend (`POST/GET /community/posts`, comentarios, likes son
+              cualquier autenticado), así que ninguna lleva <RequireRoles> —
+              mismo patrón que Donaciones/Banco de recursos. La moderación de
+              PLATAFORMA vive aparte, más abajo. */}
+          <Route path="comunidad" element={<CommunityFeedPage />} />
+          <Route path="comunidad/:id" element={<PostDetailPage />} />
+          <Route path="mis-publicaciones" element={<MyPostsPage />} />
           {/* M05/RF14 (F-3) · certificado de donación REAL, leído por donationId
               (nav-state) desde el recibo real de la donación. */}
           <Route path="certificado" element={<CertificateEmissionPage />} />
@@ -390,6 +405,16 @@ export function AppRoutes() {
             element={
               <RequireRoles roles={PLATFORM_DOCUMENTS_ROLES}>
                 <PlatformDocumentsReviewPage />
+              </RequireRoles>
+            }
+          />
+          {/* M11 · moderación básica de comunidad, cross-tenant (F-8).
+              Audiencia de PLATAFORMA — denegada a roles de organización. */}
+          <Route
+            path="plataforma/comunidad"
+            element={
+              <RequireRoles roles={COMMUNITY_MODERATION_ROLES}>
+                <CommunityModerationPage />
               </RequireRoles>
             }
           />

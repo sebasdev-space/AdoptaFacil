@@ -3,6 +3,7 @@ import { ORG_ROLES, Role } from '@adoptafacil/contracts';
 import {
   AlertTriangleIcon,
   BoxIcon,
+  ChatIcon,
   HeartIcon,
   HomeIcon,
   MegaphoneIcon,
@@ -33,6 +34,17 @@ export const ANIMAL_VIEW_ROLES = [
 export const ORG_DOCUMENTS_ROLES = [Role.Owner, Role.Administrator, Role.ReadOnlyAuditor] as const;
 
 export const PLATFORM_DOCUMENTS_ROLES = [Role.PlatformAdmin, Role.PlatformSuperAdmin] as const;
+
+/**
+ * F-8 (M11, comunidad) — "Moderación de comunidad", audiencia de PLATAFORMA.
+ * Copiado VERBATIM del `@Roles` de `CommunityModerationController`
+ * (`GET /platform/community/posts`) — mismos dos roles que
+ * `PLATFORM_DOCUMENTS_ROLES`, declarado aparte porque es el @Roles de un
+ * endpoint DISTINTO (mismo criterio que el resto de constantes de este
+ * archivo: se copia del controller real, no se reutiliza una constante de
+ * otro dominio aunque los valores coincidan).
+ */
+export const COMMUNITY_MODERATION_ROLES = [Role.PlatformAdmin, Role.PlatformSuperAdmin] as const;
 
 /**
  * S2-01 — reconnects "Campañas" as the INTERNAL management surface at
@@ -287,6 +299,19 @@ export const navItems: NavItem[] = [
       },
     ],
   },
+  // MENU-SUBMENUS: "Comunidad" agrupa el feed cruzado ("Comunidad", sin
+  // @Roles — cualquier autenticado, igual que "Mis donaciones"/"Mis
+  // ofertas") y "Mis publicaciones" (idem, sin @Roles) — mismo patrón que
+  // los grupos "Donaciones"/"Banco de recursos" (F-8, M11).
+  {
+    path: '/comunidad',
+    label: 'Comunidad',
+    icon: ChatIcon,
+    children: [
+      { path: '/comunidad', label: 'Feed', icon: ChatIcon },
+      { path: '/mis-publicaciones', label: 'Mis publicaciones', icon: ChatIcon },
+    ],
+  },
   // F-7 (M10, marketplace simplificado): catálogo de productos de la
   // organización, contacto por WhatsApp — mismo patrón plano que "Campañas"
   // arriba, gated a MARKETPLACE_VIEW_ROLES (calcado del @Roles real).
@@ -371,5 +396,12 @@ export const navItems: NavItem[] = [
     label: 'Revisión de documentos',
     icon: ShieldIcon,
     roles: PLATFORM_DOCUMENTS_ROLES,
+  },
+  // M11 · moderación básica de la comunidad, audiencia de PLATAFORMA (F-8).
+  {
+    path: '/plataforma/comunidad',
+    label: 'Moderación de comunidad',
+    icon: ChatIcon,
+    roles: COMMUNITY_MODERATION_ROLES,
   },
 ];
