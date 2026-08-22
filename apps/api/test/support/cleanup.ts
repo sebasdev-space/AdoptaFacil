@@ -21,6 +21,7 @@ import type { PrismaClient } from '@prisma/client';
 // in the purge tx disables the triggers so these org-scoped deletes go through.
 // sponsorship_status_history (M07, T-056) is append-only the same way
 // (immutability trigger rejects removal for every role, incl. superuser).
+// legal_representatives (M01, S-1, RNF10) is append-only the same way too.
 const APPEND_ONLY_TABLES = [
   'audit_logs',
   'formalization_transitions',
@@ -29,6 +30,7 @@ const APPEND_ONLY_TABLES = [
   'clinical_events',
   'animals',
   'sponsorship_status_history',
+  'legal_representatives',
 ];
 
 export async function purgeOrganizations(
