@@ -16,6 +16,7 @@ describe('buildPortalView', () => {
     expect(view.sections).toHaveLength(PORTAL_SECTION_BLUEPRINT.length);
     expect(view.sections.map((s) => s.kind)).toEqual([
       'pets',
+      'products',
       'activeCampaign',
       'needsToday',
       'transparency',
@@ -23,11 +24,12 @@ describe('buildPortalView', () => {
     for (const section of view.sections) {
       expect(section.status).toBe('placeholder');
       expect(section.title.length).toBeGreaterThan(0);
-      // F-CAMPANAS-PORTAL-2 (S2-07): activeCampaign's integration point is
-      // RESOLVED now (OrgPublicPage short-circuits it to a real component,
-      // same as 'pets' already did) — its blueprint text no longer says
-      // "pendiente". The other still-unwired sections keep that marker.
-      if (section.kind === 'activeCampaign') {
+      // F-CAMPANAS-PORTAL-2 (S2-07) / F-MKT-PORTAL-1: activeCampaign and
+      // products' integration points are RESOLVED now (OrgPublicPage
+      // short-circuits both to a real component, same as 'pets' already
+      // did) — their blueprint text no longer says "pendiente". The other
+      // still-unwired sections keep that marker.
+      if (section.kind === 'activeCampaign' || section.kind === 'products') {
         expect(section.integrationPoint).not.toMatch(/pendiente/);
       } else if (section.kind !== 'pets') {
         expect(section.integrationPoint).toMatch(/pendiente/);
