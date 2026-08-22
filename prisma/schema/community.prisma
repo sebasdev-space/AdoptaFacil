@@ -1,3 +1,117 @@
-// Module: community · Owner: @fabian (Ola 0)
-// TODO: models defined by @fabian. Every business model MUST carry
-// organization_id and enable RLS following the _rls_probe reference in org.prisma.
+// Module: community (M11) · Owner: @fabian
+// Comunidad (Consolidación operativa, M11): publicaciones, comentarios y
+// likes compartidos entre TODAS las organizaciones y personas — a diferencia
+// de otras tablas de negocio de esta plataforma, el feed es CRUZADO por
+// diseño (como una red social), no privado por tenant.
+//
+// Criterio de `organizationId` (documentado en el PR, per el pedido del plan):
+//   - Cuenta de ORGANIZACIÓN publica → `organizationId` = su propia org (dato
+//     tenant-scoped normal, gestionado bajo RLS por esa org).
+//   - Cuenta PERSONA publica → `organizationId` = NULL. Una Persona SÍ tiene
+//     su propio tenant interno (org.prisma: todo `User.organizationId` es
+//     NOT NULL), pero es un tenant personal/interno — no una identidad
+//     organizacional real que deba mostrarse en un feed público. NULL aquí
+//     significa "sin afiliación que mostrar", no "sin dueño".
+// Comment/PostImage/PostLike replican el `organizationId` de su Post (no el
+// del actor) — así una organización conserva visibilidad RLS normal sobre el
+// engagement de SUS PROPIAS publicaciones, mientras que crear un comentario/
+// like/publicación-de-Persona es SIEMPRE cross-tenant por identidad y pasa
+// por funciones SECURITY DEFINER acotadas (mismo patrón que M05 `Donation` /
+// M09 `ResourceOffer`) — jamás un select crudo que evada RLS.
+//
+// NOTE (module boundary): la FK a `organizations` NO se modela como
+// @relation de Prisma (eso exigiría un campo de vuelta en el modelo
+// Organization de org.prisma, archivo de otro dueño). `organizationId` es un
+// escalar plano; la FK (ON DELETE CASCADE, nullable) se declara en la
+// migración SQL. Las relaciones intra-módulo (imágenes, comentarios, likes) SÍ
+// se modelan.
+
+/// Publicación de la comunidad (M11). Tenant-scoped SOLO cuando tiene
+/// organización (RLS ENABLE+FORCE+tenant_isolation) — una fila con
+/// `organization_id IS NULL` es invisible bajo CUALQUIER contexto de tenant
+/// (NULL nunca satisface la igualdad de la policy) y solo se lee/escribe vía
+/// las funciones SECURITY DEFINER del feed cruzado. `comment_count`/
+/// `like_count` son contadores desnormalizados mantenidos por esas funciones
+/// (nunca por el cliente). Nunca se borra físicamente salvo por su propia
+/// autora (auto-servicio) — la moderación de plataforma solo cambia `status`.
+model Post {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String?   @map("organization_id") @db.Uuid
+  authorUserId   String    @map("author_user_id") @db.Uuid
+  authorName     String    @map("author_name")
+  type           String
+  title          String?
+  body           String
+  status         String    @default("published")
+  commentCount   Int       @default(0) @map("comment_count")
+  likeCount      Int       @default(0) @map("like_count")
+  moderationReason   String?   @map("moderation_reason")
+  moderatedByUserId  String?   @map("moderated_by_user_id") @db.Uuid
+  moderatedAt        DateTime? @map("moderated_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  images   PostImage[]
+  comments Comment[]
+  likes    PostLike[]
+
+  @@index([organizationId])
+  @@index([type])
+  @@index([status])
+  @@index([authorUserId])
+  @@map("community_posts")
+}
+
+/// Foto adjunta a una publicación (M11). `organization_id` replica el de su
+/// Post (ver nota de criterio arriba). Solo metadata — bytes detrás de
+/// StoragePort. Reservada al crear la publicación (sin add/remove posterior
+/// en este alcance).
+model PostImage {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String?  @map("organization_id") @db.Uuid
+  postId         String   @map("post_id") @db.Uuid
+  storageRef     String   @map("storage_ref")
+  order          Int      @default(0)
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([postId])
+  @@map("community_post_images")
+}
+
+/// Comentario en una publicación (M11). `organization_id` replica el de su
+/// Post. Escrito SIEMPRE vía función SECURITY DEFINER (la autora del
+/// comentario casi nunca pertenece a la org de la publicación).
+model Comment {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String?  @map("organization_id") @db.Uuid
+  postId         String   @map("post_id") @db.Uuid
+  authorUserId   String   @map("author_user_id") @db.Uuid
+  authorName     String   @map("author_name")
+  body           String
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([postId])
+  @@map("community_comments")
+}
+
+/// Like de una publicación (M11), clave única (post, usuario) — togglear es
+/// insertar/eliminar esa fila. `organization_id` replica el de su Post.
+/// Escrito SIEMPRE vía función SECURITY DEFINER.
+model PostLike {
+  postId         String   @map("post_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  organizationId String?  @map("organization_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+  @@index([organizationId])
+  @@map("community_post_likes")
+}

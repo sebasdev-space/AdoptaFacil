@@ -13,6 +13,7 @@ import { HealthModule } from './health/health.module';
 import { AdoptionsModule } from './modules/adoptions/adoptions.module';
 import { AnimalsModule } from './modules/animals/animals.module';
 import { CampaignsModule } from './modules/campaigns/campaigns.module';
+import { CommunityModule } from './modules/community/community.module';
 import { DonationsModule } from './modules/donations/donations.module';
 import { MarketplaceModule } from './modules/marketplace/marketplace.module';
 import { OrgModule } from './modules/org/org.module';
@@ -70,6 +71,8 @@ import { RedisModule } from './redis/redis.module';
     ResourcesModule,
     // M10 · marketplace simplificado: catálogo por organización (Ola 3, F-7).
     MarketplaceModule,
+    // M11 · comunidad: publicaciones, comentarios, likes y moderación (Ola 3, F-8).
+    CommunityModule,
   ],
 })
 export class AppModule {}
