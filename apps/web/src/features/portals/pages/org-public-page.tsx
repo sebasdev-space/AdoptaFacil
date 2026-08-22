@@ -17,6 +17,7 @@ import { PortalPlaceholderSection } from '../components/portal-placeholder-secti
 import { PortalTransparencyBar } from '../components/portal-transparency-bar';
 import { PortalSocialLinks } from '../components/portal-social-links';
 import { PortalAdoptionSection } from '../components/portal-adoption-section';
+import { PortalProductsSection } from '../components/portal-products-section';
 import { PortalCampaignsSection } from '../components/portal-campaigns-section';
 import { PortalAboutSection } from '../components/portal-about-section';
 import { PortalContactInfoSection } from '../components/portal-contact-info-section';
@@ -182,11 +183,13 @@ export function OrgPublicPage({ slugOverride }: OrgPublicPageProps = {}) {
 
   // Secciones agregadas AÚN sin módulo dueño (necesita hoy/transparencia) nacen en
   // status:'placeholder' — ocultarlas evita el "Próximamente" vacío frente al
-  // cliente (pulido visual T-D02). 'pets' y 'activeCampaign' (F-CAMPANAS-PORTAL-2,
-  // S2-07) ya están cableadas a datos reales y siempre se muestran.
+  // cliente (pulido visual T-D02). 'pets', 'products' (F-MKT-PORTAL-1) y
+  // 'activeCampaign' (F-CAMPANAS-PORTAL-2, S2-07) ya están cableadas a datos
+  // reales y siempre se muestran.
   const visibleSections = view?.sections.filter(
     (section) =>
       section.kind === 'pets' ||
+      section.kind === 'products' ||
       section.kind === 'activeCampaign' ||
       section.status !== 'placeholder',
   );
@@ -274,12 +277,18 @@ export function OrgPublicPage({ slugOverride }: OrgPublicPageProps = {}) {
 
                 <TabsContent value="portafolio">
                   <div className="space-y-6">
-                    {/* "Mascotas en adopción" (kind 'pets', §M03/T-052);
+                    {/* "Mascotas en adopción" (kind 'pets', §M03/T-052) y
+                        "Productos" (kind 'products', §M10, F-MKT-PORTAL-1);
                         cualquier otra sección que algún día deje de ser
                         placeholder aparecería aquí también. */}
                     {portafolioSections?.map((section) =>
                       section.kind === 'pets' ? (
                         <PortalAdoptionSection key={section.kind} slug={slug as string} />
+                      ) : section.kind === 'products' ? (
+                        <PortalProductsSection
+                          key={section.kind}
+                          organizationId={view.profile.organization.id}
+                        />
                       ) : (
                         <PortalPlaceholderSection key={section.kind} section={section} />
                       ),

@@ -28,7 +28,8 @@ export type PortalOrganizationType = OrganizationType | (string & {});
 export type PortalSectionStatus = 'loading' | 'ready' | 'empty' | 'placeholder' | 'error';
 
 /** Secciones agregadas que componen el portal rico, además del perfil. */
-export type PortalSectionKind = 'pets' | 'activeCampaign' | 'needsToday' | 'transparency';
+export type PortalSectionKind =
+  'pets' | 'products' | 'activeCampaign' | 'needsToday' | 'transparency';
 
 /**
  * Una sección agregada del portal. Hoy nace en `status: 'placeholder'` con su

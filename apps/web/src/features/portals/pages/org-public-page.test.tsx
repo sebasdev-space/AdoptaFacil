@@ -135,13 +135,65 @@ describe('OrgPublicPage — rich public portal', () => {
     // Pulido visual (T-D02): necesita hoy/transparencia have NO owning module yet
     // (status stays 'placeholder' forever until one exists) — showing an empty
     // "Próximamente" card in front of the client reads as unfinished, so these
-    // sections are simply not mounted. 'pets' (T-052) and 'activeCampaign'
-    // (F-CAMPANAS-PORTAL-2, S2-07) are LIVE and always show.
+    // sections are simply not mounted. 'pets' (T-052), 'products'
+    // (F-MKT-PORTAL-1) and 'activeCampaign' (F-CAMPANAS-PORTAL-2, S2-07) are
+    // LIVE and always show.
     for (const title of ['Necesita hoy', 'Transparencia']) {
       expect(screen.queryByRole('heading', { name: title })).not.toBeInTheDocument();
     }
     expect(screen.getByRole('heading', { name: 'Mascotas en adopción' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Productos' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Campaña activa' })).toBeInTheDocument();
+  });
+
+  it('F-MKT-PORTAL-1: mounts the "Productos" section wired to the marketplace catalog scoped to THIS organization', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith('/theme')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => ({ tokens: {} }) });
+        }
+        if (url.includes('/marketplace/products')) {
+          expect(url).toContain('organizationId=org-1');
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              items: [
+                {
+                  id: 'p1',
+                  organizationId: 'org-1',
+                  organizationName: 'Refugio Patitas',
+                  name: 'Correa reflectiva',
+                  category: 'accessories',
+                  price: 25_000,
+                  stock: 5,
+                  images: [],
+                  createdAt: '2026-07-01T00:00:00.000Z',
+                },
+              ],
+              total: 1,
+              limit: 12,
+              offset: 0,
+            }),
+          });
+        }
+        if (url.includes('/animals')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ items: [], total: 0, limit: 1, offset: 0 }),
+          });
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => ORG });
+      }),
+    );
+    renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+    await screen.findByRole('heading', { name: /Refugio Patitas/ });
+
+    expect(await screen.findByText('Correa reflectiva')).toBeInTheDocument();
+    expect(screen.getByTestId('product-card')).toBeInTheDocument();
   });
 
   it('F-CAMPANAS-PORTAL-2: mounts the "Campaña activa" section wired to real data from the org-scoped feed', async () => {

@@ -16,6 +16,17 @@ export const PORTAL_SECTION_BLUEPRINT: readonly SectionBlueprint[] = [
     integrationPoint: 'M03 animales · GET /public/organizations/:slug/animals (pendiente)',
   },
   {
+    kind: 'products',
+    title: 'Productos',
+    description: 'Esta organización todavía no ha publicado productos en el marketplace.',
+    // F-MKT-PORTAL-1: cableada — igual que 'pets'/'activeCampaign', este
+    // título/descripción quedan sin usar una vez wireado (OrgPublicPage
+    // renderiza `PortalProductsSection`, que trae su propio copy). Reutiliza
+    // el endpoint público de M10 que YA soporta el filtro por organización —
+    // el hueco era solo de cableado en el portal, no de backend.
+    integrationPoint: 'M10 marketplace · GET /public/marketplace/products?organizationId=',
+  },
+  {
     kind: 'activeCampaign',
     title: 'Campaña activa',
     description: 'No hay una campaña de recaudación activa por ahora.',
