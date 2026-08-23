@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   FORMALIZATION_SEQUENCE,
   FormalizationState,
+  type DianVerificationCheckStatus,
   type FormalizationStatus,
   type FormalizationTransition,
 } from '@adoptafacil/contracts';
@@ -44,6 +45,18 @@ interface TransitionResult {
   transition: FormalizationTransition;
 }
 
+/** RNF07 — "failed" se muestra como "Verificación pendiente" (nunca "fallida"):
+ *  el reintento manual siempre queda a la mano, nunca es un cierre silencioso. */
+const DIAN_STATUS_META: Record<
+  DianVerificationCheckStatus,
+  { label: string; variant: 'info' | 'warning' | 'success' | 'destructive' }
+> = {
+  pending: { label: 'Verificación DIAN en curso', variant: 'info' },
+  retrying: { label: 'Reintentando verificación DIAN', variant: 'warning' },
+  verified: { label: 'RTE verificado ante la DIAN', variant: 'success' },
+  failed: { label: 'Verificación pendiente', variant: 'destructive' },
+};
+
 /** Formatea un instante UTC en hora de Colombia para la UI. */
 function formatCO(iso: string): string {
   return new Date(iso).toLocaleString('es-CO', { timeZone: 'America/Bogota' });
@@ -53,14 +66,16 @@ function formatCO(iso: string): string {
  *  miembro ve el estado/historial; solo el Owner puede avanzar/retroceder. */
 export function OrgFormalizationPage() {
   const client = useApiClient();
-  const { hasRole } = useSession();
+  const { hasRole, hasAnyRole } = useSession();
   const canManage = hasRole(Role.Owner);
+  const canRetryDian = hasAnyRole(Role.Owner, Role.Administrator);
 
   const [status, setStatus] = useState<FormalizationStatus | null>(null);
   const [history, setHistory] = useState<FormalizationTransition[]>([]);
   const [loading, setLoading] = useState(true);
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
+  const [retryingDian, setRetryingDian] = useState(false);
   // REFACTOR-VISUAL Fase C3: la transición pendiente de confirmar en el modal
   // (null = modal cerrado). `requiresReason` decide si el modal pide motivo.
   const [pendingTransition, setPendingTransition] = useState<{
@@ -142,6 +157,26 @@ export function OrgFormalizationPage() {
     setReason('');
   };
 
+  const retryDianVerification = async (): Promise<void> => {
+    setRetryingDian(true);
+    try {
+      await client.request('/org/formalization/dian-verification/retry', { method: 'POST' });
+      await load();
+      toast({
+        title: 'Reintento iniciado',
+        description: 'Se inició un nuevo ciclo de verificación ante la DIAN.',
+      });
+    } catch (error) {
+      toast({
+        title: 'No se pudo reintentar',
+        description: error instanceof Error ? error.message : 'Inténtalo de nuevo.',
+        variant: 'destructive',
+      });
+    } finally {
+      setRetryingDian(false);
+    }
+  };
+
   return (
     <PageContainer>
       <PageHeader
@@ -158,6 +193,31 @@ export function OrgFormalizationPage() {
             <CardContent className="space-y-4">
               <ProgressStepper steps={formalizationSteps()} currentIndex={currentIndex} />
               {status.rteVigente && <Badge>RTE vigente</Badge>}
+
+              {status.dianVerification && (
+                <div className={styles['dian-verification']}>
+                  <Badge variant={DIAN_STATUS_META[status.dianVerification.status].variant}>
+                    {DIAN_STATUS_META[status.dianVerification.status].label}
+                  </Badge>
+                  <p className={styles['dian-verification__detail']}>
+                    Intentos: {status.dianVerification.attemptsCount}
+                    {status.dianVerification.lastAttemptAt &&
+                      ` · Último intento: ${formatCO(status.dianVerification.lastAttemptAt)}`}
+                    {status.dianVerification.status === 'retrying' &&
+                      status.dianVerification.nextRetryAt &&
+                      ` · Próximo reintento: ${formatCO(status.dianVerification.nextRetryAt)}`}
+                  </p>
+                  {canRetryDian && status.dianVerification.status === 'failed' && (
+                    <Button
+                      variant="outline"
+                      disabled={retryingDian}
+                      onClick={() => void retryDianVerification()}
+                    >
+                      {retryingDian ? 'Reintentando…' : 'Reintentar verificación DIAN'}
+                    </Button>
+                  )}
+                </div>
+              )}
 
               {canManage && (next || previous) && (
                 <div className={styles.actions}>

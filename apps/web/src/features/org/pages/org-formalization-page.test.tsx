@@ -93,4 +93,60 @@ describe('OrgFormalizationPage', () => {
     expect(await screen.findByText('Estado actualizado')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
+
+  it('S-2: shows the DIAN retry ladder status while retrying, without a manual-retry button', async () => {
+    stubFetch((url) => {
+      if (url.includes('/org/formalization/history')) return [];
+      if (url.includes('/org/formalization')) {
+        return {
+          state: FormalizationState.ESAL,
+          rteVigente: false,
+          dianVerification: {
+            organizationId: 'org-1',
+            status: 'retrying',
+            attemptsCount: 1,
+            lastAttemptAt: '2026-08-23T01:00:00.000Z',
+            nextRetryAt: '2026-08-23T01:05:00.000Z',
+          },
+        };
+      }
+      return {};
+    });
+    renderShell({ route: '/organizacion/formalizacion', ...ownerSession() });
+
+    expect(await screen.findByText('Reintentando verificación DIAN')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Reintentar verificación DIAN' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('S-2: an Owner can manually retry once the DIAN retry ladder is exhausted ("Verificación pendiente")', async () => {
+    let retried = false;
+    stubFetch((url, init) => {
+      if (init?.method === 'POST' && url.includes('/org/formalization/dian-verification/retry')) {
+        retried = true;
+        return {};
+      }
+      if (url.includes('/org/formalization/history')) return [];
+      if (url.includes('/org/formalization')) {
+        return {
+          state: FormalizationState.ESAL,
+          rteVigente: false,
+          dianVerification: {
+            organizationId: 'org-1',
+            status: retried ? 'retrying' : 'failed',
+            attemptsCount: retried ? 1 : 5,
+          },
+        };
+      }
+      return {};
+    });
+    renderShell({ route: '/organizacion/formalizacion', ...ownerSession() });
+
+    expect(await screen.findByText('Verificación pendiente')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar verificación DIAN' }));
+
+    expect(await screen.findByText('Reintento iniciado')).toBeInTheDocument();
+    expect(await screen.findByText('Reintentando verificación DIAN')).toBeInTheDocument();
+  });
 });

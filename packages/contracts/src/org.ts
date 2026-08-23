@@ -187,6 +187,46 @@ export interface FormalizationStatus {
   state: FormalizationState;
   /** True iff `state === ESAL_RTE` (RTE registration current). */
   rteVigente: boolean;
+  /** Present only once the org has reached ESAL (S-2) — `undefined` before
+   *  that, since no verification has ever been attempted yet. */
+  dianVerification?: DianVerificationStatus;
+}
+
+// ============================================================================
+// DIAN RTE verification (M01, S-2, RF02 relacionado / RNF07). Contract-first,
+// additive: DIAN has NO official API (documento base) — this models the
+// SIMULATED verification (DianPort/fake adapter) that gates ESAL → ESAL_RTE,
+// with staggered retries (5min/30min/2h/24h, same schedule as the clinical
+// reminders / payouts workers) before surfacing "Verificación pendiente" with
+// a manual-retry option. Never a stand-in for the real DIAN/RTE process itself
+// (RNF07's real integration is `TODO(client)` — see DianPort).
+// ============================================================================
+
+/**
+ * - `pending`  — a verification attempt is in flight (no result yet).
+ * - `retrying` — the last attempt failed; another is scheduled (`nextRetryAt`).
+ * - `verified` — confirmed successful (unlocks the ESAL_RTE transition).
+ * - `failed`   — every staggered retry was exhausted with no success. Shown to
+ *   the Owner as "Verificación pendiente" (not "fallida") with a manual-retry
+ *   action — never a silent dead end.
+ */
+export type DianVerificationCheckStatus = 'pending' | 'retrying' | 'verified' | 'failed';
+
+/**
+ * Current DIAN RTE verification state for an organization — the fast-read
+ * projection recomputed after every attempt (mirrors `VerificationLevel`'s
+ * "computed, never hand-written" convention). Useful to M13 (dashboards) for
+ * surfacing organizations with a pending verification; no cross-module
+ * dependency is introduced by publishing it here.
+ */
+export interface DianVerificationStatus {
+  organizationId: string;
+  status: DianVerificationCheckStatus;
+  attemptsCount: number;
+  /** ISO-8601 UTC. */
+  lastAttemptAt?: string;
+  /** ISO-8601 UTC — present only while `status === 'retrying'`. */
+  nextRetryAt?: string;
 }
 
 /**

@@ -1,4 +1,9 @@
-import { DocumentType, FORMALIZATION_SEQUENCE, FormalizationState } from '@adoptafacil/contracts';
+import {
+  DocumentType,
+  FORMALIZATION_SEQUENCE,
+  FormalizationState,
+  type DianVerificationCheckStatus,
+} from '@adoptafacil/contracts';
 
 /**
  * Pure formalization state machine (RF02). The valid path is the ordered
@@ -47,6 +52,16 @@ export interface TransitionContext {
   /** Requirements map to consult; defaults to {@link TRANSITION_REQUIREMENTS}.
    *  Overridable so the gate can be unit-tested without a seeded catalog. */
   requirements?: Partial<Record<FormalizationState, readonly DocumentType[]>>;
+  /**
+   * Current DIAN RTE verification status (S-2/RNF07) — gates ESAL → ESAL_RTE
+   * specifically. `undefined` means the caller didn't pass it (existing tests,
+   * or transitions that never touch ESAL_RTE) → that specific gate is simply
+   * NOT applied, same "absent means ungated" philosophy as the document
+   * requirements map above. `FormalizationService` (the only real caller)
+   * ALWAYS passes a concrete value in production — never leaves this
+   * `undefined` — so a real request can never fall through this default.
+   */
+  dianStatus?: DianVerificationCheckStatus;
 }
 
 function indexOf(state: FormalizationState): number {
@@ -86,6 +101,22 @@ export function checkTransition(
             `current (vigente) first — missing/expired: ${missing.join(', ')}.`,
         };
       }
+    }
+    // S-2 (RNF07): the ESAL → ESAL_RTE step ADDITIONALLY requires a confirmed
+    // DIAN RTE verification — see TransitionContext.dianStatus's own doc for
+    // why `undefined` skips this gate instead of blocking.
+    if (
+      to === FormalizationState.ESAL_RTE &&
+      ctx.dianStatus !== undefined &&
+      ctx.dianStatus !== 'verified'
+    ) {
+      return {
+        allowed: false,
+        requiresReason: false,
+        error:
+          `Cannot advance to "ESAL_RTE": the DIAN RTE verification has not been ` +
+          `confirmed yet (estado: ${ctx.dianStatus}).`,
+      };
     }
     return { allowed: true, kind: 'forward', requiresReason: false };
   }

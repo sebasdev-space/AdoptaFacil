@@ -30,3 +30,15 @@
 .history__reason {
   color: var(--text-muted);
 }
+
+.dian-verification {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dian-verification__detail {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
