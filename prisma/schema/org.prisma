@@ -17,6 +17,7 @@ model Organization {
   profile                  OrganizationProfile?
   formalizationTransitions FormalizationTransition[]
   documents                OrganizationDocument[]
+  legalRepresentatives     LegalRepresentative[]
 
   @@map("organizations")
 }
@@ -178,11 +179,12 @@ model User {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  credential          AuthCredential?
-  refreshTokens       RefreshToken[]
-  passwordResetTokens PasswordResetToken[]
-  roleAssignments     UserRole[]
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  credential           AuthCredential?
+  refreshTokens        RefreshToken[]
+  passwordResetTokens  PasswordResetToken[]
+  roleAssignments      UserRole[]
+  legalRepresentatives LegalRepresentative[]
 
   @@unique([organizationId, email])
   @@index([organizationId])
@@ -287,6 +289,42 @@ model OrgMember {
   @@unique([organizationId, email])
   @@index([organizationId])
   @@map("org_members")
+}
+
+/// Legal representative signature (M01, S-1, RF14 relacionado / RNF10). Append-only
+/// and immutable exactly like FormalizationTransition: the migration grants the
+/// app role only SELECT+INSERT and installs triggers that reject any
+/// UPDATE/DELETE/TRUNCATE for every role. "Vigente" is NOT a stored flag — it is
+/// always the row with the latest `signedAt` for the organization (computed at
+/// read time in LegalRepresentativeService), so registering a new representative
+/// (or re-signing) is a plain INSERT, never a mutation of the previous row — the
+/// history itself is the audit trail. `memberId` points at the real `User`
+/// account (not the unused legacy `OrgMember` table — confirmed empty of real
+/// usage in application code before building this). `signatureFileRef` is an
+/// opaque StoragePort key to the ENCRYPTED signature bytes (AES-256-GCM, see
+/// legal-representative-crypto.ts) — the raw signature image is never persisted
+/// in the clear and never logged. `signatureHash` is the SHA-256 of the ORIGINAL
+/// (pre-encryption) bytes, reusable for the certificate hash+QR (Consolidación §8).
+model LegalRepresentative {
+  id               String   @id @default(uuid()) @db.Uuid
+  organizationId   String   @map("organization_id") @db.Uuid
+  memberId         String   @map("member_id") @db.Uuid
+  fullName         String   @map("full_name")
+  documentType     String   @map("document_type")
+  documentNumber   String   @map("document_number")
+  position         String
+  signatureFileRef String   @map("signature_file_ref")
+  signatureHash    String   @map("signature_hash")
+  status           String   @default("active")
+  signedAt         DateTime @map("signed_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  member       User         @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([organizationId, signedAt])
+  @@map("legal_representatives")
 }
 
 /// Canonical Row-Level Security reference — HARNESS ONLY, not a business table.

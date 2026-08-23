@@ -456,3 +456,91 @@ export interface DocumentReviewQueueItem {
   /** ISO-8601 UTC. */
   createdAt: string;
 }
+
+// ============================================================================
+// Legal representative signature (M01, S-1, RF14 relacionado / RNF10). Contract-
+// first, additive: published for M05 (@fabian) to replace the generic-text
+// signer placeholder in the donation certificate template. Registration is
+// append-only — re-signing creates a NEW row; "vigente" is always the most
+// recently signed one for the organization (never a mutated flag).
+// ============================================================================
+
+/**
+ * Colombian identity-document type accepted for the legal representative.
+ *
+ * TODO(client): the AUTHORITATIVE catalog is a business decision the base
+ * document does not enumerate — this is a minimal, extensible starter set
+ * (same convention as {@link OrganizationType}). String values are stable.
+ */
+export type LegalRepresentativeDocumentType =
+  'cedula_ciudadania' | 'cedula_extranjeria' | 'pasaporte';
+
+/**
+ * Lifecycle state of a legal representative record. Only `'active'` is written
+ * today — the document base does not define a revocation flow, so this is kept
+ * as a single stable value on purpose rather than inventing states (`revoked`,
+ * `pending`, …) no requirement asks for yet; extending it later is additive.
+ */
+export type LegalRepresentativeStatus = 'active';
+
+/**
+ * The organization's legal representative + their electronic signature (S-1).
+ * Simple electronic signature (drawn/traced or an uploaded image) — no
+ * biometrics, no certified digital signature (RNF10, Ley 527/1999 scope for
+ * this MVP). `memberId` is the `User` who registered it — only an Owner may
+ * (see {@link RegisterLegalRepresentativeInput}); extending write access to
+ * Administrator is a `TODO(client)` decision the base document doesn't fix.
+ */
+export interface LegalRepresentative {
+  id: string;
+  organizationId: string;
+  /** The `User` account (Owner) this signature belongs to. */
+  memberId: string;
+  fullName: string;
+  documentType: LegalRepresentativeDocumentType;
+  documentNumber: string;
+  /** Cargo (e.g. "Representante legal", "Director ejecutivo"). */
+  position: string;
+  /** Opaque StoragePort key to the ENCRYPTED signature bytes — never the raw
+   *  image; there is no endpoint that returns the decrypted file. */
+  signatureFileRef: string;
+  /** SHA-256 (hex) of the ORIGINAL signature bytes, computed before encryption —
+   *  reusable for the certificate's own hash+QR verification (Consolidación §8). */
+  signatureHash: string;
+  status: LegalRepresentativeStatus;
+  /** ISO-8601 UTC — when this signature was captured. */
+  signedAt: string;
+  /** ISO-8601 UTC. */
+  createdAt: string;
+}
+
+/** Register (or re-register, replacing the current one) the org's legal
+ *  representative. Always a full submission — there is no partial-update
+ *  endpoint; a "change of representative" is simply registering a new one. */
+export interface RegisterLegalRepresentativeInput {
+  fullName: string;
+  documentType: LegalRepresentativeDocumentType;
+  documentNumber: string;
+  position: string;
+  /** Base64-encoded signature image (drawn on a canvas or an uploaded file),
+   *  WITHOUT a `data:` URL prefix. */
+  signatureBase64: string;
+  signatureContentType: string;
+}
+
+/**
+ * Narrow, cross-module projection for M05 (@fabian) to consume when rendering
+ * the donation certificate's signer — replaces the generic placeholder text in
+ * `certificate-document.tsx`. Deliberately excludes `documentType`/
+ * `documentNumber` (PII not needed by the certificate template) and never
+ * exposes signature bytes, only the opaque reference + hash. Served by the
+ * `legal_representative_summary(organization_id)` SECURITY DEFINER function
+ * (same pattern as `organization_public`/`reconciliation_report`) — meant to be
+ * called directly from M05's backend code, not over HTTP.
+ */
+export interface LegalRepresentativeSummary {
+  fullName: string;
+  position: string;
+  signatureFileRef: string;
+  signatureHash: string;
+}

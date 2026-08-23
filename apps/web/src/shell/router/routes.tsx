@@ -29,6 +29,7 @@ import {
   NationalTransparencyPage,
   OrgDocumentsPage,
   OrgFormalizationPage,
+  OrgLegalRepresentativePage,
   OrgProfilePage,
   OrgVolunteeringPage,
   PlatformDocumentsReviewPage,
@@ -315,6 +316,19 @@ export function AppRoutes() {
             element={
               <RequireRoles roles={ORG_DOCUMENTS_ROLES}>
                 <OrgDocumentsPage />
+              </RequireRoles>
+            }
+          />
+          {/* M01 · representante legal + firma electrónica (S-1, RF14 relacionado
+              / RNF10). CRUCE DE DOMINIO (@sebastian, avisar a @fabian): único
+              archivo tocado fuera de features/org/** en esta tarea — un
+              <Route> más, mismo gate de roles que /organizacion/documentos
+              (ORG_DOCUMENTS_ROLES, ya importado arriba). */}
+          <Route
+            path="organizacion/representante-legal"
+            element={
+              <RequireRoles roles={ORG_DOCUMENTS_ROLES}>
+                <OrgLegalRepresentativePage />
               </RequireRoles>
             }
           />

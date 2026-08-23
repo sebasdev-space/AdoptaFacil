@@ -88,6 +88,9 @@ function OrgActionBar({ org, saveButton }: { org: Organization; saveButton?: Rea
           {FORMALIZATION_LABELS[org.formalizationState ?? FormalizationState.Informal]}
         </Badge>
       </Link>
+      <Link to="/organizacion/representante-legal" className={`${linkClass} gap-1.5`}>
+        Representante legal
+      </Link>
       <Link to="/organizacion/portal" className={`${linkClass} gap-1.5`}>
         <PaletteIcon />
         Personalización

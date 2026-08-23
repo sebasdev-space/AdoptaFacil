@@ -4,6 +4,12 @@ import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
 import { FormalizationController } from './formalization.controller';
 import { FormalizationService } from './formalization.service';
+import {
+  LEGAL_REPRESENTATIVE_CONFIG,
+  loadLegalRepresentativeConfig,
+} from './legal-representative-crypto';
+import { LegalRepresentativeController } from './legal-representative.controller';
+import { LegalRepresentativeService } from './legal-representative.service';
 import { OrgController } from './org.controller';
 import { OrgProfileService } from './org-profile.service';
 import { OrganizationSummaryController } from './organization-summary.controller';
@@ -26,6 +32,7 @@ import { PlatformSettingsService } from './platform-settings.service';
     OrgController,
     FormalizationController,
     DocumentsController,
+    LegalRepresentativeController,
     OrganizationSummaryController,
     PlatformDocumentsController,
     PlatformSettingsController,
@@ -34,6 +41,8 @@ import { PlatformSettingsService } from './platform-settings.service';
     OrgProfileService,
     FormalizationService,
     DocumentsService,
+    LegalRepresentativeService,
+    { provide: LEGAL_REPRESENTATIVE_CONFIG, useFactory: loadLegalRepresentativeConfig },
     OrganizationSummaryService,
     PlatformDocumentsService,
     PlatformSettingsService,
