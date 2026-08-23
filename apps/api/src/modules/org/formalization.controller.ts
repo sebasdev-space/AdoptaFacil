@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Post, UseGuards } from '@nestjs/common';
 import {
   type FormalizationStatus,
   type FormalizationTransition,
@@ -11,6 +11,7 @@ import { JwtAuthGuard } from '../../core/auth/jwt-auth.guard';
 import { ZodValidationPipe } from '../../core/auth/zod-validation.pipe';
 import { Roles } from '../../core/rbac/roles.decorator';
 import { RolesGuard } from '../../core/rbac/roles.guard';
+import { DianVerificationService } from './dian-verification.service';
 import { FormalizationService, type TransitionResult } from './formalization.service';
 import { requestTransitionSchema } from './formalization.schemas';
 
@@ -22,7 +23,10 @@ import { requestTransitionSchema } from './formalization.schemas';
 @Controller('org/formalization')
 @UseGuards(JwtAuthGuard)
 export class FormalizationController {
-  constructor(private readonly service: FormalizationService) {}
+  constructor(
+    private readonly service: FormalizationService,
+    private readonly dianVerification: DianVerificationService,
+  ) {}
 
   @Get()
   getStatus(): Promise<FormalizationStatus> {
@@ -42,5 +46,15 @@ export class FormalizationController {
     @Body(new ZodValidationPipe(requestTransitionSchema)) dto: RequestFormalizationTransitionInput,
   ): Promise<TransitionResult> {
     return this.service.transition(actor.id, dto);
+  }
+
+  /** Manual retry of the DIAN RTE verification (S-2) — Owner/Administrator,
+   *  never a silent dead end once the staggered retries are exhausted. */
+  @Post('dian-verification/retry')
+  @HttpCode(202)
+  @UseGuards(RolesGuard)
+  @Roles(Role.Owner, Role.Administrator)
+  async retryDianVerification(@CurrentUser() actor: RequestUser): Promise<void> {
+    await this.dianVerification.retryManually(actor.id);
   }
 }

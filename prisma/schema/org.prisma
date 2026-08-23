@@ -18,6 +18,7 @@ model Organization {
   formalizationTransitions FormalizationTransition[]
   documents                OrganizationDocument[]
   legalRepresentatives     LegalRepresentative[]
+  dianVerificationAttempts DianVerificationAttempt[]
 
   @@map("organizations")
 }
@@ -82,6 +83,12 @@ model OrganizationProfile {
   /// contract (S2-PORTAL). Rendered in the public portal's "Información" tab;
   /// the tab is hidden when this is empty/absent.
   extendedContact    Json?    @map("extended_contact")
+  /// { status, attemptsCount, lastAttemptAt?, nextRetryAt? } — DianVerificationStatus
+  /// contract (S-2, RNF07). Recomputed as a side effect of each verification
+  /// attempt (DianVerificationService), never set directly — same "computed,
+  /// never hand-written" convention as `verificationLevel` above. `null` means
+  /// no verification has ever been attempted (org hasn't reached ESAL yet).
+  dianVerification   Json?    @map("dian_verification")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
@@ -325,6 +332,34 @@ model LegalRepresentative {
   @@index([organizationId])
   @@index([organizationId, signedAt])
   @@map("legal_representatives")
+}
+
+/// Append-only log of DIAN RTE verification attempts (S-2, RF02 relacionado /
+/// RNF07). Same immutability convention as FormalizationTransition: the
+/// migration grants the app role only SELECT+INSERT and installs triggers that
+/// reject any UPDATE/DELETE/TRUNCATE for every role. The CURRENT/aggregate
+/// status (for fast reads + the state-machine gate) lives on
+/// `OrganizationProfile.dianVerification`, recomputed after each attempt; this
+/// table is purely the historical trail of every attempt (auto-retry or
+/// manual). `actorUserId` is null for automatic attempts (queue-triggered, no
+/// human actor) and set for a manual retry. The NIT is deliberately NEVER
+/// persisted here (nor in the audit log) — TODO(client): the base document
+/// does not fix a masking rule for it, so the simplest safe default (don't log
+/// it at all) is used instead of guessing one.
+model DianVerificationAttempt {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  attemptNumber  Int      @map("attempt_number")
+  result         String
+  triggeredBy    String   @map("triggered_by")
+  actorUserId    String?  @map("actor_user_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([organizationId, createdAt])
+  @@map("dian_verification_attempts")
 }
 
 /// Canonical Row-Level Security reference — HARNESS ONLY, not a business table.

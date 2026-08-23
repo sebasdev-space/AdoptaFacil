@@ -9,6 +9,7 @@ import {
 import { AuditService } from '../../core/audit/audit.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../core/tenant/tenant-context.service';
+import { DianVerificationService, parseDianVerification } from './dian-verification.service';
 import { DocumentsService } from './documents.service';
 import { checkTransition, rteVigenteFor } from './formalization.machine';
 
@@ -36,6 +37,7 @@ export class FormalizationService {
     private readonly tenant: TenantContextService,
     private readonly audit: AuditService,
     private readonly documents: DocumentsService,
+    private readonly dianVerification: DianVerificationService,
   ) {}
 
   private requireOrgId(): string {
@@ -46,7 +48,8 @@ export class FormalizationService {
     return organizationId;
   }
 
-  /** Current formalization state + rteVigente for the caller's org. */
+  /** Current formalization state + rteVigente (+ DIAN verification, S-2) for
+   *  the caller's org. */
   async getStatus(): Promise<FormalizationStatus> {
     const organizationId = this.requireOrgId();
     return this.prisma.withOrgContext(organizationId, async (tx) => {
@@ -54,6 +57,7 @@ export class FormalizationService {
       return {
         state: (profile?.formalizationState as FormalizationState) ?? FormalizationState.Informal,
         rteVigente: profile?.rteVigente ?? false,
+        dianVerification: parseDianVerification(organizationId, profile?.dianVerification),
       };
     });
   }
@@ -81,7 +85,10 @@ export class FormalizationService {
     input: RequestFormalizationTransitionInput,
   ): Promise<TransitionResult> {
     const organizationId = this.requireOrgId();
-    return this.prisma.withOrgContext(organizationId, async (tx) => {
+    let shouldTriggerDianVerification = false;
+    let nitForDianVerification: string | null = null;
+
+    const result = await this.prisma.withOrgContext(organizationId, async (tx) => {
       const profile = await tx.organizationProfile.findUnique({ where: { organizationId } });
       const from =
         (profile?.formalizationState as FormalizationState) ?? FormalizationState.Informal;
@@ -90,7 +97,13 @@ export class FormalizationService {
       // documents to be Approved & current. The catalog is empty by default
       // (TODO(client) in TRANSITION_REQUIREMENTS), so this is a no-op until seeded.
       const satisfiedDocuments = await this.documents.satisfiedTypesInTx(tx, organizationId);
-      const check = checkTransition(from, input.targetState, { satisfiedDocuments });
+      // S-2 (RNF07): the ESAL_RTE gate needs a CONCRETE status here, never
+      // `undefined` — otherwise the machine's "absent means ungated" default
+      // (meant for pure unit tests) would silently bypass real production
+      // requests. No attempt ever made yet reads the same as "pending".
+      const dianStatus =
+        parseDianVerification(organizationId, profile?.dianVerification)?.status ?? 'pending';
+      const check = checkTransition(from, input.targetState, { satisfiedDocuments, dianStatus });
       if (!check.allowed) {
         throw new BadRequestException(check.error);
       }
@@ -132,10 +145,28 @@ export class FormalizationService {
         metadata: { from, to: input.targetState, kind: check.kind },
       });
 
+      // S-2 (RNF07): reaching ESAL auto-triggers the DIAN RTE verification —
+      // captured here (inside the tx, where `profile.nit` is already loaded)
+      // but enqueued AFTER the transaction commits, same "external I/O never
+      // inside the DB transaction" rule as DocumentsService/RemindersService.
+      // Silently skipped with no NIT yet — that's a data-completeness gap for
+      // the Owner to fix in Datos institucionales, not a reason to block
+      // reaching ESAL itself (not required by the base document).
+      if (input.targetState === FormalizationState.ESAL && profile?.nit) {
+        shouldTriggerDianVerification = true;
+        nitForDianVerification = profile.nit;
+      }
+
       return {
         status: { state: input.targetState, rteVigente },
         transition: toTransition(row),
       };
     });
+
+    if (shouldTriggerDianVerification && nitForDianVerification) {
+      await this.dianVerification.enqueue(organizationId, nitForDianVerification, 'auto', null);
+    }
+
+    return result;
   }
 }

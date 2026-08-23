@@ -1,7 +1,13 @@
+import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../../core/auth/auth.module';
+import { DIAN_VERIFICATION_QUEUE } from './dian-verification.constants';
+import { DianVerificationProcessor } from './dian-verification.processor';
+import { DianVerificationService } from './dian-verification.service';
+import { DIAN_PORT } from './dian.port';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
+import { FakeDianAdapter } from './fake-dian.adapter';
 import { FormalizationController } from './formalization.controller';
 import { FormalizationService } from './formalization.service';
 import {
@@ -27,7 +33,11 @@ import { PlatformSettingsService } from './platform-settings.service';
  * provided by the shared, global StorageModule (core, T-107) — no local binding.
  */
 @Module({
-  imports: [AuthModule],
+  // BullModule.registerQueue only registers a QUEUE NAME on the already-global
+  // BullMQ↔Redis connection (QueueModule, core) — it does not touch or
+  // reconfigure that shared module, same pattern AnimalsModule already uses
+  // for REMINDERS_QUEUE.
+  imports: [AuthModule, BullModule.registerQueue({ name: DIAN_VERIFICATION_QUEUE })],
   controllers: [
     OrgController,
     FormalizationController,
@@ -46,6 +56,28 @@ import { PlatformSettingsService } from './platform-settings.service';
     OrganizationSummaryService,
     PlatformDocumentsService,
     PlatformSettingsService,
+    DianVerificationService,
+    DianVerificationProcessor,
+    {
+      provide: DIAN_PORT,
+      useFactory: () => {
+        // DIAN has NO official API (documento base) — 'fake' is the only real
+        // option today; DIAN_DRIVER exists only so a future real adapter can
+        // slot in later without touching any consumer (TODO(client), see
+        // dian.port.ts).
+        const driver = process.env.DIAN_DRIVER ?? 'fake';
+        if (driver !== 'fake') {
+          throw new Error(`Unsupported DIAN_DRIVER "${driver}" — only "fake" exists today.`);
+        }
+        const latencyMs = process.env.DIAN_FAKE_LATENCY_MS
+          ? Number(process.env.DIAN_FAKE_LATENCY_MS)
+          : undefined;
+        const failuresBeforeSuccess = process.env.DIAN_FAKE_FAILURES
+          ? Number(process.env.DIAN_FAKE_FAILURES)
+          : undefined;
+        return new FakeDianAdapter({ latencyMs, failuresBeforeSuccess });
+      },
+    },
   ],
 })
 export class OrgModule {}

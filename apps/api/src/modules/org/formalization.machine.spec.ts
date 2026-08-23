@@ -85,4 +85,36 @@ describe('formalization state machine', () => {
       ).toBe(true);
     });
   });
+
+  describe('DIAN RTE verification gate on ESAL → ESAL_RTE (S-2, RNF07)', () => {
+    it('blocks the step when dianStatus is passed but not "verified"', () => {
+      for (const status of ['pending', 'retrying', 'failed'] as const) {
+        const check = checkTransition(FormalizationState.ESAL, FormalizationState.ESAL_RTE, {
+          dianStatus: status,
+        });
+        expect(check.allowed).toBe(false);
+        expect(check.error).toMatch(/DIAN RTE verification/i);
+      }
+    });
+
+    it('allows the step once dianStatus is "verified"', () => {
+      const check = checkTransition(FormalizationState.ESAL, FormalizationState.ESAL_RTE, {
+        dianStatus: 'verified',
+      });
+      expect(check).toMatchObject({ allowed: true, kind: 'forward' });
+    });
+
+    it('does NOT gate when dianStatus is omitted (backward-compatible default — see the top-level test at the start of this file)', () => {
+      expect(checkTransition(FormalizationState.ESAL, FormalizationState.ESAL_RTE).allowed).toBe(
+        true,
+      );
+    });
+
+    it('does not gate any OTHER transition, even with a non-verified dianStatus', () => {
+      const check = checkTransition(FormalizationState.Informal, FormalizationState.EnProceso, {
+        dianStatus: 'failed',
+      });
+      expect(check.allowed).toBe(true);
+    });
+  });
 });
