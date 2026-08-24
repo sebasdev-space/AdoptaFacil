@@ -450,3 +450,43 @@ describe('S-7 (M12, RF23) · "Moderación de reseñas" demands PLATFORM_REVIEWS_
     expect(screen.queryByText('Sin acceso')).not.toBeInTheDocument();
   });
 });
+
+describe('S-8 (M13, RF24) · platform dashboards demand strict per-audience roles (deny-by-default)', () => {
+  it('PlatformAdmin dashboard renders for PlatformAdmin', async () => {
+    renderShell({ route: '/plataforma/dashboard', ...sessionWith([Role.PlatformAdmin]) });
+    expect(
+      await screen.findByRole('heading', { name: 'Dashboard de plataforma' }),
+    ).toBeInTheDocument();
+  });
+
+  it('PlatformAdmin dashboard renders for PlatformSuperAdmin too', async () => {
+    renderShell({ route: '/plataforma/dashboard', ...sessionWith([Role.PlatformSuperAdmin]) });
+    expect(
+      await screen.findByRole('heading', { name: 'Dashboard de plataforma' }),
+    ).toBeInTheDocument();
+  });
+
+  it('PlatformAdmin dashboard denies an Owner (no platform role)', async () => {
+    renderShell({ route: '/plataforma/dashboard', ...sessionWith([Role.Owner]) });
+    expect(await screen.findByText('Sin acceso')).toBeInTheDocument();
+  });
+
+  it('financial dashboard denies a normal PlatformAdmin (financial data is SuperAdmin-only)', async () => {
+    renderShell({
+      route: '/plataforma/dashboard/financiero',
+      ...sessionWith([Role.PlatformAdmin]),
+    });
+    expect(await screen.findByText('Sin acceso')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Dashboard financiero' })).not.toBeInTheDocument();
+  });
+
+  it('financial dashboard renders for PlatformSuperAdmin', async () => {
+    renderShell({
+      route: '/plataforma/dashboard/financiero',
+      ...sessionWith([Role.PlatformSuperAdmin]),
+    });
+    expect(
+      await screen.findByRole('heading', { name: 'Dashboard financiero' }),
+    ).toBeInTheDocument();
+  });
+});
