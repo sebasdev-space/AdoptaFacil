@@ -21,6 +21,7 @@ import { PaymentsModule } from './modules/payments/payments.module';
 import { PortalsModule } from './modules/portals/portals.module';
 import { ResourcesModule } from './modules/resources/resources.module';
 import { SponsorshipsModule } from './modules/sponsorships/sponsorships.module';
+import { VolunteeringModule } from './modules/volunteering/volunteering.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { QueueModule } from './queues/queue.module';
 import { RedisModule } from './redis/redis.module';
@@ -73,6 +74,8 @@ import { RedisModule } from './redis/redis.module';
     MarketplaceModule,
     // M11 · comunidad: publicaciones, comentarios, likes y moderación (Ola 3, F-8).
     CommunityModule,
+    // M08 · voluntariado + servicio social estudiantil (RF18/RF19, Ola 3, S-6).
+    VolunteeringModule,
   ],
 })
 export class AppModule {}

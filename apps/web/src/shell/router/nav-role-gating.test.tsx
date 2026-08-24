@@ -386,3 +386,32 @@ describe('T-065 · "Transparencia" route redirects home (no stale "Ola 1" placeh
     expect(screen.queryByText(/Ola 1/)).not.toBeInTheDocument();
   });
 });
+
+describe('S-6 (M08, RF18/RF19) · "Voluntariado" surface demands VOLUNTEERING_VIEW_ROLES (deny-by-default)', () => {
+  it('renders the management screen for Owner', async () => {
+    renderShell({ route: '/organizacion/voluntariado', ...sessionWith([Role.Owner]) });
+    expect(await screen.findByRole('heading', { name: 'Voluntariado' })).toBeInTheDocument();
+  });
+
+  it('renders (view-only) for ReadOnlyAuditor', async () => {
+    renderShell({ route: '/organizacion/voluntariado', ...sessionWith([Role.ReadOnlyAuditor]) });
+    expect(await screen.findByRole('heading', { name: 'Voluntariado' })).toBeInTheDocument();
+  });
+
+  it('denies a role outside VOLUNTEERING_VIEW_ROLES (Operator — not defined by the base document for this module)', async () => {
+    renderShell({ route: '/organizacion/voluntariado', ...sessionWith([Role.Operator]) });
+    expect(await screen.findByText('Sin acceso')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Voluntariado' })).not.toBeInTheDocument();
+  });
+
+  it('denies a Persona (no org role) on the management route', async () => {
+    renderShell({ route: '/organizacion/voluntariado', ...sessionWith([]) });
+    expect(await screen.findByText('Sin acceso')).toBeInTheDocument();
+  });
+
+  it('leaves "Mi voluntariado" (Persona-facing, no @Roles) reachable without an org role', async () => {
+    renderShell({ route: '/voluntariado', ...sessionWith([]) });
+    expect(await screen.findByRole('heading', { name: 'Voluntariado' })).toBeInTheDocument();
+    expect(screen.queryByText('Sin acceso')).not.toBeInTheDocument();
+  });
+});

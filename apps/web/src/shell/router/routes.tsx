@@ -15,6 +15,7 @@ import {
   PLATFORM_DUPLICATES_ROLES,
   RESOURCE_VIEW_ROLES,
   SPONSORSHIP_VIEW_ROLES,
+  VOLUNTEERING_VIEW_ROLES,
 } from '../navigation';
 import { AnimalDetailPage } from '../pages/animal-detail-page';
 import { GeneralPortalPage } from '../../features/catalog';
@@ -32,7 +33,6 @@ import {
   OrgFormalizationPage,
   OrgLegalRepresentativePage,
   OrgProfilePage,
-  OrgVolunteeringPage,
   PlatformDocumentsReviewPage,
   PlatformDuplicatesReviewPage,
 } from '../../features/org';
@@ -77,6 +77,11 @@ import {
 import { DonatePage, ReceivedDonationsPage } from '../../features/donations';
 import { SponsorPage, SponsorshipsPage } from '../../features/sponsorships';
 import { CertificateEmissionPage, CertificateVerificationPage } from '../../features/certificates';
+import {
+  MyVolunteeringPage,
+  VolunteerOpportunitiesPage,
+  VolunteerOpportunityDetailPage,
+} from '../../features/volunteering';
 
 /**
  * Route tree for the shell.
@@ -264,6 +269,12 @@ export function AppRoutes() {
               organizationName]) desde el detalle público de un animal (§M14,
               fuera de alcance de S2-03); sin objetivo, "mis apadrinamientos". */}
           <Route path="apadrinar" element={<SponsorPage />} />
+          {/* M08 (S-6, RF18/RF19) · "Mi voluntariado" — explorar oportunidades,
+              inscribirse, registrar horas y descargar certificados. Mismo
+              SEAM que apadrinamientos/donaciones: ningún endpoint de "mine"
+              lleva `@Roles` (cualquier Persona autenticada), así que la ruta
+              no lleva <RequireRoles>. */}
+          <Route path="voluntariado" element={<MyVolunteeringPage />} />
           {/* M09 · ofrecer ayuda / mis ofertas (F-6). Mismo SEAM que
               donaciones/apadrinamientos: `POST /resources/offers` y
               `GET /resources/offers/mine` no llevan `@Roles` (cualquier
@@ -445,18 +456,32 @@ export function AppRoutes() {
               </RequireRoles>
             }
           />
+          {/* M08 (S-6, RF18/RF19) · voluntariado + servicio social estudiantil —
+              esta era una entrada Fase-12 "ComingSoon" (sin backend); ahora
+              real, gated a VOLUNTEERING_VIEW_ROLES (copiado VERBATIM del
+              controller). `org-volunteering-page.tsx` (features/org) queda sin
+              referenciar — fuera del alcance de archivos de S-6 tocar/eliminar
+              ese módulo ajeno; señalado en el reporte de cierre. */}
+          <Route
+            path="organizacion/voluntariado"
+            element={
+              <RequireRoles roles={VOLUNTEERING_VIEW_ROLES}>
+                <VolunteerOpportunitiesPage />
+              </RequireRoles>
+            }
+          />
+          <Route
+            path="organizacion/voluntariado/:id"
+            element={
+              <RequireRoles roles={VOLUNTEERING_VIEW_ROLES}>
+                <VolunteerOpportunityDetailPage />
+              </RequireRoles>
+            }
+          />
           {/* Fase 12 (REFACTOR-VISUAL v2) · módulos aún no construidos —
               "ComingSoon", sin backend detrás. Gated a ORG_MEMBER_ROLES como
               "Mi organización"/"Formalización": una Persona no tiene org que
               gestionar. */}
-          <Route
-            path="organizacion/voluntariado"
-            element={
-              <RequireRoles roles={ORG_MEMBER_ROLES}>
-                <OrgVolunteeringPage />
-              </RequireRoles>
-            }
-          />
           <Route
             path="organizacion/transparencia-nacional"
             element={

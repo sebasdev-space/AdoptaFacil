@@ -1,3 +1,146 @@
-// Module: volunteering · Owner: @sebastian (Ola 0)
-// TODO: models defined by @sebastian. Every business model MUST carry
-// organization_id and enable RLS following the _rls_probe reference in org.prisma.
+// Module: volunteering (M08) · Owner: @sebastian
+// Voluntariado + servicio social estudiantil (RF18/RF19, §10/§14). An
+// organization publishes VolunteerOpportunity records; a Person (voluntario —
+// same identity model as a sponsor/donor: cross-tenant, never a member of the
+// organization) enrolls, logs ServiceHours sessions, and — once enough
+// APPROVED hours accumulate — receives a VolunteerCertificate. Built from
+// scratch (Ola 3, no prior code to inventory).
+//
+// NOTE (module boundary): `organizationId`/`volunteerUserId` reference
+// `organizations`/`users` (owned by the same developer, different files) as
+// PLAIN SCALARS — no cross-file Prisma @relation, same convention as
+// campaigns→organizations / sponsorships→animals. Those FKs (ON DELETE
+// CASCADE) are declared in this module's own migration SQL; org.prisma is
+// never touched.
+
+/// A volunteering opportunity an organization publishes (RF18, §14). `status`
+/// gates the PUBLIC listing (only `active` opportunities are ever shown there).
+/// `appliesToStudentService` marks whether this counts toward the mandatory
+/// student social service (RF19, Resolución 4210/1996 art. 6°) — set by the
+/// organization at publish time and SNAPSHOTTED onto each VolunteerEnrollment
+/// at signup (a later edit here never reclassifies an existing enrollment).
+/// Tenant-scoped (organization_id + RLS ENABLE+FORCE + tenant_isolation).
+model VolunteerOpportunity {
+  id                       String   @id @default(uuid()) @db.Uuid
+  organizationId           String   @map("organization_id") @db.Uuid
+  title                    String
+  description              String?
+  category                 String
+  startDate                DateTime @map("start_date")
+  endDate                  DateTime @map("end_date")
+  /// Cupo — max enrollments. NULL = no cap.
+  capacity                 Int?
+  location                 String
+  requirements             String?
+  appliesToStudentService  Boolean  @default(false) @map("applies_to_student_service")
+  status                   String   @default("active")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt @map("updated_at")
+
+  enrollments VolunteerEnrollment[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@map("volunteer_opportunities")
+}
+
+/// A Person's (voluntario) enrollment in an opportunity (RF18, §14). Lives in
+/// the OPPORTUNITY's org tenant — the volunteer is not a member of that org,
+/// so creation is cross-tenant (SECURITY DEFINER, same technique as M07
+/// `create_sponsorship`). `appliesToStudentService` is a SNAPSHOT copied from
+/// the opportunity at enrollment time (see that field's own doc comment).
+/// `rejectionReason`/`decidedByUserId`/`decidedAt` are set together, once, by
+/// the org's accept/reject decision — enforced by the service (a reason is
+/// REQUIRED for `rejected`, same criterion as the platform document queue).
+/// One enrollment per (opportunity, volunteer) — no duplicate signups.
+model VolunteerEnrollment {
+  id                      String    @id @default(uuid()) @db.Uuid
+  organizationId          String    @map("organization_id") @db.Uuid
+  opportunityId           String    @map("opportunity_id") @db.Uuid
+  volunteerUserId         String    @map("volunteer_user_id") @db.Uuid
+  /// Snapshotted from `users` AT ENROLLMENT TIME by `create_volunteer_enrollment`
+  /// (SECURITY DEFINER — the volunteer is never a member of this org, so a live
+  /// join is not possible without a cross-tenant lookup). Used for the org's own
+  /// authenticated view AND for notification emails tied to this enrollment
+  /// (accept/reject, hours decisions, certificate) — same "snapshot, not live"
+  /// rationale as `Sponsorship.sponsorName`/`AdoptionRequest.applicant`.
+  volunteerName           String    @map("volunteer_name")
+  volunteerEmail          String    @map("volunteer_email")
+  appliesToStudentService Boolean   @map("applies_to_student_service")
+  status                  String    @default("pending")
+  rejectionReason         String?   @map("rejection_reason")
+  decidedByUserId         String?   @map("decided_by_user_id") @db.Uuid
+  decidedAt               DateTime? @map("decided_at")
+  createdAt               DateTime  @default(now()) @map("created_at")
+
+  opportunity  VolunteerOpportunity  @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  serviceHours ServiceHours[]
+  certificate  VolunteerCertificate?
+
+  @@unique([opportunityId, volunteerUserId])
+  @@index([organizationId])
+  @@index([opportunityId])
+  @@index([volunteerUserId])
+  @@map("volunteer_enrollments")
+}
+
+/// A logged session of hours worked against the volunteer's OWN accepted
+/// enrollment (RF18/RF19, §14). Only `approved` hours ever count as "horas
+/// efectivas" — the single fact this whole module exists to protect (RF19:
+/// "las instituciones no certifican horas parciales"). `volunteerUserId` is
+/// denormalized from the enrollment so the volunteer's own tenant-independent
+/// reads/writes never need a join across the RLS boundary. Money-style
+/// integer conventions do NOT apply here — `hours` is fractional (e.g. 2.5).
+model ServiceHours {
+  id              String    @id @default(uuid()) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  enrollmentId    String    @map("enrollment_id") @db.Uuid
+  volunteerUserId String    @map("volunteer_user_id") @db.Uuid
+  date            DateTime
+  hours           Float
+  description     String
+  status          String    @default("pending")
+  rejectionReason String?   @map("rejection_reason")
+  decidedByUserId String?   @map("decided_by_user_id") @db.Uuid
+  decidedAt       DateTime? @map("decided_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  enrollment VolunteerEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([enrollmentId])
+  @@index([volunteerUserId])
+  @@map("service_hours")
+}
+
+/// Certificate issued by the organization for ONE enrollment (RF18/RF19).
+/// APPEND-ONLY (same convention as `campaign_evidences` post-S-4,
+/// `dian_verification_attempts`, `legal_representatives`): the app role gets
+/// only SELECT+INSERT, and DB triggers reject UPDATE/DELETE/TRUNCATE for every
+/// role — a donor-equivalent (here: a school, or the volunteer themselves)
+/// must be able to trust that an issued certificate never changes. Every
+/// name/hours field is a SNAPSHOT at issuance time (never a live join), same
+/// rationale as `Sponsorship.sponsorName`. One certificate per enrollment
+/// (`@@unique`) — issuing again is not a flow this spec defines (TODO(client)
+/// if a re-issuance/correction need ever materializes).
+model VolunteerCertificate {
+  id                      String   @id @default(uuid()) @db.Uuid
+  organizationId          String   @map("organization_id") @db.Uuid
+  enrollmentId            String   @unique @map("enrollment_id") @db.Uuid
+  volunteerUserId         String   @map("volunteer_user_id") @db.Uuid
+  volunteerName           String   @map("volunteer_name")
+  organizationName        String   @map("organization_name")
+  opportunityTitle        String   @map("opportunity_title")
+  totalApprovedHours      Float    @map("total_approved_hours")
+  periodStart             DateTime @map("period_start")
+  periodEnd               DateTime @map("period_end")
+  appliesToStudentService Boolean  @map("applies_to_student_service")
+  issuedByUserId          String   @map("issued_by_user_id") @db.Uuid
+  issuedAt                DateTime @default(now()) @map("issued_at")
+
+  enrollment VolunteerEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([volunteerUserId])
+  @@map("volunteer_certificates")
+}

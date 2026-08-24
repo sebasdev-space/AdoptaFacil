@@ -14,6 +14,7 @@ export {
   PLATFORM_DUPLICATES_ROLES,
   RESOURCE_VIEW_ROLES,
   SPONSORSHIP_VIEW_ROLES,
+  VOLUNTEERING_VIEW_ROLES,
 } from './nav-items';
 export { NavProvider, useNav } from './nav-context';
 export { BREAKPOINTS, DESKTOP_QUERY, type Breakpoint } from './breakpoints';
