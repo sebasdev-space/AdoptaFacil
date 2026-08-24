@@ -104,4 +104,10 @@ describe('donationConceptLabel', () => {
       'Campaña #c0ffee12',
     );
   });
+
+  it('labels a sponsorship-earmarked donation with a short id (never a fabricated name)', () => {
+    expect(donationConceptLabel({ kind: 'sponsorship', id: 'a1b2c3d4-abcd-4321-9999' })).toBe(
+      'Apadrinamiento #a1b2c3d4',
+    );
+  });
 });

@@ -41,5 +41,7 @@ export function donationConceptLabel(concept: PaymentConcept): string {
       return `Animal ${shortId}`;
     case 'campaign':
       return `Campaña ${shortId}`;
+    case 'sponsorship':
+      return `Apadrinamiento ${shortId}`;
   }
 }

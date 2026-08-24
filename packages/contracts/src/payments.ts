@@ -31,7 +31,7 @@ export type PayoutStatus = 'scheduled' | 'paid' | 'failed';
 export type CommissionPayer = 'organization' | 'donor';
 
 /** What the money is FOR (drives beneficiary/accounting; not a checkout split). */
-export type PaymentConceptKind = 'organization' | 'animal' | 'campaign';
+export type PaymentConceptKind = 'organization' | 'animal' | 'campaign' | 'sponsorship';
 
 export interface PaymentConcept {
   kind: PaymentConceptKind;
