@@ -67,6 +67,27 @@ export const COMMUNITY_MODERATION_ROLES = [Role.PlatformAdmin, Role.PlatformSupe
 export const PLATFORM_REVIEWS_ROLES = [Role.PlatformAdmin, Role.PlatformSuperAdmin] as const;
 
 /**
+ * M13 (S-8, RF24) — "Dashboard de plataforma" (conteos de colas), audiencia
+ * de PLATAFORMA. Copiado VERBATIM del `@Roles` de
+ * `PlatformDashboardController.getAdminSummary` (`GET /platform/dashboard/admin`)
+ * — mismos dos roles que `PLATFORM_DOCUMENTS_ROLES`, declarado aparte por el
+ * mismo criterio del resto de constantes de este archivo.
+ */
+export const PLATFORM_ADMIN_DASHBOARD_ROLES = [
+  Role.PlatformAdmin,
+  Role.PlatformSuperAdmin,
+] as const;
+
+/**
+ * M13 (S-8, RF24) — "Dashboard financiero" (finanzas agregadas + mapa/lista
+ * geográfica), audiencia de PLATAFORMA — SOLO PlatformSuperAdmin. Copiado
+ * VERBATIM del `@Roles` de `PlatformDashboardController.getSuperAdminSummary`
+ * (`GET /platform/dashboard/super-admin`). Un PlatformAdmin normal NO debe
+ * ver cifras financieras agregadas.
+ */
+export const PLATFORM_SUPER_ADMIN_DASHBOARD_ROLES = [Role.PlatformSuperAdmin] as const;
+
+/**
  * S2-01 — reconnects "Campañas" as the INTERNAL management surface at
  * `/organizacion/campanas` (CampaignsPage), not the public portal T-065 pulled it
  * from. Copied VERBATIM from `CampaignsController`'s VIEW_ROLES (GET /campaigns):
@@ -471,5 +492,22 @@ export const navItems: NavItem[] = [
     path: '/resenas',
     label: 'Mis reseñas',
     icon: ChatIcon,
+  },
+  // M13 (S-8, RF24) · dashboards por audiencia de PLATAFORMA — conteos
+  // consolidados de las tres colas ya existentes (documentos, duplicidad,
+  // reseñas). Ruta hermana de las otras vistas /plataforma/*.
+  {
+    path: '/plataforma/dashboard',
+    label: 'Dashboard de plataforma',
+    icon: ShieldIcon,
+    roles: PLATFORM_ADMIN_DASHBOARD_ROLES,
+  },
+  // M13 (S-8, RF24) · dashboard financiero — SOLO PlatformSuperAdmin, nunca
+  // un PlatformAdmin normal (RBAC deny-by-default sobre cifras financieras).
+  {
+    path: '/plataforma/dashboard/financiero',
+    label: 'Dashboard financiero',
+    icon: ShieldIcon,
+    roles: PLATFORM_SUPER_ADMIN_DASHBOARD_ROLES,
   },
 ];

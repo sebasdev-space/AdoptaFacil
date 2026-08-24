@@ -44,3 +44,87 @@ export interface OrganizationDashboardSummary {
    *  puede importar código de `apps/web`. */
   formalizationPercent: number;
 }
+
+// ============================================================================
+// M13, RF24, S-8 — Dashboards de PLATAFORMA (PlatformAdmin/PlatformSuperAdmin).
+// La audiencia Organización es `OrganizationDashboardSummary` arriba (S2-08).
+// Documento base: "Dashboards y analítica — por audiencia (organización, Admin
+// con cola de revisión, SuperAdmin con indicadores financieros y mapa de
+// Colombia, no mapamundi)". Sin serie de tiempo ni analítica histórica en esta
+// primera versión (mismo alcance mínimo de S2-08).
+// ============================================================================
+
+/**
+ * Dashboard de PlatformAdmin (y PlatformSuperAdmin, que ve todo lo de Admin
+ * además de su propio dashboard financiero) — consolida en un solo lugar los
+ * conteos de las TRES colas de moderación que ya existen por separado
+ * (documentos S1-05/S2-06, organizaciones duplicadas S-3, reseñas S-7). Cada
+ * conteo es EXACTAMENTE `.length` de la misma cola que ya expone su propio
+ * endpoint — nunca un recálculo con un filtro distinto, así que este número
+ * siempre coincide con lo que muestra cada cola por separado.
+ */
+export interface PlatformAdminDashboardSummary {
+  /** = `(GET /platform/documents/queue).length` (status IN pending/under_review). */
+  pendingDocuments: number;
+  /** = `(GET /platform/duplicates/queue).length` (status = pending). */
+  pendingDuplicateFlags: number;
+  /** = `(GET /platform/reviews/queue).length` — incluye 'pending' Y 'approved'
+   *  (una reseña aprobada sigue siendo accionable: puede ocultarse tras un
+   *  reporte), MISMO criterio que la propia cola de reseñas, no solo
+   *  `status = 'pending'` en aislamiento. */
+  pendingReviews: number;
+}
+
+/** Un nivel de verificación (0 = ninguno) y cuántas organizaciones lo tienen. */
+export interface OrganizationVerificationLevelCount {
+  level: number;
+  count: number;
+}
+
+/** Un departamento (texto libre, tal como quedó guardado en
+ *  `OrganizationLocation.department`) y cuántas organizaciones lo declaran.
+ *  'Sin especificar' agrupa las que no tienen perfil o no llenaron el campo. */
+export interface OrganizationDepartmentCount {
+  department: string;
+  count: number;
+}
+
+/**
+ * Dashboard de PlatformSuperAdmin — TODO lo de PlatformAdmin más finanzas
+ * agregadas de plataforma y distribución geográfica. Un PlatformAdmin normal
+ * NUNCA ve este tipo (403 a nivel de RBAC, no un campo oculto en el mismo
+ * payload).
+ *
+ * Financiero: suma de `breakdown` (mismo cálculo ya persistido por
+ * `computeBreakdown()`, M15) de TODAS las donaciones aprobadas de TODAS las
+ * organizaciones — nunca una fórmula nueva, solo la suma de lo ya calculado.
+ * IVA de cada comisión va sumado dentro de su propio total
+ * (platformFeeTotal incluye el IVA de la comisión de plataforma; lo mismo
+ * para gatewayFeeTotal), de forma que
+ * `grossTotal === platformFeeTotal + gatewayFeeTotal + netTotal` se mantiene
+ * como identidad verificable también a nivel agregado.
+ *
+ * Geografía: `organizationsByDepartment` es una lista simple (para
+ * lista/gráfico de barras), NO un mapa interactivo de Colombia — el proyecto
+ * no tiene ningún activo geográfico (geojson/SVG/librería de mapas)
+ * disponible; construir uno fiel sin ese activo queda como `TODO(client)`,
+ * tarea de diseño aparte.
+ */
+export interface PlatformSuperAdminDashboardSummary {
+  grossTotal: number;
+  platformFeeTotal: number;
+  gatewayFeeTotal: number;
+  netTotal: number;
+  organizationsByVerificationLevel: OrganizationVerificationLevelCount[];
+  /** Animales activos y en adopción, a nivel de TODA la plataforma (misma
+   *  definición que `OrganizationDashboardSummary.animalsActive`). */
+  activeAnimals: number;
+  /** Solicitudes de adopción con status 'approved' — primer conteo de este
+   *  dato en el proyecto (no existía antes ni a nivel de organización). */
+  totalAdoptions: number;
+  /** Campañas con status 'active', a nivel de plataforma. */
+  activeCampaigns: number;
+  /** Apadrinamientos con status 'active', a nivel de plataforma. */
+  activeSponsorships: number;
+  organizationsByDepartment: OrganizationDepartmentCount[];
+}

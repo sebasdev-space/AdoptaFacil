@@ -12,5 +12,9 @@ import { ReviewsService } from './reviews.service';
   imports: [AuthModule],
   controllers: [ReviewsController, PlatformReviewsController, PublicReputationController],
   providers: [ReviewsService, PlatformReviewsService, PublicReputationService],
+  // M13 (S-8): the platform dashboard reuses `.queue().length` for its
+  // "pending reviews" count instead of a parallel query — same reasoning as
+  // OrgModule's exports.
+  exports: [PlatformReviewsService],
 })
 export class ReputationModule {}

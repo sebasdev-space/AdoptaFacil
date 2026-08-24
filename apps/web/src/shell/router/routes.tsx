@@ -11,9 +11,11 @@ import {
   MARKETPLACE_VIEW_ROLES,
   ORG_DOCUMENTS_ROLES,
   ORG_MEMBER_ROLES,
+  PLATFORM_ADMIN_DASHBOARD_ROLES,
   PLATFORM_DOCUMENTS_ROLES,
   PLATFORM_DUPLICATES_ROLES,
   PLATFORM_REVIEWS_ROLES,
+  PLATFORM_SUPER_ADMIN_DASHBOARD_ROLES,
   RESOURCE_VIEW_ROLES,
   SPONSORSHIP_VIEW_ROLES,
   VOLUNTEERING_VIEW_ROLES,
@@ -34,9 +36,11 @@ import {
   OrgFormalizationPage,
   OrgLegalRepresentativePage,
   OrgProfilePage,
+  PlatformAdminDashboardPage,
   PlatformDocumentsReviewPage,
   PlatformDuplicatesReviewPage,
   PlatformReviewsReviewPage,
+  PlatformSuperAdminDashboardPage,
 } from '../../features/org';
 import {
   OrgPublicPage,
@@ -521,6 +525,24 @@ export function AppRoutes() {
               no tiene gate de rol, así que esta ruta tampoco lleva
               <RequireRoles>, mismo criterio que "Mi voluntariado". */}
           <Route path="resenas" element={<MyReviewsPage />} />
+          {/* M13 (S-8, RF24) · dashboards por audiencia de PLATAFORMA — la
+              audiencia Organización ya vive en /organizacion/* (S2-08). */}
+          <Route
+            path="plataforma/dashboard"
+            element={
+              <RequireRoles roles={PLATFORM_ADMIN_DASHBOARD_ROLES}>
+                <PlatformAdminDashboardPage />
+              </RequireRoles>
+            }
+          />
+          <Route
+            path="plataforma/dashboard/financiero"
+            element={
+              <RequireRoles roles={PLATFORM_SUPER_ADMIN_DASHBOARD_ROLES}>
+                <PlatformSuperAdminDashboardPage />
+              </RequireRoles>
+            }
+          />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Route>
