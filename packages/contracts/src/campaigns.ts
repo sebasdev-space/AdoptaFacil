@@ -149,13 +149,17 @@ export interface CampaignFundingReconcileResult {
 }
 
 // ============================================================================
-// Accountability / rendición de cuentas (RF16, §9 M06) — T-054. An organization
-// uploads spending evidences (invoices/receipts/proofs/photos) against a
-// campaign; the public accountability report shows what was spent, with the
-// evidences. Files go through StoragePort as PUBLIC objects (the donor must see
-// them). Amounts are INTEGER COP pesos. This slice does NOT wire real raised
-// amounts (that is T-055): the report shows declared spending only, never a
-// fabricated "executed %" against a still-zero raised amount.
+// Accountability / rendición de cuentas (RF16, §9 M06) — T-054, hardened to
+// append-only immutable in S-4. An organization uploads spending evidences
+// (invoices/receipts/proofs/photos) against a campaign; the public
+// accountability report shows the campaign (goal + raised, from T-055 — the
+// SAME `raisedAmount` exposed everywhere else, never recomputed), its
+// evidences, and the SUM of declared spending. Files go through StoragePort as
+// PUBLIC objects (the donor must see them). Amounts are INTEGER COP pesos.
+// Once published, an evidence can never be edited or removed (S-4) — there is
+// deliberately no update/patch input here; the DB rejects UPDATE/DELETE
+// unconditionally. No correction/replacement flow exists — TODO(client) if the
+// client ever asks to invalidate/replace a published evidence.
 // ============================================================================
 
 /**
@@ -184,6 +188,7 @@ export const CAMPAIGN_EVIDENCE_TYPES: readonly CampaignEvidenceType[] = [
  * A spending evidence attached to a campaign (internal projection). `amount` is
  * integer COP pesos and OPTIONAL (a photo may carry no monetary value).
  * `storageRef` is the opaque public storage key; timestamps are ISO-8601 UTC.
+ * IMMUTABLE once created (S-4) — there is no update input for this type.
  */
 export interface CampaignEvidence {
   id: string;
@@ -217,15 +222,6 @@ export interface CreateCampaignEvidenceInput {
   order?: number;
 }
 
-/** Patch a spending evidence (business fields only; the file is immutable). */
-export interface UpdateCampaignEvidenceInput {
-  type?: CampaignEvidenceType;
-  concept?: string;
-  amount?: number;
-  spentAt?: string;
-  order?: number;
-}
-
 /** Returned on evidence creation: the row plus the target to PUT the bytes to. */
 export interface CampaignEvidenceUploadResult {
   evidence: CampaignEvidence;
@@ -249,10 +245,11 @@ export interface CampaignEvidencePublic {
 }
 
 /**
- * Public accountability report of a campaign (RF16): the public campaign, its
- * public evidences, and the SUM of declared spending (integer COP). Never
- * exposes internal data nor evidences of cancelled campaigns. It does NOT claim
- * an "executed %" — the relation to raised funds is wired in T-055.
+ * Public accountability report of a campaign (RF16): the public campaign
+ * (`campaign.goalAmount`/`campaign.raisedAmount` — the exact same figures
+ * shown everywhere else a `CampaignPublic` is returned, e.g. the public
+ * catalog), its public evidences, and the SUM of declared spending (integer
+ * COP). Never exposes internal data nor evidences of cancelled campaigns.
  */
 export interface CampaignAccountabilityReport {
   campaign: CampaignPublic;

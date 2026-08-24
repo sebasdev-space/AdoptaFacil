@@ -59,32 +59,36 @@ model CampaignFundingApplication {
   @@map("campaign_funding_applications")
 }
 
-/// Spending evidence for accountability (RF16, §9 M06 · T-054): invoices,
-/// receipts, proofs and photos an org uploads to show HOW campaign money was
-/// used. Tenant-scoped (organization_id + RLS ENABLE+FORCE + tenant_isolation).
-/// Money in INTEGER COP pesos (`amount` optional — a photo may carry none). Files
-/// go through StoragePort as PUBLIC objects (donor must see them); only the
-/// storage ref + business metadata live here. Soft-managed via `deleted_at`
-/// (never physically deleted by the app role); edits/removals are audited.
-/// Public exposure goes through a SECURITY DEFINER function (public columns
-/// only), never a raw cross-tenant select.
+/// Spending evidence for accountability (RF16, §9 M06 · T-054, hardened to
+/// append-only immutable in S-4): invoices, receipts, proofs and photos an org
+/// uploads to show HOW campaign money was used. Tenant-scoped (organization_id
+/// + RLS ENABLE+FORCE + tenant_isolation). Money in INTEGER COP pesos (`amount`
+/// optional — a photo may carry none). Files go through StoragePort as PUBLIC
+/// objects (donor must see them); only the storage ref + business metadata
+/// live here. APPEND-ONLY (S-4, RF16): a donor must be able to trust that a
+/// published evidence never changes after they looked at it — the app role can
+/// only SELECT+INSERT (T-054's original UPDATE grant + soft-delete via
+/// `deleted_at` were removed), and DB triggers reject UPDATE/DELETE/TRUNCATE
+/// for every role, same convention as `formalization_transitions`/
+/// `dian_verification_attempts`/`legal_representatives`. No correction/
+/// replacement flow exists for a publishing mistake — TODO(client) if the
+/// client ever asks for one. Public exposure goes through a SECURITY DEFINER
+/// function (public columns only), never a raw cross-tenant select.
 ///
 /// NOTE (module boundary): the campaign FK is a Prisma @relation (intra-module);
 /// the FK to `organizations` is declared in the T-054 migration SQL (not as a
 /// @relation) to avoid editing org.prisma — another owner's file.
 model CampaignEvidence {
-  id             String    @id @default(uuid()) @db.Uuid
-  organizationId String    @map("organization_id") @db.Uuid
-  campaignId     String    @map("campaign_id") @db.Uuid
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  campaignId     String   @map("campaign_id") @db.Uuid
   type           String
   concept        String
   amount         Int?
-  spentAt        DateTime  @map("spent_at")
-  storageRef     String    @map("storage_ref")
-  order          Int       @default(0)
-  deletedAt      DateTime? @map("deleted_at")
-  createdAt      DateTime  @default(now()) @map("created_at")
-  updatedAt      DateTime  @updatedAt @map("updated_at")
+  spentAt        DateTime @map("spent_at")
+  storageRef     String   @map("storage_ref")
+  order          Int      @default(0)
+  createdAt      DateTime @default(now()) @map("created_at")
 
   campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 

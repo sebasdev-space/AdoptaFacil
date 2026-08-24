@@ -6,7 +6,6 @@ import {
   type CampaignEvidenceUploadResult,
   type CreateCampaignEvidenceInput,
   type Paginated,
-  type UpdateCampaignEvidenceInput,
 } from '@adoptafacil/contracts';
 import { AuditService } from '../../core/audit/audit.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -30,11 +29,14 @@ function toEvidence(row: EvidenceRow): CampaignEvidence {
 }
 
 /**
- * Accountability evidences (RF16 · T-054). Tenant-scoped (RLS): an org only ever
- * touches its OWN campaigns' evidences. Files are reserved through StoragePort as
- * PUBLIC objects (the donor must see them); only the storage ref + business
- * metadata are persisted. Removal is logical (deleted_at); every mutation is
- * audited (append-only, UTC). No money is raised/executed here (that is T-055).
+ * Accountability evidences (RF16 · T-054, hardened to append-only immutable in
+ * S-4). Tenant-scoped (RLS): an org only ever touches its OWN campaigns'
+ * evidences. Files are reserved through StoragePort as PUBLIC objects (the
+ * donor must see them); only the storage ref + business metadata are
+ * persisted. A published evidence can never be edited or removed — the DB
+ * rejects UPDATE/DELETE/TRUNCATE unconditionally (see the S-4 migration) — so
+ * this service exposes only `create`/`list`. Every upload is audited
+ * (append-only, UTC). No money is raised/executed here (that is T-055).
  */
 @Injectable()
 export class CampaignEvidencesService {
@@ -104,7 +106,7 @@ export class CampaignEvidencesService {
     });
   }
 
-  /** Paginated list of a campaign's (non-deleted) evidences, by display order. */
+  /** Paginated list of a campaign's evidences, by display order. */
   async list(
     campaignId: string,
     limit: number,
@@ -114,7 +116,7 @@ export class CampaignEvidencesService {
     const take = clampLimit(limit);
     const skip = Math.max(offset || 0, 0);
     return this.prisma.withOrgContext(organizationId, async (tx) => {
-      const where = { campaignId, deletedAt: null };
+      const where = { campaignId };
       const [rows, total] = await Promise.all([
         tx.campaignEvidence.findMany({
           where,
@@ -125,60 +127,6 @@ export class CampaignEvidencesService {
         tx.campaignEvidence.count({ where }),
       ]);
       return { items: rows.map(toEvidence), total, limit: take, offset: skip };
-    });
-  }
-
-  /** Patch an evidence's business fields; audited. */
-  async update(
-    actorUserId: string,
-    campaignId: string,
-    id: string,
-    input: UpdateCampaignEvidenceInput,
-  ): Promise<CampaignEvidence> {
-    const organizationId = this.requireOrgId();
-    return this.prisma.withOrgContext(organizationId, async (tx) => {
-      const existing = await tx.campaignEvidence.findUnique({ where: { id } });
-      if (!existing || existing.campaignId !== campaignId || existing.deletedAt) {
-        throw new NotFoundException('Evidence not found');
-      }
-      const updated = await tx.campaignEvidence.update({
-        where: { id },
-        data: {
-          type: input.type,
-          concept: input.concept,
-          amount: input.amount,
-          spentAt: input.spentAt ? new Date(input.spentAt) : undefined,
-          order: input.order,
-        },
-      });
-      await this.audit.recordWithTx(tx, {
-        organizationId,
-        actorUserId,
-        action: 'campaign.evidence_updated',
-        entityType: 'campaign_evidence',
-        entityId: id,
-        metadata: { fields: Object.keys(input) },
-      });
-      return toEvidence(updated);
-    });
-  }
-
-  /** Logical removal (deleted_at); audited. Never a physical DELETE. */
-  async remove(actorUserId: string, campaignId: string, id: string): Promise<void> {
-    const organizationId = this.requireOrgId();
-    await this.prisma.withOrgContext(organizationId, async (tx) => {
-      const existing = await tx.campaignEvidence.findUnique({ where: { id } });
-      if (!existing || existing.campaignId !== campaignId || existing.deletedAt) {
-        throw new NotFoundException('Evidence not found');
-      }
-      await tx.campaignEvidence.update({ where: { id }, data: { deletedAt: new Date() } });
-      await this.audit.recordWithTx(tx, {
-        organizationId,
-        actorUserId,
-        action: 'campaign.evidence_removed',
-        entityType: 'campaign_evidence',
-        entityId: id,
-      });
     });
   }
 }

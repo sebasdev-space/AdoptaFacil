@@ -75,7 +75,7 @@ function stubFetch(handler: (url: string, init?: RequestInit) => unknown) {
   );
 }
 
-/** Routes by URL/method: campaign GET/PATCH, evidences list/POST/PATCH/DELETE, storage PUT. */
+/** Routes by URL/method: campaign GET/PATCH, evidences list/POST, storage PUT. */
 function stubCampaignApi({
   campaign = CAMPAIGN,
   evidences = [EVIDENCE],
@@ -95,7 +95,6 @@ function stubCampaignApi({
           upload: { url: 'http://localhost:3000/storage/upload?key=k2', key: 'k2' },
         };
       }
-      if (method === 'PATCH' || method === 'DELETE') return {};
       return { items: evidences, total: evidences.length, limit: 50, offset: 0 };
     }
     if (method === 'PATCH') return { ...campaign, ...JSON.parse(String(init?.body ?? '{}')) };
@@ -128,7 +127,6 @@ describe('CampaignDetailPage (S2-01)', () => {
     await screen.findByText('Compra de insumos quirúrgicos');
     expect(screen.queryByRole('heading', { name: 'Editar campaña' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Agregar evidencia' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument();
   });
 
   it('saves an edit via PATCH and toasts success', async () => {
@@ -172,51 +170,19 @@ describe('CampaignDetailPage (S2-01)', () => {
     expect(await screen.findByText('Evidencia agregada')).toBeInTheDocument();
   });
 
-  it('blocks saving an evidence edit with an invalid amount — never sends the PATCH (regression: previously reached the backend as a raw NaN/decimal and only surfaced its unfriendly 400)', async () => {
-    const calls = stubCampaignApi();
+  it('S-4: an evidence has no Editar/Eliminar controls — once published it is immutable', async () => {
+    stubCampaignApi();
     renderShell({ route: '/organizacion/campanas/c1', ...sessionWith([Role.Owner]) });
 
     const row = (await screen.findByText('Compra de insumos quirúrgicos')).closest('li');
-    fireEvent.click(within(row as HTMLElement).getByRole('button', { name: 'Editar' }));
-
-    const amountInput = screen.getByLabelText('Monto (COP)');
-    fireEvent.change(amountInput, { target: { value: '12.5' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
-
     expect(
-      await screen.findByText('El monto (si lo indicas) debe ser un entero COP mayor a 0.'),
+      within(row as HTMLElement).queryByRole('button', { name: 'Editar' }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(row as HTMLElement).queryByRole('button', { name: 'Eliminar' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Una vez publicada, una evidencia no se puede editar ni eliminar/),
     ).toBeInTheDocument();
-    expect(amountInput).toHaveAttribute('aria-invalid', 'true');
-    // The invalid amount never left the browser as a PATCH request.
-    expect(calls.some((c) => c.init?.method === 'PATCH' && c.url.includes('/evidences/e1'))).toBe(
-      false,
-    );
-
-    // Fixing the value clears the error and the PATCH goes through normally.
-    fireEvent.change(amountInput, { target: { value: '75000' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar' }));
-
-    await waitFor(() => {
-      const patch = calls.find(
-        (c) => c.init?.method === 'PATCH' && c.url.includes('/evidences/e1'),
-      );
-      expect(patch).toBeDefined();
-      expect(JSON.parse(String(patch?.init?.body)).amount).toBe(75000);
-    });
-  });
-
-  it('deletes an evidence and toasts success', async () => {
-    const calls = stubCampaignApi();
-    renderShell({ route: '/organizacion/campanas/c1', ...sessionWith([Role.Owner]) });
-
-    const row = (await screen.findByText('Compra de insumos quirúrgicos')).closest('li');
-    fireEvent.click(within(row as HTMLElement).getByRole('button', { name: 'Eliminar' }));
-
-    await waitFor(() => {
-      expect(
-        calls.some((c) => c.init?.method === 'DELETE' && c.url.includes('/evidences/e1')),
-      ).toBe(true);
-    });
-    expect(await screen.findByText('Evidencia eliminada')).toBeInTheDocument();
   });
 });
