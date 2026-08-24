@@ -19,6 +19,8 @@ model Organization {
   documents                OrganizationDocument[]
   legalRepresentatives     LegalRepresentative[]
   dianVerificationAttempts DianVerificationAttempt[]
+  duplicateFlagsAsFlagged  OrganizationDuplicateFlag[] @relation("OrganizationDuplicateFlagsFlagged")
+  duplicateFlagsAsMatched  OrganizationDuplicateFlag[] @relation("OrganizationDuplicateFlagsMatched")
 
   @@map("organizations")
 }
@@ -360,6 +362,40 @@ model DianVerificationAttempt {
   @@index([organizationId])
   @@index([organizationId, createdAt])
   @@map("dian_verification_attempts")
+}
+
+/// Flagged possible duplicate organization (M01, S-3 — risk-table §16
+/// "Captación ilegal / LA-FT" mitigation; no explicit RF). ONLY `similar_name`
+/// matches ever produce a row here — an exact NIT match is a hard block at
+/// write time (409), never persisted as a row needing review. RLS ENABLE+
+/// FORCE + tenant_isolation on `organizationId` (the FLAGGED org), same as
+/// every business table; PlatformAdmin/PlatformSuperAdmin review it
+/// cross-tenant through bounded SECURITY DEFINER functions, mirroring
+/// `platform_document_queue`/`platform_document_decide` (T-103). Immutable
+/// after a decision — the app role may only SELECT+INSERT; the single
+/// pending→dismissed/confirmed UPDATE happens only inside
+/// `platform_duplicate_flag_decide`, and a DB trigger then freezes the row
+/// forever (same "one decision update, then frozen" convention as
+/// `organization_documents`, RNF05). `similarityScore` is the pg_trgm score at
+/// flag-creation time (0..1).
+model OrganizationDuplicateFlag {
+  id                    String    @id @default(uuid()) @db.Uuid
+  organizationId        String    @map("organization_id") @db.Uuid
+  matchedOrganizationId String    @map("matched_organization_id") @db.Uuid
+  matchType             String    @map("match_type")
+  similarityScore       Float?    @map("similarity_score")
+  status                String    @default("pending")
+  decidedByUserId       String?   @map("decided_by_user_id") @db.Uuid
+  decidedAt             DateTime? @map("decided_at")
+  createdAt             DateTime  @default(now()) @map("created_at")
+
+  organization        Organization @relation("OrganizationDuplicateFlagsFlagged", fields: [organizationId], references: [id], onDelete: Cascade)
+  matchedOrganization  Organization @relation("OrganizationDuplicateFlagsMatched", fields: [matchedOrganizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([matchedOrganizationId])
+  @@index([status])
+  @@map("organization_duplicate_flags")
 }
 
 /// Canonical Row-Level Security reference — HARNESS ONLY, not a business table.

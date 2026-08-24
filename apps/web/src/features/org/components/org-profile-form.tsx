@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import type {
   Organization,
+  OrganizationDuplicateWarning,
   OrganizationExtendedContact,
   UpdateOrganizationProfileInput,
 } from '@adoptafacil/contracts';
@@ -367,6 +368,12 @@ export const OrgProfileForm = forwardRef<OrgProfileFormHandle, OrgProfileFormPro
     const [form, setForm] = useState<FormState>(() => initialState(initial));
     const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
     const [saving, setSaving] = useState(false);
+    // S-3: matches surfaced on the LAST save whose new/edited name resembled
+    // an existing organization — never blocks the save, just asks the user to
+    // confirm it isn't an accidental duplicate. Cleared on the next attempt.
+    const [duplicateWarning, setDuplicateWarning] = useState<OrganizationDuplicateWarning | null>(
+      null,
+    );
     // A department's city list is a short, known set (see colombian-locations.ts);
     // "custom" tracks whether the CITY select shows the free-text fallback. Derived
     // once from the loaded record so pre-existing data outside the static catalog
@@ -445,6 +452,7 @@ export const OrgProfileForm = forwardRef<OrgProfileFormHandle, OrgProfileFormPro
           method: 'PUT',
           json: buildPayload(form),
         });
+        setDuplicateWarning(updated.duplicateWarning ?? null);
         toast({
           title: 'Cambios guardados correctamente',
           description: 'Tu perfil institucional se actualizó.',
@@ -481,6 +489,19 @@ export const OrgProfileForm = forwardRef<OrgProfileFormHandle, OrgProfileFormPro
         />
 
         <OrgTabPanel value="institucional" activeValue={activeTab}>
+          {duplicateWarning && duplicateWarning.matches.length > 0 && (
+            <div role="status" className={styles['duplicate-warning']}>
+              <p className={styles['duplicate-warning__title']}>
+                Encontramos organizaciones con un nombre parecido. Se guardó igual — confirma que no
+                se trata de un duplicado accidental:
+              </p>
+              <ul className={styles['duplicate-warning__list']}>
+                {duplicateWarning.matches.map((match) => (
+                  <li key={match.organizationId}>{match.organizationName}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           <div className="grid gap-4 md:grid-cols-2">
             <OrgTextField
               id="org-name"

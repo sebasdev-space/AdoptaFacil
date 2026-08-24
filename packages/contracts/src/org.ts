@@ -42,6 +42,10 @@ export interface Organization {
   aboutUs?: string;
   /** Structured contact detail for the public portal's "Información" tab. */
   extendedContact?: OrganizationExtendedContact;
+  /** Present ONLY in the `PUT /org/profile` response right after a save whose
+   *  new/edited name matched an existing organization above the similarity
+   *  threshold (S-3) — never persisted, never returned by a plain `GET`. */
+  duplicateWarning?: OrganizationDuplicateWarning;
 
   // --- Public portal (M14, additive) -----------------------------------------
   /** Subdomain for the org portal, e.g. `patitaspeludas` in
@@ -583,4 +587,71 @@ export interface LegalRepresentativeSummary {
   position: string;
   signatureFileRef: string;
   signatureHash: string;
+}
+
+// ============================================================================
+// Organization duplicate detection (M01, S-3). No explicit RF in the base
+// document — this exists to mitigate the risk-table §16 "Captación ilegal /
+// LA-FT" entry (KYC básico, cribado en listas) plus basic data hygiene: the
+// NIT is a unique legal identifier in Colombia (same reference as S-1/RF14,
+// art. 125-3 ET). Two INDEPENDENT signals, deliberately asymmetric:
+//   - Exact NIT match  → a HARD rule. Blocks the save outright (409) — no
+//     review needed, it is by definition a data error or a duplicate attempt.
+//   - Similar name      → NEVER blocks (avoids false positives — e.g. two
+//     unrelated foundations with similar names in different cities). Only
+//     warns the submitter and queues an `OrganizationDuplicateFlag` for
+//     PlatformAdmin/PlatformSuperAdmin review.
+// ============================================================================
+
+export interface OrganizationDuplicateMatch {
+  organizationId: string;
+  organizationName: string;
+  /** 0..1 trigram similarity score (`pg_trgm`). */
+  similarityScore: number;
+}
+
+/** See {@link Organization.duplicateWarning}. */
+export interface OrganizationDuplicateWarning {
+  matches: OrganizationDuplicateMatch[];
+}
+
+/**
+ * `exact_nit` is a HARD block (see above) — a row of this match type could
+ * only ever exist if it were recorded for audit purposes, which this spec
+ * does not do (the save never completes, so there is no organization state
+ * to attach a review flag to). Only `similar_name` is produced today; the
+ * enum keeps room for a future signal without another migration.
+ */
+export type OrganizationDuplicateMatchType = 'exact_nit' | 'similar_name';
+
+export type OrganizationDuplicateFlagStatus = 'pending' | 'dismissed' | 'confirmed';
+
+/**
+ * A flagged possible duplicate, queued for PlatformAdmin/PlatformSuperAdmin
+ * review — cross-tenant, RLS-isolated at the table level and reachable only
+ * through the platform review endpoints (same shape convention as
+ * {@link DocumentReviewQueueItem}). The base document does not define what
+ * happens operationally once a duplicate is `confirmed` (suspend the newer
+ * org? contact both?) — TODO(client); this only records the decision.
+ */
+export interface OrganizationDuplicateFlag {
+  id: string;
+  organizationId: string;
+  organizationName: string;
+  matchedOrganizationId: string;
+  matchedOrganizationName: string;
+  matchType: OrganizationDuplicateMatchType;
+  similarityScore?: number;
+  status: OrganizationDuplicateFlagStatus;
+  decidedByUserId?: string;
+  /** ISO-8601 UTC. */
+  decidedAt?: string;
+  /** ISO-8601 UTC. */
+  createdAt: string;
+}
+
+export type ReviewOrganizationDuplicateDecision = 'dismiss' | 'confirm';
+
+export interface ReviewOrganizationDuplicateInput {
+  decision: ReviewOrganizationDuplicateDecision;
 }

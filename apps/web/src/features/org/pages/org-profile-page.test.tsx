@@ -229,6 +229,28 @@ describe('OrgProfilePage — hub central en tabs (S2-VISUAL-TABS)', () => {
     });
   });
 
+  it('S-3: shows the similar-organization warning inline after saving, without blocking the save', async () => {
+    stubFetch((_url, init) => {
+      if (init?.method === 'PUT') {
+        return {
+          ...BASE_ORG,
+          duplicateWarning: {
+            matches: [{ organizationId: 'org-2', organizationName: 'Refugio Patitas Felises' }],
+          },
+        };
+      }
+      return BASE_ORG;
+    });
+    renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
+    await screen.findByRole('heading', { name: 'Perfil de la organización' });
+
+    expect(screen.queryByText('Refugio Patitas Felises')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Guardar cambios/ }));
+
+    // The save still succeeds — the warning never blocks it.
+    expect(await screen.findByText('Refugio Patitas Felises')).toBeInTheDocument();
+  });
+
   describe('Dirección de tu portal público (antes "slug") — UX de errores/validación', () => {
     it('no muestra la palabra "Slug" — usa un label entendible, con vista previa del enlace en vivo', async () => {
       renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });

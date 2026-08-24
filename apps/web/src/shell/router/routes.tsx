@@ -12,6 +12,7 @@ import {
   ORG_DOCUMENTS_ROLES,
   ORG_MEMBER_ROLES,
   PLATFORM_DOCUMENTS_ROLES,
+  PLATFORM_DUPLICATES_ROLES,
   RESOURCE_VIEW_ROLES,
   SPONSORSHIP_VIEW_ROLES,
 } from '../navigation';
@@ -33,6 +34,7 @@ import {
   OrgProfilePage,
   OrgVolunteeringPage,
   PlatformDocumentsReviewPage,
+  PlatformDuplicatesReviewPage,
 } from '../../features/org';
 import {
   OrgPublicPage,
@@ -419,6 +421,17 @@ export function AppRoutes() {
             element={
               <RequireRoles roles={PLATFORM_DOCUMENTS_ROLES}>
                 <PlatformDocumentsReviewPage />
+              </RequireRoles>
+            }
+          />
+          {/* M01, S-3 · organizaciones posiblemente duplicadas (nombre similar),
+              ruta hermana de la revisión de documentos. Audiencia de PLATAFORMA
+              — denegada a roles de organización. */}
+          <Route
+            path="plataforma/organizaciones-duplicadas"
+            element={
+              <RequireRoles roles={PLATFORM_DUPLICATES_ROLES}>
+                <PlatformDuplicatesReviewPage />
               </RequireRoles>
             }
           />

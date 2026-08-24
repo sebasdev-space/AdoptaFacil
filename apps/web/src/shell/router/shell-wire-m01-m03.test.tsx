@@ -69,6 +69,12 @@ const SURFACES = [
     heading: 'Revisión de documentos',
     allow: Role.PlatformAdmin,
   },
+  {
+    name: 'organizaciones duplicadas (S-3)',
+    route: '/plataforma/organizaciones-duplicadas',
+    heading: 'Organizaciones duplicadas',
+    allow: Role.PlatformAdmin,
+  },
 ] as const;
 
 describe('T-031 · route guards (deny-by-default)', () => {
@@ -122,6 +128,9 @@ describe('T-031 · menu reflects the role (first barrier)', () => {
         within(nav()).getByRole('link', { name: 'Revisión de documentos' }),
       ).toBeInTheDocument(),
     );
+    expect(
+      within(nav()).getByRole('link', { name: 'Organizaciones duplicadas' }),
+    ).toBeInTheDocument();
     expect(within(nav()).queryByRole('link', { name: 'Animales' })).not.toBeInTheDocument();
     expect(within(nav()).queryByRole('link', { name: 'Documentos' })).not.toBeInTheDocument();
   });

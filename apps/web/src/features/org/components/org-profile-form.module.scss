@@ -24,6 +24,28 @@
   margin-top: 0.5rem;
 }
 
+// S-3: aviso de posible organización duplicada (por nombre similar) — nunca
+// bloquea el guardado, solo pide confirmar que no es un duplicado accidental.
+// Mismos colores que Badge's status-pill--warning (packages/ui).
+.duplicate-warning {
+  background-color: #fef3e2;
+  color: #b45309;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  font-size: var(--fs-sm);
+}
+
+.duplicate-warning__title {
+  font-weight: var(--fw-semibold);
+  margin: 0 0 0.375rem;
+}
+
+.duplicate-warning__list {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
 .org-form__field {
   display: flex;
   flex-direction: column;

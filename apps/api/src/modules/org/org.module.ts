@@ -7,6 +7,7 @@ import { DianVerificationService } from './dian-verification.service';
 import { DIAN_PORT } from './dian.port';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
+import { DuplicateDetectionService } from './duplicate-detection.service';
 import { FakeDianAdapter } from './fake-dian.adapter';
 import { FormalizationController } from './formalization.controller';
 import { FormalizationService } from './formalization.service';
@@ -22,6 +23,8 @@ import { OrganizationSummaryController } from './organization-summary.controller
 import { OrganizationSummaryService } from './organization-summary.service';
 import { PlatformDocumentsController } from './platform-documents.controller';
 import { PlatformDocumentsService } from './platform-documents.service';
+import { PlatformDuplicatesController } from './platform-duplicates.controller';
+import { PlatformDuplicatesService } from './platform-duplicates.service';
 import { PlatformSettingsController } from './platform-settings.controller';
 import { PlatformSettingsService } from './platform-settings.service';
 
@@ -45,12 +48,15 @@ import { PlatformSettingsService } from './platform-settings.service';
     LegalRepresentativeController,
     OrganizationSummaryController,
     PlatformDocumentsController,
+    PlatformDuplicatesController,
     PlatformSettingsController,
   ],
   providers: [
     OrgProfileService,
     FormalizationService,
     DocumentsService,
+    DuplicateDetectionService,
+    PlatformDuplicatesService,
     LegalRepresentativeService,
     { provide: LEGAL_REPRESENTATIVE_CONFIG, useFactory: loadLegalRepresentativeConfig },
     OrganizationSummaryService,
