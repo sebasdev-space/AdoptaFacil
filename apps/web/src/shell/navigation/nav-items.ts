@@ -36,6 +36,16 @@ export const ORG_DOCUMENTS_ROLES = [Role.Owner, Role.Administrator, Role.ReadOnl
 export const PLATFORM_DOCUMENTS_ROLES = [Role.PlatformAdmin, Role.PlatformSuperAdmin] as const;
 
 /**
+ * M01, S-3 — "Organizaciones duplicadas", audiencia de PLATAFORMA. Copiado
+ * VERBATIM del `@Roles` de `PlatformDuplicatesController`
+ * (`GET /platform/duplicates/queue`) — mismos dos roles que
+ * `PLATFORM_DOCUMENTS_ROLES`, declarado aparte porque es el @Roles de un
+ * endpoint DISTINTO (mismo criterio que el resto de constantes de este
+ * archivo).
+ */
+export const PLATFORM_DUPLICATES_ROLES = [Role.PlatformAdmin, Role.PlatformSuperAdmin] as const;
+
+/**
  * F-8 (M11, comunidad) — "Moderación de comunidad", audiencia de PLATAFORMA.
  * Copiado VERBATIM del `@Roles` de `CommunityModerationController`
  * (`GET /platform/community/posts`) — mismos dos roles que
@@ -396,6 +406,15 @@ export const navItems: NavItem[] = [
     label: 'Revisión de documentos',
     icon: ShieldIcon,
     roles: PLATFORM_DOCUMENTS_ROLES,
+  },
+  // M01, S-3 · organizaciones posiblemente duplicadas (mitigación de riesgo
+  // "Captación ilegal / LA-FT", §16). Audiencia de PLATAFORMA — ruta hermana
+  // de la revisión de documentos, misma zona.
+  {
+    path: '/plataforma/organizaciones-duplicadas',
+    label: 'Organizaciones duplicadas',
+    icon: AlertTriangleIcon,
+    roles: PLATFORM_DUPLICATES_ROLES,
   },
   // M11 · moderación básica de la comunidad, audiencia de PLATAFORMA (F-8).
   {

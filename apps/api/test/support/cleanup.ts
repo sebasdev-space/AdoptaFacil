@@ -23,6 +23,11 @@ import type { PrismaClient } from '@prisma/client';
 // (immutability trigger rejects removal for every role, incl. superuser).
 // legal_representatives (M01, S-1, RNF10) and dian_verification_attempts
 // (M01, S-2, RNF07) are append-only the same way too.
+// organization_duplicate_flags (M01, S-3) is append-only-after-decision the
+// same way as organization_documents — AND has a SECOND org-referencing
+// column (matched_organization_id, the OTHER organization in the match) not
+// covered by the generic organization_id-only loop below, so it gets an
+// extra explicit delete for that column too (still inside replica mode).
 const APPEND_ONLY_TABLES = [
   'audit_logs',
   'formalization_transitions',
@@ -33,6 +38,7 @@ const APPEND_ONLY_TABLES = [
   'sponsorship_status_history',
   'legal_representatives',
   'dian_verification_attempts',
+  'organization_duplicate_flags',
 ];
 
 export async function purgeOrganizations(
@@ -48,6 +54,12 @@ export async function purgeOrganizations(
       for (const id of organizationIds) {
         await tx.$executeRawUnsafe(`DELETE FROM ${table} WHERE organization_id = $1::uuid`, id);
       }
+    }
+    for (const id of organizationIds) {
+      await tx.$executeRawUnsafe(
+        `DELETE FROM organization_duplicate_flags WHERE matched_organization_id = $1::uuid`,
+        id,
+      );
     }
   });
   await admin.organization.deleteMany({ where: { id: { in: organizationIds } } });

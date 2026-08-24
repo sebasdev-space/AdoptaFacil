@@ -4,6 +4,7 @@ import type { Organization as OrgRow, OrganizationProfile as ProfileRow } from '
 import {
   FormalizationState,
   type Organization,
+  type OrganizationDuplicateWarning,
   type OrganizationExtendedContact,
   type OrganizationLocation,
   type OrganizationPublic,
@@ -16,6 +17,7 @@ import { AuditService } from '../../core/audit/audit.service';
 import { isUniqueConstraintViolation } from '../../core/errors/prisma-conflict.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../core/tenant/tenant-context.service';
+import { DuplicateDetectionService } from './duplicate-detection.service';
 
 /** Merge the registry row (organizations) with its profile into the full
  *  `Organization` contract shape. */
@@ -53,6 +55,7 @@ export class OrgProfileService {
     private readonly prisma: PrismaService,
     private readonly tenant: TenantContextService,
     private readonly audit: AuditService,
+    private readonly duplicates: DuplicateDetectionService,
   ) {}
 
   private requireOrgId(): string {
@@ -84,6 +87,34 @@ export class OrgProfileService {
     input: UpdateOrganizationProfileInput,
   ): Promise<Organization> {
     const organizationId = this.requireOrgId();
+
+    // S-3: NIT is a unique legal identifier (art. 125-3 ET) — a HARD block,
+    // checked and (if blocked) audited BEFORE the write transaction below, so
+    // the audit record survives even though the profile write never runs.
+    const nit = input.nit?.trim();
+    if (nit) {
+      const nitConflict = await this.duplicates.findNitConflict(organizationId, nit);
+      if (nitConflict) {
+        await this.audit.record({
+          organizationId,
+          actorUserId,
+          action: 'organization.duplicate_check_blocked',
+          entityType: 'organization',
+          entityId: organizationId,
+          metadata: {
+            matchType: 'exact_nit',
+            matchedOrganizationId: nitConflict.organizationId,
+          },
+        });
+        throw new ConflictException('Ya existe una organización registrada con este NIT.');
+      }
+    }
+
+    // Fuzzy name match NEVER blocks — only warns + flags for review (S-3).
+    // Computed before the transaction; persisted (flag rows) inside it, so
+    // the flag only exists if the profile write itself actually commits.
+    const name = input.name?.trim();
+    const similarMatches = name ? await this.duplicates.findSimilarNames(organizationId, name) : [];
 
     const profileWrite = {
       nit: input.nit,
@@ -150,11 +181,43 @@ export class OrgProfileService {
         // Only WHICH fields changed — never the values (avoid logging PII).
         metadata: { fields: Object.keys(input) },
       });
+
+      // S-3: every verification runs its own audit trail entry, matched or
+      // not — atomic with the write it protected (the NIT-blocked case above
+      // records its own audit BEFORE this transaction even starts, since here
+      // the write always succeeds).
+      let duplicateWarning: OrganizationDuplicateWarning | undefined;
+      if (nit || name) {
+        await this.audit.recordWithTx(tx, {
+          organizationId,
+          actorUserId,
+          action: 'organization.duplicate_check_performed',
+          entityType: 'organization',
+          entityId: organizationId,
+          metadata: {
+            nitChecked: Boolean(nit),
+            nameChecked: Boolean(name),
+            similarNameMatches: similarMatches.length,
+          },
+        });
+        if (similarMatches.length > 0) {
+          await tx.organizationDuplicateFlag.createMany({
+            data: similarMatches.map((match) => ({
+              organizationId,
+              matchedOrganizationId: match.organizationId,
+              matchType: 'similar_name',
+              similarityScore: match.similarityScore,
+            })),
+          });
+          duplicateWarning = { matches: similarMatches };
+        }
+      }
+
       const [org, profile] = await Promise.all([
         tx.organization.findUniqueOrThrow({ where: { id: organizationId } }),
         tx.organizationProfile.findUnique({ where: { organizationId } }),
       ]);
-      return toOrganization(org, profile);
+      return { ...toOrganization(org, profile), ...(duplicateWarning ? { duplicateWarning } : {}) };
     });
   }
 

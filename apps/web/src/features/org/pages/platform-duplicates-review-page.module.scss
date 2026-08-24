@@ -1,0 +1,19 @@
+.queue {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.item__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
