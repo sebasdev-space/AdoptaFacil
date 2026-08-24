@@ -1,3 +1,25 @@
-// Module: reputation · Owner: @sebastian (Ola 0)
-// TODO: models defined by @sebastian. Every business model MUST carry
-// organization_id and enable RLS following the _rls_probe reference in org.prisma.
+// Module: reputation (M12, RF23) · Owner: @sebastian
+// Review/Rating de organizaciones con arquitectura preparada para moderación
+// (S-7). Contenido inmutable tras el envío; solo `status` + columnas de
+// moderación transicionan, y únicamente vía las funciones SECURITY DEFINER
+// de la migración (la app nunca tiene GRANT UPDATE sobre esta tabla).
+
+model Review {
+  id                String    @id @default(uuid()) @db.Uuid
+  organizationId    String    @map("organization_id") @db.Uuid
+  authorUserId      String    @map("author_user_id") @db.Uuid
+  rating            Int
+  comment           String?
+  isAnonymous       Boolean   @default(false) @map("is_anonymous")
+  // pending | approved | rejected | hidden — ver ReviewStatus en contracts.
+  status            String    @default("pending")
+  moderatedByUserId String?   @map("moderated_by_user_id") @db.Uuid
+  moderatedAt       DateTime? @map("moderated_at")
+  // Motivo del rechazo, o de un ocultamiento posterior (approved -> hidden).
+  rejectionReason   String?   @map("rejection_reason")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  @@unique([organizationId, authorUserId])
+  @@index([organizationId])
+  @@map("reviews")
+}

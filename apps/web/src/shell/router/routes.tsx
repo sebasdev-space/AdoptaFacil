@@ -13,6 +13,7 @@ import {
   ORG_MEMBER_ROLES,
   PLATFORM_DOCUMENTS_ROLES,
   PLATFORM_DUPLICATES_ROLES,
+  PLATFORM_REVIEWS_ROLES,
   RESOURCE_VIEW_ROLES,
   SPONSORSHIP_VIEW_ROLES,
   VOLUNTEERING_VIEW_ROLES,
@@ -35,6 +36,7 @@ import {
   OrgProfilePage,
   PlatformDocumentsReviewPage,
   PlatformDuplicatesReviewPage,
+  PlatformReviewsReviewPage,
 } from '../../features/org';
 import {
   OrgPublicPage,
@@ -82,6 +84,7 @@ import {
   VolunteerOpportunitiesPage,
   VolunteerOpportunityDetailPage,
 } from '../../features/volunteering';
+import { MyReviewsPage, OrganizationReputationPage } from '../../features/reputation';
 
 /**
  * Route tree for the shell.
@@ -181,6 +184,10 @@ export function AppRoutes() {
           /organizacion/marketplace below. */}
       <Route path="/marketplace" element={<PublicMarketplacePage />} />
       <Route path="/marketplace/:id" element={<PublicProductDetailPage />} />
+      {/* Public reputation indicators for ONE organization (M12, RF23, S-7) —
+          no auth required to read; an authenticated visitor sees a "leave a
+          review" form here instead of on a separate route. */}
+      <Route path="/organizaciones/:slug/resenas" element={<OrganizationReputationPage />} />
 
       {/* Protected — guard first, then the shell layout */}
       <Route element={<RequireAuth />}>
@@ -498,6 +505,22 @@ export function AppRoutes() {
               </RequireRoles>
             }
           />
+          {/* M12 (S-7, RF23) · moderación de reseñas, cross-tenant. Audiencia
+              de PLATAFORMA — ruta hermana de /plataforma/documentos y
+              /plataforma/organizaciones-duplicadas (misma zona ya existente,
+              no una nueva). */}
+          <Route
+            path="plataforma/resenas"
+            element={
+              <RequireRoles roles={PLATFORM_REVIEWS_ROLES}>
+                <PlatformReviewsReviewPage />
+              </RequireRoles>
+            }
+          />
+          {/* M12 (S-7, RF23) · "Mis reseñas" de la Persona — GET /reviews/mine
+              no tiene gate de rol, así que esta ruta tampoco lleva
+              <RequireRoles>, mismo criterio que "Mi voluntariado". */}
+          <Route path="resenas" element={<MyReviewsPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Route>

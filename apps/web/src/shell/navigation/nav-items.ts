@@ -57,6 +57,16 @@ export const PLATFORM_DUPLICATES_ROLES = [Role.PlatformAdmin, Role.PlatformSuper
 export const COMMUNITY_MODERATION_ROLES = [Role.PlatformAdmin, Role.PlatformSuperAdmin] as const;
 
 /**
+ * M12 (S-7, RF23) — "Moderación de reseñas", audiencia de PLATAFORMA. Copiado
+ * VERBATIM del `@Roles` de `PlatformReviewsController`
+ * (`GET /platform/reviews/queue`) — mismos dos roles que
+ * `PLATFORM_DOCUMENTS_ROLES`, declarado aparte porque es el @Roles de un
+ * endpoint DISTINTO (mismo criterio que el resto de constantes de este
+ * archivo).
+ */
+export const PLATFORM_REVIEWS_ROLES = [Role.PlatformAdmin, Role.PlatformSuperAdmin] as const;
+
+/**
  * S2-01 — reconnects "Campañas" as the INTERNAL management surface at
  * `/organizacion/campanas` (CampaignsPage), not the public portal T-065 pulled it
  * from. Copied VERBATIM from `CampaignsController`'s VIEW_ROLES (GET /campaigns):
@@ -445,5 +455,21 @@ export const navItems: NavItem[] = [
     path: '/voluntariado',
     label: 'Mi voluntariado',
     icon: HeartIcon,
+  },
+  // M12 (S-7, RF23) · moderación de reseñas, audiencia de PLATAFORMA — ruta
+  // hermana de /plataforma/documentos y /plataforma/organizaciones-duplicadas.
+  {
+    path: '/plataforma/resenas',
+    label: 'Moderación de reseñas',
+    icon: ChatIcon,
+    roles: PLATFORM_REVIEWS_ROLES,
+  },
+  // M12 (S-7, RF23) · "Mis reseñas" — lo que la Persona ha reseñado y su
+  // estado. Sin @Roles en el backend (cualquier Persona autenticada), mismo
+  // criterio que "Mi voluntariado"/"Mis apadrinamientos".
+  {
+    path: '/resenas',
+    label: 'Mis reseñas',
+    icon: ChatIcon,
   },
 ];
