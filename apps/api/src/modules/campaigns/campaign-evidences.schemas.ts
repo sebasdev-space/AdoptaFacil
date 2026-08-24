@@ -17,17 +17,3 @@ export const createCampaignEvidenceSchema = z
     order: z.number().int().min(0).optional(),
   })
   .strict();
-
-/** Patch an evidence's business fields (the file is immutable). At least one. */
-export const updateCampaignEvidenceSchema = z
-  .object({
-    type: z.nativeEnum(CampaignEvidenceType).optional(),
-    concept: z.string().trim().min(1).max(500).optional(),
-    amount: z.number().int().positive().optional(),
-    spentAt: z.string().datetime({ offset: true }).optional(),
-    order: z.number().int().min(0).optional(),
-  })
-  .strict()
-  .refine((value) => Object.keys(value).length > 0, {
-    message: 'At least one field must be provided.',
-  });

@@ -7,11 +7,14 @@ import { AppModule } from '../src/app.module';
 import { purgeOrganizations } from './support/cleanup';
 
 /**
- * Accountability end-to-end (RF16 · T-054): an org uploads a spending evidence
- * (real bytes through StoragePort) on its campaign, and the PUBLIC accountability
- * report shows the evidence + the declared-spending total WITHOUT a session.
- * Plus the guardrails: money validation, RBAC deny-by-default, tenant isolation,
- * and cancelled campaigns never surfacing publicly.
+ * Accountability end-to-end (RF16 · T-054, hardened to append-only immutable
+ * in S-4): an org uploads a spending evidence (real bytes through StoragePort)
+ * on its campaign, and the PUBLIC accountability report shows the evidence +
+ * the declared-spending total WITHOUT a session. Plus the guardrails: money
+ * validation, RBAC deny-by-default, tenant isolation, immutability (no
+ * edit/delete route, and the DB itself rejects a raw UPDATE/DELETE), the
+ * raisedAmount cross-check against another public endpoint, and cancelled
+ * campaigns never surfacing publicly.
  */
 describe('Campaign accountability (RF16 · T-054)', () => {
   let app: INestApplication;
@@ -25,6 +28,7 @@ describe('Campaign accountability (RF16 · T-054)', () => {
   let personToken = '';
   let campaignId = '';
   let evidenceKey = '';
+  let evidenceId = '';
 
   async function registerOrg(tag: string): Promise<{ token: string; orgId: string }> {
     const res = await request(server)
@@ -94,6 +98,7 @@ describe('Campaign accountability (RF16 · T-054)', () => {
     expect(created.body.evidence.amount).toBe(120_000);
     expect(created.body.evidence.storageRef).toMatch(/^public\//);
     evidenceKey = created.body.upload.key;
+    evidenceId = created.body.evidence.id;
 
     // PUT the real bytes to the reserved key, then the public serve works.
     await request(server)
@@ -176,6 +181,57 @@ describe('Campaign accountability (RF16 · T-054)', () => {
       .set('Authorization', `Bearer ${otherOwnerToken}`)
       .expect(200);
     expect(list.body.total).toBe(0);
+  });
+
+  it('S-4: immutability — no edit/delete route exists, and the DB itself rejects a raw UPDATE/DELETE', async () => {
+    // No PATCH/DELETE route was ever wired for an evidence (S-4 removed it) —
+    // both hit Nest's default "no route matched" 404.
+    await request(server)
+      .patch(`/campaigns/${campaignId}/evidences/${evidenceId}`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ concept: 'intento de edición' })
+      .expect(404);
+    await request(server)
+      .delete(`/campaigns/${campaignId}/evidences/${evidenceId}`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .expect(404);
+
+    // Defense in depth: even a raw SQL statement (bypassing the app entirely,
+    // as a superuser) is rejected by the DB trigger — "incluso vía llamada
+    // directa a la API" is not the only path a donor needs protection from.
+    await expect(
+      admin.$executeRawUnsafe(
+        `UPDATE campaign_evidences SET concept = 'hackeado' WHERE id = $1::uuid`,
+        evidenceId,
+      ),
+    ).rejects.toThrow(/append-only/);
+    await expect(
+      admin.$executeRawUnsafe(`DELETE FROM campaign_evidences WHERE id = $1::uuid`, evidenceId),
+    ).rejects.toThrow(/append-only/);
+
+    // Untouched — still visible with its original concept in the public report.
+    const res = await request(server)
+      .get(`/public/campaigns/${campaignId}/accountability`)
+      .expect(200);
+    expect(res.body.evidences.find((e: { id: string }) => e.id === evidenceId).concept).toBe(
+      'Compra de insumos',
+    );
+  });
+
+  it('S-4: raisedAmount in the accountability report matches the SAME campaign exposed via /public/campaigns/:id (no parallel calculation)', async () => {
+    // Force a real, non-zero raisedAmount directly on the row (the funding
+    // math itself is M05/T-055's — out of scope here; this only proves BOTH
+    // public endpoints read the exact same column for the exact same campaign).
+    await admin.campaign.update({ where: { id: campaignId }, data: { raisedAmount: 350_000 } });
+
+    const single = await request(server).get(`/public/campaigns/${campaignId}`).expect(200);
+    const accountability = await request(server)
+      .get(`/public/campaigns/${campaignId}/accountability`)
+      .expect(200);
+
+    expect(accountability.body.campaign.raisedAmount).toBe(single.body.raisedAmount);
+    expect(accountability.body.campaign.raisedAmount).toBe(350_000);
+    expect(accountability.body.campaign.goalAmount).toBe(single.body.goalAmount);
   });
 
   it('does NOT expose the accountability report of a cancelled campaign (404)', async () => {

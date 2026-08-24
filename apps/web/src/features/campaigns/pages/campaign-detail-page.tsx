@@ -12,7 +12,6 @@ import {
   type CreateCampaignEvidenceInput,
   type Paginated,
   Role,
-  type UpdateCampaignEvidenceInput,
   type UpdateCampaignInput,
 } from '@adoptafacil/contracts';
 import {
@@ -20,6 +19,7 @@ import {
   Button,
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
   EmptyState,
@@ -98,7 +98,6 @@ export function CampaignDetailPage() {
   const [evSpentAt, setEvSpentAt] = useState('');
   const [evFile, setEvFile] = useState<File | null>(null);
   const [savingEvidence, setSavingEvidence] = useState(false);
-  const [editingEvidenceId, setEditingEvidenceId] = useState<string | null>(null);
 
   const applyCampaign = (found: Campaign): void => {
     setCampaign(found);
@@ -252,46 +251,6 @@ export function CampaignDetailPage() {
     }
   };
 
-  const patchEvidence = async (
-    evidenceId: string,
-    patch: UpdateCampaignEvidenceInput,
-  ): Promise<void> => {
-    if (!id) return;
-    try {
-      await client.request(
-        `/campaigns/${encodeURIComponent(id)}/evidences/${encodeURIComponent(evidenceId)}`,
-        { method: 'PATCH', json: patch },
-      );
-      setEditingEvidenceId(null);
-      await loadEvidences();
-      toast({ title: 'Evidencia actualizada', variant: 'success' });
-    } catch (error) {
-      toast({
-        title: 'No se pudo actualizar la evidencia',
-        description: error instanceof Error ? error.message : 'Inténtalo de nuevo.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const removeEvidence = async (evidenceId: string): Promise<void> => {
-    if (!id) return;
-    try {
-      await client.request(
-        `/campaigns/${encodeURIComponent(id)}/evidences/${encodeURIComponent(evidenceId)}`,
-        { method: 'DELETE' },
-      );
-      await loadEvidences();
-      toast({ title: 'Evidencia eliminada', variant: 'success' });
-    } catch (error) {
-      toast({
-        title: 'No se pudo eliminar la evidencia',
-        description: error instanceof Error ? error.message : 'Inténtalo de nuevo.',
-        variant: 'destructive',
-      });
-    }
-  };
-
   return (
     <PageContainer>
       <PageHeader
@@ -427,7 +386,13 @@ export function CampaignDetailPage() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
-              <CardTitle>Evidencias de rendición</CardTitle>
+              <div>
+                <CardTitle>Evidencias de rendición</CardTitle>
+                <CardDescription>
+                  Una vez publicada, una evidencia no se puede editar ni eliminar — los donantes
+                  deben poder confiar en que lo que ven no cambia.
+                </CardDescription>
+              </div>
               {canManage && (
                 <Button size="sm" onClick={() => setShowEvidenceForm((v) => !v)}>
                   {showEvidenceForm ? 'Cancelar' : 'Agregar evidencia'}
@@ -520,51 +485,24 @@ export function CampaignDetailPage() {
               )}
               {!evidencesLoading && evidences.length > 0 && (
                 <ul className="space-y-3">
-                  {evidences.map((evidence) =>
-                    editingEvidenceId === evidence.id ? (
-                      <EvidenceEditRow
-                        key={evidence.id}
-                        evidence={evidence}
-                        onCancel={() => setEditingEvidenceId(null)}
-                        onSave={(patch) => patchEvidence(evidence.id, patch)}
-                      />
-                    ) : (
-                      <li
-                        key={evidence.id}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm"
-                      >
-                        <div className="min-w-0">
-                          <p className="flex items-center gap-2 font-medium">
-                            <Badge variant="secondary">{EVIDENCE_TYPE_LABELS[evidence.type]}</Badge>
-                            <span className="truncate">{evidence.concept}</span>
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatBogota(evidence.spentAt)}
-                            {typeof evidence.amount === 'number' &&
-                              ` · ${formatCop(evidence.amount)}`}
-                          </p>
-                        </div>
-                        {canManage && (
-                          <div className="flex shrink-0 items-center gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => setEditingEvidenceId(evidence.id)}
-                            >
-                              Editar
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => void removeEvidence(evidence.id)}
-                            >
-                              Eliminar
-                            </Button>
-                          </div>
-                        )}
-                      </li>
-                    ),
-                  )}
+                  {evidences.map((evidence) => (
+                    <li
+                      key={evidence.id}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3 text-sm"
+                    >
+                      <div className="min-w-0">
+                        <p className="flex items-center gap-2 font-medium">
+                          <Badge variant="secondary">{EVIDENCE_TYPE_LABELS[evidence.type]}</Badge>
+                          <span className="truncate">{evidence.concept}</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatBogota(evidence.spentAt)}
+                          {typeof evidence.amount === 'number' &&
+                            ` · ${formatCop(evidence.amount)}`}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
                 </ul>
               )}
             </CardContent>
@@ -572,82 +510,5 @@ export function CampaignDetailPage() {
         </div>
       )}
     </PageContainer>
-  );
-}
-
-interface EvidenceEditRowProps {
-  evidence: CampaignEvidence;
-  onCancel: () => void;
-  onSave: (patch: UpdateCampaignEvidenceInput) => void;
-}
-
-/**
- * Inline edit row for a single evidence's business fields (the file is
- * immutable). `amount` MUST be validated the same way `submitEvidence` (the
- * create path) already does — before this fix it wasn't, so an invalid value
- * (a decimal, negative, or unparseable amount) went straight to the PATCH
- * request and only the backend's Zod schema caught it, surfacing a raw
- * "amount: Expected integer, received float"-style message instead of a
- * clear one, and losing whatever the user had just typed.
- */
-function EvidenceEditRow({ evidence, onCancel, onSave }: EvidenceEditRowProps) {
-  const [concept, setConcept] = useState(evidence.concept);
-  const [amount, setAmount] = useState(evidence.amount ? String(evidence.amount) : '');
-  const [spentAt, setSpentAt] = useState(toDateInputValue(evidence.spentAt));
-  const [amountError, setAmountError] = useState<string | null>(null);
-
-  const save = (): void => {
-    const amountValue = parseOptionalEvidenceAmount(amount);
-    if (amountValue === null) {
-      setAmountError('El monto (si lo indicas) debe ser un entero COP mayor a 0.');
-      return;
-    }
-    setAmountError(null);
-    onSave({
-      concept: concept.trim() || undefined,
-      amount: amountValue,
-      spentAt: spentAt ? new Date(spentAt).toISOString() : undefined,
-    });
-  };
-
-  return (
-    <li className="space-y-3 rounded-md border p-3">
-      <Input value={concept} onChange={(e) => setConcept(e.target.value)} aria-label="Concepto" />
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1">
-          <Input
-            type="number"
-            min={1}
-            step={1}
-            value={amount}
-            onChange={(e) => {
-              setAmount(e.target.value);
-              if (amountError) setAmountError(null);
-            }}
-            aria-label="Monto (COP)"
-            aria-invalid={amountError ? true : undefined}
-          />
-          {amountError && (
-            <p role="alert" className="text-xs font-medium text-destructive">
-              {amountError}
-            </p>
-          )}
-        </div>
-        <Input
-          type="date"
-          value={spentAt}
-          onChange={(e) => setSpentAt(e.target.value)}
-          aria-label="Fecha del gasto"
-        />
-      </div>
-      <div className="flex gap-2">
-        <Button size="sm" onClick={save}>
-          Guardar
-        </Button>
-        <Button size="sm" variant="outline" onClick={onCancel}>
-          Cancelar
-        </Button>
-      </div>
-    </li>
   );
 }
