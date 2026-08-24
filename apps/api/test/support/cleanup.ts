@@ -29,7 +29,8 @@ import type { PrismaClient } from '@prisma/client';
 // covered by the generic organization_id-only loop below, so it gets an
 // extra explicit delete for that column too (still inside replica mode).
 // campaign_evidences (M06, RF16, hardened to append-only in S-4) is the same
-// way — no UPDATE/DELETE/TRUNCATE for any role.
+// way — no UPDATE/DELETE/TRUNCATE for any role. volunteer_certificates (M08,
+// RF18/RF19, S-6) is append-only from day one, same convention.
 const APPEND_ONLY_TABLES = [
   'audit_logs',
   'formalization_transitions',
@@ -42,6 +43,7 @@ const APPEND_ONLY_TABLES = [
   'dian_verification_attempts',
   'organization_duplicate_flags',
   'campaign_evidences',
+  'volunteer_certificates',
 ];
 
 export async function purgeOrganizations(

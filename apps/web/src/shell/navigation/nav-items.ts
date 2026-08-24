@@ -86,6 +86,19 @@ export const SPONSORSHIP_VIEW_ROLES = [
 ] as const;
 
 /**
+ * S-6 (M08, RF18/RF19) — gestión interna de voluntariado en
+ * `/organizacion/voluntariado` (VolunteerOpportunitiesPage). Copiado VERBATIM
+ * de `VolunteerOpportunitiesController`'s `VIEW_ROLES` — sin Operator (su
+ * alcance no está definido por el documento base para este módulo, mismo
+ * criterio que Apadrinamientos), + ReadOnlyAuditor solo ve.
+ */
+export const VOLUNTEERING_VIEW_ROLES = [
+  Role.Owner,
+  Role.Administrator,
+  Role.ReadOnlyAuditor,
+] as const;
+
+/**
  * F-NAV-ADOPCIONES (AUD-F1 finding): "Adopciones" had NO role gate at all —
  * any authenticated user, including a Persona with no org, saw the entry and
  * landed on the org's evaluation kanban (empty, meaningless to them). Copied
@@ -388,16 +401,17 @@ export const navItems: NavItem[] = [
   // (S2-04A §4): it now lives as a button inside "Mi organización"'s action bar
   // (OrgProfilePage, S2-01/S2-REORG), not as a top-level nav entry. The ROUTE
   // (`/organizacion/portal`) and its guard are UNCHANGED — see routes.tsx.
-  // Fase 12 (REFACTOR-VISUAL v2): módulo aún sin backend — entrada visible con
-  // el badge "Pronto" en vez de ocultarse, siguiendo el patrón documentado en
-  // `ComingSoon` (packages/ui). Gated a ORG_MEMBER_ROLES: una Persona no tiene
-  // organización a la que aplique.
+  // M08 (S-6, RF18/RF19): this was a Fase-12 "Coming Soon" placeholder
+  // (backend didn't exist yet) — now that the module is built, the entry
+  // becomes real: `comingSoon` is dropped and `roles` is tightened from the
+  // generic `ORG_MEMBER_ROLES` placeholder to the real
+  // `VOLUNTEERING_VIEW_ROLES` (copied VERBATIM from the controller). Same
+  // path/label/icon — this UPDATES the existing entry, not a new one.
   {
     path: '/organizacion/voluntariado',
     label: 'Voluntariado',
     icon: HeartIcon,
-    roles: ORG_MEMBER_ROLES,
-    comingSoon: true,
+    roles: VOLUNTEERING_VIEW_ROLES,
   },
   // M01 · revisión documental de PLATAFORMA (T-031, wires T-103). Audiencia de
   // plataforma, no de organización — separada del resto del menú.
@@ -422,5 +436,14 @@ export const navItems: NavItem[] = [
     label: 'Moderación de comunidad',
     icon: ChatIcon,
     roles: COMMUNITY_MODERATION_ROLES,
+  },
+  // M08 (S-6, RF18/RF19) · "Mi voluntariado" — explorar oportunidades,
+  // inscribirse, registrar horas y descargar certificados. Sin @Roles en el
+  // backend (cualquier Persona autenticada), mismo criterio que
+  // "Mis solicitudes" (adopciones) y "Mis apadrinamientos".
+  {
+    path: '/voluntariado',
+    label: 'Mi voluntariado',
+    icon: HeartIcon,
   },
 ];
