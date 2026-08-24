@@ -4,6 +4,7 @@ export { OrgDocumentsPage } from './pages/org-documents-page';
 export { OrgLegalRepresentativePage } from './pages/org-legal-representative-page';
 export { PlatformDocumentsReviewPage } from './pages/platform-documents-review-page';
 export { PlatformDuplicatesReviewPage } from './pages/platform-duplicates-review-page';
+export { PlatformReviewsReviewPage } from './pages/platform-reviews-review-page';
 export { OrgVolunteeringPage } from './pages/org-volunteering-page';
 export { NationalTransparencyPage } from './pages/national-transparency-page';
 export { ExogenousReportPage } from './pages/exogenous-report-page';

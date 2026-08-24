@@ -415,3 +415,38 @@ describe('S-6 (M08, RF18/RF19) · "Voluntariado" surface demands VOLUNTEERING_VI
     expect(screen.queryByText('Sin acceso')).not.toBeInTheDocument();
   });
 });
+
+describe('S-7 (M12, RF23) · "Moderación de reseñas" demands PLATFORM_REVIEWS_ROLES (deny-by-default)', () => {
+  it('renders the moderation queue for PlatformAdmin', async () => {
+    renderShell({ route: '/plataforma/resenas', ...sessionWith([Role.PlatformAdmin]) });
+    expect(
+      await screen.findByRole('heading', { name: 'Moderación de reseñas' }),
+    ).toBeInTheDocument();
+  });
+
+  it('renders for PlatformSuperAdmin', async () => {
+    renderShell({ route: '/plataforma/resenas', ...sessionWith([Role.PlatformSuperAdmin]) });
+    expect(
+      await screen.findByRole('heading', { name: 'Moderación de reseñas' }),
+    ).toBeInTheDocument();
+  });
+
+  it('denies an Owner — including the reviewed organization itself (conflict of interest, RF23)', async () => {
+    renderShell({ route: '/plataforma/resenas', ...sessionWith([Role.Owner]) });
+    expect(await screen.findByText('Sin acceso')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Moderación de reseñas' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('denies a Persona (no org role)', async () => {
+    renderShell({ route: '/plataforma/resenas', ...sessionWith([]) });
+    expect(await screen.findByText('Sin acceso')).toBeInTheDocument();
+  });
+
+  it('leaves "Mis reseñas" (Persona-facing, no @Roles) reachable without an org role', async () => {
+    renderShell({ route: '/resenas', ...sessionWith([]) });
+    expect(await screen.findByRole('heading', { name: 'Mis reseñas' })).toBeInTheDocument();
+    expect(screen.queryByText('Sin acceso')).not.toBeInTheDocument();
+  });
+});

@@ -19,6 +19,7 @@ import { MarketplaceModule } from './modules/marketplace/marketplace.module';
 import { OrgModule } from './modules/org/org.module';
 import { PaymentsModule } from './modules/payments/payments.module';
 import { PortalsModule } from './modules/portals/portals.module';
+import { ReputationModule } from './modules/reputation/reputation.module';
 import { ResourcesModule } from './modules/resources/resources.module';
 import { SponsorshipsModule } from './modules/sponsorships/sponsorships.module';
 import { VolunteeringModule } from './modules/volunteering/volunteering.module';
@@ -76,6 +77,8 @@ import { RedisModule } from './redis/redis.module';
     CommunityModule,
     // M08 · voluntariado + servicio social estudiantil (RF18/RF19, Ola 3, S-6).
     VolunteeringModule,
+    // M12 · reputación: reseñas, calificación e indicadores públicos (RF23, S-7).
+    ReputationModule,
   ],
 })
 export class AppModule {}

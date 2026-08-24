@@ -30,7 +30,9 @@ import type { PrismaClient } from '@prisma/client';
 // extra explicit delete for that column too (still inside replica mode).
 // campaign_evidences (M06, RF16, hardened to append-only in S-4) is the same
 // way — no UPDATE/DELETE/TRUNCATE for any role. volunteer_certificates (M08,
-// RF18/RF19, S-6) is append-only from day one, same convention.
+// RF18/RF19, S-6) is append-only from day one, same convention. reviews (M12,
+// RF23, S-7) too: the app role never gets UPDATE/DELETE, and its DELETE/
+// TRUNCATE triggers reject removal for every role including superuser.
 const APPEND_ONLY_TABLES = [
   'audit_logs',
   'formalization_transitions',
@@ -44,6 +46,7 @@ const APPEND_ONLY_TABLES = [
   'organization_duplicate_flags',
   'campaign_evidences',
   'volunteer_certificates',
+  'reviews',
 ];
 
 export async function purgeOrganizations(
