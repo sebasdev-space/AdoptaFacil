@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   Role,
+  SponsorshipPaymentStatus,
   SponsorshipPeriodicity,
   SponsorshipStatus,
   type Sponsorship,
@@ -146,14 +147,40 @@ describe('SponsorshipsPage — apadrinamientos recibidos por la organización (S
       expect(within(animalsCard).getByText('1 / 1')).toBeInTheDocument();
     });
 
-    it('muestra "Pagos fallidos" como "—" con una nota — el concepto no existe todavía (T-057)', async () => {
-      stubFetch(baseHandler([sponsorship()]));
+    it('"En riesgo de suspensión" (S-5-REDISEÑO) cuenta apadrinamientos con período pendiente y 2+ intentos', async () => {
+      stubFetch(
+        baseHandler([
+          sponsorship({ id: 's-1' }), // no period yet — not at risk
+          sponsorship({
+            id: 's-2',
+            sponsorUserId: 'p2',
+            animalId: 'animal-2',
+            currentPeriodStatus: SponsorshipPaymentStatus.Pending,
+            currentPeriodAttemptCount: 2,
+          }),
+        ]),
+      );
+      renderShell({ route: '/organizacion/apadrinamientos', ...sessionWith([Role.Owner]) });
+
+      const riskCard = (await screen.findByText('En riesgo de suspensión')).closest(
+        'div',
+      ) as HTMLElement;
+      expect(within(riskCard).getByText('1')).toBeInTheDocument();
+    });
+
+    it('muestra un badge de "Pago pendiente" en la fila de un apadrinamiento en riesgo', async () => {
+      stubFetch(
+        baseHandler([
+          sponsorship({
+            currentPeriodStatus: SponsorshipPaymentStatus.Pending,
+            currentPeriodAttemptCount: 2,
+          }),
+        ]),
+      );
       renderShell({ route: '/organizacion/apadrinamientos', ...sessionWith([Role.Owner]) });
 
       await screen.findByText('Firulais');
-      expect(screen.getByText('Pagos fallidos')).toBeInTheDocument();
-      expect(screen.getByText('—')).toBeInTheDocument();
-      expect(screen.getByText('Próximamente')).toBeInTheDocument();
+      expect(screen.getByText('Pago pendiente (2/3)')).toBeInTheDocument();
     });
   });
 

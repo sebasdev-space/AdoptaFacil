@@ -14,6 +14,7 @@ import {
   type Paginated,
   Role,
   type Sponsorship,
+  type SponsorshipPayment,
   SponsorshipStatus,
   type SponsorshipStatusChangeInput,
   type SponsorshipStatusHistoryEntry,
@@ -24,6 +25,7 @@ import { JwtAuthGuard } from '../../core/auth/jwt-auth.guard';
 import { ZodValidationPipe } from '../../core/auth/zod-validation.pipe';
 import { Roles } from '../../core/rbac/roles.decorator';
 import { RolesGuard } from '../../core/rbac/roles.guard';
+import { SponsorshipPaymentsService } from './sponsorship-payments.service';
 import { SponsorshipsService } from './sponsorships.service';
 import { createSponsorshipSchema, sponsorshipStatusChangeSchema } from './sponsorships.schemas';
 
@@ -42,7 +44,10 @@ const VIEW_ROLES = [...MANAGE_ROLES, Role.ReadOnlyAuditor] as const;
 @Controller('sponsorships')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SponsorshipsController {
-  constructor(private readonly service: SponsorshipsService) {}
+  constructor(
+    private readonly service: SponsorshipsService,
+    private readonly payments: SponsorshipPaymentsService,
+  ) {}
 
   /** Subscribe to a plan — any authenticated Person (no @Roles gate). */
   @Post()
@@ -51,6 +56,18 @@ export class SponsorshipsController {
     @Body(new ZodValidationPipe(createSponsorshipSchema)) dto: CreateSponsorshipInput,
   ): Promise<Sponsorship> {
     return this.service.subscribe(actor, dto);
+  }
+
+  /** Recovery after auto-suspension by billing failure (Objetivo 6) — any
+   *  authenticated Person may retry ONLY their own suspended sponsorship (no
+   *  @Roles gate, ownership checked cross-tenant inside the service). */
+  @Post(':id/retry-payment')
+  @HttpCode(200)
+  retryPayment(
+    @CurrentUser() actor: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<SponsorshipPayment> {
+    return this.payments.retryPayment(actor, id);
   }
 
   /** The sponsor's own sponsorships (cross-tenant, by identity) — "mis
@@ -83,6 +100,13 @@ export class SponsorshipsController {
   @Roles(...VIEW_ROLES)
   history(@Param('id', ParseUUIDPipe) id: string): Promise<SponsorshipStatusHistoryEntry[]> {
     return this.service.history(id);
+  }
+
+  /** Recurring-billing ledger (S-5-REDISEÑO): every period + every attempt. */
+  @Get(':id/payments')
+  @Roles(...VIEW_ROLES)
+  listPayments(@Param('id', ParseUUIDPipe) id: string): Promise<SponsorshipPayment[]> {
+    return this.payments.listForSponsorship(id);
   }
 
   @Post(':id/suspend')

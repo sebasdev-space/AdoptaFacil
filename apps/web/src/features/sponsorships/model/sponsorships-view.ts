@@ -1,5 +1,9 @@
 import type { Sponsorship, SponsorshipPlan } from '@adoptafacil/contracts';
-import { SponsorshipPeriodicity, SponsorshipStatus } from '@adoptafacil/contracts';
+import {
+  SponsorshipPaymentStatus,
+  SponsorshipPeriodicity,
+  SponsorshipStatus,
+} from '@adoptafacil/contracts';
 
 /** Etiquetas legibles (es-CO) del estado de un apadrinamiento (RF17, enum CERRADO). */
 export const SPONSORSHIP_STATUS_LABELS: Record<SponsorshipStatus, string> = {
@@ -77,17 +81,39 @@ export function sponsorDisplayName(sponsorship: Sponsorship): string {
   return sponsorship.sponsorName ?? `Padrino ${shortId(sponsorship.sponsorUserId)}`;
 }
 
-/** Métricas reales del dashboard de apadrinamientos (T-DASH-APADRINAMIENTOS).
- *  `failedPaymentsCount` NO existe todavía (T-057, sin PaymentPort conectado
- *  — ver el schema `SponsorshipStatus`, que no tiene un estado de pago
- *  fallido); se deja fuera de este tipo a propósito en vez de fabricar un
- *  conteo — la página lo muestra como "—" con una nota, no como parte de
- *  este cálculo. */
+/** Métricas reales del dashboard de apadrinamientos (T-DASH-APADRINAMIENTOS,
+ *  extendido en S-5-REDISEÑO ahora que T-057 conecta el cobro recurrente:
+ *  `atRiskCount` ya es un dato real, `Sponsorship.currentPeriodStatus`/
+ *  `currentPeriodAttemptCount` — nunca un número fabricado). */
 export interface SponsorshipMetrics {
   activePadrinosCount: number;
   monthlyIncomeTotal: number;
   animalsSponsoredCount: number;
   animalsTotalCount: number;
+  /** Período en curso `pending` con al menos 2 intentos ya generados — "en
+   *  riesgo de suspensión" (Objetivo 7), no solo al momento final. */
+  atRiskCount: number;
+}
+
+/** ¿Este apadrinamiento está en riesgo de suspensión por impago (Objetivo 7)?
+ *  Período en curso `pending` con 2 o más intentos ya usados (de 3 posibles) —
+ *  antes de eso, un solo intento pendiente es simplemente el cobro normal del
+ *  mes, no una señal de riesgo. */
+export function isPaymentAtRisk(sponsorship: Sponsorship): boolean {
+  return (
+    sponsorship.currentPeriodStatus === SponsorshipPaymentStatus.Pending &&
+    (sponsorship.currentPeriodAttemptCount ?? 0) >= 2
+  );
+}
+
+/** ¿Esta suspensión fue por impago (vs. manual por la organización)? Señal de
+ *  UI únicamente (habilita el botón "Pagar de nuevo") — la autoridad real es
+ *  el backend, que rechaza el intento si no aplica (S-5-REDISEÑO Objetivo 6). */
+export function isBillingFailureSuspension(sponsorship: Sponsorship): boolean {
+  return (
+    sponsorship.status === SponsorshipStatus.Suspended &&
+    sponsorship.currentPeriodStatus === SponsorshipPaymentStatus.Failed
+  );
 }
 
 /**
@@ -107,5 +133,6 @@ export function computeSponsorshipMetrics(
     monthlyIncomeTotal: active.reduce((sum, s) => sum + (plansById.get(s.planId)?.amount ?? 0), 0),
     animalsSponsoredCount: new Set(active.map((s) => s.animalId)).size,
     animalsTotalCount,
+    atRiskCount: sponsorships.filter(isPaymentAtRisk).length,
   };
 }

@@ -2,6 +2,7 @@ import type {
   CreateSponsorshipInput,
   Paginated,
   Sponsorship,
+  SponsorshipPayment,
   SponsorshipPlan,
   SponsorshipStatusChangeInput,
 } from '@adoptafacil/contracts';
@@ -75,5 +76,27 @@ export function cancelSponsorship(
   return client.request<Sponsorship>(`/sponsorships/${id}/cancel`, {
     method: 'POST',
     json: dto,
+  });
+}
+
+/** Recurring-billing ledger of one sponsorship (S-5-REDISEÑO —
+ *  Owner/Administrator/ReadOnlyAuditor, `GET /sponsorships/:id/payments`). */
+export function getSponsorshipPayments(
+  client: ApiClient,
+  id: string,
+): Promise<SponsorshipPayment[]> {
+  return client.request<SponsorshipPayment[]>(`/sponsorships/${id}/payments`);
+}
+
+/** Sponsor-initiated recovery after auto-suspension by billing failure
+ *  (S-5-REDISEÑO Objetivo 6 — any authenticated Person, no @Roles gate,
+ *  `POST /sponsorships/:id/retry-payment`). The backend rejects it (400/404)
+ *  if the caller is not the sponsor or the suspension was not billing-related. */
+export function retrySponsorshipPayment(
+  client: ApiClient,
+  id: string,
+): Promise<SponsorshipPayment> {
+  return client.request<SponsorshipPayment>(`/sponsorships/${id}/retry-payment`, {
+    method: 'POST',
   });
 }

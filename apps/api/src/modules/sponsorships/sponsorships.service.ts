@@ -14,6 +14,7 @@ import {
   type Paginated,
   type Sponsorship,
   type SponsorshipPeriodicity,
+  type SponsorshipPaymentStatus,
   SponsorshipStatus,
   type SponsorshipStatusHistoryEntry,
 } from '@adoptafacil/contracts';
@@ -56,11 +57,22 @@ interface SponsorshipMineRow {
   startedAt: string;
   suspendedAt: string | null;
   cancelledAt: string | null;
+  /** S-5-REDISEÑO: latest SponsorshipPayment, if any (null otherwise). */
+  currentPeriodStatus: string | null;
+  currentPeriodAttemptCount: number | null;
   createdAt: string;
 }
 
+/** Latest `SponsorshipPayment` per sponsorship — resolved separately for
+ *  `list`/`get` (org-context ORM reads); `listMine` gets it inline from
+ *  `sponsorships_for_sponsor()`'s own JSONB (S-5-REDISEÑO). */
+interface CurrentPeriod {
+  status: SponsorshipPaymentStatus;
+  attemptCount: number;
+}
+
 /** ORM reads (tx.sponsorship.*) already come back camelCase via Prisma's @map. */
-function toSponsorship(row: SponsorshipModel): Sponsorship {
+function toSponsorship(row: SponsorshipModel, currentPeriod?: CurrentPeriod): Sponsorship {
   return {
     id: row.id,
     organizationId: row.organizationId,
@@ -72,6 +84,8 @@ function toSponsorship(row: SponsorshipModel): Sponsorship {
     startedAt: row.startedAt.toISOString(),
     suspendedAt: row.suspendedAt?.toISOString(),
     cancelledAt: row.cancelledAt?.toISOString(),
+    currentPeriodStatus: currentPeriod?.status,
+    currentPeriodAttemptCount: currentPeriod?.attemptCount,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -111,6 +125,8 @@ function toMine(row: SponsorshipMineRow, organizationName: string | undefined): 
     startedAt: row.startedAt,
     suspendedAt: row.suspendedAt ?? undefined,
     cancelledAt: row.cancelledAt ?? undefined,
+    currentPeriodStatus: (row.currentPeriodStatus as SponsorshipPaymentStatus | null) ?? undefined,
+    currentPeriodAttemptCount: row.currentPeriodAttemptCount ?? undefined,
     createdAt: row.createdAt,
   };
 }
@@ -225,20 +241,56 @@ export class SponsorshipsService {
         tx.sponsorship.findMany({ where, orderBy: { createdAt: 'desc' }, take, skip }),
         tx.sponsorship.count({ where }),
       ]);
-      return { items: rows.map(toSponsorship), total, limit: take, offset: skip };
+      const currentPeriods = await this.currentPeriodsBySponsorshipId(
+        tx,
+        rows.map((r) => r.id),
+      );
+      return {
+        items: rows.map((r) => toSponsorship(r, currentPeriods.get(r.id))),
+        total,
+        limit: take,
+        offset: skip,
+      };
     });
+  }
+
+  /** Latest `SponsorshipPayment` per sponsorship id (S-5-REDISEÑO Objetivo 7)
+   *  — one batched query, not N+1. */
+  private async currentPeriodsBySponsorshipId(
+    tx: Prisma.TransactionClient,
+    sponsorshipIds: string[],
+  ): Promise<Map<string, CurrentPeriod>> {
+    if (sponsorshipIds.length === 0) {
+      return new Map();
+    }
+    const rows = await tx.sponsorshipPayment.findMany({
+      where: { sponsorshipId: { in: sponsorshipIds } },
+      orderBy: { createdAt: 'desc' },
+    });
+    const byId = new Map<string, CurrentPeriod>();
+    for (const row of rows) {
+      if (!byId.has(row.sponsorshipId)) {
+        byId.set(row.sponsorshipId, {
+          status: row.status as SponsorshipPaymentStatus,
+          attemptCount: row.attemptCount,
+        });
+      }
+    }
+    return byId;
   }
 
   /** One sponsorship of the caller's org. */
   async get(id: string): Promise<Sponsorship> {
     const organizationId = this.requireOrgId();
-    const row = await this.prisma.withOrgContext(organizationId, (tx) =>
-      tx.sponsorship.findUnique({ where: { id } }),
-    );
+    const { row, currentPeriod } = await this.prisma.withOrgContext(organizationId, async (tx) => {
+      const found = await tx.sponsorship.findUnique({ where: { id } });
+      const periods = found ? await this.currentPeriodsBySponsorshipId(tx, [found.id]) : new Map();
+      return { row: found, currentPeriod: found ? periods.get(found.id) : undefined };
+    });
     if (!row || row.organizationId !== organizationId) {
       throw new NotFoundException('Sponsorship not found');
     }
-    return toSponsorship(row);
+    return toSponsorship(row, currentPeriod);
   }
 
   /** The immutable status history of one of the caller's org sponsorships. */
@@ -312,6 +364,56 @@ export class SponsorshipsService {
       });
       return toSponsorship(updated);
     });
+  }
+
+  /**
+   * System-triggered transition for the recurring-billing job/poller
+   * (S-5-REDISEÑO) — no `TenantContextService`/ALS context exists in a
+   * background worker, so this takes an explicit `tx`/`organizationId`
+   * instead of `requireOrgId()`, and always uses `actorUserId: null` (a
+   * system action, same convention as `RemindersService`'s audit calls).
+   * Reuses the SAME validated state machine and writes the SAME history
+   * shape as the human-triggered `transition()` above — just without the
+   * HTTP-request-scoped plumbing a background job doesn't have.
+   */
+  async applySystemTransition(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    id: string,
+    to: SponsorshipStatus,
+    reason: string,
+  ): Promise<Sponsorship> {
+    const existing = await tx.sponsorship.findUnique({ where: { id } });
+    if (!existing || existing.organizationId !== organizationId) {
+      throw new NotFoundException('Sponsorship not found');
+    }
+    const from = existing.status as SponsorshipStatus;
+    const check = checkSponsorshipTransition(from, to);
+    if (!check.allowed) {
+      throw new BadRequestException(check.error);
+    }
+    const timestampField =
+      to === SponsorshipStatus.Suspended
+        ? { suspendedAt: new Date() }
+        : to === SponsorshipStatus.Active
+          ? { suspendedAt: null }
+          : {};
+    const updated = await tx.sponsorship.update({
+      where: { id },
+      data: { status: to, ...timestampField },
+    });
+    await tx.sponsorshipStatusHistory.create({
+      data: { organizationId, sponsorshipId: id, fromStatus: from, toStatus: to, reason },
+    });
+    await this.audit.recordWithTx(tx, {
+      organizationId,
+      actorUserId: null,
+      action: `sponsorship.${to}`,
+      entityType: 'sponsorship',
+      entityId: id,
+      metadata: { from, to, reason },
+    });
+    return toSponsorship(updated);
   }
 
   suspend(actorUserId: string, id: string, reason?: string): Promise<Sponsorship> {
