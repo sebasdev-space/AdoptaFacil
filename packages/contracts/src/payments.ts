@@ -79,6 +79,14 @@ export interface CollectionResult {
   collectionId: string;
   status: PaymentStatus;
   breakdown: PaymentBreakdown;
+  /**
+   * URL where the payer completes the checkout (e.g. the link sent in a "tu
+   * pago está listo" reminder for a recurring collection, T-057). Optional so
+   * a caller reading data persisted before this field existed (or a future
+   * adapter that genuinely has no separate checkout URL) never assumes it is
+   * present.
+   */
+  paymentLinkUrl?: string;
 }
 
 /** Normalized, idempotent webhook event (dedup by `dedupKey`). */
@@ -312,10 +320,12 @@ export class FakePaymentAdapter implements PaymentPort {
   static readonly PROVIDER = 'fake-local';
 
   async createCollection(input: CreateCollectionInput): Promise<CollectionResult> {
+    const collectionId = `fake-col-${stableHash(input.idempotencyKey)}`;
     return {
-      collectionId: `fake-col-${stableHash(input.idempotencyKey)}`,
+      collectionId,
       status: 'approved',
       breakdown: computeBreakdown(input.intendedAmount, input.commissionPayer),
+      paymentLinkUrl: `https://fake-checkout.local/l/${collectionId}`,
     };
   }
 
