@@ -105,7 +105,23 @@ describe('WompiPaymentAdapter (T-060, M15a — recaudo via Payment Links)', () =
       collectionId: 'link-123',
       status: 'pending',
       breakdown: expectedBreakdown,
+      paymentLinkUrl: 'https://checkout.wompi.co/l/link-123',
     });
+  });
+
+  it('builds the payment link URL from WOMPI_CHECKOUT_BASE_URL when overridden (e.g. sandbox)', async () => {
+    const fetchFn = jest.fn<ReturnType<WompiFetch>, Parameters<WompiFetch>>(() =>
+      Promise.resolve(jsonResponse({ data: { id: 'link-999' } }, 201)),
+    ) as unknown as WompiFetch;
+    const config = {
+      get: (key: string) =>
+        key === 'WOMPI_CHECKOUT_BASE_URL' ? 'https://checkout.uat.wompi.dev/' : ENV[key],
+    } as unknown as ConfigService<Env, true>;
+    const adapter = new WompiPaymentAdapter(config, fetchFn);
+
+    const result = await adapter.createCollection(baseInput);
+
+    expect(result.paymentLinkUrl).toBe('https://checkout.uat.wompi.dev/l/link-999');
   });
 
   it('is idempotent by reference: the SAME idempotencyKey always produces the SAME reference', async () => {

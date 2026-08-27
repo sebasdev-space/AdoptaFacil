@@ -156,6 +156,7 @@ function resolvePath(source: unknown, path: string): unknown {
 export class WompiPaymentAdapter implements PaymentPort {
   private readonly logger = new Logger('WompiPaymentAdapter');
   private readonly baseUrl: string;
+  private readonly checkoutBaseUrl: string;
   private readonly privateKey: string;
   private readonly eventsSecret: string;
 
@@ -168,6 +169,13 @@ export class WompiPaymentAdapter implements PaymentPort {
     this.baseUrl = (config.get('WOMPI_BASE_URL', { infer: true }) as string).replace(/\/$/, '');
     this.privateKey = config.get('WOMPI_PRIVATE_KEY', { infer: true }) as string;
     this.eventsSecret = config.get('WOMPI_EVENTS_SECRET', { infer: true }) as string;
+    // Falls back in-code (not just at the zod-schema level) so a caller that
+    // wires this adapter with a raw, unvalidated config object (as tests do)
+    // still gets a working checkout host.
+    this.checkoutBaseUrl = (
+      (config.get('WOMPI_CHECKOUT_BASE_URL', { infer: true }) as string | undefined) ??
+      'https://checkout.wompi.co'
+    ).replace(/\/$/, '');
   }
 
   /**
@@ -206,7 +214,12 @@ export class WompiPaymentAdapter implements PaymentPort {
 
     const body = (await response.json()) as WompiPaymentLinkCreated;
     this.logger.log(`payment link created id=${body.data.id} reference=${reference}`);
-    return { collectionId: body.data.id, status: 'pending', breakdown };
+    return {
+      collectionId: body.data.id,
+      status: 'pending',
+      breakdown,
+      paymentLinkUrl: `${this.checkoutBaseUrl}/l/${body.data.id}`,
+    };
   }
 
   /**

@@ -69,6 +69,14 @@ export const envSchema = z.object({
   WOMPI_PUBLIC_KEY: z.string().min(1).optional(),
   WOMPI_PRIVATE_KEY: z.string().min(1).optional(),
   WOMPI_EVENTS_SECRET: z.string().min(1).optional(),
+  // Host that serves the actual checkout PAGE for a Payment Link (the payer's
+  // browser destination) — a DIFFERENT host than WOMPI_BASE_URL (the API).
+  // Documented production pattern: https://checkout.wompi.co/l/<id>. NOT
+  // required (has a working production default) because the sandbox/uat host
+  // is unverified against real credentials — same caveat already flagged on
+  // WompiPaymentLinkFetched in wompi-payment.adapter.ts; override via env for
+  // sandbox once confirmed (T-060 manual step).
+  WOMPI_CHECKOUT_BASE_URL: z.string().url().default('https://checkout.wompi.co'),
   // S-5-REDISEÑO (M07/RF17, T-057): interval of the repeatable sponsorship
   // billing scan job — opens a new period for sponsorships that just reached
   // their nextBillingAt, and advances the reminder/retry ladder of open
