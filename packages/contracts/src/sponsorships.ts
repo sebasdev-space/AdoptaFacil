@@ -3,10 +3,18 @@
 // Recurring animal sponsorships (RF17, §9/§14). BASE slice (T-056): an
 // organization defines sponsorship PLANS for its animals; a sponsor (Person,
 // "padrino") subscribes to a plan; the organization suspends/reactivates/cancels
-// and sees the history. Money is INTEGER COP pesos (never float). This slice does
-// NOT process any payment — TODO(T-057): connect Sponsorship to PAYMENT_PORT for
-// real recurring charges and publish SponsorshipPayment. All timestamps are
-// ISO-8601 UTC (Colombia local time is a presentation concern only).
+// and sees the history. Money is INTEGER COP pesos (never float). All timestamps
+// are ISO-8601 UTC (Colombia local time is a presentation concern only).
+//
+// S-5-REDISEÑO (incluye T-057) — replaces the original S-5 design (automatic
+// debit does not exist; Wompi only exposes one-shot payment links). Adds
+// `SponsorshipPayment`/`SponsorshipPaymentAttempt`: a per-billing-period ledger
+// driven by the FIRST real cron job in this project (daily BullMQ scan), with a
+// tolerant reminder/retry ladder (up to 3 payment-link attempts) before
+// auto-suspension. Payment confirmation is via POLLING
+// `PaymentPort.getCollectionStatus()`, not the gateway webhook (that webhook is
+// hardcoded inside donations/**, Fabián's domain — extending it was out of
+// scope here, confirmed with the user 2026-08-24).
 
 /**
  * Billing cadence of a plan — CLOSED for now (`monthly`, the base document's
@@ -114,6 +122,19 @@ export interface Sponsorship {
   suspendedAt?: string;
   /** ISO-8601 UTC, set when cancelled (terminal). */
   cancelledAt?: string;
+  /**
+   * Status of the CURRENT billing period (S-5-REDISEÑO) — lets "Mis
+   * apadrinamientos" and the org management view show "pago pendiente / en
+   * riesgo" throughout the reminder/retry ladder, not only at the moment of
+   * final suspension (Objetivo 7). `undefined` when no period has been opened
+   * yet (e.g. a brand-new sponsorship before the daily job's first pass).
+   * Populated only by `list`/`get`/`listMine` (same "enrichment, not a real
+   * column" convention as `organizationName`/`planName` above).
+   */
+  currentPeriodStatus?: SponsorshipPaymentStatus;
+  /** How many payment-link attempts the current period has used (0-3). Only
+   *  present alongside {@link currentPeriodStatus}. */
+  currentPeriodAttemptCount?: number;
   /** ISO-8601 UTC. */
   createdAt: string;
 }
@@ -144,6 +165,81 @@ export interface SponsorshipStatusHistoryEntry {
 export interface SponsorshipStatusChangeInput {
   reason?: string;
 }
+
+// ============================================================================
+// S-5-REDISEÑO (M07, RF17, incluye T-057) — recurring billing ledger. One
+// `SponsorshipPayment` per (sponsorshipId, period); one `SponsorshipPaymentAttempt`
+// per payment LINK generated within that period (never a retry of the same
+// link — a new attempt is always a new `PaymentPort.createCollection()` call).
+// ============================================================================
+
+/**
+ * Lifecycle of one billing period. `paid`/`failed` are normally terminal —
+ * the ONE exception: `failed` -> `paid` when the sponsor recovers a
+ * billing-failure suspension by paying a new, sponsor-initiated link
+ * (Objetivo 6, "recuperación") against that same historical period.
+ */
+export enum SponsorshipPaymentStatus {
+  Pending = 'pending',
+  Paid = 'paid',
+  Failed = 'failed',
+}
+
+/** Outcome of one payment-link attempt. Terminal once `paid` or `expired` —
+ *  an expired attempt is never reused; the next attempt is a brand-new link. */
+export enum SponsorshipPaymentAttemptResult {
+  Pending = 'pending',
+  Paid = 'paid',
+  Expired = 'expired',
+}
+
+/**
+ * One payment link generated for one period. `collectionId` is
+ * `PaymentPort`'s own id (confirmed by polling `getCollectionStatus`, see the
+ * file header). `paymentLinkUrl` is OPTIONAL: `PaymentPort.CollectionResult`
+ * does not expose a checkout URL today — TODO(client): populate this once
+ * that contract gains one additively (Fabián's domain; not changed here).
+ */
+export interface SponsorshipPaymentAttempt {
+  id: string;
+  sponsorshipPaymentId: string;
+  attemptNumber: number;
+  collectionId: string;
+  paymentLinkUrl?: string;
+  /** ISO-8601 UTC — when this specific link stops being honored (a NEW
+   *  attempt is generated after this, never a retry of this same link). */
+  expiresAt: string;
+  result: SponsorshipPaymentAttemptResult;
+  /** ISO-8601 UTC. */
+  createdAt: string;
+}
+
+/**
+ * One billing period (`period` = `YYYY-MM`) of a sponsorship. `attempts` is
+ * the full ledger of links generated for it (1 to 3, oldest first).
+ */
+export interface SponsorshipPayment {
+  id: string;
+  sponsorshipId: string;
+  organizationId: string;
+  period: string;
+  status: SponsorshipPaymentStatus;
+  attempts: SponsorshipPaymentAttempt[];
+  /** ISO-8601 UTC. */
+  createdAt: string;
+}
+
+/**
+ * The exact free-text reason recorded on `SponsorshipStatusHistory` when the
+ * DAILY BILLING JOB auto-suspends a sponsorship after 3 failed attempts —
+ * distinguishes an automatic (billing-failure) suspension from a manual one
+ * by the organization, since RF17 does not add a new status value or a
+ * dedicated reason column for this (the existing free-text `reason` field is
+ * "deliberately generic", per its own doc comment). Compared by exact string
+ * equality wherever this distinction matters (auto-reactivation eligibility).
+ */
+export const BILLING_FAILURE_SUSPENSION_REASON =
+  'Pago fallido: se agotaron los 3 intentos de cobro.';
 
 // ============================================================================
 // Public (portal) projections — additive, NO sponsor PII. Lets Fabián's portal

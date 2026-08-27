@@ -69,6 +69,31 @@ export const envSchema = z.object({
   WOMPI_PUBLIC_KEY: z.string().min(1).optional(),
   WOMPI_PRIVATE_KEY: z.string().min(1).optional(),
   WOMPI_EVENTS_SECRET: z.string().min(1).optional(),
+  // S-5-REDISEÑO (M07/RF17, T-057): interval of the repeatable sponsorship
+  // billing scan job — opens a new period for sponsorships that just reached
+  // their nextBillingAt, and advances the reminder/retry ladder of open
+  // periods. Defaults to daily, same cadence as REMINDERS_SCAN_INTERVAL_MS.
+  SPONSORSHIP_BILLING_SCAN_INTERVAL_MS: z.coerce.number().int().positive().default(86_400_000),
+  // Interval of the payment-status POLLER (checks
+  // PaymentPort.getCollectionStatus for every pending attempt). Confirmation
+  // is via polling, not the gateway webhook — that webhook is hardcoded for
+  // concept_kind='campaign' inside donations/** (Fabián's domain); extending
+  // it for 'sponsorship' was out of scope here (confirmed with the user,
+  // 2026-08-24). A shorter interval than the daily scan keeps confirmation
+  // close to real time without needing that cross-domain change.
+  SPONSORSHIP_PAYMENT_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(300_000),
+  // Tolerant reminder/retry ladder day-offsets (S-5-REDISEÑO Objetivo 3),
+  // ALL measured from a billing period's OWN periodStartedAt — never a fixed
+  // calendar date. Product decision taken 2026-08-24 (equipo): several
+  // reminders + up to 2 new payment links (3 attempts total) before
+  // suspending. These are DEFAULTS, not a rule fixed by the base document —
+  // adjustable via env with no code change.
+  SPONSORSHIP_REMINDER_DAY_1: z.coerce.number().int().positive().default(5),
+  SPONSORSHIP_EXPIRE_ATTEMPT_1_DAY: z.coerce.number().int().positive().default(10),
+  SPONSORSHIP_REMINDER_DAY_2: z.coerce.number().int().positive().default(15),
+  SPONSORSHIP_EXPIRE_ATTEMPT_2_DAY: z.coerce.number().int().positive().default(20),
+  SPONSORSHIP_REMINDER_FINAL_DAY: z.coerce.number().int().positive().default(25),
+  SPONSORSHIP_EXPIRE_ATTEMPT_3_DAY: z.coerce.number().int().positive().default(30),
 });
 
 /** Runtime config type (from the base object schema). */

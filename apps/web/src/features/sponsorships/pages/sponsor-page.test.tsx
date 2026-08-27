@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  SponsorshipPaymentStatus,
   SponsorshipPeriodicity,
   SponsorshipStatus,
   type Sponsorship,
@@ -114,6 +115,67 @@ describe('SponsorPage — sin animalId muestra "Mis apadrinamientos"', () => {
 
     await screen.findByText('Firulais');
     expect(screen.queryByRole('button', { name: 'Ver historial' })).not.toBeInTheDocument();
+  });
+
+  it('S-5-REDISEÑO: muestra el aviso de pago en riesgo desde el 2º intento pendiente', async () => {
+    stubFetch((url) => {
+      if (url.includes('/sponsorships/mine')) {
+        return [
+          sponsorship({
+            currentPeriodStatus: SponsorshipPaymentStatus.Pending,
+            currentPeriodAttemptCount: 2,
+          }),
+        ];
+      }
+      return [];
+    });
+    renderShell({ route: '/apadrinar', ...personSession() });
+
+    await screen.findByText('Firulais');
+    expect(screen.getByText(/intento 2 de 3/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Pagar de nuevo/ })).not.toBeInTheDocument();
+  });
+
+  it('S-5-REDISEÑO: un apadrinamiento suspendido por pago fallido ofrece "Pagar de nuevo" y reintenta el cobro', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    let retried = false;
+    stubFetch((url, init) => {
+      calls.push({ url, init });
+      if (url.includes('/retry-payment') && init?.method === 'POST') {
+        retried = true;
+        return {
+          id: 'pay-1',
+          sponsorshipId: 's-1',
+          organizationId: 'org-1',
+          period: '2026-08',
+          status: 'pending',
+          attempts: [],
+          createdAt: '2026-08-01T00:00:00.000Z',
+        };
+      }
+      if (url.includes('/sponsorships/mine')) {
+        return [
+          sponsorship({
+            status: SponsorshipStatus.Suspended,
+            currentPeriodStatus: retried
+              ? SponsorshipPaymentStatus.Pending
+              : SponsorshipPaymentStatus.Failed,
+          }),
+        ];
+      }
+      return [];
+    });
+    renderShell({ route: '/apadrinar', ...personSession() });
+
+    await screen.findByText('Firulais');
+    expect(screen.getByText('Suspendido por pago fallido.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Pagar de nuevo' }));
+
+    await waitFor(() => {
+      const post = calls.find((c) => c.url.includes('/retry-payment') && c.init?.method === 'POST');
+      expect(post).toBeDefined();
+    });
+    expect(await screen.findByText('Nuevo cobro generado')).toBeInTheDocument();
   });
 });
 

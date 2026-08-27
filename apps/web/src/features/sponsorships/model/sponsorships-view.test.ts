@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
+  SponsorshipPaymentStatus,
   SponsorshipPeriodicity,
   SponsorshipStatus,
   type Sponsorship,
   type SponsorshipPlan,
 } from '@adoptafacil/contracts';
-import { computeSponsorshipMetrics, sponsorDisplayName } from './sponsorships-view';
+import {
+  computeSponsorshipMetrics,
+  isBillingFailureSuspension,
+  isPaymentAtRisk,
+  sponsorDisplayName,
+} from './sponsorships-view';
 
 function sponsorship(over: Partial<Sponsorship> = {}): Sponsorship {
   return {
@@ -95,6 +101,98 @@ describe('computeSponsorshipMetrics (T-DASH-APADRINAMIENTOS)', () => {
       monthlyIncomeTotal: 0,
       animalsSponsoredCount: 0,
       animalsTotalCount: 8,
+      atRiskCount: 0,
     });
+  });
+
+  it('counts atRiskCount only for pending periods with 2+ attempts already used (S-5-REDISEÑO)', () => {
+    const rows = [
+      sponsorship({ id: 's-1' }), // no period yet — not at risk
+      sponsorship({
+        id: 's-2',
+        currentPeriodStatus: SponsorshipPaymentStatus.Pending,
+        currentPeriodAttemptCount: 1,
+      }), // first attempt only — normal billing, not "at risk" yet
+      sponsorship({
+        id: 's-3',
+        currentPeriodStatus: SponsorshipPaymentStatus.Pending,
+        currentPeriodAttemptCount: 2,
+      }),
+      sponsorship({
+        id: 's-4',
+        currentPeriodStatus: SponsorshipPaymentStatus.Paid,
+        currentPeriodAttemptCount: 3,
+      }), // resolved (paid) — not at risk regardless of attempt count
+    ];
+    expect(computeSponsorshipMetrics(rows, new Map(), 4).atRiskCount).toBe(1);
+  });
+});
+
+describe('isPaymentAtRisk (S-5-REDISEÑO Objetivo 7)', () => {
+  it('is false with no open period', () => {
+    expect(isPaymentAtRisk(sponsorship())).toBe(false);
+  });
+
+  it('is false on the first attempt (normal billing, not yet a risk signal)', () => {
+    expect(
+      isPaymentAtRisk(
+        sponsorship({
+          currentPeriodStatus: SponsorshipPaymentStatus.Pending,
+          currentPeriodAttemptCount: 1,
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it('is true from the 2nd attempt onward while still pending', () => {
+    expect(
+      isPaymentAtRisk(
+        sponsorship({
+          currentPeriodStatus: SponsorshipPaymentStatus.Pending,
+          currentPeriodAttemptCount: 2,
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('is false once the period is resolved (paid or failed)', () => {
+    expect(
+      isPaymentAtRisk(
+        sponsorship({
+          currentPeriodStatus: SponsorshipPaymentStatus.Paid,
+          currentPeriodAttemptCount: 3,
+        }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe('isBillingFailureSuspension (S-5-REDISEÑO Objetivo 6)', () => {
+  it('is true when suspended with a failed period', () => {
+    expect(
+      isBillingFailureSuspension(
+        sponsorship({
+          status: SponsorshipStatus.Suspended,
+          currentPeriodStatus: SponsorshipPaymentStatus.Failed,
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('is false for a manual suspension (no failed period)', () => {
+    expect(isBillingFailureSuspension(sponsorship({ status: SponsorshipStatus.Suspended }))).toBe(
+      false,
+    );
+  });
+
+  it('is false when active, even with a failed period on record', () => {
+    expect(
+      isBillingFailureSuspension(
+        sponsorship({
+          status: SponsorshipStatus.Active,
+          currentPeriodStatus: SponsorshipPaymentStatus.Failed,
+        }),
+      ),
+    ).toBe(false);
   });
 });

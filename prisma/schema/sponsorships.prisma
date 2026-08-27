@@ -39,8 +39,10 @@ model SponsorshipPlan {
 /// `create_donation`). `animalId` is denormalized from the plan (per the base
 /// document's §14 model) for direct query without a join. `status` is the
 /// CURRENT state (active|suspended|cancelled); `SponsorshipStatusHistory` is its
-/// immutable audit trail. TODO(T-057): connect to PAYMENT_PORT for real recurring
-/// charges + SponsorshipPayment; this slice creates NO payment.
+/// immutable audit trail. Recurring billing (S-5-REDISEÑO/T-057): the gateway
+/// only supports one-shot payment links (no card tokenization) — see
+/// `SponsorshipPayment`/`SponsorshipPaymentAttempt` below for the per-period
+/// attempt ledger the daily billing job drives off `nextBillingAt`.
 model Sponsorship {
   id             String    @id @default(uuid()) @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid
@@ -61,17 +63,87 @@ model Sponsorship {
   startedAt      DateTime  @default(now()) @map("started_at")
   suspendedAt    DateTime? @map("suspended_at")
   cancelledAt    DateTime? @map("cancelled_at")
+  /// Next date this sponsorship owes a billing period (S-5-REDISEÑO). Each
+  /// sponsorship keeps its OWN anchor (defaults to `now()` at subscribe time,
+  /// i.e. the first period starts immediately) so the daily job can tell which
+  /// sponsorships are due TODAY without a single fixed billing date for
+  /// everyone. Advanced by +1 month by the billing job once a period resolves
+  /// (paid or failed) — never by a direct sponsor/org write.
+  nextBillingAt  DateTime  @default(now()) @map("next_billing_at")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
-  plan    SponsorshipPlan            @relation(fields: [planId], references: [id], onDelete: Cascade)
-  history SponsorshipStatusHistory[]
+  plan     SponsorshipPlan            @relation(fields: [planId], references: [id], onDelete: Cascade)
+  history  SponsorshipStatusHistory[]
+  payments SponsorshipPayment[]
 
   @@index([organizationId])
   @@index([planId])
   @@index([animalId])
   @@index([sponsorUserId])
   @@map("sponsorships")
+}
+
+/// One BILLING PERIOD of a sponsorship (S-5-REDISEÑO/T-057), `period` = 'YYYY-MM'.
+/// `status`: pending (still trying) → paid | failed (terminal). `periodStartedAt`
+/// is day-0 of the tolerant reminder/retry ladder (Objetivo 3) — every day-offset
+/// threshold is measured from THIS timestamp, never from a fixed calendar date,
+/// so the ladder is robust to the daily job catching up after downtime.
+/// `attemptCount`/`remindersSent` are the ladder's own persisted state (NOT
+/// derived from `attempts.length` — a reminder does not create an attempt row).
+/// One row per (sponsorshipId, period) — a period is opened at most once.
+model SponsorshipPayment {
+  id              String    @id @default(uuid()) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  sponsorshipId   String    @map("sponsorship_id") @db.Uuid
+  period          String
+  status          String    @default("pending")
+  periodStartedAt DateTime  @default(now()) @map("period_started_at")
+  attemptCount    Int       @default(0) @map("attempt_count")
+  remindersSent   Int       @default(0) @map("reminders_sent")
+  paidAt          DateTime? @map("paid_at")
+  failedAt        DateTime? @map("failed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  sponsorship Sponsorship                 @relation(fields: [sponsorshipId], references: [id], onDelete: Cascade)
+  attempts    SponsorshipPaymentAttempt[]
+
+  @@unique([sponsorshipId, period])
+  @@index([organizationId])
+  @@index([sponsorshipId])
+  @@map("sponsorship_payments")
+}
+
+/// One payment LINK generated for one period (S-5-REDISEÑO/T-057) — a distinct
+/// `PaymentPort.createCollection()` call, never a retry of the same collection
+/// (a new link is always a NEW resource with its own `collectionId`). Content is
+/// immutable after insert (the migration's trigger enforces this); only `result`
+/// transitions, pending → paid | expired (terminal), also trigger-validated.
+/// `idempotencyKey` is deterministic per
+/// `sponsorship:<sponsorshipId>:<period>:attempt:<attemptNumber>` so a crashed/
+/// re-run job step can never create two links for the same attempt.
+/// `paymentLinkUrl` is nullable: `PaymentPort.CollectionResult` does not expose a
+/// checkout URL today (TODO(client) — see the S-5-REDISEÑO closing report) —
+/// populated only once/if that contract gains one additively.
+model SponsorshipPaymentAttempt {
+  id                   String    @id @default(uuid()) @db.Uuid
+  organizationId       String    @map("organization_id") @db.Uuid
+  sponsorshipPaymentId String    @map("sponsorship_payment_id") @db.Uuid
+  attemptNumber        Int       @map("attempt_number")
+  collectionId         String    @map("collection_id")
+  paymentLinkUrl       String?   @map("payment_link_url")
+  idempotencyKey       String    @unique @map("idempotency_key")
+  expiresAt            DateTime  @map("expires_at")
+  result               String    @default("pending")
+  createdAt            DateTime  @default(now()) @map("created_at")
+
+  payment SponsorshipPayment @relation(fields: [sponsorshipPaymentId], references: [id], onDelete: Cascade)
+
+  @@unique([sponsorshipPaymentId, attemptNumber])
+  @@index([organizationId])
+  @@index([collectionId])
+  @@map("sponsorship_payment_attempts")
 }
 
 /// Append-only history of sponsorship status changes (RF17). Same pattern as

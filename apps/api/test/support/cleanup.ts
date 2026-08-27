@@ -33,6 +33,11 @@ import type { PrismaClient } from '@prisma/client';
 // RF18/RF19, S-6) is append-only from day one, same convention. reviews (M12,
 // RF23, S-7) too: the app role never gets UPDATE/DELETE, and its DELETE/
 // TRUNCATE triggers reject removal for every role including superuser.
+// sponsorship_payments/sponsorship_payment_attempts (M07, RF17,
+// S-5-REDISEÑO) allow UPDATE (the billing job mutates status/counters
+// through normal RLS-scoped writes) but their DELETE/TRUNCATE triggers
+// reject removal for every role the same way — purged here under replica
+// mode too.
 const APPEND_ONLY_TABLES = [
   'audit_logs',
   'formalization_transitions',
@@ -47,6 +52,8 @@ const APPEND_ONLY_TABLES = [
   'campaign_evidences',
   'volunteer_certificates',
   'reviews',
+  'sponsorship_payment_attempts',
+  'sponsorship_payments',
 ];
 
 export async function purgeOrganizations(

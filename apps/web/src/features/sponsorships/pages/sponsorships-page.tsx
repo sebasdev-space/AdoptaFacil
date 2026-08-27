@@ -36,6 +36,7 @@ import {
   computeSponsorshipMetrics,
   formatBogota,
   formatCop,
+  isPaymentAtRisk,
   shortId,
   SPONSORSHIP_STATUS_LABELS,
   sponsorDisplayName,
@@ -61,9 +62,10 @@ import styles from './sponsorships-page.module.scss';
  *    `computeSponsorshipMetrics` sobre los apadrinamientos + planes ya en
  *    memoria (mismo criterio que el resto del proyecto: sin agregado nuevo de
  *    backend si se puede derivar del que ya existe).
- *  - Pagos fallidos: NO existe ese concepto todavía (T-057 no conecta
- *    PAYMENT_PORT; `SponsorshipStatus` no tiene un estado de pago fallido) —
- *    se muestra "—" con una nota, nunca un número fabricado.
+ *  - En riesgo de suspensión (S-5-REDISEÑO, T-057): apadrinamientos con un
+ *    período de cobro `pending` y 2+ intentos ya usados (de 3) — dato REAL
+ *    desde `Sponsorship.currentPeriodStatus`/`currentPeriodAttemptCount`,
+ *    ahora que el cobro recurrente quedó conectado.
  */
 export function SponsorshipsPage() {
   const client = useApiClient();
@@ -194,18 +196,7 @@ export function SponsorshipsPage() {
               label="Animales apadrinados"
               value={`${metrics.animalsSponsoredCount} / ${metrics.animalsTotalCount}`}
             />
-            <StatCard
-              label="Pagos fallidos"
-              value="—"
-              accessory={
-                <span
-                  className="text-xs text-muted-foreground"
-                  title="Próximamente: T-057 conecta el cobro recurrente real (PaymentPort). Hoy ningún apadrinamiento procesa pagos, así que no hay nada que reportar como fallido todavía."
-                >
-                  Próximamente
-                </span>
-              }
-            />
+            <StatCard label="En riesgo de suspensión" value={metrics.atRiskCount} />
           </div>
 
           <Table>
@@ -238,6 +229,11 @@ export function SponsorshipsPage() {
                       <Badge variant={sponsorshipStatusVariant(sponsorship.status)}>
                         {SPONSORSHIP_STATUS_LABELS[sponsorship.status]}
                       </Badge>
+                      {isPaymentAtRisk(sponsorship) && (
+                        <Badge variant="warning">
+                          Pago pendiente ({sponsorship.currentPeriodAttemptCount}/3)
+                        </Badge>
+                      )}
                     </TableCell>
                     {canManage && (
                       <TableCell>

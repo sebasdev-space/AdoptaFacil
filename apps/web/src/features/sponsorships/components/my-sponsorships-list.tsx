@@ -1,11 +1,22 @@
 import { useEffect, useState } from 'react';
 import type { Sponsorship } from '@adoptafacil/contracts';
-import { Badge, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@adoptafacil/ui';
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Skeleton,
+  useToast,
+} from '@adoptafacil/ui';
 import { useApiClient } from '../../../shell/api';
-import { listMySponsorships } from '../api/sponsorships-api';
+import { listMySponsorships, retrySponsorshipPayment } from '../api/sponsorships-api';
 import {
   formatBogota,
   formatCop,
+  isBillingFailureSuspension,
+  isPaymentAtRisk,
   normalizeSponsorships,
   SPONSORSHIP_PERIODICITY_LABELS,
   SPONSORSHIP_STATUS_LABELS,
@@ -29,9 +40,16 @@ import styles from './my-sponsorships-list.module.scss';
  */
 export function MySponsorshipsList() {
   const client = useApiClient();
+  const { toast } = useToast();
   const [sponsorships, setSponsorships] = useState<Sponsorship[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
+
+  const load = async (): Promise<void> => {
+    const body = await listMySponsorships(client);
+    setSponsorships(normalizeSponsorships(body));
+  };
 
   useEffect(() => {
     let active = true;
@@ -49,6 +67,27 @@ export function MySponsorshipsList() {
       active = false;
     };
   }, [client]);
+
+  const retryPayment = async (sponsorship: Sponsorship): Promise<void> => {
+    setRetryingId(sponsorship.id);
+    try {
+      await retrySponsorshipPayment(client, sponsorship.id);
+      await load();
+      toast({
+        title: 'Nuevo cobro generado',
+        description: 'Cuando se confirme el pago, tu apadrinamiento se reactivará automáticamente.',
+        variant: 'success',
+      });
+    } catch (error) {
+      toast({
+        title: 'No se pudo generar un nuevo cobro',
+        description: error instanceof Error ? error.message : 'Inténtalo de nuevo.',
+        variant: 'destructive',
+      });
+    } finally {
+      setRetryingId(null);
+    }
+  };
 
   if (loading) return <Skeleton className="h-64 w-full" />;
 
@@ -95,6 +134,25 @@ export function MySponsorshipsList() {
                   Desde {formatBogota(sponsorship.startedAt)}
                   {sponsorship.planName ? ` · ${sponsorship.planName}` : ''}
                 </p>
+                {isPaymentAtRisk(sponsorship) && (
+                  <p className={styles['hint--error']}>
+                    Pago pendiente — intento {sponsorship.currentPeriodAttemptCount} de 3. Si no se
+                    confirma pronto, el apadrinamiento se suspenderá.
+                  </p>
+                )}
+                {isBillingFailureSuspension(sponsorship) && (
+                  <div className="flex items-center gap-2">
+                    <p className={styles['hint--error']}>Suspendido por pago fallido.</p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={retryingId === sponsorship.id}
+                      onClick={() => void retryPayment(sponsorship)}
+                    >
+                      {retryingId === sponsorship.id ? 'Generando…' : 'Pagar de nuevo'}
+                    </Button>
+                  </div>
+                )}
               </li>
             ))}
           </ul>
