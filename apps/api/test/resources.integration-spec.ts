@@ -133,6 +133,28 @@ describe('Resources (M09, F-6: needs → offers → deliveries → evidence, RBA
     expect(detail.body).toMatchObject({ id: needId, organizationId: org.orgId });
   });
 
+  it("F-NEEDS-PORTAL-1: the public catalog filters by organization — NEVER returns another org's needs (§M14 portal)", async () => {
+    const otherOrg = await registerOrg('other-org');
+    const otherNeed = await createNeed(otherOrg.token, { title: 'Camas para perros' }).expect(201);
+
+    const scoped = await request(server)
+      .get(`/public/resources/needs?organizationId=${org.orgId}`)
+      .expect(200);
+    expect(
+      scoped.body.items.every((n: { organizationId: string }) => n.organizationId === org.orgId),
+    ).toBe(true);
+    expect(scoped.body.items.some((n: { id: string }) => n.id === needId)).toBe(true);
+    expect(scoped.body.items.some((n: { id: string }) => n.id === otherNeed.body.id)).toBe(false);
+
+    const scopedToOther = await request(server)
+      .get(`/public/resources/needs?organizationId=${otherOrg.orgId}`)
+      .expect(200);
+    expect(scopedToOther.body.items.some((n: { id: string }) => n.id === otherNeed.body.id)).toBe(
+      true,
+    );
+    expect(scopedToOther.body.items.some((n: { id: string }) => n.id === needId)).toBe(false);
+  });
+
   it('rejects an offer with a quantity that is not a positive integer', async () => {
     await offer(donor.token, needId, 0).expect(400);
     await offer(donor.token, needId, -5).expect(400);

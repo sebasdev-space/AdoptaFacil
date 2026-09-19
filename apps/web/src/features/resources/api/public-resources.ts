@@ -3,6 +3,7 @@ import type { ResourceNeedPublic, ResourceNeedsPage } from '@adoptafacil/contrac
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
 export interface ListPublicNeedsParams {
+  organizationId?: string;
   limit?: number;
   offset?: number;
   signal?: AbortSignal;
@@ -11,16 +12,20 @@ export interface ListPublicNeedsParams {
 /**
  * Consume el catálogo PÚBLICO de necesidades (M09): `GET /public/resources/needs`
  * (solo necesidades que aún aceptan ayuda, columnas públicas). Sin token.
+ * Filtro opcional `organizationId` (§M14 portal, F-NEEDS-PORTAL-1) — mismo
+ * patrón que `organizationId` en `listPublicProducts` (`public-marketplace.ts`).
  *
  * ⚠️ Blindaje anti-regresión (mismo patrón que `public-campaigns.ts`): SIEMPRE
  * se normaliza `.items` a `[]` si no es un array.
  */
 export async function listPublicNeeds({
+  organizationId,
   limit,
   offset,
   signal,
 }: ListPublicNeedsParams = {}): Promise<ResourceNeedsPage> {
   const params = new URLSearchParams();
+  if (organizationId) params.set('organizationId', organizationId);
   if (typeof limit === 'number') params.set('limit', String(limit));
   if (typeof offset === 'number') params.set('offset', String(offset));
   const qs = params.toString();

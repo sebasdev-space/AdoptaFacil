@@ -132,17 +132,16 @@ describe('OrgPublicPage — rich public portal', () => {
     renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
     await screen.findByRole('heading', { name: /Refugio Patitas/ });
 
-    // Pulido visual (T-D02): necesita hoy/transparencia have NO owning module yet
-    // (status stays 'placeholder' forever until one exists) — showing an empty
-    // "Próximamente" card in front of the client reads as unfinished, so these
-    // sections are simply not mounted. 'pets' (T-052), 'products'
-    // (F-MKT-PORTAL-1) and 'activeCampaign' (F-CAMPANAS-PORTAL-2, S2-07) are
-    // LIVE and always show.
-    for (const title of ['Necesita hoy', 'Transparencia']) {
-      expect(screen.queryByRole('heading', { name: title })).not.toBeInTheDocument();
-    }
+    // Pulido visual (T-D02): transparencia has NO owning module yet (status
+    // stays 'placeholder' forever until one exists) — showing an empty
+    // "Próximamente" card in front of the client reads as unfinished, so that
+    // section is simply not mounted. 'pets' (T-052), 'products'
+    // (F-MKT-PORTAL-1), 'needsToday' (F-NEEDS-PORTAL-1) and 'activeCampaign'
+    // (F-CAMPANAS-PORTAL-2, S2-07) are LIVE and always show.
+    expect(screen.queryByRole('heading', { name: 'Transparencia' })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Mascotas en adopción' })).toBeInTheDocument();
     expect(await screen.findByRole('heading', { name: 'Productos' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Necesita hoy' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Campaña activa' })).toBeInTheDocument();
   });
 
@@ -194,6 +193,58 @@ describe('OrgPublicPage — rich public portal', () => {
 
     expect(await screen.findByText('Correa reflectiva')).toBeInTheDocument();
     expect(screen.getByTestId('product-card')).toBeInTheDocument();
+  });
+
+  it('F-NEEDS-PORTAL-1: mounts the "Necesita hoy" section wired to the resource bank scoped to THIS organization', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith('/theme')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => ({ tokens: {} }) });
+        }
+        if (url.includes('/resources/needs')) {
+          expect(url).toContain('organizationId=org-1');
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({
+              items: [
+                {
+                  id: 'n1',
+                  organizationId: 'org-1',
+                  organizationName: 'Refugio Patitas',
+                  title: 'Alimento para gatos',
+                  category: 'food',
+                  quantityNeeded: 20,
+                  unit: 'kg',
+                  quantityFulfilled: 5,
+                  progress: 0.25,
+                  status: 'partially_fulfilled',
+                  createdAt: '2026-07-01T00:00:00.000Z',
+                },
+              ],
+              total: 1,
+              limit: 12,
+              offset: 0,
+            }),
+          });
+        }
+        if (url.includes('/marketplace/products') || url.includes('/animals')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => ({ items: [], total: 0, limit: 1, offset: 0 }),
+          });
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => ORG });
+      }),
+    );
+    renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
+    await screen.findByRole('heading', { name: /Refugio Patitas/ });
+
+    expect(await screen.findByText('Alimento para gatos')).toBeInTheDocument();
+    expect(screen.getByTestId('need-card')).toBeInTheDocument();
   });
 
   it('F-CAMPANAS-PORTAL-2: mounts the "Campaña activa" section wired to real data from the org-scoped feed', async () => {
