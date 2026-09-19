@@ -124,6 +124,31 @@ describe('Platform dashboards (M13, RF24, S-8)', () => {
   });
 
   it("PlatformAdmin's consolidated counts match each queue's own current length exactly", async () => {
+    // create_review (S7 fix, RF23) now requires a completed interaction between
+    // the author and the organization — grant one via an approved donation
+    // (same request/webhook shape already used below in this file) before
+    // reviewing, otherwise the review is rejected with 400.
+    const idempotencyKey = `s8-review-interaction-${randomUUID()}`;
+    const donation = await request(server)
+      .post('/donations')
+      .set('Authorization', `Bearer ${person.token}`)
+      .send({
+        organizationId: org.orgId,
+        intendedAmount: 10_000,
+        commissionPayer: 'organization',
+        idempotencyKey,
+      })
+      .expect(201);
+    await request(server)
+      .post('/donations/webhook')
+      .set('x-payment-signature', 'fake-sig')
+      .send({
+        collectionId: donation.body.collectionId,
+        status: 'approved',
+        eventId: `s8-review-interaction-evt-${randomUUID()}`,
+      })
+      .expect(200);
+
     // Create one pending item in each queue so none of the three is trivially 0.
     await request(server)
       .post('/reviews')
