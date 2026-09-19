@@ -241,6 +241,20 @@ export interface SponsorshipPayment {
 export const BILLING_FAILURE_SUSPENSION_REASON =
   'Pago fallido: se agotaron los 3 intentos de cobro.';
 
+/**
+ * The exact free-text reason recorded on `SponsorshipStatusHistory` when
+ * `POST /animals/:id/register-death` (M07 hallazgo QA) auto-suspends every
+ * ACTIVE sponsorship of an animal marked deceased — same rationale and
+ * comparison convention as {@link BILLING_FAILURE_SUSPENSION_REASON} above
+ * (a system-triggered suspension distinguished by exact string equality,
+ * since RF17 does not add a dedicated reason column). Reassigning the
+ * sponsor to another animal, refunding the current period, and a
+ * personalized notification message are a FUTURE entregable — TODO(client):
+ * this reason only records the fact, it makes no promise about those.
+ */
+export const ANIMAL_DECEASED_SUSPENSION_REASON =
+  'Apadrinamiento suspendido: el animal fue registrado como fallecido.';
+
 // ============================================================================
 // Public (portal) projections — additive, NO sponsor PII. Lets Fabián's portal
 // show "this animal has N active sponsors" and the plans available to sponsor it,

@@ -31,6 +31,12 @@ import { SponsorshipsService } from './sponsorships.service';
  * see `sponsorship-payment-poller.service.ts`'s header comment). Consumes
  * core (tenant/auth/rbac/audit/payments/notifications) — global providers;
  * AuthModule is imported for the JwtAuthGuard.
+ *
+ * Exports `SponsorshipsService` (M07 hallazgo QA, `POST
+ * /animals/:id/register-death`): AnimalsModule imports THIS module to reuse
+ * `applySystemTransition` — the SAME method/pattern
+ * `sponsorship-billing.service.ts` already uses for the auto-suspension on
+ * billing failure — instead of duplicating the sponsorship state machine.
  */
 @Module({
   imports: [AuthModule, BullModule.registerQueue({ name: SPONSORSHIP_BILLING_QUEUE })],
@@ -45,5 +51,6 @@ import { SponsorshipsService } from './sponsorships.service';
     SponsorshipBillingScheduler,
     SponsorshipBillingProcessor,
   ],
+  exports: [SponsorshipsService],
 })
 export class SponsorshipsModule {}

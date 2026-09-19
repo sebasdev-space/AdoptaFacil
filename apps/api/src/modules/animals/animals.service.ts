@@ -6,14 +6,15 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import type {
-  Prisma,
   Animal as AnimalRow,
   AnimalBreed as BreedRow,
   AnimalPhoto as PhotoRow,
 } from '@prisma/client';
 import {
   type Animal,
+  ANIMAL_DECEASED_SUSPENSION_REASON,
   type AnimalBreed,
   type AnimalPhoto,
   type AnimalPhotoUploadResult,
@@ -23,12 +24,16 @@ import {
   type AnimalStatus,
   type CreateAnimalBreedInput,
   type CreateAnimalInput,
+  SponsorshipStatus,
   type UpdateAnimalInput,
 } from '@adoptafacil/contracts';
+import type { NotificationPort } from '../../core/notifications/notification.port';
+import { NOTIFICATION_PORT } from '../../core/notifications/notification.port';
 import { AuditService } from '../../core/audit/audit.service';
 import { isUniqueConstraintViolation } from '../../core/errors/prisma-conflict.util';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../core/tenant/tenant-context.service';
+import { SponsorshipsService } from '../sponsorships/sponsorships.service';
 import { computeAge } from './animal-age';
 import { STORAGE_PORT, type StoragePort } from '../../core/storage/storage.port';
 
@@ -37,6 +42,14 @@ type AnimalWithRelations = AnimalRow & { photos: PhotoRow[]; breed: BreedRow | n
 /** Adoption request statuses that block a delete/soft-remove (RF07 §3.4). */
 const ACTIVE_ADOPTION_STATUSES = ['new', 'in_review', 'approved'] as const;
 
+/** Row from `sponsorship_active_sponsors_for_animal()` (M07 hallazgo QA, raw
+ *  SQL SECURITY DEFINER — see the migration's header comment). */
+interface ActiveSponsorRow {
+  sponsorship_id: string;
+  sponsor_user_id: string;
+  sponsor_email: string;
+}
+
 @Injectable()
 export class AnimalsService {
   constructor(
@@ -44,6 +57,8 @@ export class AnimalsService {
     private readonly tenant: TenantContextService,
     private readonly audit: AuditService,
     @Inject(STORAGE_PORT) private readonly storage: StoragePort,
+    private readonly sponsorships: SponsorshipsService,
+    @Inject(NOTIFICATION_PORT) private readonly notifications: NotificationPort,
   ) {}
 
   private requireOrgId(): string {
@@ -290,6 +305,101 @@ export class AnimalsService {
         entityId: id,
       });
     });
+  }
+
+  /**
+   * Register an animal as deceased (M07 hallazgo QA: "Registrar fallecimiento"
+   * was a `ComingSoon` placeholder with no real backend — see
+   * `animal-deceased-modal.tsx`'s prior doc comment). Same role gate as
+   * {@link remove} (Owner/Administrator only — a terminal, sensitive change to
+   * the record, not a routine edit). Within ONE transaction:
+   *   1. Marks the animal `status='deceased'` + `isActive=false` (same
+   *      "no longer in adoption" flag `setActive`/`remove` already use).
+   *   2. Suspends every ACTIVE sponsorship of this animal via
+   *      `SponsorshipsService.applySystemTransition` — the SAME method/reason
+   *      pattern `sponsorship-billing.service.ts` uses for its own
+   *      system-triggered suspension (billing failure), just with
+   *      {@link ANIMAL_DECEASED_SUSPENSION_REASON} instead. Sponsorships that
+   *      are already suspended/cancelled are left untouched (only `active`
+   *      rows are looked up in the first place).
+   *   3. Audits `animal.deceased` with the affected-sponsorship COUNT only
+   *      (never sponsor PII) in metadata.
+   * Sponsor emails for the affected sponsorships are resolved INSIDE the same
+   * transaction (AFTER confirming the animal belongs to the caller's org —
+   * never before, so a request for another org's animal id never triggers the
+   * cross-tenant read at all) via the bounded
+   * `sponsorship_active_sponsors_for_animal` SECURITY DEFINER function (a
+   * sponsor is a Person outside this org, so their email sits behind `users`'
+   * RLS — same cross-tenant-read rationale as `sponsorships_due_for_billing()`),
+   * then notified BEST-EFFORT after commit (same "notify outside the tx"
+   * convention as the billing service) with an honest message: no promised
+   * refund or automatic reassignment — those stay TODO(client), exactly as the
+   * modal already documented.
+   */
+  async registerDeath(actorUserId: string, id: string): Promise<Animal> {
+    const organizationId = this.requireOrgId();
+
+    const { animal, activeSponsors } = await this.prisma.withOrgContext(
+      organizationId,
+      async (tx) => {
+        const existing = await tx.animal.findUnique({ where: { id } });
+        if (!existing || existing.organizationId !== organizationId) {
+          throw new NotFoundException('Animal not found');
+        }
+
+        const updated = await tx.animal.update({
+          where: { id },
+          data: { status: 'deceased', isActive: false },
+          include: { photos: true, breed: true },
+        });
+
+        const sponsors = await tx.$queryRaw<ActiveSponsorRow[]>(
+          Prisma.sql`SELECT * FROM sponsorship_active_sponsors_for_animal(${id}::uuid)`,
+        );
+
+        for (const sponsor of sponsors) {
+          await this.sponsorships.applySystemTransition(
+            tx,
+            organizationId,
+            sponsor.sponsorship_id,
+            SponsorshipStatus.Suspended,
+            ANIMAL_DECEASED_SUSPENSION_REASON,
+          );
+        }
+
+        await this.audit.recordWithTx(tx, {
+          organizationId,
+          actorUserId,
+          action: 'animal.deceased',
+          entityType: 'animal',
+          entityId: id,
+          metadata: { affectedSponsorshipsCount: sponsors.length },
+        });
+
+        return { animal: this.toAnimal(updated), activeSponsors: sponsors };
+      },
+    );
+
+    for (const sponsor of activeSponsors) {
+      await this.notifyBestEffort(
+        sponsor.sponsor_email,
+        'Un animal que apadrinas falleció',
+        `${animal.name} falleció y tu apadrinamiento fue suspendido. La organización se pondrá en contacto contigo.`,
+      );
+    }
+
+    return animal;
+  }
+
+  /** Best-effort notification — a delivery failure never fails the request
+   *  (same convention as `SponsorshipBillingService.notifyBestEffort`). */
+  private async notifyBestEffort(to: string, subject: string, body: string): Promise<void> {
+    try {
+      await this.notifications.send({ to, subject, body });
+    } catch {
+      // Best-effort: the death registration already succeeded; a notification
+      // failure must not roll it back or surface as a request error.
+    }
   }
 
   // --- Photos ----------------------------------------------------------------

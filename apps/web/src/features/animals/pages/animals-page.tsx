@@ -43,13 +43,19 @@ const SPECIES_FILTER_OPTIONS: { value: 'all' | AnimalSpecies; label: string }[] 
 
 /** El mockup de este refactor listaba "En tratamiento"/"Reservado" como
  *  ejemplos ilustrativos, pero `AnimalStatus` (packages/contracts/src/
- *  animals.ts) no distingue esos matices — solo tiene estos 4 valores reales.
- *  Se etiquetan con los nombres reales en vez de inventar sub-estados. */
+ *  animals.ts) no distingue esos matices — solo tiene estos valores reales.
+ *  Se etiquetan con los nombres reales en vez de inventar sub-estados.
+ *  `deceased` (M07 hallazgo QA, `POST /animals/:id/register-death`) se agrega
+ *  aquí SOLO para que este mapa exhaustivo siga compilando — el animal ya
+ *  queda oculto de la lista por defecto vía `isActive=false`, igual que
+ *  cualquier otro registro desactivado; este badge solo se ve con
+ *  `includeInactive`. */
 const STATUS_LABELS: Record<AnimalStatus, string> = {
   available: 'En adopción',
   in_process: 'En proceso',
   adopted: 'Adoptado',
   unavailable: 'No disponible',
+  deceased: 'Fallecido',
 };
 
 const STATUS_BADGE_VARIANT: Record<AnimalStatus, BadgeVariant> = {
@@ -57,6 +63,7 @@ const STATUS_BADGE_VARIANT: Record<AnimalStatus, BadgeVariant> = {
   in_process: 'info',
   adopted: 'secondary',
   unavailable: 'outline',
+  deceased: 'destructive',
 };
 
 /** Etiqueta de edad derivada (calculada en la API). */
