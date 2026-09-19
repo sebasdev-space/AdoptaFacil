@@ -34,8 +34,9 @@ const SUMMARY = {
   activeSponsorships: 6,
   organizationsByDepartment: [
     { department: 'Antioquia', count: 4 },
-    { department: 'Bogotá D.C.', count: 2 },
+    { department: 'Bogotá, D.C.', count: 2 },
   ],
+  organizationsGrowth: { currentPeriodCount: 9, previousPeriodCount: 6, growthRatePct: 50 },
 };
 
 function stubFetch(body: unknown) {
@@ -53,7 +54,7 @@ function stubFetch(body: unknown) {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('PlatformSuperAdminDashboardPage (RF24)', () => {
-  it('shows financial totals, business counts, verification levels and department bars', async () => {
+  it('shows financial totals, business counts, verification levels and the Colombia choropleth', async () => {
     stubFetch(SUMMARY);
     renderShell({
       route: '/plataforma/dashboard/financiero',
@@ -61,11 +62,50 @@ describe('PlatformSuperAdminDashboardPage (RF24)', () => {
     });
 
     expect(await screen.findByText(/\$\s?1\.000\.000/)).toBeInTheDocument();
-    expect(screen.getByText('Antioquia')).toBeInTheDocument();
-    expect(screen.getByText('Bogotá D.C.')).toBeInTheDocument();
+    expect(
+      screen.getByRole('img', { name: /Mapa de Colombia con organizaciones registradas/ }),
+    ).toBeInTheDocument();
+    // `<title>` lives inside each <path> (per-shape tooltip/accessible name),
+    // not `svg > title`, so `getByText` (not `getByTitle`, which only looks
+    // at `svg > title`) is how RTL reaches it.
+    expect(screen.getByText('Antioquia: 4 organizaciones')).toBeInTheDocument();
+    expect(screen.getByText('Bogotá, D.C.: 2 organizaciones')).toBeInTheDocument();
+    // Every other department renders too (count 0), just with the muted fill.
+    expect(screen.getByText('Vichada: 0 organizaciones')).toBeInTheDocument();
     expect(screen.getByText('Sin verificar')).toBeInTheDocument();
     expect(screen.getByText('Verificado')).toBeInTheDocument();
     expect(screen.getByText('12')).toBeInTheDocument(); // activeAnimals
+    expect(screen.getByText('9')).toBeInTheDocument(); // organizationsGrowth.currentPeriodCount
+    expect(screen.getByText(/▲ \+50% vs\. mes anterior/)).toBeInTheDocument();
+  });
+
+  it('lists a department that does not match any known map shape separately, instead of dropping it', async () => {
+    stubFetch({
+      ...SUMMARY,
+      organizationsByDepartment: [
+        ...SUMMARY.organizationsByDepartment,
+        { department: 'Sin especificar', count: 3 },
+      ],
+    });
+    renderShell({
+      route: '/plataforma/dashboard/financiero',
+      ...sessionWith([Role.PlatformSuperAdmin]),
+    });
+
+    expect(await screen.findByText('Sin especificar: 3')).toBeInTheDocument();
+  });
+
+  it('shows a negative growth rate with a down arrow when organizations registered fewer than the previous period', async () => {
+    stubFetch({
+      ...SUMMARY,
+      organizationsGrowth: { currentPeriodCount: 3, previousPeriodCount: 6, growthRatePct: -50 },
+    });
+    renderShell({
+      route: '/plataforma/dashboard/financiero',
+      ...sessionWith([Role.PlatformSuperAdmin]),
+    });
+
+    expect(await screen.findByText(/▼ -50% vs\. mes anterior/)).toBeInTheDocument();
   });
 
   it('denies a normal PlatformAdmin (financial data is SuperAdmin-only)', async () => {

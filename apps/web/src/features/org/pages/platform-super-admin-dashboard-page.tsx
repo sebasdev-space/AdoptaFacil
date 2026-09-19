@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Role, type PlatformSuperAdminDashboardSummary } from '@adoptafacil/contracts';
+import {
+  type OrganizationDepartmentCount,
+  Role,
+  type PlatformSuperAdminDashboardSummary,
+} from '@adoptafacil/contracts';
 import {
   Card,
   CardContent,
@@ -12,6 +16,11 @@ import {
 import { PageContainer, PageHeader } from '../../_layout';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
+import {
+  COLOMBIA_DEPARTMENT_PATHS,
+  COLOMBIA_MAP_VIEWBOX,
+  SAN_ANDRES_INSET,
+} from '../data/colombia-department-paths';
 import { VERIFICATION_LEVEL_LABELS } from '../verification-level-labels';
 
 /** Formatea pesos enteros COP (sin decimales), es-CO. */
@@ -23,18 +32,105 @@ function formatCop(pesos: number): string {
   }).format(pesos);
 }
 
+/** "▲12%" / "▼8%" / "▬0%" para el delta de `StatCard` (RF28). */
+function formatGrowthDelta(growthRatePct: number): { label: string; direction: 'up' | 'down' } {
+  const rounded = Math.round(growthRatePct * 10) / 10;
+  const arrow = rounded > 0 ? '▲' : rounded < 0 ? '▼' : '▬';
+  return {
+    label: `${arrow} ${rounded > 0 ? '+' : ''}${rounded}% vs. mes anterior`,
+    direction: rounded < 0 ? 'down' : 'up',
+  };
+}
+
 /**
- * `/plataforma/dashboard/financiero` (RF24, M13, S-8) — SOLO
- * PlatformSuperAdmin: indicadores financieros agregados de plataforma
- * (nunca visibles a un PlatformAdmin normal), indicadores de negocio y
- * distribución de organizaciones por departamento.
- *
- * El documento base pide "mapa de Colombia" para esta audiencia — el
- * proyecto no tiene ningún activo geográfico de Colombia (geojson/SVG/
- * librería de mapas) disponible hoy, así que esto se entrega como una
- * lista/gráfico de barras horizontal con datos reales y correctamente
- * agregados, no como un mapa aproximado o inventado. Un mapa interactivo
- * real queda como TODO(client) / tarea de diseño aparte.
+ * Choropleth de Colombia por departamento (S-9): reemplaza la antigua lista/
+ * barras — el proyecto ahora sí tiene un activo geográfico real (ver
+ * `colombia-department-paths.ts`, generado desde la división política 2018 de
+ * DANE, no aproximado a mano). Un departamento con `count === 0` (incluye
+ * cualquiera que ni siquiera aparezca en `data`) se pinta con el mismo
+ * `--muted` que el resto de la UI; el resto usa `--primary` (el mismo teal de
+ * marca que ya coloreaban las barras) con opacidad proporcional a
+ * `count / max`, un ramp secuencial de un solo tono. `title` por `<path>` da
+ * tooltip nativo + nombre accesible sin JS adicional. Cualquier entrada de
+ * `data` cuyo `department` no matchee ningún path conocido (typo, "Sin
+ * especificar", u otro valor libre no cubierto por `colombian-locations.ts`)
+ * se lista aparte para que ese dato nunca desaparezca silenciosamente.
+ */
+function ColombiaChoropleth({ data }: { data: OrganizationDepartmentCount[] }) {
+  const countByDepartment = new Map(data.map((row) => [row.department, row.count]));
+  const maxCount = Math.max(1, ...data.map((row) => row.count));
+  const knownDepartments = new Set(COLOMBIA_DEPARTMENT_PATHS.map((f) => f.department));
+  const unmatched = data.filter((row) => !knownDepartments.has(row.department));
+
+  return (
+    <div className="space-y-3">
+      <svg
+        viewBox={COLOMBIA_MAP_VIEWBOX}
+        role="img"
+        aria-label="Mapa de Colombia con organizaciones registradas por departamento"
+        className="mx-auto h-auto w-full max-w-xs"
+      >
+        <rect
+          x={SAN_ANDRES_INSET.x - 4}
+          y={SAN_ANDRES_INSET.y - 4}
+          width={SAN_ANDRES_INSET.size + 8}
+          height={SAN_ANDRES_INSET.size + 8}
+          rx={4}
+          className="fill-none stroke-muted-foreground/40"
+          strokeWidth={1}
+          strokeDasharray="2 2"
+        />
+        {COLOMBIA_DEPARTMENT_PATHS.map((feature) => {
+          const count = countByDepartment.get(feature.department) ?? 0;
+          const fill =
+            count === 0
+              ? 'hsl(var(--muted))'
+              : `hsl(var(--primary) / ${0.18 + 0.82 * (count / maxCount)})`;
+          return (
+            <path
+              key={feature.department}
+              d={feature.path}
+              fill={fill}
+              className="stroke-card"
+              strokeWidth={0.75}
+            >
+              <title>
+                {feature.department}: {count} {count === 1 ? 'organización' : 'organizaciones'}
+              </title>
+            </path>
+          );
+        })}
+      </svg>
+      <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+        <span>0</span>
+        <div
+          className="h-2 w-32 rounded-full"
+          style={{
+            background: 'linear-gradient(to right, hsl(var(--muted)), hsl(var(--primary)))',
+          }}
+        />
+        <span>{maxCount} org.</span>
+      </div>
+      {unmatched.length > 0 && (
+        <ul className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          {unmatched.map((row) => (
+            <li key={row.department}>
+              {row.department}: {row.count}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/**
+ * `/plataforma/dashboard/financiero` (RF24, M13, S-8; RF28 growth y mapa real
+ * añadidos en S-9) — SOLO PlatformSuperAdmin: indicadores financieros
+ * agregados de plataforma (nunca visibles a un PlatformAdmin normal),
+ * indicadores de negocio (incluida la tasa de crecimiento mensual de
+ * organizaciones registradas, RF28) y distribución geográfica de
+ * organizaciones por departamento como choropleth (ver `ColombiaChoropleth`).
  */
 export function PlatformSuperAdminDashboardPage() {
   const client = useApiClient();
@@ -71,6 +167,11 @@ export function PlatformSuperAdminDashboardPage() {
             organizationsByDepartment: Array.isArray(data?.organizationsByDepartment)
               ? data.organizationsByDepartment
               : [],
+            organizationsGrowth: data?.organizationsGrowth ?? {
+              currentPeriodCount: 0,
+              previousPeriodCount: 0,
+              growthRatePct: 0,
+            },
           });
         }
       } finally {
@@ -90,10 +191,6 @@ export function PlatformSuperAdminDashboardPage() {
       </PageContainer>
     );
   }
-
-  const maxDepartmentCount = summary
-    ? Math.max(1, ...summary.organizationsByDepartment.map((d) => d.count))
-    : 1;
 
   return (
     <PageContainer>
@@ -128,6 +225,11 @@ export function PlatformSuperAdminDashboardPage() {
               <StatCard label="Adopciones totales" value={summary.totalAdoptions} />
               <StatCard label="Campañas activas" value={summary.activeCampaigns} />
               <StatCard label="Apadrinamientos activos" value={summary.activeSponsorships} />
+              <StatCard
+                label="Organizaciones registradas (últimos 30 días)"
+                value={summary.organizationsGrowth.currentPeriodCount}
+                delta={formatGrowthDelta(summary.organizationsGrowth.growthRatePct)}
+              />
             </CardContent>
           </Card>
 
@@ -154,20 +256,7 @@ export function PlatformSuperAdminDashboardPage() {
               {summary.organizationsByDepartment.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Sin datos todavía.</p>
               ) : (
-                <ul className="space-y-2">
-                  {summary.organizationsByDepartment.map((row) => (
-                    <li key={row.department} className="flex items-center gap-3 text-sm">
-                      <span className="w-40 shrink-0 truncate">{row.department}</span>
-                      <div className="h-4 flex-1 rounded bg-muted">
-                        <div
-                          className="h-4 rounded bg-primary"
-                          style={{ width: `${(row.count / maxDepartmentCount) * 100}%` }}
-                        />
-                      </div>
-                      <span className="w-8 shrink-0 text-right">{row.count}</span>
-                    </li>
-                  ))}
-                </ul>
+                <ColombiaChoropleth data={summary.organizationsByDepartment} />
               )}
             </CardContent>
           </Card>
