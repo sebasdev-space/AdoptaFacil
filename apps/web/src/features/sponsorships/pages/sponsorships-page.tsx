@@ -29,6 +29,7 @@ import {
   listOrgPlans,
   listOrgSponsorships,
   reactivateSponsorship,
+  registerAnimalDeath,
   suspendSponsorship,
 } from '../api/sponsorships-api';
 import { AnimalDeceasedModal } from '../components/animal-deceased-modal';
@@ -169,6 +170,29 @@ export function SponsorshipsPage() {
     } finally {
       setCancelling(false);
     }
+  }
+
+  // M07 hallazgo QA: registra el fallecimiento del animal del `deceasedTarget`
+  // actual. El conteo de padrinos afectados para el toast es el MISMO que ya
+  // se muestra en el modal (derivado de los apadrinamientos ya cargados) —
+  // capturado ANTES de la llamada, no un dato nuevo del backend.
+  async function confirmDeceased(): Promise<void> {
+    if (!deceasedTarget) return;
+    const animalName =
+      animalNamesById.get(deceasedTarget.animalId) ?? shortId(deceasedTarget.animalId);
+    const affectedCount = sponsorships.filter(
+      (s) => s.animalId === deceasedTarget.animalId && s.status === SponsorshipStatus.Active,
+    ).length;
+    await registerAnimalDeath(client, deceasedTarget.animalId);
+    await load();
+    toast({
+      title: `${animalName} fue registrado como fallecido`,
+      description:
+        affectedCount === 1
+          ? 'Se suspendió 1 apadrinamiento activo.'
+          : `Se suspendieron ${affectedCount} apadrinamientos activos.`,
+      variant: 'success',
+    });
   }
 
   const metrics = computeSponsorshipMetrics(sponsorships, plansById, animalsTotalCount);
@@ -329,6 +353,7 @@ export function SponsorshipsPage() {
               ).length
             : 0
         }
+        onConfirm={confirmDeceased}
       />
     </PageContainer>
   );

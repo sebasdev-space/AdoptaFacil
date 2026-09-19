@@ -21,9 +21,13 @@ export type AnimalSize = 'small' | 'medium' | 'large';
  * - `available`   — disponible para adopción
  * - `in_process`  — con una solicitud/adopción en curso (en_proceso)
  * - `adopted`     — adoptado
- * - `unavailable` — no disponible (retirado, en tratamiento, fallecido, …)
+ * - `unavailable` — no disponible (retirado, en tratamiento, …)
+ * - `deceased`    — fallecido (M07 hallazgo QA, `POST /animals/:id/register-death`).
+ *   ADDITIVE: set ONLY by that dedicated endpoint (never a manual status edit),
+ *   which also flips `isActive=false` and suspends the animal's active
+ *   sponsorships — see AnimalsService.registerDeath.
  */
-export type AnimalStatus = 'available' | 'in_process' | 'adopted' | 'unavailable';
+export type AnimalStatus = 'available' | 'in_process' | 'adopted' | 'unavailable' | 'deceased';
 
 /** Allowed values, exported for validation and UI (dropdowns/filters). */
 export const ANIMAL_SPECIES: readonly AnimalSpecies[] = ['dog', 'cat', 'other'];
@@ -34,6 +38,7 @@ export const ANIMAL_STATUSES: readonly AnimalStatus[] = [
   'in_process',
   'adopted',
   'unavailable',
+  'deceased',
 ];
 
 /**

@@ -1,4 +1,5 @@
 import type {
+  Animal,
   CreateSponsorshipInput,
   Paginated,
   Sponsorship,
@@ -99,4 +100,12 @@ export function retrySponsorshipPayment(
   return client.request<SponsorshipPayment>(`/sponsorships/${id}/retry-payment`, {
     method: 'POST',
   });
+}
+
+/** Register an animal as deceased (M07 hallazgo QA — Owner/Administrator,
+ *  `POST /animals/:id/register-death`; belongs to the animals module, called
+ *  from here since "Registrar fallecimiento" lives on this page). Marks the
+ *  animal deceased/inactive and auto-suspends its ACTIVE sponsorships. */
+export function registerAnimalDeath(client: ApiClient, animalId: string): Promise<Animal> {
+  return client.request<Animal>(`/animals/${animalId}/register-death`, { method: 'POST' });
 }

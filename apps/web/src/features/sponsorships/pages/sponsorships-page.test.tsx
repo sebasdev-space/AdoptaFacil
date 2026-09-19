@@ -288,7 +288,7 @@ describe('SponsorshipsPage — apadrinamientos recibidos por la organización (S
     expect(await screen.findByRole('button', { name: 'Reactivar' })).toBeInTheDocument();
   });
 
-  describe('Fase 9 — "Registrar fallecimiento" (vista próximamente, sin backend real)', () => {
+  describe('M07 hallazgo QA — "Registrar fallecimiento" (flujo real, POST /animals/:id/register-death)', () => {
     it('ofrece la acción solo sobre un apadrinamiento ACTIVO, y abre el modal con datos reales', async () => {
       stubFetch(baseHandler([sponsorship()]));
       renderShell({ route: '/organizacion/apadrinamientos', ...sessionWith([Role.Owner]) });
@@ -300,15 +300,90 @@ describe('SponsorshipsPage — apadrinamientos recibidos por la organización (S
         await screen.findByRole('heading', { name: 'Registrar fallecimiento de Firulais' }),
       ).toBeInTheDocument();
       expect(screen.getByText('Firulais tiene 1 padrino activo.')).toBeInTheDocument();
-      expect(screen.getByText('Disponible próximamente')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Sí, registrar fallecimiento' }),
+      ).toBeInTheDocument();
 
       const modal = screen.getByTestId('animal-deceased-modal');
-      fireEvent.click(within(modal).getAllByRole('button', { name: 'Cerrar' })[0]);
+      fireEvent.click(within(modal).getByRole('button', { name: 'Cancelar' }));
       await waitFor(() =>
         expect(
           screen.queryByRole('heading', { name: 'Registrar fallecimiento de Firulais' }),
         ).not.toBeInTheDocument(),
       );
+    });
+
+    it('confirma y llama al endpoint real, refresca la lista y muestra una confirmación con el conteo de padrinos afectados', async () => {
+      const calls: Array<{ url: string; init?: RequestInit }> = [];
+      let deceased = false;
+      stubFetch((url, init) => {
+        calls.push({ url, init });
+        if (init?.method === 'POST' && url.includes('/register-death')) {
+          deceased = true;
+          return { id: 'animal-1', organizationId: 'org-1', name: 'Firulais', status: 'deceased' };
+        }
+        if (url.includes('/sponsorships?')) {
+          return {
+            items: [
+              sponsorship({
+                status: deceased ? SponsorshipStatus.Suspended : SponsorshipStatus.Active,
+              }),
+            ],
+            total: 1,
+            limit: 50,
+            offset: 0,
+          };
+        }
+        return baseHandler([sponsorship()])(url);
+      });
+      renderShell({ route: '/organizacion/apadrinamientos', ...sessionWith([Role.Owner]) });
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Registrar fallecimiento' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Sí, registrar fallecimiento' }));
+
+      await waitFor(() => {
+        const post = calls.find((c) => c.init?.method === 'POST');
+        expect(post).toBeDefined();
+        expect(post?.url).toContain('/animals/animal-1/register-death');
+      });
+      expect(await screen.findByText('Firulais fue registrado como fallecido')).toBeInTheDocument();
+      expect(screen.getByText('Se suspendió 1 apadrinamiento activo.')).toBeInTheDocument();
+      // The reload (`load()`) picks up the now-suspended sponsorship — its
+      // row offers "Reactivar" instead of "Suspender"/"Registrar fallecimiento".
+      expect(await screen.findByRole('button', { name: 'Reactivar' })).toBeInTheDocument();
+    });
+
+    it('muestra el error y mantiene el modal abierto si el endpoint falla', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+          const url = String(input);
+          if (init?.method === 'POST' && url.includes('/register-death')) {
+            return Promise.resolve({
+              ok: false,
+              status: 400,
+              headers: { get: () => null },
+              json: async () => ({ message: 'No se pudo registrar el fallecimiento' }),
+            });
+          }
+          const body = baseHandler([sponsorship()])(url);
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: { get: () => null },
+            json: async () => body,
+          });
+        }),
+      );
+      renderShell({ route: '/organizacion/apadrinamientos', ...sessionWith([Role.Owner]) });
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Registrar fallecimiento' }));
+      fireEvent.click(await screen.findByRole('button', { name: 'Sí, registrar fallecimiento' }));
+
+      expect(await screen.findByText('No se pudo registrar el fallecimiento')).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { name: 'Registrar fallecimiento de Firulais' }),
+      ).toBeInTheDocument();
     });
 
     it('no la ofrece sobre un apadrinamiento ya cancelado (terminal)', async () => {

@@ -1,6 +1,7 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../../core/auth/auth.module';
+import { SponsorshipsModule } from '../sponsorships/sponsorships.module';
 import { AnimalsController } from './animals.controller';
 import { AnimalsService } from './animals.service';
 import { BulkImportService } from './bulk-import.service';
@@ -25,9 +26,15 @@ import { PublicAnimalsService } from './public-animals.service';
  * SECURITY DEFINER function (no auth, no RLS evasion). STORAGE_PORT /
  * NOTIFICATION_PORT come from the shared global core modules (T-107). Consumes
  * core (tenant/auth/rbac/audit) — global providers.
+ *
+ * Imports SponsorshipsModule (M07 hallazgo QA, `POST
+ * /animals/:id/register-death`): registering an animal as deceased must
+ * auto-suspend its ACTIVE sponsorships, so AnimalsService reuses
+ * `SponsorshipsService.applySystemTransition` rather than duplicating the
+ * sponsorship state machine here.
  */
 @Module({
-  imports: [AuthModule, BullModule.registerQueue({ name: REMINDERS_QUEUE })],
+  imports: [AuthModule, BullModule.registerQueue({ name: REMINDERS_QUEUE }), SponsorshipsModule],
   controllers: [
     AnimalsController,
     ClinicalController,

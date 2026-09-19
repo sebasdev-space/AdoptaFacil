@@ -187,6 +187,18 @@ export class AnimalsController {
     return this.service.remove(actor.id, id);
   }
 
+  /** Register an animal as deceased (M07 hallazgo QA): marks the record
+   *  deceased/inactive and auto-suspends its active sponsorships. Same role
+   *  gate as `remove` above (DELETE_ROLES) — a terminal, sensitive change. */
+  @Post(':id/register-death')
+  @Roles(...DELETE_ROLES)
+  registerDeath(
+    @CurrentUser() actor: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<Animal> {
+    return this.service.registerDeath(actor.id, id);
+  }
+
   @Post(':id/photos')
   @Roles(...WRITE_ROLES)
   addPhoto(

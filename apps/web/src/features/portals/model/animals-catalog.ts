@@ -26,11 +26,17 @@ export const SIZE_LABELS: Record<AnimalSize, string> = {
   large: 'Grande',
 };
 
+/** `deceased` (M07 hallazgo QA, `POST /animals/:id/register-death`) nunca
+ *  aparece realmente aquí — el catálogo público ya filtra por
+ *  `is_active=true AND status='available'` (`public_org_adoptable_animals`,
+ *  T-029) y un animal fallecido siempre queda `isActive=false`. Se agrega la
+ *  etiqueta solo para que este mapa exhaustivo siga compilando. */
 export const STATUS_LABELS: Record<AnimalStatus, string> = {
   available: 'Disponible',
   in_process: 'En proceso de adopción',
   adopted: 'Adoptado',
   unavailable: 'No disponible',
+  deceased: 'Fallecido',
 };
 
 /** Etiqueta legible de la edad DERIVADA (calculada en la API, T-104) — nunca una
