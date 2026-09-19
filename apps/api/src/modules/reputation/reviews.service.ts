@@ -110,6 +110,16 @@ export class ReviewsService {
       if (/23505|already exists/i.test(message)) {
         throw new BadRequestException('Ya reseñaste esta organización.');
       }
+      // `create_review` (S7 fix, RF23) now RAISE EXCEPTIONs when the author
+      // never had a completed adoption/donation/sponsorship payment with the
+      // organization — same "match on the DB's own message" technique as the
+      // duplicate case above (the RAISE has no dedicated SQLSTATE of its own,
+      // it reuses restrict_violation, so match on the message text instead).
+      if (/no completed adoption, donation or sponsorship payment/i.test(message)) {
+        throw new BadRequestException(
+          'Solo puedes calificar organizaciones con las que hayas tenido una adopción, donación o apadrinamiento.',
+        );
+      }
       throw error;
     }
     const row = rows[0];
