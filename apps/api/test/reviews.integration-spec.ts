@@ -7,12 +7,14 @@ import { AppModule } from '../src/app.module';
 import { purgeOrganizations } from './support/cleanup';
 
 /**
- * M12 reputation (RF23) end-to-end: create a review (pending, not public yet)
- * → duplicate blocked → PlatformAdmin moderation queue → approve/reject
- * (reason mandatory to reject) → public indicators (average/count, only
- * approved) → anonymity respected → approved -> hidden after a report →
- * content is immutable forever → RBAC deny-by-default for moderation,
- * including the reviewed organization itself.
+ * M12 reputation (RF23) end-to-end: an author needs a REAL interaction with
+ * the organization first (approved adoption | approved donation | paid
+ * sponsorship period — QA-reported gap, fixed here) → create a review
+ * (pending, not public yet) → duplicate blocked → PlatformAdmin moderation
+ * queue → approve/reject (reason mandatory to reject) → public indicators
+ * (average/count, only approved) → anonymity respected → approved -> hidden
+ * after a report → content is immutable forever → RBAC deny-by-default for
+ * moderation, including the reviewed organization itself.
  */
 describe('Reviews / reputation (M12, RF23)', () => {
   let app: INestApplication;
@@ -74,6 +76,84 @@ describe('Reviews / reputation (M12, RF23)', () => {
     return actor;
   }
 
+  // ---------------------------------------------------------------------
+  // Fixtures for the "real interaction" gate (RF23 fix, T-review-interaction).
+  // `create_review` now requires the author to have had at least ONE of an
+  // approved adoption, an approved donation or a paid sponsorship period with
+  // the reviewed organization. Driving the full flows (kanban transitions,
+  // gateway webhook, the daily billing job) for every test would be a lot of
+  // machinery for a fixture, so — same spirit as `actorWithPlatformRole`
+  // above — these write the resulting row directly via the admin (superuser)
+  // connection, which is exactly the state those flows would have produced.
+  // ---------------------------------------------------------------------
+  async function grantApprovedAdoption(orgId: string, userId: string): Promise<void> {
+    await admin.adoptionRequest.create({
+      data: {
+        organizationId: orgId,
+        animalId: randomUUID(),
+        animalSnapshot: { name: 'Firulais', species: 'dog' },
+        applicantUserId: userId,
+        applicant: { fullName: 'Adoptante Fixture', email: 'adoptante-fixture@test.local' },
+        message: 'Fixture RF23: adopción ya aprobada para habilitar la reseña.',
+        status: 'approved',
+      },
+    });
+  }
+
+  async function grantApprovedDonation(orgId: string, userId: string): Promise<void> {
+    await admin.donation.create({
+      data: {
+        organizationId: orgId,
+        donorUserId: userId,
+        conceptKind: 'organization',
+        conceptId: orgId,
+        commissionPayer: 'organization',
+        intendedAmount: 20000,
+        amountCharged: 20000,
+        breakdown: { intendedAmount: 20000, commission: 800, vat: 152, net: 19200 },
+        collectionId: `s7-fixture-col-${randomUUID()}`,
+        idempotencyKey: `s7-fixture-idem-${randomUUID()}`,
+        status: 'approved',
+      },
+    });
+  }
+
+  async function grantPaidSponsorship(orgId: string, userId: string): Promise<void> {
+    // Unlike adoption_requests/donations, `sponsorship_plans.animal_id` has a
+    // REAL FK to `animals` — needs an actual row, not just a random uuid.
+    const animal = await admin.animal.create({
+      data: { organizationId: orgId, name: 'Fixture RF23', species: 'dog' },
+    });
+    const plan = await admin.sponsorshipPlan.create({
+      data: {
+        organizationId: orgId,
+        animalId: animal.id,
+        name: 'Plan fixture RF23',
+        amount: 15000,
+      },
+    });
+    const sponsorship = await admin.sponsorship.create({
+      data: {
+        organizationId: orgId,
+        planId: plan.id,
+        animalId: plan.animalId,
+        sponsorUserId: userId,
+      },
+    });
+    // Real interaction requires a PAID period, not just the subscription row
+    // (see the migration's comment: a fresh/failed subscription is not yet a
+    // real transaction).
+    await admin.sponsorshipPayment.create({
+      data: {
+        organizationId: orgId,
+        sponsorshipId: sponsorship.id,
+        period: '2026-09',
+        status: 'paid',
+        paidAt: new Date(),
+      },
+    });
+  }
+
   const setSlug = (token: string, slug: string) =>
     request(server).put('/org/profile').set('Authorization', `Bearer ${token}`).send({ slug });
 
@@ -109,6 +189,7 @@ describe('Reviews / reputation (M12, RF23)', () => {
   let author1: Actor;
   let author2: Actor;
   let author3: Actor;
+  let author4: Actor;
   let slug: string;
 
   beforeAll(async () => {
@@ -122,6 +203,14 @@ describe('Reviews / reputation (M12, RF23)', () => {
     author1 = await registerPerson('1');
     author2 = await registerPerson('2');
     author3 = await registerPerson('3');
+    author4 = await registerPerson('4');
+
+    // author1/2/3 each get ONE of the three qualifying interactions with
+    // `org` (RF23 fix) so their existing review scenarios below keep
+    // working; author4 gets none, for the negative test.
+    await grantApprovedAdoption(org.orgId, author1.userId);
+    await grantApprovedDonation(org.orgId, author2.userId);
+    await grantPaidSponsorship(org.orgId, author3.userId);
 
     slug = `s7-slug-${randomUUID().slice(0, 8)}`;
     await setSlug(org.token, slug).expect(200);
@@ -133,7 +222,15 @@ describe('Reviews / reputation (M12, RF23)', () => {
     await app?.close();
   });
 
-  it('creates a review as pending — not visible in the public summary/list yet', async () => {
+  it('rejects a review from an author with NO adoption/donation/sponsorship with the organization (RF23 fix)', async () => {
+    const res = await createReview(author4.token, {
+      organizationId: org.orgId,
+      rating: 5,
+    }).expect(400);
+    expect(res.body.message).toMatch(/adopción, donación o apadrinamiento/i);
+  });
+
+  it('creates a review as pending (author has an APPROVED ADOPTION with the org) — not visible in the public summary/list yet', async () => {
     const created = await createReview(author1.token, {
       organizationId: org.orgId,
       rating: 5,
@@ -225,7 +322,7 @@ describe('Reviews / reputation (M12, RF23)', () => {
     ]);
   });
 
-  it('an anonymous review hides the author name publicly, but the real author stays visible to PlatformAdmin', async () => {
+  it('an anonymous review hides the author name publicly, but the real author stays visible to PlatformAdmin (author has an APPROVED DONATION with the org)', async () => {
     await createReview(author2.token, {
       organizationId: org.orgId,
       rating: 2,
@@ -254,7 +351,7 @@ describe('Reviews / reputation (M12, RF23)', () => {
     });
   });
 
-  it('PlatformAdmin rejects a review with a reason — never becomes public, and no resubmission is allowed', async () => {
+  it('PlatformAdmin rejects a review with a reason — never becomes public, and no resubmission is allowed (author has a PAID SPONSORSHIP with the org)', async () => {
     await createReview(author3.token, { organizationId: org.orgId, rating: 1 }).expect(201);
     const mine = await listMine(author3.token).expect(200);
     const pendingId = mine.body[0].id as string;

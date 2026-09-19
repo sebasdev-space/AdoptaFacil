@@ -77,6 +77,22 @@ describe('ReviewsService.create (RF23)', () => {
     expect(h.record).not.toHaveBeenCalled();
   });
 
+  it('maps the "no interaction" DB exception to a friendly 400 (RF23 fix)', async () => {
+    const h = makeService();
+    h.queryRaw.mockRejectedValueOnce(
+      new Error(
+        'Raw query failed. Code: `P2010`. Message: `create_review: author has no completed adoption, donation or sponsorship payment with this organization (RF23)`',
+      ),
+    );
+
+    const promise = h.service.create(actor, { organizationId: 'org-1', rating: 5 });
+    await expect(promise).rejects.toBeInstanceOf(BadRequestException);
+    await expect(promise).rejects.toMatchObject({
+      message: expect.stringContaining('adopción, donación o apadrinamiento'),
+    });
+    expect(h.record).not.toHaveBeenCalled();
+  });
+
   it('throws NotFound when the organization does not exist (create_review returns no rows)', async () => {
     const h = makeService();
     h.queryRaw.mockResolvedValueOnce([]);
