@@ -1,5 +1,6 @@
 /**
- * Pure helpers for the Wompi payout dispatcher (M15b, RF26) — no DB, no I/O,
+ * Pure helpers for the payout dispatcher (M15b, RF26, Fase 2 — not implemented
+ * yet, see payments.module.ts) — no DB, no I/O,
  * so the retry-backoff schedule is unit tested in isolation, same pattern as
  * `animals/reminders.window.ts` (RNF07).
  */

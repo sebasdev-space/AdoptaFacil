@@ -123,7 +123,7 @@ describe('Donation certificates (M05: RF14, ESAL-RTE gating, no cross-org/donor 
 
     await request(server)
       .post('/donations/webhook')
-      .set('x-payment-signature', 'fake-sig')
+      .set('x-signature', 'fake-sig')
       .send({
         collectionId: esalCollectionId,
         status: 'approved',
@@ -151,7 +151,7 @@ describe('Donation certificates (M05: RF14, ESAL-RTE gating, no cross-org/donor 
   it('is idempotent: a repeated webhook delivery never issues a second certificate', async () => {
     await request(server)
       .post('/donations/webhook')
-      .set('x-payment-signature', 'fake-sig')
+      .set('x-signature', 'fake-sig')
       .send({
         collectionId: esalCollectionId,
         status: 'approved',
@@ -208,7 +208,7 @@ describe('Donation certificates (M05: RF14, ESAL-RTE gating, no cross-org/donor 
 
     await request(server)
       .post('/donations/webhook')
-      .set('x-payment-signature', 'fake-sig')
+      .set('x-signature', 'fake-sig')
       .send({
         collectionId: donate.body.collectionId,
         status: 'approved',

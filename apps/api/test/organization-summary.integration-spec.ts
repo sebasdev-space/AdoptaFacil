@@ -253,7 +253,7 @@ describe('Organization summary (S2-08, M13)', () => {
     net1 = computeBreakdown(50_000, 'organization').net;
     await request(server)
       .post('/donations/webhook')
-      .set('x-payment-signature', 'fake-sig')
+      .set('x-signature', 'fake-sig')
       .send({
         collectionId: donation1.body.collectionId,
         status: 'approved',
@@ -275,7 +275,7 @@ describe('Organization summary (S2-08, M13)', () => {
     net2 = computeBreakdown(30_000, 'donor').net;
     await request(server)
       .post('/donations/webhook')
-      .set('x-payment-signature', 'fake-sig')
+      .set('x-signature', 'fake-sig')
       .send({
         collectionId: donation2.body.collectionId,
         status: 'approved',

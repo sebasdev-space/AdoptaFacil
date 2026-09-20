@@ -59,24 +59,18 @@ export const envSchema = z.object({
   // Base URL the API is reachable at, used to build upload/serve URLs.
   STORAGE_PUBLIC_BASE_URL: z.string().url().default('http://localhost:3000'),
   // T-052 (payments): which PaymentPort adapter to bind. 'fake' = deterministic
-  // dev/test double (default); 'wompi' is the real gateway (T-060, recaudo via
-  // Payment Links). Swap happens in PaymentModule, no consumer changes.
-  PAYMENT_DRIVER: z.enum(['fake', 'wompi']).default('fake'),
-  // T-060 (M15a): Wompi credentials — read ONLY from env; never hardcoded, never
+  // dev/test double (default); 'mercadopago' is the real gateway (recaudo via
+  // Checkout Pro preferences). Swap happens in PaymentModule, no consumer
+  // changes. Wompi was fully replaced by MercadoPago (client decision) — the
+  // gateway never conviven, so this enum has no 'wompi' option any more.
+  PAYMENT_DRIVER: z.enum(['fake', 'mercadopago']).default('fake'),
+  // MercadoPago credentials — read ONLY from env; never hardcoded, never
   // committed. Optional at the schema level so 'fake' mode boots without them;
-  // the refine below enforces their presence when PAYMENT_DRIVER=wompi.
-  WOMPI_BASE_URL: z.string().url().optional(),
-  WOMPI_PUBLIC_KEY: z.string().min(1).optional(),
-  WOMPI_PRIVATE_KEY: z.string().min(1).optional(),
-  WOMPI_EVENTS_SECRET: z.string().min(1).optional(),
-  // Host that serves the actual checkout PAGE for a Payment Link (the payer's
-  // browser destination) — a DIFFERENT host than WOMPI_BASE_URL (the API).
-  // Documented production pattern: https://checkout.wompi.co/l/<id>. NOT
-  // required (has a working production default) because the sandbox/uat host
-  // is unverified against real credentials — same caveat already flagged on
-  // WompiPaymentLinkFetched in wompi-payment.adapter.ts; override via env for
-  // sandbox once confirmed (T-060 manual step).
-  WOMPI_CHECKOUT_BASE_URL: z.string().url().default('https://checkout.wompi.co'),
+  // the refine below enforces their presence when PAYMENT_DRIVER=mercadopago.
+  MERCADOPAGO_BASE_URL: z.string().url().default('https://api.mercadopago.com'),
+  MERCADOPAGO_PUBLIC_KEY: z.string().min(1).optional(),
+  MERCADOPAGO_ACCESS_TOKEN: z.string().min(1).optional(),
+  MERCADOPAGO_WEBHOOK_SECRET: z.string().min(1).optional(),
   // S-5-REDISEÑO (M07/RF17, T-057): interval of the repeatable sponsorship
   // billing scan job — opens a new period for sponsorships that just reached
   // their nextBillingAt, and advances the reminder/retry ladder of open
@@ -116,15 +110,15 @@ const REQUIRED_SMTP_KEYS = [
   'SMTP_FROM',
 ] as const;
 
-/** Wompi vars required when PAYMENT_DRIVER=wompi (fail-fast at boot, T-060). */
-const REQUIRED_WOMPI_KEYS = [
-  'WOMPI_BASE_URL',
-  'WOMPI_PUBLIC_KEY',
-  'WOMPI_PRIVATE_KEY',
-  'WOMPI_EVENTS_SECRET',
+/** MercadoPago vars required when PAYMENT_DRIVER=mercadopago (fail-fast at boot). */
+const REQUIRED_MERCADOPAGO_KEYS = [
+  'MERCADOPAGO_BASE_URL',
+  'MERCADOPAGO_PUBLIC_KEY',
+  'MERCADOPAGO_ACCESS_TOKEN',
+  'MERCADOPAGO_WEBHOOK_SECRET',
 ] as const;
 
-/** The validated schema + cross-field rules (fail-fast for smtp/wompi credentials). */
+/** The validated schema + cross-field rules (fail-fast for smtp/mercadopago credentials). */
 export const validatedEnvSchema = envSchema.superRefine((env, ctx) => {
   if (env.NOTIFICATION_DRIVER === 'smtp') {
     for (const key of REQUIRED_SMTP_KEYS) {
@@ -137,13 +131,13 @@ export const validatedEnvSchema = envSchema.superRefine((env, ctx) => {
       }
     }
   }
-  if (env.PAYMENT_DRIVER === 'wompi') {
-    for (const key of REQUIRED_WOMPI_KEYS) {
+  if (env.PAYMENT_DRIVER === 'mercadopago') {
+    for (const key of REQUIRED_MERCADOPAGO_KEYS) {
       if (env[key] === undefined || env[key] === null || env[key] === '') {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: [key],
-          message: `${key} is required when PAYMENT_DRIVER=wompi`,
+          message: `${key} is required when PAYMENT_DRIVER=mercadopago`,
         });
       }
     }

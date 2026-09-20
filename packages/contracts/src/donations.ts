@@ -7,10 +7,12 @@
 // desde `./payments`, que es la ÚNICA fuente de la cuenta (checkout y recibo
 // muestran lo mismo).
 //
-// Decisiones cerradas heredadas de payments.ts (NO reabrir): Wompi, recaudo +
-// dispersión T+1 (la dispersión real es M15, fuera de M05), SIN split, comisión
-// plataforma 4%, pasarela 2,65%+700, IVA 19% solo sobre comisiones, COP (pesos
-// enteros), sin custodia de saldos.
+// Decisiones cerradas heredadas de payments.ts (NO reabrir): MercadoPago (reemplazó
+// a Wompi por completo), recaudo + dispersión T+1 MANUAL (la dispersión real es
+// M15, fuera de M05), SIN split, comisión plataforma 4%, pasarela 2,65%+700 (cifra
+// de Wompi, pendiente confirmación del cliente para MercadoPago — ver TODO(client)
+// en payments.ts), IVA 19% solo sobre comisiones, COP (pesos enteros), sin
+// custodia de saldos.
 
 import type {
   CommissionPayer,

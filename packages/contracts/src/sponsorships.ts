@@ -7,7 +7,9 @@
 // are ISO-8601 UTC (Colombia local time is a presentation concern only).
 //
 // S-5-REDISEÑO (incluye T-057) — replaces the original S-5 design (automatic
-// debit does not exist; Wompi only exposes one-shot payment links). Adds
+// debit does not exist; the gateway only exposes one-shot payment links/
+// preferences — true under Wompi and still true under MercadoPago, which
+// replaced it). Adds
 // `SponsorshipPayment`/`SponsorshipPaymentAttempt`: a per-billing-period ledger
 // driven by the FIRST real cron job in this project (daily BullMQ scan), with a
 // tolerant reminder/retry ladder (up to 3 payment-link attempts) before

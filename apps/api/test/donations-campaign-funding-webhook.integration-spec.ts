@@ -103,7 +103,7 @@ describe('Donations webhook → campaign funding enganche (T-057)', () => {
 
     const res = await request(server)
       .post('/donations/webhook')
-      .set('x-payment-signature', 'sig')
+      .set('x-signature', 'sig')
       .send({ collectionId, status: 'approved', eventId: `evt-${collectionId}` })
       .expect(200);
 
@@ -118,7 +118,7 @@ describe('Donations webhook → campaign funding enganche (T-057)', () => {
 
     await request(server)
       .post('/donations/webhook')
-      .set('x-payment-signature', 'sig')
+      .set('x-signature', 'sig')
       .send({ collectionId, status: 'approved', eventId: `evt-${collectionId}` })
       .expect(200);
 
@@ -131,7 +131,7 @@ describe('Donations webhook → campaign funding enganche (T-057)', () => {
 
     await request(server)
       .post('/donations/webhook')
-      .set('x-payment-signature', 'sig')
+      .set('x-signature', 'sig')
       .send({ collectionId, status: 'approved', eventId: `evt-${collectionId}` })
       .expect(200);
     expect(applyApprovedCollection).toHaveBeenCalledTimes(1);
@@ -140,7 +140,7 @@ describe('Donations webhook → campaign funding enganche (T-057)', () => {
     // apply_donation_webhook itself no-ops BEFORE the enganche is ever reached.
     const replay = await request(server)
       .post('/donations/webhook')
-      .set('x-payment-signature', 'sig')
+      .set('x-signature', 'sig')
       .send({ collectionId, status: 'approved', eventId: `evt-${collectionId}` })
       .expect(200);
     expect(replay.body.applied).toBe(false);
@@ -153,7 +153,7 @@ describe('Donations webhook → campaign funding enganche (T-057)', () => {
 
     const res = await request(server)
       .post('/donations/webhook')
-      .set('x-payment-signature', 'sig')
+      .set('x-signature', 'sig')
       .send({ collectionId, status: 'approved', eventId: `evt-${collectionId}` })
       .expect(200);
 

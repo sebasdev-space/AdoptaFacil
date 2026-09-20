@@ -3,11 +3,13 @@
 // PaymentPort (contract-first, Ola 2, T-040). Publishes ONLY the contract that the
 // money engine exposes so the consumers (M06 campaigns, M07 sponsorships, M05
 // donations, …) can build against a stable, simulable surface WITHOUT waiting for
-// the real Wompi adapter (that is M15 implementation, a later task).
+// the real gateway adapter (that is M15 implementation, a later task).
 //
 // CLOSED decisions reflected here (do NOT reopen):
-//   - Gateway: Wompi. Consolidated collection + T+1 payout. NO split at checkout —
-//     the port never models a split; `breakdown` is informational/accounting only.
+//   - Gateway: MercadoPago (reemplazó a Wompi por completo). Consolidated
+//     collection + T+1 payout, dispersión MANUAL (NOT MercadoPago's Marketplace
+//     split). NO split at checkout — the port never models a split; `breakdown`
+//     is informational/accounting only.
 //   - Platform commission 4% on gross; gateway commission 2.65% + 700 (fixed);
 //     IVA 19% ONLY over commissions; no custody of third-party balances; COP.
 //   - SARLAFT/KYC (RF28) is validated in M15 BEFORE createPayout — NOT by the port.
@@ -98,6 +100,19 @@ export interface NormalizedWebhookEvent {
   dedupKey: string;
 }
 
+/**
+ * Transport-level context a webhook verifier may need BESIDES the raw body and
+ * the signature header (MercadoPago, T-0xx/Fase 1): its `x-signature` scheme
+ * needs `x-request-id` and the `data.id` query param to build the manifest, and
+ * it does NOT include the payment status in the body — the verifier must fetch
+ * it separately. Optional/aditive so a driver that doesn't need it (the fake
+ * adapter) simply ignores it.
+ */
+export interface WebhookVerificationContext {
+  headers?: Record<string, string | undefined>;
+  query?: Record<string, string | undefined>;
+}
+
 /** Colombian bank account type (RF26 payouts — ahorros/corriente). */
 export type BankAccountType = 'savings' | 'checking';
 
@@ -108,7 +123,7 @@ export type BankAccountType = 'savings' | 'checking';
  * platform-owned balance).
  */
 export interface PayoutBankAccount {
-  /** Wompi bank code (financial-institution catalog). */
+  /** Código del banco en el catálogo del proveedor de pagos vigente. */
   bankCode: string;
   accountType: BankAccountType;
   accountNumber: string;
@@ -185,7 +200,7 @@ export interface PayoutView {
 
 /**
  * The money-engine port (hexagonal). Ola 1 binds a simulable adapter; the real
- * Wompi adapter arrives behind this SAME interface (M15/Ola 2 implementation).
+ * MercadoPago adapter arrives behind this SAME interface (M15/Ola 2 implementation).
  * Idempotency, retries and reconciliation live in M15; the port only exposes the
  * operations (and accepts the idempotency key).
  */
@@ -194,15 +209,27 @@ export interface PaymentPort {
   createCollection(input: CreateCollectionInput): Promise<CollectionResult>;
   /** Current status of a collection. */
   getCollectionStatus(collectionId: string): Promise<PaymentStatus>;
-  /** Verify a gateway webhook signature and normalize it to a dedup-able event. */
-  verifyAndNormalizeWebhook(payload: unknown, signature: string): NormalizedWebhookEvent;
+  /**
+   * Verify a gateway webhook signature and normalize it to a dedup-able event.
+   * ASYNC: MercadoPago's webhook body carries only an id (never the payment
+   * status), so a compliant verifier must make a separate API call to resolve
+   * the actual status before returning. `context` carries the transport
+   * details (headers/query) a given driver's signature scheme needs beyond
+   * the raw body + signature header.
+   */
+  verifyAndNormalizeWebhook(
+    payload: unknown,
+    signature: string,
+    context?: WebhookVerificationContext,
+  ): Promise<NormalizedWebhookEvent>;
   /** Schedule a payout (T+1). SARLAFT/KYC is checked in M15 before calling this. */
   createPayout(input: CreatePayoutInput): Promise<PayoutResult>;
   /** Verify a payout-confirmation webhook and normalize it to a dedup-able event. */
   verifyAndNormalizePayoutWebhook(
     payload: unknown,
     signature: string,
-  ): NormalizedPayoutWebhookEvent;
+    context?: WebhookVerificationContext,
+  ): Promise<NormalizedPayoutWebhookEvent>;
 }
 
 // ============================================================================
@@ -214,6 +241,11 @@ export interface PaymentPort {
 export const PAYMENT_FEE_CONFIG = {
   /** Platform commission over gross. */
   platformRate: 0.04,
+  // TODO(client): estos valores siguen siendo los de Wompi (2.65% + $700 COP) —
+  // pendiente de que el cliente confirme la tarifa real de MercadoPago Colombia
+  // asignada a su cuenta (referencia pública: 3.29%+$800+IVA para liberación
+  // instantánea, pero puede variar por categoría/volumen). NO cambiar sin
+  // confirmación explícita.
   /** Gateway proportional commission over gross. */
   gatewayRate: 0.0265,
   /** Gateway fixed commission (pesos). */
@@ -281,7 +313,7 @@ export function computeBreakdown(
 
 // ============================================================================
 // FakePaymentAdapter — deterministic, dependency-free, browser-safe test double.
-// Ola 1 dev/test only. The REAL Wompi adapter is M15 implementation. If the daily
+// Ola 1 dev/test only. The REAL MercadoPago adapter is M15 implementation. If the daily
 // decides the fake lives in core/ with the other stubs, this can move there
 // unchanged — it depends only on this file's types + computeBreakdown.
 // ============================================================================
@@ -333,7 +365,11 @@ export class FakePaymentAdapter implements PaymentPort {
     return 'approved';
   }
 
-  verifyAndNormalizeWebhook(payload: unknown, _signature: string): NormalizedWebhookEvent {
+  async verifyAndNormalizeWebhook(
+    payload: unknown,
+    _signature: string,
+    _context?: WebhookVerificationContext,
+  ): Promise<NormalizedWebhookEvent> {
     const body = (payload ?? {}) as FakeWebhookPayload;
     const collectionId = body.collectionId ?? 'fake-col-unknown';
     const eventId = body.eventId ?? `fake-evt-${stableHash(collectionId)}`;
@@ -352,10 +388,11 @@ export class FakePaymentAdapter implements PaymentPort {
     };
   }
 
-  verifyAndNormalizePayoutWebhook(
+  async verifyAndNormalizePayoutWebhook(
     payload: unknown,
     _signature: string,
-  ): NormalizedPayoutWebhookEvent {
+    _context?: WebhookVerificationContext,
+  ): Promise<NormalizedPayoutWebhookEvent> {
     const body = (payload ?? {}) as FakePayoutWebhookPayload;
     const payoutId = body.payoutId ?? 'fake-pay-unknown';
     const eventId = body.eventId ?? `fake-pevt-${stableHash(payoutId)}`;

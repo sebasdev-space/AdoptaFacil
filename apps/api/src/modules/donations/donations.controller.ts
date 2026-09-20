@@ -7,6 +7,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -16,6 +17,7 @@ import {
   type DonationCertificate,
   type DonationReceipt,
   type DonationWithReceipt,
+  type WebhookVerificationContext,
 } from '@adoptafacil/contracts';
 import type { RequestUser } from '../../core/auth/auth.types';
 import { CurrentUser } from '../../core/auth/current-user.decorator';
@@ -101,15 +103,24 @@ export class DonationsController {
 
   /**
    * Gateway webhook (PUBLIC — no JWT). The body is the raw gateway payload; the
-   * signature travels in the `x-payment-signature` header. The PaymentPort verifies
-   * and normalizes it, and the settlement + receipt are idempotent (dedup by event).
+   * signature travels in the `x-signature` header (MercadoPago's `ts=...,v1=...`
+   * format). `x-request-id` and the `data.id` query param are ALSO required to
+   * build MercadoPago's signature manifest — bundled into `context` and passed
+   * through untouched. The PaymentPort verifies and normalizes it, and the
+   * settlement + receipt are idempotent (dedup by event).
    */
   @Post('webhook')
   @HttpCode(200)
   applyWebhook(
     @Body() payload: unknown,
-    @Headers('x-payment-signature') signature?: string,
+    @Headers('x-signature') signature: string | undefined,
+    @Headers('x-request-id') requestId: string | undefined,
+    @Query() query: Record<string, string | undefined>,
   ): Promise<WebhookOutcome> {
-    return this.service.applyWebhook(payload, signature ?? '');
+    const context: WebhookVerificationContext = {
+      headers: { 'x-request-id': requestId },
+      query,
+    };
+    return this.service.applyWebhook(payload, signature ?? '', context);
   }
 }

@@ -68,7 +68,8 @@ import { RedisModule } from './redis/redis.module';
     CampaignsModule,
     // M07 · recurring sponsorships base (RF17 / T-056, no payment yet).
     SponsorshipsModule,
-    // M15b · dispersión T+1 vía Wompi Payouts (RF26, F-4).
+    // M15b · dispersión T+1 (RF26, F-4) — Fase 2, BLOQUEADA (pendiente
+    // aprobación de Disbursements de MercadoPago; antes vía Wompi Payouts).
     PaymentsModule,
     // M09 · banco de recursos: necesidades, ofertas y entregas (Ola 3, F-6).
     ResourcesModule,
