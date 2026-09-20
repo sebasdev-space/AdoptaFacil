@@ -100,7 +100,7 @@ describe('Reconciliation report (M15b, F-5, RF26: recaudado vs. dispersado)', ()
       .expect(201);
     await request(server)
       .post('/donations/webhook')
-      .set('x-payment-signature', 'fake-sig')
+      .set('x-signature', 'fake-sig')
       .send({
         collectionId: donate.body.collectionId,
         status: 'approved',

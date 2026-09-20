@@ -19,6 +19,7 @@ import {
   type PaymentBreakdown,
   type PaymentConcept,
   type PaymentPort,
+  type WebhookVerificationContext,
 } from '@adoptafacil/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../core/tenant/tenant-context.service';
@@ -184,10 +185,14 @@ export class DonationsService {
    * idempotent: a repeated delivery (same `dedupKey`) is a no-op and never emits a
    * second receipt. Both the settlement and the receipt are AUDITED (UTC).
    */
-  async applyWebhook(payload: unknown, signature: string): Promise<WebhookOutcome> {
+  async applyWebhook(
+    payload: unknown,
+    signature: string,
+    context?: WebhookVerificationContext,
+  ): Promise<WebhookOutcome> {
     let event: NormalizedWebhookEvent;
     try {
-      event = this.payment.verifyAndNormalizeWebhook(payload, signature);
+      event = await this.payment.verifyAndNormalizeWebhook(payload, signature, context);
     } catch (error) {
       this.logger.warn(`Webhook rechazado (firma inválida): ${(error as Error).message}`);
       throw new ForbiddenException('Webhook signature verification failed.');

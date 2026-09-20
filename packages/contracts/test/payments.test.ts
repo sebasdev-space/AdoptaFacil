@@ -138,8 +138,8 @@ describe('FakePaymentAdapter — deterministic + idempotent', () => {
     expect(a.status).toBe('scheduled');
   });
 
-  it('normalizes a webhook with a dedup key', () => {
-    const evt = port.verifyAndNormalizeWebhook(
+  it('normalizes a webhook with a dedup key', async () => {
+    const evt = await port.verifyAndNormalizeWebhook(
       { collectionId: 'fake-col-1', status: 'approved', eventId: 'evt-9' },
       'sig',
     );

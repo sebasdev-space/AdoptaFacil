@@ -141,7 +141,7 @@ describe('Platform dashboards (M13, RF24, S-8)', () => {
       .expect(201);
     await request(server)
       .post('/donations/webhook')
-      .set('x-payment-signature', 'fake-sig')
+      .set('x-signature', 'fake-sig')
       .send({
         collectionId: donation.body.collectionId,
         status: 'approved',
@@ -228,7 +228,7 @@ describe('Platform dashboards (M13, RF24, S-8)', () => {
       .expect(201);
     await request(server)
       .post('/donations/webhook')
-      .set('x-payment-signature', 'fake-sig')
+      .set('x-signature', 'fake-sig')
       .send({
         collectionId: donation.body.collectionId,
         status: 'approved',

@@ -168,7 +168,7 @@ describe('Donations (M05: donate + breakdown + receipt)', () => {
   it('approves via the gateway webhook and emits an automatic receipt', async () => {
     const res = await request(server)
       .post('/donations/webhook')
-      .set('x-payment-signature', 'fake-sig')
+      .set('x-signature', 'fake-sig')
       .send({ collectionId: orgCollectionId, status: 'approved', eventId: 'evt-org-1' })
       .expect(200);
     expect(res.body.applied).toBe(true);
@@ -187,7 +187,7 @@ describe('Donations (M05: donate + breakdown + receipt)', () => {
   it('is idempotent by dedupKey: a repeated webhook does NOT emit a second receipt', async () => {
     const res = await request(server)
       .post('/donations/webhook')
-      .set('x-payment-signature', 'fake-sig')
+      .set('x-signature', 'fake-sig')
       .send({ collectionId: orgCollectionId, status: 'approved', eventId: 'evt-org-1' })
       .expect(200);
     // Already settled ⇒ no-op.

@@ -68,7 +68,7 @@ describe('donation-breakdown-view', () => {
       'IVA sobre el apoyo de sostenimiento a AdoptaFácil',
     );
     expect(lines.map((l) => l.label).join(' ')).not.toMatch(/comisión adoptaf[aá]cil/i);
-    // The GATEWAY's own fee (Wompi, a third party) is a real commission and keeps
+    // The GATEWAY's own fee (MercadoPago, a third party) is a real commission and keeps
     // its name — only AdoptaFácil's own retained percentage was relabeled.
     expect(lines.find((l) => l.key === 'gatewayFee')?.label).toBe('Comisión pasarela');
   });

@@ -16,7 +16,7 @@ import { DonationCertificatesService } from './donation-certificates.service';
  *
  * PaymentPort: consumed from the GLOBAL `PAYMENT_PORT` provider (core `PaymentModule`,
  * @Global, T-052/T-054). No local binding — the service injects the token directly.
- * The adapter (fake / future Wompi) is chosen there via `PAYMENT_DRIVER`.
+ * The adapter (fake / real MercadoPago) is chosen there via `PAYMENT_DRIVER`.
  *
  * CampaignsModule (T-057): imported ONLY to consume its exported
  * `CampaignFundingService` — the webhook enganche calls

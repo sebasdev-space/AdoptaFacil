@@ -10,7 +10,8 @@ import { payoutBackoffMs } from './payouts.window';
 import { PayoutsService } from './payouts.service';
 
 /**
- * BullMQ worker for Wompi payout dispatch (M15b, RF26). One job (`dispatch`):
+ * BullMQ worker for payout dispatch (M15b, RF26, Fase 2 — not implemented yet
+ * by the real adapter). One job (`dispatch`):
  * calls the PaymentPort for a single scheduled payout; on failure the service
  * throws so BullMQ retries with the staggered backoff (5min/30min/2h/24h),
  * same pattern as the clinical-reminders worker.

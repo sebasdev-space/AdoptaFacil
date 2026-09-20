@@ -8,7 +8,8 @@ import { PayoutsService } from '../src/modules/payments/payouts.service';
 import { purgeOrganizations } from './support/cleanup';
 
 /**
- * M15b (F-4, RF26) — dispersión T+1 vía Wompi Payouts. Verifies: the org's own
+ * M15b (F-4, RF26) — dispersión T+1 (Fase 2, not implemented by the real
+ * MercadoPago adapter yet). Verifies, against the `fake` driver: the org's own
  * bank account registration (RBAC: Owner/Administrator only), triggering a
  * payout (RBAC: PlatformAdmin/PlatformSuperAdmin only, treasury operation),
  * idempotency (a retry with the same key never double-pays), the dispatch
@@ -234,7 +235,7 @@ describe('Payouts (M15b, RF26: bank account + dispatch + webhook + no double-pay
     expect(after?.status).toBe('failed');
     expect(after?.attempts).toBe(1);
     expect(after?.lastError).toMatch(/cuenta bancaria/);
-    expect(after?.wompiPayoutId).toBeNull(); // never called Wompi
+    expect(after?.wompiPayoutId).toBeNull(); // never called the gateway
   });
 
   it('webhook settles the payout to paid (idempotent — a repeated delivery is a no-op)', async () => {

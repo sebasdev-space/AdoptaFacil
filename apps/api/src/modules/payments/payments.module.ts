@@ -11,12 +11,14 @@ import { ReconciliationController } from './reconciliation.controller';
 import { ReconciliationService } from './reconciliation.service';
 
 /**
- * M15b · Dispersión T+1 vía Wompi Payouts (RF26). Owns:
+ * M15b · Dispersión T+1 (RF26) — Fase 2, BLOQUEADA (pendiente aprobación de
+ * Disbursements de MercadoPago; el diseño original apuntaba a Wompi Payouts,
+ * ya reemplazado). Owns:
  *   - `organization_bank_accounts` (RLS) — the org's own registered payout
  *     destination (Owner/Administrator self-service, `/org/payout-bank-account`).
  *   - `payouts` (RLS) — one row per dispersión attempt, dispatched through a
  *     BullMQ worker (staggered retry on gateway failure) and settled by the
- *     Wompi payout webhook (`/payments/payouts/webhook`, public).
+ *     gateway's payout webhook (`/payments/payouts/webhook`, public).
  *   - `/platform/payouts` — PlatformAdmin/PlatformSuperAdmin trigger + inspect
  *     (treasury operation; an org never self-triggers its own payout).
  *   - `/platform/reconciliation` (F-5, RF26) — read-only report crossing

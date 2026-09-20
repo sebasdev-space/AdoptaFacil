@@ -81,7 +81,7 @@ describe('Campaign funding (RF15 · T-055)', () => {
   function webhook(collectionId: string, status: 'approved' | 'declined'): Promise<unknown> {
     return request(server)
       .post('/donations/webhook')
-      .set('x-payment-signature', 'test-sig')
+      .set('x-signature', 'test-sig')
       .send({ collectionId, status })
       .expect(200);
   }

@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing';
 import { FakePaymentAdapter, type PaymentPort } from '@adoptafacil/contracts';
 import { PAYMENT_PORT } from './payment.port';
 import { PaymentModule } from './payment.module';
-import { WompiPaymentAdapter } from './wompi-payment.adapter';
+import { MercadoPagoPaymentAdapter } from './mercadopago-payment.adapter';
 
 describe('PaymentModule (T-052)', () => {
   async function resolvePort(): Promise<PaymentPort> {
@@ -13,7 +13,7 @@ describe('PaymentModule (T-052)', () => {
     return moduleRef.get<PaymentPort>(PAYMENT_PORT);
   }
 
-  /** Isolated env (ignores the real .env) so the wompi-driver test is deterministic. */
+  /** Isolated env (ignores the real .env) so the mercadopago-driver test is deterministic. */
   async function resolvePortWithEnv(env: Record<string, string>): Promise<PaymentPort> {
     const moduleRef = await Test.createTestingModule({
       imports: [
@@ -68,14 +68,14 @@ describe('PaymentModule (T-052)', () => {
     expect(p1.status).toBe('scheduled');
   });
 
-  it('binds PAYMENT_PORT to the WompiPaymentAdapter when PAYMENT_DRIVER=wompi (T-060)', async () => {
+  it('binds PAYMENT_PORT to the MercadoPagoPaymentAdapter when PAYMENT_DRIVER=mercadopago', async () => {
     const port = await resolvePortWithEnv({
-      PAYMENT_DRIVER: 'wompi',
-      WOMPI_BASE_URL: 'https://sandbox.wompi.co/v1',
-      WOMPI_PUBLIC_KEY: 'pub_test_dummy',
-      WOMPI_PRIVATE_KEY: 'prv_test_dummy',
-      WOMPI_EVENTS_SECRET: 'test_events_dummy',
+      PAYMENT_DRIVER: 'mercadopago',
+      MERCADOPAGO_BASE_URL: 'https://api.mercadopago.com',
+      MERCADOPAGO_PUBLIC_KEY: 'TEST-pub-dummy',
+      MERCADOPAGO_ACCESS_TOKEN: 'TEST-token-dummy',
+      MERCADOPAGO_WEBHOOK_SECRET: 'test_webhook_secret_dummy',
     });
-    expect(port).toBeInstanceOf(WompiPaymentAdapter);
+    expect(port).toBeInstanceOf(MercadoPagoPaymentAdapter);
   });
 });

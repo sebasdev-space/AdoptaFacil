@@ -32,25 +32,27 @@ describe('validateEnv — NOTIFICATION_DRIVER fail-fast (T-109)', () => {
   });
 });
 
-describe('validateEnv — PAYMENT_DRIVER fail-fast (T-060)', () => {
-  it('boots with the default fake driver (no WOMPI_* vars needed)', () => {
+describe('validateEnv — PAYMENT_DRIVER fail-fast (T-052)', () => {
+  it('boots with the default fake driver (no MERCADOPAGO_* vars needed)', () => {
     expect(() => validateEnv({ ...BASE })).not.toThrow();
     expect(validateEnv({ ...BASE }).PAYMENT_DRIVER).toBe('fake');
   });
 
-  it('fails fast when driver=wompi and credentials are missing', () => {
-    expect(() => validateEnv({ ...BASE, PAYMENT_DRIVER: 'wompi' })).toThrow(/WOMPI_BASE_URL/);
+  it('fails fast when driver=mercadopago and credentials are missing', () => {
+    expect(() => validateEnv({ ...BASE, PAYMENT_DRIVER: 'mercadopago' })).toThrow(
+      /MERCADOPAGO_PUBLIC_KEY/,
+    );
   });
 
-  it('accepts driver=wompi when all WOMPI_* vars are present', () => {
+  it('accepts driver=mercadopago when all MERCADOPAGO_* vars are present', () => {
     expect(() =>
       validateEnv({
         ...BASE,
-        PAYMENT_DRIVER: 'wompi',
-        WOMPI_BASE_URL: 'https://sandbox.wompi.co/v1',
-        WOMPI_PUBLIC_KEY: 'pub_test_dummy',
-        WOMPI_PRIVATE_KEY: 'prv_test_dummy',
-        WOMPI_EVENTS_SECRET: 'test_events_dummy',
+        PAYMENT_DRIVER: 'mercadopago',
+        MERCADOPAGO_BASE_URL: 'https://api.mercadopago.com',
+        MERCADOPAGO_PUBLIC_KEY: 'TEST-pub-dummy',
+        MERCADOPAGO_ACCESS_TOKEN: 'TEST-token-dummy',
+        MERCADOPAGO_WEBHOOK_SECRET: 'test_webhook_secret_dummy',
       }),
     ).not.toThrow();
   });

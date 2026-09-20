@@ -42,12 +42,14 @@ function fromRow(row: PayoutRow): PayoutView {
 }
 
 /**
- * M15b (RF26) — dispersión T+1. `requestPayout` is the PlatformAdmin-triggered
- * entry point (a treasury operation): it persists the attempt idempotently and
- * enqueues the actual Wompi call on a BullMQ worker so a gateway hiccup retries
- * with backoff instead of failing the HTTP request. `dispatch` is what the
- * worker calls; `applyWebhook` settles the payout from Wompi's confirmation —
- * completely mirrors the donations webhook flow (M05), just for the payout side.
+ * M15b (RF26) — dispersión T+1 (Fase 2, BLOQUEADA: not implemented by the real
+ * MercadoPago adapter yet, pending Disbursements approval). `requestPayout` is
+ * the PlatformAdmin-triggered entry point (a treasury operation): it persists
+ * the attempt idempotently and enqueues the actual gateway call on a BullMQ
+ * worker so a gateway hiccup retries with backoff instead of failing the HTTP
+ * request. `dispatch` is what the worker calls; `applyWebhook` settles the
+ * payout from the gateway's confirmation — completely mirrors the donations
+ * webhook flow (M05), just for the payout side.
  */
 @Injectable()
 export class PayoutsService {
@@ -93,7 +95,7 @@ export class PayoutsService {
       // Not yet dispatched (new row, or a previous dispatch never succeeded) —
       // enqueue exactly once. BullMQ's own retry/backoff covers gateway
       // failures; re-enqueueing a job for an ALREADY dispatched payout would
-      // risk a second Wompi call, so this check is the guard against that.
+      // risk a second gateway call, so this check is the guard against that.
       await this.queue.add(
         PAYOUT_DISPATCH_JOB,
         { payoutId: row.id, organizationId },
@@ -110,7 +112,7 @@ export class PayoutsService {
   }
 
   /**
-   * Dispatch ONE payout to Wompi (called by the BullMQ worker). Throws on
+   * Dispatch ONE payout to the gateway (called by the BullMQ worker). Throws on
    * failure so BullMQ retries with the staggered backoff (RNF07-style,
    * `payoutBackoffMs`) — same pattern as `RemindersService.send`. Runs under
    * `withOrgContext(organizationId, ...)` because the WORKER has no request
@@ -130,7 +132,7 @@ export class PayoutsService {
         return; // purged/unknown — nothing to do
       }
       if (payout.wompiPayoutId) {
-        return; // already dispatched successfully — never call Wompi twice
+        return; // already dispatched successfully — never call the gateway twice
       }
 
       const bankAccount = await this.bankAccounts.findForOrgTx(tx, organizationId);
@@ -210,14 +212,16 @@ export class PayoutsService {
   }
 
   /**
-   * Apply a Wompi payout-confirmation webhook (PUBLIC, no JWT — same posture
+   * Apply a payout-confirmation webhook (PUBLIC, no JWT — same posture
    * as the donations webhook). Idempotent: `apply_payout_webhook` only
    * transitions a payout from 'scheduled', so a repeated delivery is a no-op.
+   * Fase 2 (dispersión T+1) — not implemented yet by the real adapter; this
+   * path is only exercised by the fake driver today.
    */
   async applyWebhook(payload: unknown, signature: string): Promise<void> {
     let event;
     try {
-      event = this.payment.verifyAndNormalizePayoutWebhook(payload, signature);
+      event = await this.payment.verifyAndNormalizePayoutWebhook(payload, signature);
     } catch (error) {
       this.logger.warn(`Payout webhook rechazado (firma inválida): ${(error as Error).message}`);
       throw new BadRequestException('Webhook signature verification failed.');

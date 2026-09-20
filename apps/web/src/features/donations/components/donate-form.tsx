@@ -23,7 +23,8 @@ export interface DonateFormProps {
  * sostenimiento y la comisión de la pasarela" (commissionPayer = 'donor';
  * F-NOMENCLATURA-CHECKBOX: extiende #100 al checkbox — el donante cubre AMBOS
  * componentes, el % que retiene AdoptaFácil (apoyo, no "comisión" propia por
- * indicación fiscal) y la comisión real de Wompi (tercero, mantiene su nombre).
+ * indicación fiscal) y la comisión real de la pasarela de pago (tercero,
+ * mantiene su nombre — MercadoPago).
  * Solo habilita "Donar" con un monto válido (≥ mínimo).
  */
 export function DonateForm({ organizationName, submitting = false, onDonate }: DonateFormProps) {

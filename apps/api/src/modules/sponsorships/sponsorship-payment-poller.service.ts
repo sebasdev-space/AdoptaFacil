@@ -18,7 +18,7 @@ interface PendingAttemptRow {
 /**
  * Payment CONFIRMATION for the recurring-billing ledger (S-5-REDISEÑO, M07/
  * RF17, T-057) — by POLLING `PaymentPort.getCollectionStatus()`, not the
- * gateway webhook. The single webhook Wompi calls is already wired inside
+ * gateway webhook. The single webhook the gateway calls is already wired inside
  * `donations/**` with a hardcoded `if (concept_kind === 'campaign')` branch
  * (Fabián's domain) — extending it for `'sponsorship'` would mean editing
  * that module, out of scope for this task (confirmed with the user,
