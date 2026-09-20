@@ -12,7 +12,11 @@ Plataforma web **multi-tenant** para el ecosistema de rescate animal en Colombia
 organizaciones y personas conviven en un mismo sistema para adopciones, donaciones, campañas,
 apadrinamientos, voluntariado y más. Sello distintivo: **transparencia y confianza**. Gratis para
 organizaciones; ingreso por comisión sobre transacciones (4% con desglose transparente; IVA solo
-sobre la comisión). Pasarela **Wompi**: recaudo consolidado + **dispersión T+1** (sin split en checkout).
+sobre la comisión). Pasarela **MercadoPago** (reemplazó a Wompi por decisión del cliente,
+feat/fab/mercadopago-recaudo): recaudo consolidado vía Checkout Pro + **dispersión T+1** manual
+(sin el split automático de Marketplace de MercadoPago). La dispersión real (Fase 2, API
+"Disbursements" de MercadoPago) está pendiente de que MercadoPago apruebe esos permisos sobre la
+app del cliente — hasta entonces, `createPayout` no está implementado.
 
 **Jerarquía de fuentes de verdad** (gana el de más arriba): (1) Documento base (requisitos y
 roadmap) → (2) Consolidación operativa → (3) Metodología → (4) Instructivo del desarrollador →
