@@ -186,7 +186,30 @@ describe('Platform dashboards (M13, RF24, S-8)', () => {
       activeCampaigns: expect.any(Number),
       activeSponsorships: expect.any(Number),
       organizationsByDepartment: expect.any(Array),
+      organizationsGrowth: {
+        currentPeriodCount: expect.any(Number),
+        previousPeriodCount: expect.any(Number),
+        growthRatePct: expect.any(Number),
+      },
     });
+  });
+
+  it('organizationsGrowth.currentPeriodCount moves by exactly +1 when a new org registers (RF28, delta)', async () => {
+    const before = await superAdminSummary(platformSuperAdmin.token).expect(200);
+
+    await registerOrg('Refugio S9 crecimiento');
+
+    const after = await superAdminSummary(platformSuperAdmin.token).expect(200);
+
+    expect(
+      after.body.organizationsGrowth.currentPeriodCount -
+        before.body.organizationsGrowth.currentPeriodCount,
+    ).toBe(1);
+    // A brand-new org's created_at is "now", well inside the current 30-day
+    // window, so it can never land in the previous-period bucket.
+    expect(after.body.organizationsGrowth.previousPeriodCount).toBe(
+      before.body.organizationsGrowth.previousPeriodCount,
+    );
   });
 
   it("the financial total moves by EXACTLY one approved donation's breakdown (delta, robust to other test data)", async () => {

@@ -1,5 +1,8 @@
 import type { PrismaService } from '../../prisma/prisma.service';
-import { PlatformSuperAdminDashboardService } from './platform-super-admin-dashboard.service';
+import {
+  computeOrganizationsGrowth,
+  PlatformSuperAdminDashboardService,
+} from './platform-super-admin-dashboard.service';
 
 interface Harness {
   service: PlatformSuperAdminDashboardService;
@@ -35,7 +38,8 @@ describe('PlatformSuperAdminDashboardService.getSummary (RF24)', () => {
           ],
         },
       ])
-      .mockResolvedValueOnce([{ data: [{ department: 'Antioquia', count: 4 }] }]);
+      .mockResolvedValueOnce([{ data: [{ department: 'Antioquia', count: 4 }] }])
+      .mockResolvedValueOnce([{ current_period_count: 6, previous_period_count: 4 }]);
 
     const summary = await h.service.getSummary();
 
@@ -53,6 +57,7 @@ describe('PlatformSuperAdminDashboardService.getSummary (RF24)', () => {
       activeCampaigns: 2,
       activeSponsorships: 6,
       organizationsByDepartment: [{ department: 'Antioquia', count: 4 }],
+      organizationsGrowth: { currentPeriodCount: 6, previousPeriodCount: 4, growthRatePct: 50 },
     });
     // gross === platformFee + gatewayFee + net (same identity computeBreakdown
     // guarantees per-donation) must still hold once summed at platform scale.
@@ -72,7 +77,8 @@ describe('PlatformSuperAdminDashboardService.getSummary (RF24)', () => {
         { active_animals: 0, total_adoptions: 0, active_campaigns: 0, active_sponsorships: 0 },
       ])
       .mockResolvedValueOnce([{ data: [] }])
-      .mockResolvedValueOnce([{ data: [] }]);
+      .mockResolvedValueOnce([{ data: [] }])
+      .mockResolvedValueOnce([{ current_period_count: 0, previous_period_count: 0 }]);
 
     const summary = await h.service.getSummary();
 
@@ -87,6 +93,41 @@ describe('PlatformSuperAdminDashboardService.getSummary (RF24)', () => {
       activeCampaigns: 0,
       activeSponsorships: 0,
       organizationsByDepartment: [],
+      organizationsGrowth: { currentPeriodCount: 0, previousPeriodCount: 0, growthRatePct: 0 },
+    });
+  });
+});
+
+describe('computeOrganizationsGrowth (RF28)', () => {
+  it('computes a positive growth rate when the current period grew', () => {
+    expect(computeOrganizationsGrowth(15, 10)).toEqual({
+      currentPeriodCount: 15,
+      previousPeriodCount: 10,
+      growthRatePct: 50,
+    });
+  });
+
+  it('computes a negative growth rate when the current period shrank', () => {
+    expect(computeOrganizationsGrowth(5, 10)).toEqual({
+      currentPeriodCount: 5,
+      previousPeriodCount: 10,
+      growthRatePct: -50,
+    });
+  });
+
+  it('returns 0% (no division by zero) when both periods have zero organizations', () => {
+    expect(computeOrganizationsGrowth(0, 0)).toEqual({
+      currentPeriodCount: 0,
+      previousPeriodCount: 0,
+      growthRatePct: 0,
+    });
+  });
+
+  it('returns 100% (never Infinity/NaN) when the previous period was zero but the current period is not', () => {
+    expect(computeOrganizationsGrowth(3, 0)).toEqual({
+      currentPeriodCount: 3,
+      previousPeriodCount: 0,
+      growthRatePct: 100,
     });
   });
 });

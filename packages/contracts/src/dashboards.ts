@@ -90,6 +90,25 @@ export interface OrganizationDepartmentCount {
 }
 
 /**
+ * Tasa de crecimiento mensual de organizaciones registradas (RF28). Compara
+ * `organizations.created_at` de los últimos 30 días contra los 30 días
+ * anteriores a esos (día 60 a día 30) — mismos dos conteos reales, nunca una
+ * fórmula distinta. `growthRatePct = ((current - previous) / previous) * 100`,
+ * salvo cuando `previousPeriodCount === 0`: ahí se define como `0` si tampoco
+ * hubo registros en el período actual (no hay división por cero) o `100` si
+ * el período actual tiene registros (creció "desde cero", convención
+ * explícita — no infinito/NaN).
+ */
+export interface OrganizationsGrowth {
+  /** Organizaciones con `created_at` en los últimos 30 días. */
+  currentPeriodCount: number;
+  /** Organizaciones con `created_at` entre hace 60 y hace 30 días. */
+  previousPeriodCount: number;
+  /** % de cambio de currentPeriodCount vs previousPeriodCount (puede ser negativo). */
+  growthRatePct: number;
+}
+
+/**
  * Dashboard de PlatformSuperAdmin — TODO lo de PlatformAdmin más finanzas
  * agregadas de plataforma y distribución geográfica. Un PlatformAdmin normal
  * NUNCA ve este tipo (403 a nivel de RBAC, no un campo oculto en el mismo
@@ -104,11 +123,17 @@ export interface OrganizationDepartmentCount {
  * `grossTotal === platformFeeTotal + gatewayFeeTotal + netTotal` se mantiene
  * como identidad verificable también a nivel agregado.
  *
- * Geografía: `organizationsByDepartment` es una lista simple (para
- * lista/gráfico de barras), NO un mapa interactivo de Colombia — el proyecto
- * no tiene ningún activo geográfico (geojson/SVG/librería de mapas)
- * disponible; construir uno fiel sin ese activo queda como `TODO(client)`,
- * tarea de diseño aparte.
+ * Geografía: `organizationsByDepartment` es una lista simple de conteos por
+ * departamento; el frontend (S-9) la renderiza como un choropleth real de
+ * Colombia (`ColombiaChoropleth`, `apps/web/src/features/org/data/
+ * colombia-department-paths.ts`, geometría real vía DANE 2018), no como una
+ * lista/barras — este contrato solo transporta los datos agregados, no la
+ * forma de la visualización.
+ *
+ * `organizationsGrowth` (RF28, S-9): tasa de crecimiento mensual de
+ * organizaciones registradas — ver `OrganizationsGrowth`. Alcance mínimo de
+ * RF28 (solo organizaciones); otras series (donaciones, adopciones) no están
+ * cubiertas por este campo.
  */
 export interface PlatformSuperAdminDashboardSummary {
   grossTotal: number;
@@ -127,4 +152,5 @@ export interface PlatformSuperAdminDashboardSummary {
   /** Apadrinamientos con status 'active', a nivel de plataforma. */
   activeSponsorships: number;
   organizationsByDepartment: OrganizationDepartmentCount[];
+  organizationsGrowth: OrganizationsGrowth;
 }
