@@ -5,9 +5,11 @@ import { PublicResourceNeedsService } from './public-resource-needs.service';
 /**
  * PUBLIC resource-need catalog (M09) — NO authentication, public columns
  * only, served through bounded SECURITY DEFINER functions. Lists needs still
- * accepting help across organizations and exposes a single need's detail
- * (donors browse here before offering — offering itself requires auth, see
- * `ResourceOffersController`).
+ * accepting help across organizations (optionally scoped to ONE organization
+ * via `organizationId` — same optional-filter shape as
+ * `PublicMarketplaceProductsController`, which closed the same portal-wiring
+ * gap for M10) and exposes a single need's detail (donors browse here before
+ * offering — offering itself requires auth, see `ResourceOffersController`).
  */
 @Controller('public/resources/needs')
 export class PublicResourceNeedsController {
@@ -17,8 +19,9 @@ export class PublicResourceNeedsController {
   list(
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
+    @Query('organizationId') organizationId?: string,
   ): Promise<ResourceNeedsPage> {
-    return this.service.list(Number(limit), Number(offset));
+    return this.service.list(Number(limit), Number(offset), organizationId);
   }
 
   @Get(':id')

@@ -54,19 +54,23 @@ function computeProgressClamped(fulfilled: number, needed: number): number {
  * tenant exposure goes through bounded SECURITY DEFINER functions
  * (`public_resource_needs`/`public_resource_need`) — never a raw RLS-evading
  * select — so only public columns ever leave the DB. Mirrors
- * `PublicCampaignsService`.
+ * `PublicCampaignsService`/`PublicMarketplaceProductsService`.
  */
 @Injectable()
 export class PublicResourceNeedsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Needs still accepting help, across organizations (paginated). */
-  async list(limit: number, offset: number): Promise<ResourceNeedsPage> {
+  /** Needs still accepting help, across organizations (paginated), optionally
+   *  scoped to a single organization (§M14 portal — same optional-filter
+   *  shape `PublicMarketplaceProductsService.list` already uses for M10). */
+  async list(limit: number, offset: number, organizationId?: string): Promise<ResourceNeedsPage> {
     const take = clampLimit(limit);
     const skip = Math.max(offset || 0, 0);
     const rows = await this.prisma.$queryRaw<
       Array<{ data: { items: RawPublicNeed[]; total: number } }>
-    >(Prisma.sql`SELECT public_resource_needs(${take}::int, ${skip}::int) AS data`);
+    >(
+      Prisma.sql`SELECT public_resource_needs(${take}::int, ${skip}::int, ${organizationId ?? null}::uuid) AS data`,
+    );
     const data = rows[0]?.data ?? { items: [], total: 0 };
     return {
       items: (data.items ?? []).map(toPublic),

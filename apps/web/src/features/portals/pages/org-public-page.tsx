@@ -18,6 +18,7 @@ import { PortalTransparencyBar } from '../components/portal-transparency-bar';
 import { PortalSocialLinks } from '../components/portal-social-links';
 import { PortalAdoptionSection } from '../components/portal-adoption-section';
 import { PortalProductsSection } from '../components/portal-products-section';
+import { PortalNeedsSection } from '../components/portal-needs-section';
 import { PortalCampaignsSection } from '../components/portal-campaigns-section';
 import { PortalAboutSection } from '../components/portal-about-section';
 import { PortalContactInfoSection } from '../components/portal-contact-info-section';
@@ -58,11 +59,11 @@ const DEFAULT_LAYOUT: Layout = { logoPosition: 'left', socialNavPosition: 'right
  *    (S2-REORG, mismo campo real ya usado para el logo/sidebar). En mobile
  *    el panel lateral se apila debajo. Todo con los MISMOS
  *    componentes/rutas de siempre, solo reubicados.
- *  - aggregated sections still in `status: 'placeholder'` (necesita hoy /
- *    transparencia — no owning module yet) are simply NOT mounted, instead of
- *    showing an empty "Próximamente" card; 'pets' and 'activeCampaign'
- *    (F-CAMPANAS-PORTAL-2, S2-07) are wired to real data
- *    (see docs/TASKS.md · deuda de cableado M14).
+ *  - aggregated sections still in `status: 'placeholder'` (transparencia — no
+ *    owning module yet) are simply NOT mounted, instead of showing an empty
+ *    "Próximamente" card; 'pets', 'products' (F-MKT-PORTAL-1), 'needsToday'
+ *    (F-NEEDS-PORTAL-1) and 'activeCampaign' (F-CAMPANAS-PORTAL-2, S2-07) are
+ *    all wired to real data (see docs/TASKS.md · deuda de cableado M14).
  *
  * PERSONALIZATION (T-027): the org's brand tokens are fetched and applied at
  * runtime as CSS custom properties on a SCOPED wrapper (not the global <html>), so
@@ -181,15 +182,16 @@ export function OrgPublicPage({ slugOverride }: OrgPublicPageProps = {}) {
   // "nunca más" hardcodeado: si el catálogo se puebla, la barra vuelve a aparecer).
   const hasVerificationSignal = (view?.profile.organization.verificationLevel?.level ?? 0) > 0;
 
-  // Secciones agregadas AÚN sin módulo dueño (necesita hoy/transparencia) nacen en
+  // Secciones agregadas AÚN sin módulo dueño (transparencia) nacen en
   // status:'placeholder' — ocultarlas evita el "Próximamente" vacío frente al
-  // cliente (pulido visual T-D02). 'pets', 'products' (F-MKT-PORTAL-1) y
-  // 'activeCampaign' (F-CAMPANAS-PORTAL-2, S2-07) ya están cableadas a datos
-  // reales y siempre se muestran.
+  // cliente (pulido visual T-D02). 'pets', 'products' (F-MKT-PORTAL-1),
+  // 'needsToday' (F-NEEDS-PORTAL-1) y 'activeCampaign' (F-CAMPANAS-PORTAL-2,
+  // S2-07) ya están cableadas a datos reales y siempre se muestran.
   const visibleSections = view?.sections.filter(
     (section) =>
       section.kind === 'pets' ||
       section.kind === 'products' ||
+      section.kind === 'needsToday' ||
       section.kind === 'activeCampaign' ||
       section.status !== 'placeholder',
   );
@@ -277,15 +279,21 @@ export function OrgPublicPage({ slugOverride }: OrgPublicPageProps = {}) {
 
                 <TabsContent value="portafolio">
                   <div className="space-y-6">
-                    {/* "Mascotas en adopción" (kind 'pets', §M03/T-052) y
-                        "Productos" (kind 'products', §M10, F-MKT-PORTAL-1);
-                        cualquier otra sección que algún día deje de ser
-                        placeholder aparecería aquí también. */}
+                    {/* "Mascotas en adopción" (kind 'pets', §M03/T-052),
+                        "Productos" (kind 'products', §M10, F-MKT-PORTAL-1) y
+                        "Necesita hoy" (kind 'needsToday', §M09,
+                        F-NEEDS-PORTAL-1); cualquier otra sección que algún
+                        día deje de ser placeholder aparecería aquí también. */}
                     {portafolioSections?.map((section) =>
                       section.kind === 'pets' ? (
                         <PortalAdoptionSection key={section.kind} slug={slug as string} />
                       ) : section.kind === 'products' ? (
                         <PortalProductsSection
+                          key={section.kind}
+                          organizationId={view.profile.organization.id}
+                        />
+                      ) : section.kind === 'needsToday' ? (
+                        <PortalNeedsSection
                           key={section.kind}
                           organizationId={view.profile.organization.id}
                         />

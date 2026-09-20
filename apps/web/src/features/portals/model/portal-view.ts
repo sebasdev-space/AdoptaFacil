@@ -38,8 +38,14 @@ export const PORTAL_SECTION_BLUEPRINT: readonly SectionBlueprint[] = [
   {
     kind: 'needsToday',
     title: 'Necesita hoy',
-    description: 'No hay necesidades urgentes publicadas hoy.',
-    integrationPoint: 'M-necesidades · GET /public/organizations/:slug/needs (pendiente)',
+    description: 'Esta organización todavía no ha publicado necesidades en el banco de recursos.',
+    // F-NEEDS-PORTAL-1: cableada — igual que 'products'/'activeCampaign', este
+    // título/descripción quedan sin usar una vez wireado (OrgPublicPage
+    // renderiza `PortalNeedsSection`, que trae su propio copy). Reutiliza el
+    // endpoint público de M09 que YA soporta el filtro por organización — el
+    // hueco era solo de cableado en el portal, no de backend (mismo cierre
+    // que F-MKT-PORTAL-1 hizo para M10/marketplace).
+    integrationPoint: 'M09 banco de recursos · GET /public/resources/needs?organizationId=',
   },
   {
     kind: 'transparency',
