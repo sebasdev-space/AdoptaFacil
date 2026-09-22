@@ -82,12 +82,20 @@ Ruta: **Dashboard financiero** (`/plataforma/dashboard/financiero`). Muestra:
   (departamentos coloreados según cuántas organizaciones tienen registradas ahí), con la geometría real
   de la división política del país — ya no es una lista de barras.
 - Cifras financieras agregadas: volumen recaudado, dispersado y neto.
-- **Conciliación de recaudo vs. dispersión**: cruza lo recibido a través de Wompi Collections contra lo
-  efectivamente dispersado a cada organización vía Wompi Payouts, señalando diferencias para revisión
+- **Conciliación de recaudo vs. dispersión**: cruza lo recibido a través de MercadoPago Collections
+  contra lo efectivamente dispersado a cada organización, señalando diferencias para revisión
   manual, por organización y por período.
 
 Un PlatformAdmin que no sea SuperAdmin no puede ver esta pantalla ni sus cifras — se lo confirma un
 aviso de acceso denegado.
+
+**Aviso vigente (reemplazo de pasarela, sep-2026):** el recaudo ya corre 100% sobre MercadoPago,
+pero la dispersión (`createPayout`) todavía NO está implementada para MercadoPago — requiere que
+MercadoPago apruebe el permiso "Disbursements" sobre la aplicación del cliente, trámite en curso.
+Mientras esa aprobación no llegue, el lado "dispersado" de la conciliación se queda en cero para
+toda donación recaudada después del cambio de pasarela: no es un error del reporte, es el estado
+real de la integración. Avísale al equipo de desarrollo en cuanto el cliente confirme la
+aprobación, para retomar esa parte.
 
 ## 8. Resumen de hallazgos de la última verificación
 
@@ -114,6 +122,18 @@ después de fusionar las cuatro correcciones juntas.
 del dashboard financiero solo cubren organizaciones registradas para el indicador de crecimiento (RF28);
 una serie de tiempo de donaciones/adopciones sigue fuera de alcance hasta que el documento base la pida
 explícitamente.
+
+**Cambio posterior (20-sep-2026): reemplazo de pasarela de pago.** Por decisión del cliente,
+MercadoPago reemplazó completamente a Wompi ([#177](https://github.com/sebasdev-space/AdoptaFacil/pull/177)),
+manteniendo el mismo modelo (recaudo consolidado + dispersión T+1 manual, nunca el split automático
+de Marketplace). Verificado en vivo contra el sandbox real de MercadoPago antes de fusionar. Dos
+cosas quedan pendientes de que el cliente confirme, sin las cuales esta parte no está 100% cerrada:
+
+1. La comisión real de pasarela asignada a su cuenta (el desglose que ve el donante sigue mostrando
+   temporalmente la tarifa vieja de Wompi, marcado con `TODO(client)` en el código).
+2. Si su aplicación de MercadoPago ya tiene aprobados los permisos de "Disbursements" — sin eso, la
+   dispersión T+1 real (Fase 2) sigue sin poder implementarse, y el recaudo actual no tiene forma
+   automática de llegar a la cuenta bancaria de las organizaciones (ver sección 7, aviso vigente).
 
 ## 9. Soporte
 
