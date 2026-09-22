@@ -96,6 +96,20 @@ export const envSchema = z.object({
   SPONSORSHIP_EXPIRE_ATTEMPT_2_DAY: z.coerce.number().int().positive().default(20),
   SPONSORSHIP_REMINDER_FINAL_DAY: z.coerce.number().int().positive().default(25),
   SPONSORSHIP_EXPIRE_ATTEMPT_3_DAY: z.coerce.number().int().positive().default(30),
+  // T-Google-SignIn (auth): which IdentityPort adapter to bind. `fake` = a
+  // deterministic dev/test double that accepts a documented fake token format
+  // (default — no real Google account needed); `google` verifies real Google
+  // ID tokens via google-auth-library. Swap happens in IdentityModule, no
+  // consumer changes (same PAYMENT_DRIVER-style seam). When
+  // AUTH_IDENTITY_DRIVER=google, GOOGLE_OAUTH_CLIENT_ID below is REQUIRED
+  // (fail-fast, see the refine). The client has not handed over real Google
+  // OAuth credentials yet, so `google` cannot be exercised end-to-end until
+  // then — same "stub until credentials exist" shape PAYMENT_DRIVER had
+  // before T-052/MercadoPago.
+  AUTH_IDENTITY_DRIVER: z.enum(['fake', 'google']).default('fake'),
+  // Google OAuth 2.0 Client ID (web application type) the ID token's audience
+  // must match. Read ONLY from env; never hardcoded, never committed.
+  GOOGLE_OAUTH_CLIENT_ID: z.string().min(1).optional(),
 });
 
 /** Runtime config type (from the base object schema). */
@@ -118,6 +132,9 @@ const REQUIRED_MERCADOPAGO_KEYS = [
   'MERCADOPAGO_WEBHOOK_SECRET',
 ] as const;
 
+/** Google OAuth vars required when AUTH_IDENTITY_DRIVER=google (fail-fast at boot). */
+const REQUIRED_GOOGLE_IDENTITY_KEYS = ['GOOGLE_OAUTH_CLIENT_ID'] as const;
+
 /** The validated schema + cross-field rules (fail-fast for smtp/mercadopago credentials). */
 export const validatedEnvSchema = envSchema.superRefine((env, ctx) => {
   if (env.NOTIFICATION_DRIVER === 'smtp') {
@@ -138,6 +155,17 @@ export const validatedEnvSchema = envSchema.superRefine((env, ctx) => {
           code: z.ZodIssueCode.custom,
           path: [key],
           message: `${key} is required when PAYMENT_DRIVER=mercadopago`,
+        });
+      }
+    }
+  }
+  if (env.AUTH_IDENTITY_DRIVER === 'google') {
+    for (const key of REQUIRED_GOOGLE_IDENTITY_KEYS) {
+      if (env[key] === undefined || env[key] === null || env[key] === '') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `${key} is required when AUTH_IDENTITY_DRIVER=google`,
         });
       }
     }

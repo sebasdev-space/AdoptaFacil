@@ -7,6 +7,7 @@ import { AppModule } from '../src/app.module';
 import { SponsorshipBillingService } from '../src/modules/sponsorships/sponsorship-billing.service';
 import { SponsorshipPaymentPollerService } from '../src/modules/sponsorships/sponsorship-payment-poller.service';
 import { purgeOrganizations } from './support/cleanup';
+import { completeTestProfile } from './support/profile';
 
 /**
  * Recurring sponsorship billing end-to-end (S-5-REDISEÑO, M07/RF17, T-057):
@@ -64,6 +65,7 @@ describe('Sponsorship recurring billing (S-5-REDISEÑO, M07/RF17, T-057)', () =>
       })
       .expect(201);
     orgIds.push(res.body.user.organizationId);
+    await completeTestProfile(admin, res.body.user.id);
     return {
       token: res.body.tokens.accessToken,
       orgId: res.body.user.organizationId,

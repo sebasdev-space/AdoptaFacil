@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { SponsorshipPlanPublic, SponsorshipPublicSummary } from '@adoptafacil/contracts';
 import {
   Button,
@@ -12,7 +12,7 @@ import {
   useToast,
 } from '@adoptafacil/ui';
 import { PageContainer, PageHeader } from '../../_layout';
-import { useApiClient } from '../../../shell/api';
+import { isIncompleteProfileError, useApiClient } from '../../../shell/api';
 import { fetchAnimalSponsorshipSummary } from '../api/public-sponsorships';
 import { subscribeToPlan } from '../api/sponsorships-api';
 import { formatCop, SPONSORSHIP_PERIODICITY_LABELS } from '../model/sponsorships-view';
@@ -61,6 +61,8 @@ export function SponsorPage() {
   const client = useApiClient();
   const { toast } = useToast();
   const target = useSponsorTarget();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const [summary, setSummary] = useState<SponsorshipPublicSummary | null>(null);
   const [summaryState, setSummaryState] = useState<SummaryState>('loading');
@@ -111,6 +113,18 @@ export function SponsorPage() {
       setDone(plan);
       toast({ title: 'Apadrinamiento creado', description: `Ahora apadrinas a ${animalLabel}.` });
     } catch (error) {
+      // T-Google-SignIn (business rule #3): apadrinar requires a complete
+      // profile (phone/documentId/address).
+      if (isIncompleteProfileError(error)) {
+        navigate('/perfil/completar', {
+          state: {
+            from: location,
+            reason:
+              'Antes de apadrinar necesitamos tu teléfono, documento de identidad y dirección.',
+          },
+        });
+        return;
+      }
       toast({
         title: 'No se pudo procesar el apadrinamiento',
         description: error instanceof Error ? error.message : 'Inténtalo de nuevo.',

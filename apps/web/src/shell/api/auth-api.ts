@@ -1,7 +1,9 @@
 import type {
   AuthTokens,
   AuthenticatedUser,
+  CompleteProfileRequest,
   ForgotPasswordRequest,
+  GoogleSignInRequest,
   LoginRequest,
   LoginResponse,
   RegisterRequest,
@@ -22,6 +24,19 @@ export interface AuthApi {
   login(credentials: LoginRequest): Promise<LoginResponse>;
   /** Create an account (Organization or Person) and return a session. */
   register(request: RegisterRequest): Promise<RegisterResponse>;
+  /**
+   * Google Sign-In (T-Google-SignIn): logs into an existing account (any
+   * account type, matched by email) or creates a lightweight new Person
+   * account — never an Organization. Same response shape as login/register.
+   */
+  googleSignIn(request: GoogleSignInRequest): Promise<LoginResponse>;
+  /**
+   * Complete/update the caller's own Person profile (`phone`/`documentId`/
+   * `address`) — the fields gated before donating/apadrinar, requesting an
+   * adoption, or enrolling as a volunteer. Every field is independently
+   * optional; only what's still missing needs to be sent.
+   */
+  completeProfile(request: CompleteProfileRequest): Promise<AuthenticatedUser>;
   /** Request a password reset. Resolves with no body (202); never enumerates. */
   requestPasswordReset(request: ForgotPasswordRequest): Promise<void>;
   /**
@@ -113,6 +128,23 @@ export class HttpAuthApi implements AuthApi {
       accountType === 'organization' ? '/auth/register/organization' : '/auth/register/person';
     const response = await this.fetchFn(endpoint(this.baseUrl, path), jsonRequestInit('POST', dto));
     return parseJsonResponse<RegisterResponse>(response);
+  }
+
+  async googleSignIn(request: GoogleSignInRequest): Promise<LoginResponse> {
+    const response = await this.fetchFn(
+      endpoint(this.baseUrl, '/auth/google'),
+      jsonRequestInit('POST', request),
+    );
+    return parseJsonResponse<LoginResponse>(response);
+  }
+
+  completeProfile(request: CompleteProfileRequest): Promise<AuthenticatedUser> {
+    // Authenticated: routes through the client so the refresh interceptor applies.
+    return this.client
+      .request<AuthenticatedUser>('/auth/me/profile', { method: 'PATCH', json: request })
+      .catch((error) => {
+        throw toApiError(error);
+      });
   }
 
   async requestPasswordReset(request: ForgotPasswordRequest): Promise<void> {

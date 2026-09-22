@@ -6,6 +6,7 @@ import request from 'supertest';
 import { computeBreakdown } from '@adoptafacil/contracts';
 import { AppModule } from '../src/app.module';
 import { purgeOrganizations } from './support/cleanup';
+import { completeTestProfile } from './support/profile';
 
 /**
  * M05 donations (T-050, P1) end-to-end: an authenticated PERSON donates to an
@@ -70,6 +71,7 @@ describe('Donations (M05: donate + breakdown + receipt)', () => {
       .expect(201);
     personToken = personReg.body.tokens.accessToken;
     orgIds.push(personReg.body.user.organizationId);
+    await completeTestProfile(admin, personReg.body.user.id);
 
     const person2Reg = await request(server)
       .post('/auth/register/person')
@@ -81,6 +83,7 @@ describe('Donations (M05: donate + breakdown + receipt)', () => {
       .expect(201);
     person2Token = person2Reg.body.tokens.accessToken;
     orgIds.push(person2Reg.body.user.organizationId);
+    await completeTestProfile(admin, person2Reg.body.user.id);
   });
 
   afterAll(async () => {

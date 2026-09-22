@@ -13,12 +13,16 @@ import {
   type AuthenticatedUser,
   type AuthSession,
   type AuthTokens,
+  type CompleteProfileInput,
+  type GoogleSignInInput,
+  type IdentityPort,
   type LoginDto,
   type RegisterOrganizationDto,
   type RegisterPersonDto,
   Role,
 } from '@adoptafacil/contracts';
 import { AuditService } from '../audit/audit.service';
+import { IDENTITY_PORT } from '../identity/identity.port';
 import { NOTIFICATION_PORT, type NotificationPort } from '../notifications/notification.port';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DEFAULT_ANIMAL_BREEDS } from '../../modules/animals/animal-breeds.catalog';
@@ -47,6 +51,7 @@ export class AuthService {
     private readonly passwords: PasswordService,
     private readonly tokens: TokenService,
     @Inject(NOTIFICATION_PORT) private readonly notifications: NotificationPort,
+    @Inject(IDENTITY_PORT) private readonly identity: IdentityPort,
     private readonly audit: AuditService,
     config: ConfigService<Env, true>,
   ) {
@@ -139,6 +144,30 @@ export class AuthService {
     return { user, tokens };
   }
 
+  /** Build the client-facing principal, folding in the tenant-scoped profile's
+   *  optional fields (T-Google-SignIn) — the single place every auth flow
+   *  (password login, Google Sign-In, `/auth/me`) shapes an AuthenticatedUser. */
+  private toAuthenticatedUser(
+    principal: { id: string; email: string; accountType: AccountType; organizationId: string },
+    profile?: {
+      displayName?: string | null;
+      phone?: string | null;
+      documentId?: string | null;
+      address?: string | null;
+    } | null,
+  ): AuthenticatedUser {
+    return {
+      id: principal.id,
+      email: principal.email,
+      displayName: profile?.displayName ?? principal.email,
+      accountType: principal.accountType,
+      organizationId: principal.organizationId,
+      phone: profile?.phone ?? undefined,
+      documentId: profile?.documentId ?? undefined,
+      address: profile?.address ?? undefined,
+    };
+  }
+
   async login(dto: LoginDto): Promise<AuthSession> {
     const normalizedEmail = dto.email.trim().toLowerCase();
     const credential = await this.prisma.authCredential.findUnique({
@@ -161,13 +190,15 @@ export class AuthService {
       tx.user.findUnique({ where: { id: credential.userId } }),
     );
 
-    const user: AuthenticatedUser = {
-      id: credential.userId,
-      email: credential.email,
-      displayName: profile?.displayName ?? credential.email,
-      accountType,
-      organizationId: credential.organizationId,
-    };
+    const user = this.toAuthenticatedUser(
+      {
+        id: credential.userId,
+        email: credential.email,
+        accountType,
+        organizationId: credential.organizationId,
+      },
+      profile,
+    );
     const tokens = await this.tokens.issueTokens({
       userId: credential.userId,
       organizationId: credential.organizationId,
@@ -188,13 +219,137 @@ export class AuthService {
     const profile = await this.prisma.withOrgContext(principal.organizationId, (tx) =>
       tx.user.findUnique({ where: { id: principal.id } }),
     );
-    return {
-      id: principal.id,
-      email: principal.email,
-      displayName: profile?.displayName ?? principal.email,
-      accountType: principal.accountType,
-      organizationId: principal.organizationId,
-    };
+    return this.toAuthenticatedUser(principal, profile);
+  }
+
+  /**
+   * Google Sign-In (T-Google-SignIn, `POST /auth/google`): verifies the ID
+   * token via IdentityPort, then AUTO-LINKS by email to an existing
+   * AuthCredential (regardless of whether it was originally created with a
+   * password or with Google) — or, the first time, creates a lightweight
+   * Person account (NEVER an Organization; registering one stays the long
+   * NIT/legal-representative form). Ends the SAME way as password login/
+   * register: a fresh AuthSession (access + refresh JWT pair) — Google
+   * Sign-In is a different FRONT DOOR into the exact same session type, not a
+   * separate kind of session.
+   */
+  async googleSignIn(dto: GoogleSignInInput): Promise<AuthSession> {
+    const claims = await this.identity.verifyGoogleIdToken(dto.idToken);
+    const normalizedEmail = claims.email.trim().toLowerCase();
+
+    const existing = await this.prisma.authCredential.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (existing) {
+      // Auto-link: enter the existing account as-is, whatever its accountType
+      // or original authProvider — Google Sign-In never mutates the account.
+      const accountType = existing.accountType as AccountType;
+      const profile = await this.prisma.withOrgContext(existing.organizationId, (tx) =>
+        tx.user.findUnique({ where: { id: existing.userId } }),
+      );
+      const user = this.toAuthenticatedUser(
+        {
+          id: existing.userId,
+          email: existing.email,
+          accountType,
+          organizationId: existing.organizationId,
+        },
+        profile,
+      );
+      const tokens = await this.tokens.issueTokens({
+        userId: existing.userId,
+        organizationId: existing.organizationId,
+        accountType,
+        email: existing.email,
+      });
+      return { user, tokens };
+    }
+
+    // First time: create a lightweight PERSON account. The password hash is a
+    // random, unguessable value — never usable to log in with a password (this
+    // account only ever authenticates via Google) — but stored the SAME way as
+    // a real password so `passwordHash` stays a plain required column with no
+    // separate "no password" state to model.
+    const passwordHash = await this.passwords.hash(randomBytes(32).toString('hex'));
+    const organizationId = randomUUID();
+    const userId = randomUUID();
+    const displayName = claims.name.trim() || normalizedEmail;
+
+    await this.prisma.withOrgContext(organizationId, async (tx) => {
+      await tx.organization.create({ data: { id: organizationId, name: displayName } });
+      await tx.user.create({
+        data: {
+          id: userId,
+          organizationId,
+          accountType: 'person',
+          email: normalizedEmail,
+          displayName,
+        },
+      });
+      await tx.authCredential.create({
+        data: {
+          userId,
+          organizationId,
+          accountType: 'person',
+          email: normalizedEmail,
+          passwordHash,
+          authProvider: 'google',
+          googleSub: claims.sub,
+        },
+      });
+      await this.audit.recordWithTx(tx, {
+        organizationId,
+        actorUserId: userId,
+        action: 'auth.google_signup',
+        entityType: 'user',
+        entityId: userId,
+      });
+    });
+
+    const user = this.toAuthenticatedUser({
+      id: userId,
+      email: normalizedEmail,
+      accountType: 'person',
+      organizationId,
+    });
+    const tokens = await this.tokens.issueTokens({
+      userId,
+      organizationId,
+      accountType: 'person',
+      email: normalizedEmail,
+    });
+    return { user, tokens };
+  }
+
+  /**
+   * Profile-completion gate (T-Google-SignIn, business rule #3): a Person
+   * fills in `phone`/`documentId`/`address` here — each field independently
+   * optional, so a caller only sends what's still missing. Read back via
+   * `requireCompleteProfile` (core/auth/require-complete-profile.ts) before
+   * donating/apadrinar, requesting an adoption, or enrolling as a volunteer.
+   */
+  async completeProfile(actor: RequestUser, dto: CompleteProfileInput): Promise<AuthenticatedUser> {
+    const profile = await this.prisma.withOrgContext(actor.organizationId, (tx) =>
+      tx.user.update({
+        where: { id: actor.id },
+        data: {
+          ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
+          ...(dto.documentId !== undefined ? { documentId: dto.documentId } : {}),
+          ...(dto.address !== undefined ? { address: dto.address } : {}),
+        },
+      }),
+    );
+    await this.audit.record({
+      organizationId: actor.organizationId,
+      actorUserId: actor.id,
+      action: 'user.profile_completed',
+      entityType: 'user',
+      entityId: actor.id,
+      // Never the actual values (Ley 1581) — only which fields were touched.
+      metadata: { fields: Object.keys(dto) },
+    });
+    return this.toAuthenticatedUser(actor, profile);
   }
 
   async refresh(refreshToken: string): Promise<AuthTokens> {

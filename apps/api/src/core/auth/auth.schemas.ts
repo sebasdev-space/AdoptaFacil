@@ -44,3 +44,19 @@ export const passwordResetConfirmSchema = z.object({
   token: z.string().min(1).max(512),
   password,
 });
+
+// T-Google-SignIn: the raw ID token from Google Identity Services (or the
+// FakeIdentityAdapter's documented "fake:<email>:<name>" / base64url-JSON
+// format in dev). Verified server-side via IdentityPort — never trusted as-is.
+export const googleSignInSchema = z.object({
+  idToken: z.string().min(1),
+});
+
+// T-Google-SignIn: `PATCH /users/me/profile`. Every field independently
+// optional (a caller may fill in just the ones still missing); an empty
+// object is a no-op, never an error.
+export const completeProfileSchema = z.object({
+  phone: z.string().trim().min(1).max(40).optional(),
+  documentId: z.string().trim().min(1).max(40).optional(),
+  address: z.string().trim().min(1).max(300).optional(),
+});

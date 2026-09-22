@@ -7,6 +7,7 @@ import { AppModule } from '../src/app.module';
 import { FollowUpService } from '../src/modules/adoptions/followup.service';
 import { STORAGE_PORT, type StoragePort } from '../src/core/storage/storage.port';
 import { purgeOrganizations } from './support/cleanup';
+import { completeTestProfile } from './support/profile';
 
 /**
  * M04 post-adoption FOLLOW-UP (T-028c, RF12) end-to-end: from a SIGNED contract the
@@ -63,6 +64,7 @@ describe('Adoption follow-up (M04: post-adoption tracking)', () => {
       .expect(201);
     personToken = person.body.tokens.accessToken;
     orgIds.push(person.body.user.organizationId);
+    await completeTestProfile(admin, person.body.user.id);
 
     const other = await request(server)
       .post('/auth/register/organization')

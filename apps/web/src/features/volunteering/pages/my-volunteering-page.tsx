@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   type Paginated,
   type ServiceHours,
@@ -19,7 +20,7 @@ import {
   useToast,
 } from '@adoptafacil/ui';
 import { PageContainer, PageHeader } from '../../_layout';
-import { useApiClient } from '../../../shell/api';
+import { isIncompleteProfileError, useApiClient } from '../../../shell/api';
 import { downloadVolunteerCertificatePdf } from '../lib/certificate';
 import {
   ENROLLMENT_STATUS_LABELS,
@@ -41,6 +42,7 @@ import {
 export function MyVolunteeringPage() {
   const client = useApiClient();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const [opportunities, setOpportunities] = useState<VolunteerOpportunityPublic[]>([]);
   const [enrollments, setEnrollments] = useState<VolunteerEnrollmentMine[]>([]);
@@ -89,6 +91,17 @@ export function MyVolunteeringPage() {
       await loadAll();
       toast({ title: 'Inscripción enviada', variant: 'success' });
     } catch (error) {
+      // T-Google-SignIn (business rule #3): enrolling as a volunteer requires
+      // a complete profile (phone/documentId/address).
+      if (isIncompleteProfileError(error)) {
+        navigate('/perfil/completar', {
+          state: {
+            reason:
+              'Antes de inscribirte como voluntario necesitamos tu teléfono, documento de identidad y dirección.',
+          },
+        });
+        return;
+      }
       toast({
         title: 'No se pudo completar la inscripción',
         description: error instanceof Error ? error.message : 'Inténtalo de nuevo.',

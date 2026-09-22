@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { ConfigService } from '@nestjs/config';
+import type { IdentityPort } from '@adoptafacil/contracts';
 import type { AuditService } from '../audit/audit.service';
 import type { NotificationPort } from '../notifications/notification.port';
 import type { PrismaService } from '../../prisma/prisma.service';
@@ -60,11 +61,13 @@ function makeService(opts: {
   const config = {
     get: (key: string) => (key === 'WEB_BASE_URL' ? WEB_BASE_URL : undefined),
   } as unknown as ConfigService<Env, true>;
+  const identity = { verifyGoogleIdToken: jest.fn() };
   const service = new AuthService(
     prisma as unknown as PrismaService,
     passwords as unknown as PasswordService,
     tokens,
     notifications as unknown as NotificationPort,
+    identity as unknown as IdentityPort,
     audit as unknown as AuditService,
     config,
   );

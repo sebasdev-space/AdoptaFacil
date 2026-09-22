@@ -24,6 +24,7 @@ import {
   type NotificationPort,
 } from '../../core/notifications/notification.port';
 import type { RequestUser } from '../../core/auth/auth.types';
+import { requireCompleteProfile } from '../../core/auth/require-complete-profile';
 import type { Env } from '../../config/env.validation';
 import { checkAdoptionTransition } from './adoption-status';
 import {
@@ -83,6 +84,8 @@ export class AdoptionsService {
    *   - message length (RF10) — validated by the zod schema upstream.
    */
   async create(actor: RequestUser, input: CreateAdoptionRequestInput): Promise<AdoptionRequest> {
+    await requireCompleteProfile(this.prisma, actor);
+
     if (actor.organizationId === input.organizationId) {
       throw new ForbiddenException(
         'No puedes postular a un animal de tu propia organización (conflicto de interés).',

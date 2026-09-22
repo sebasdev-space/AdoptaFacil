@@ -26,6 +26,7 @@ import { TenantContextService } from '../../core/tenant/tenant-context.service';
 import { AuditService } from '../../core/audit/audit.service';
 import { PAYMENT_PORT } from '../../core/payments/payment.port';
 import type { RequestUser } from '../../core/auth/auth.types';
+import { requireCompleteProfile } from '../../core/auth/require-complete-profile';
 import { CampaignFundingService } from '../campaigns/campaign-funding.service';
 import { DonationCertificatesService } from './donation-certificates.service';
 
@@ -103,6 +104,8 @@ export class DonationsService {
    * without a second charge or a duplicate audit entry.
    */
   async create(actor: RequestUser, input: CreateDonationInput): Promise<Donation> {
+    await requireCompleteProfile(this.prisma, actor);
+
     const concept: PaymentConcept = input.concept ?? {
       kind: 'organization',
       id: input.organizationId,

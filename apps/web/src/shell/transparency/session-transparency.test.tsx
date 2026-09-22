@@ -79,6 +79,8 @@ function fakeAuthApi(accountType: 'organization' | 'person'): AuthApi {
   return {
     login: async () => session,
     register: async () => session,
+    googleSignIn: async () => session,
+    completeProfile: async () => session.user,
     requestPasswordReset: async () => {},
     confirmPasswordReset: async () => {},
     refresh: async () => TOKENS,

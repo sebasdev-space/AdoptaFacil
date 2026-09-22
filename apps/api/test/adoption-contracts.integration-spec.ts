@@ -5,6 +5,7 @@ import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { purgeOrganizations } from './support/cleanup';
+import { completeTestProfile } from './support/profile';
 
 /**
  * M04 adoption CONTRACT + electronic signature (T-028b, RF11) end-to-end: after a
@@ -61,6 +62,7 @@ describe('Adoption contracts (M04: contract + signature)', () => {
       .expect(201);
     personToken = person.body.tokens.accessToken;
     orgIds.push(person.body.user.organizationId);
+    await completeTestProfile(admin, person.body.user.id);
 
     const other = await request(server)
       .post('/auth/register/organization')
