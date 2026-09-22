@@ -55,8 +55,28 @@ export class TokenService {
     return refreshToken;
   }
 
-  /** Mint a fresh access + refresh pair for a principal (login / register). */
+  /**
+   * Single active session: revoke every OTHER still-active refresh token this
+   * user holds before minting a new one, so signing in from a second place
+   * ends the first. The first session's short-lived access token (15 min
+   * default) keeps working until it expires or that device tries to refresh —
+   * at that point `rotate()` rejects the now-revoked token and the web app's
+   * existing "refresh failed → session expired → logout" path takes over.
+   * There is no separate live/instant kill switch (would require checking a
+   * session store on every authenticated request); this is a deliberate,
+   * cheap trade-off.
+   */
+  private async revokeOtherSessions(userId: string): Promise<void> {
+    await this.prisma.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
+
+  /** Mint a fresh access + refresh pair for a principal (login / register /
+   *  Google sign-in) — revokes any other session this user already had. */
   async issueTokens(principal: TokenPrincipal): Promise<AuthTokens> {
+    await this.revokeOtherSessions(principal.userId);
     const refreshToken = await this.persistRefreshToken(principal.userId);
     return {
       accessToken: this.signAccessToken(principal),

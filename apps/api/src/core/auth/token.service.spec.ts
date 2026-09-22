@@ -51,6 +51,29 @@ describe('TokenService', () => {
     expect(createArg.data.userId).toBe('u1');
   });
 
+  it('single active session: revokes every other active refresh token for the user before issuing a new one', async () => {
+    const jwt = makeJwt();
+    const prisma = makePrisma();
+    (prisma.refreshToken.create as jest.Mock).mockResolvedValue({ id: 'r2' });
+    const service = new TokenService(jwt, prisma, CONFIG);
+
+    await service.issueTokens({
+      userId: 'u1',
+      organizationId: 'o1',
+      accountType: 'person',
+      email: 'e@test',
+    });
+
+    expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+      where: { userId: 'u1', revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
+    // Revocation happens BEFORE the new token is persisted, not after.
+    const revokeOrder = (prisma.refreshToken.updateMany as jest.Mock).mock.invocationCallOrder[0];
+    const createOrder = (prisma.refreshToken.create as jest.Mock).mock.invocationCallOrder[0];
+    expect(revokeOrder).toBeLessThan(createOrder);
+  });
+
   it('rotates a valid refresh token: creates a replacement and revokes the old one', async () => {
     const jwt = makeJwt();
     const prisma = makePrisma();
