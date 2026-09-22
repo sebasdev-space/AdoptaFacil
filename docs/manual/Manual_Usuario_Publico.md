@@ -10,8 +10,6 @@ comunidad. Si en cambio representas a una organización de rescate, consulta el
 _Manual de Usuario — Organizaciones_.
 
 Las capturas de este manual provienen de sesiones reales de la aplicación, con datos de demostración.
-Las secciones marcadas _(pendiente captura)_ son funciones reales y ya operativas, pero aún no tienen
-una captura de pantalla incluida en esta versión del manual.
 
 ## Índice
 
@@ -193,8 +191,10 @@ una organización esté necesitando.
 
 Desde "Banco de recursos" ves las necesidades publicadas por las organizaciones y puedes ofrecer una
 donación física contra una de ellas. Tu historial de ofertas vive en "Mis ofertas". La organización
-coordina contigo la entrega y, una vez recibida, deja evidencia de que se cumplió. _(Pendiente
-captura.)_
+coordina contigo la entrega y, una vez recibida, deja evidencia de que se cumplió.
+
+![Banco de recursos público](img/39-banco-recursos-publico.png)
+_Necesidades activas publicadas por las organizaciones._
 
 ## 7. Marketplace
 
@@ -202,7 +202,10 @@ Cada organización puede tener su propio catálogo de productos (por ejemplo, ar
 insumos que vende para financiarse). En cada producto verás siempre visible un aviso de que
 **AdoptaFácil no garantiza la entrega ni la calidad del producto** — la compra se coordina directamente
 con la organización. No hay carrito ni pago en línea: el botón de cada producto te lleva a WhatsApp para
-contactar directamente a la organización vendedora. _(Pendiente captura.)_
+contactar directamente a la organización vendedora.
+
+![Marketplace público](img/40-marketplace-publico.png)
+_Catálogo público de productos, con el aviso de no garantía siempre visible._
 
 ## 8. Comunidad
 
@@ -210,22 +213,29 @@ En "Comunidad" → "Feed" ves publicaciones de todas las organizaciones de la pl
 generales, campañas, avisos y eventos. Puedes comentar y dar like a cualquier publicación, y en "Mis
 publicaciones" ves lo que tú mismo has publicado. Solo puedes editar o borrar tus propias publicaciones;
 la moderación de contenido inapropiado la hace el equipo de AdoptaFácil, no las organizaciones.
-_(Pendiente captura.)_
+
+![Feed de comunidad](img/41-comunidad-feed.png)
+_Feed cruzado de publicaciones de todas las organizaciones y personas._
 
 ## 9. Voluntariado
 
 En "Mi voluntariado" ves las oportunidades publicadas por las organizaciones, te inscribes y registras
 tus horas de servicio a medida que las cumples; la organización las revisa y aprueba. Si eres estudiante
 de grado 10° u 11° cursando tu servicio social, al alcanzar las 80 horas exigidas por la normatividad
-puedes descargar tu certificado directamente desde la plataforma. _(Pendiente captura.)_
+puedes descargar tu certificado directamente desde la plataforma.
+
+![Mi voluntariado](img/42-mi-voluntariado.png)
+_Oportunidades disponibles, tus inscripciones, horas y certificados._
 
 ## 10. Reseñas
 
 Desde "Mis reseñas" puedes calificar (1 a 5) y dejar un comentario sobre una organización con la que
 hayas tenido una adopción, donación o apadrinamiento reales — la plataforma verifica esto antes de dejarte
 publicar la reseña, no es solo una sugerencia. Solo puedes dejar una reseña por organización; queda
-pendiente de revisión antes de aparecer en el indicador público de esa organización. _(Pendiente
-captura.)_
+pendiente de revisión antes de aparecer en el indicador público de esa organización.
+
+![Mis reseñas](img/43-mis-resenas.png)
+_Tus reseñas enviadas y su estado (pendiente de revisión o aprobada)._
 
 ## 11. Acceso y seguridad
 

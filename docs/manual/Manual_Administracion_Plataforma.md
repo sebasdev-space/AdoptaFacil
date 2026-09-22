@@ -9,11 +9,11 @@ Este manual es para el equipo interno de AdoptaFácil, con cuentas de rol **Plat
 **todas** las organizaciones y personas de la plataforma. Si buscas el manual de una organización o de
 una persona, consulta los otros dos documentos de esta serie.
 
-Este documento todavía no incluye capturas de pantalla — no hay forma automatizada de navegar y capturar
-la UI en esta ronda. Todo lo aquí descrito sí se validó contra la API real (con una credencial de
-PlatformAdmin/PlatformSuperAdmin de prueba) y por la suite de pruebas automatizadas del proyecto
-(incluida `platform-dashboards.integration-spec.ts`, en verde), además de confirmar en vivo que una
-cuenta de organización recibe acceso denegado al intentar entrar a estas rutas.
+Las capturas de este manual se tomaron con Playwright navegando la aplicación real, con una cuenta de
+prueba PlatformAdmin/PlatformSuperAdmin. Todo lo aquí descrito también se validó contra la API real y por
+la suite de pruebas automatizadas del proyecto (incluida `platform-dashboards.integration-spec.ts`, en
+verde), además de confirmar en vivo que una cuenta de organización recibe acceso denegado al intentar
+entrar a estas rutas.
 
 ## Índice
 
@@ -38,6 +38,9 @@ legal, documento del representante legal, otros). Por cada uno decides: Aprobar,
 (con motivo). Tu decisión es lo que permite a una organización avanzar de una etapa de formalización a la
 siguiente.
 
+![Revisión de documentos](img/51-plataforma-documentos.png)
+_Cola de documentos pendientes, con las acciones Aprobar / Observar / Rechazar._
+
 ## 3. Organizaciones duplicadas
 
 Ruta: **Organizaciones duplicadas** (`/plataforma/organizaciones-duplicadas`). El sistema detecta
@@ -46,12 +49,18 @@ registro o la edición de perfil, y las deja en esta cola para tu revisión — 
 de riesgo (captación ilegal / lavado de activos) exigida por el documento base del proyecto. Aquí
 decides si es un duplicado real (y qué hacer al respecto) o un falso positivo.
 
+![Organizaciones duplicadas](img/52-plataforma-duplicados.png)
+_Cola de casos de nombre similar — vacía cuando no hay ninguno pendiente de revisión._
+
 ## 4. Moderación de comunidad
 
 Ruta: **Moderación de comunidad** (`/plataforma/comunidad`). Revisas publicaciones, comentarios y
 reportes del feed de Comunidad (M11) y puedes retirar contenido inapropiado. Esta es la única capa de
 moderación de Comunidad — ninguna organización puede moderar el contenido de otra, ni siquiera el suyo
 propio más allá de borrar sus propias publicaciones.
+
+![Moderación de comunidad](img/53-plataforma-moderacion-comunidad.png)
+_Publicaciones de todas las organizaciones y personas, con la acción "Retirar"._
 
 ## 5. Moderación de reseñas
 
@@ -64,11 +73,17 @@ un apadrinamiento con al menos un pago real antes de dejarlo reseñar — no sol
 la misma organización, evita la primera sin fundamento. Esta cola sigue existiendo para el resto de la
 moderación (contenido inapropiado, ofensivo, etc.), no para suplir esa validación.
 
+![Moderación de reseñas](img/54-plataforma-moderacion-resenas.png)
+_Reseñas pendientes y ya aprobadas, con las acciones Aprobar / Rechazar / Ocultar._
+
 ## 6. Dashboard de plataforma
 
 Ruta: **Dashboard de plataforma** (`/plataforma/dashboard`), para PlatformAdmin y PlatformSuperAdmin.
 Muestra los conteos consolidados de las tres colas anteriores (documentos pendientes, organizaciones
 duplicadas sin resolver, reseñas pendientes), para que tu equipo priorice el trabajo del día.
+
+![Dashboard de plataforma](img/55-plataforma-dashboard.png)
+_Conteos consolidados de las tres colas de revisión._
 
 ## 7. Dashboard financiero (solo PlatformSuperAdmin)
 
@@ -88,6 +103,10 @@ Ruta: **Dashboard financiero** (`/plataforma/dashboard/financiero`). Muestra:
 
 Un PlatformAdmin que no sea SuperAdmin no puede ver esta pantalla ni sus cifras — se lo confirma un
 aviso de acceso denegado.
+
+![Dashboard financiero](img/56-plataforma-dashboard-financiero.png)
+_Finanzas, indicadores de negocio (incluida la tasa de crecimiento) y el mapa real de Colombia por
+departamento._
 
 ## 8. Resumen de hallazgos de la última verificación
 
