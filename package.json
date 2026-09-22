@@ -41,7 +41,10 @@
     "html-to-docx": "^1.8.0",
     "husky": "^9.1.7",
     "lint-staged": "^15.3.0",
+
     "marked": "^18.0.13",
+    "playwright": "^1.63.0",
+
     "prettier": "^3.4.2",
     "prisma": "^5.22.0",
     "turbo": "^2.3.3",

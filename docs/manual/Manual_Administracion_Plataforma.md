@@ -9,11 +9,11 @@ Este manual es para el equipo interno de AdoptaFácil, con cuentas de rol **Plat
 **todas** las organizaciones y personas de la plataforma. Si buscas el manual de una organización o de
 una persona, consulta los otros dos documentos de esta serie.
 
-Este documento todavía no incluye capturas de pantalla — no hay forma automatizada de navegar y capturar
-la UI en esta ronda. Todo lo aquí descrito sí se validó contra la API real (con una credencial de
-PlatformAdmin/PlatformSuperAdmin de prueba) y por la suite de pruebas automatizadas del proyecto
-(incluida `platform-dashboards.integration-spec.ts`, en verde), además de confirmar en vivo que una
-cuenta de organización recibe acceso denegado al intentar entrar a estas rutas.
+Las capturas de este manual se tomaron con Playwright navegando la aplicación real, con una cuenta de
+prueba PlatformAdmin/PlatformSuperAdmin. Todo lo aquí descrito también se validó contra la API real y por
+la suite de pruebas automatizadas del proyecto (incluida `platform-dashboards.integration-spec.ts`, en
+verde), además de confirmar en vivo que una cuenta de organización recibe acceso denegado al intentar
+entrar a estas rutas.
 
 ## Índice
 
@@ -38,6 +38,9 @@ legal, documento del representante legal, otros). Por cada uno decides: Aprobar,
 (con motivo). Tu decisión es lo que permite a una organización avanzar de una etapa de formalización a la
 siguiente.
 
+![Revisión de documentos](img/51-plataforma-documentos.png)
+_Cola de documentos pendientes, con las acciones Aprobar / Observar / Rechazar._
+
 ## 3. Organizaciones duplicadas
 
 Ruta: **Organizaciones duplicadas** (`/plataforma/organizaciones-duplicadas`). El sistema detecta
@@ -46,12 +49,18 @@ registro o la edición de perfil, y las deja en esta cola para tu revisión — 
 de riesgo (captación ilegal / lavado de activos) exigida por el documento base del proyecto. Aquí
 decides si es un duplicado real (y qué hacer al respecto) o un falso positivo.
 
+![Organizaciones duplicadas](img/52-plataforma-duplicados.png)
+_Cola de casos de nombre similar — vacía cuando no hay ninguno pendiente de revisión._
+
 ## 4. Moderación de comunidad
 
 Ruta: **Moderación de comunidad** (`/plataforma/comunidad`). Revisas publicaciones, comentarios y
 reportes del feed de Comunidad (M11) y puedes retirar contenido inapropiado. Esta es la única capa de
 moderación de Comunidad — ninguna organización puede moderar el contenido de otra, ni siquiera el suyo
 propio más allá de borrar sus propias publicaciones.
+
+![Moderación de comunidad](img/53-plataforma-moderacion-comunidad.png)
+_Publicaciones de todas las organizaciones y personas, con la acción "Retirar"._
 
 ## 5. Moderación de reseñas
 
@@ -64,11 +73,17 @@ un apadrinamiento con al menos un pago real antes de dejarlo reseñar — no sol
 la misma organización, evita la primera sin fundamento. Esta cola sigue existiendo para el resto de la
 moderación (contenido inapropiado, ofensivo, etc.), no para suplir esa validación.
 
+![Moderación de reseñas](img/54-plataforma-moderacion-resenas.png)
+_Reseñas pendientes y ya aprobadas, con las acciones Aprobar / Rechazar / Ocultar._
+
 ## 6. Dashboard de plataforma
 
 Ruta: **Dashboard de plataforma** (`/plataforma/dashboard`), para PlatformAdmin y PlatformSuperAdmin.
 Muestra los conteos consolidados de las tres colas anteriores (documentos pendientes, organizaciones
 duplicadas sin resolver, reseñas pendientes), para que tu equipo priorice el trabajo del día.
+
+![Dashboard de plataforma](img/55-plataforma-dashboard.png)
+_Conteos consolidados de las tres colas de revisión._
 
 ## 7. Dashboard financiero (solo PlatformSuperAdmin)
 
@@ -82,12 +97,26 @@ Ruta: **Dashboard financiero** (`/plataforma/dashboard/financiero`). Muestra:
   (departamentos coloreados según cuántas organizaciones tienen registradas ahí), con la geometría real
   de la división política del país — ya no es una lista de barras.
 - Cifras financieras agregadas: volumen recaudado, dispersado y neto.
-- **Conciliación de recaudo vs. dispersión**: cruza lo recibido a través de Wompi Collections contra lo
-  efectivamente dispersado a cada organización vía Wompi Payouts, señalando diferencias para revisión
+- **Conciliación de recaudo vs. dispersión**: cruza lo recibido a través de MercadoPago Collections
+  contra lo efectivamente dispersado a cada organización, señalando diferencias para revisión
   manual, por organización y por período.
 
 Un PlatformAdmin que no sea SuperAdmin no puede ver esta pantalla ni sus cifras — se lo confirma un
 aviso de acceso denegado.
+
+
+![Dashboard financiero](img/56-plataforma-dashboard-financiero.png)
+_Finanzas, indicadores de negocio (incluida la tasa de crecimiento) y el mapa real de Colombia por
+departamento._
+=======
+**Aviso vigente (reemplazo de pasarela, sep-2026):** el recaudo ya corre 100% sobre MercadoPago,
+pero la dispersión (`createPayout`) todavía NO está implementada para MercadoPago — requiere que
+MercadoPago apruebe el permiso "Disbursements" sobre la aplicación del cliente, trámite en curso.
+Mientras esa aprobación no llegue, el lado "dispersado" de la conciliación se queda en cero para
+toda donación recaudada después del cambio de pasarela: no es un error del reporte, es el estado
+real de la integración. Avísale al equipo de desarrollo en cuanto el cliente confirme la
+aprobación, para retomar esa parte.
+
 
 ## 8. Resumen de hallazgos de la última verificación
 
@@ -114,6 +143,18 @@ después de fusionar las cuatro correcciones juntas.
 del dashboard financiero solo cubren organizaciones registradas para el indicador de crecimiento (RF28);
 una serie de tiempo de donaciones/adopciones sigue fuera de alcance hasta que el documento base la pida
 explícitamente.
+
+**Cambio posterior (20-sep-2026): reemplazo de pasarela de pago.** Por decisión del cliente,
+MercadoPago reemplazó completamente a Wompi ([#177](https://github.com/sebasdev-space/AdoptaFacil/pull/177)),
+manteniendo el mismo modelo (recaudo consolidado + dispersión T+1 manual, nunca el split automático
+de Marketplace). Verificado en vivo contra el sandbox real de MercadoPago antes de fusionar. Dos
+cosas quedan pendientes de que el cliente confirme, sin las cuales esta parte no está 100% cerrada:
+
+1. La comisión real de pasarela asignada a su cuenta (el desglose que ve el donante sigue mostrando
+   temporalmente la tarifa vieja de Wompi, marcado con `TODO(client)` en el código).
+2. Si su aplicación de MercadoPago ya tiene aprobados los permisos de "Disbursements" — sin eso, la
+   dispersión T+1 real (Fase 2) sigue sin poder implementarse, y el recaudo actual no tiene forma
+   automática de llegar a la cuenta bancaria de las organizaciones (ver sección 7, aviso vigente).
 
 ## 9. Soporte
 
