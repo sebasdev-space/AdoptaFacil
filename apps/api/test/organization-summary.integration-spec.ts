@@ -6,6 +6,7 @@ import request from 'supertest';
 import { computeBreakdown } from '@adoptafacil/contracts';
 import { AppModule } from '../src/app.module';
 import { purgeOrganizations } from './support/cleanup';
+import { completeTestProfile } from './support/profile';
 
 /**
  * S2-08 (M13) minimal organization summary: GET /org/summary aggregates
@@ -64,6 +65,7 @@ describe('Organization summary (S2-08, M13)', () => {
       .send({ displayName: tag, email: `s208-${tag}-${randomUUID()}@test.local`, password })
       .expect(201);
     orgIds.push(res.body.user.organizationId);
+    await completeTestProfile(admin, res.body.user.id);
     return res.body.tokens.accessToken;
   }
 

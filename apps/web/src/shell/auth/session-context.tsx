@@ -21,6 +21,7 @@ import {
   type AuthApi,
   type AuthSession,
   type AuthenticatedUser,
+  type CompleteProfileRequest,
   type ForgotPasswordRequest,
   type LoginRequest,
   type RegisterRequest,
@@ -69,6 +70,14 @@ export interface SessionUser {
   organizationId?: string;
   /** Account kind — gates org-only features (e.g. the transparency indicator). */
   accountType: AccountType;
+  // --- Profile-completion gate (T-Google-SignIn) -----------------------------
+  // Present once the account has completed its profile; absent otherwise. The
+  // UI never gates navigation on these — only the 3 backend-gated actions
+  // (donate/apadrinar, solicitar adopción, inscribirse a voluntariado) do,
+  // via the 422 INCOMPLETE_PROFILE response itself.
+  phone?: string;
+  documentId?: string;
+  address?: string;
 }
 
 /**
@@ -122,6 +131,21 @@ export interface SessionContextValue {
   signIn: (credentials?: LoginRequest) => Promise<void>;
   /** Create an account (Organization or Person) and establish its session. */
   register: (request: RegisterRequest) => Promise<void>;
+  /**
+   * Google Sign-In (T-Google-SignIn): logs into an existing account (any
+   * account type, matched by email) or creates a lightweight new Person
+   * account — never an Organization. `idToken` is either a real Google
+   * Identity Services credential or (dev, no VITE_GOOGLE_CLIENT_ID) the
+   * FakeIdentityAdapter's documented test token.
+   */
+  signInWithGoogle: (idToken: string) => Promise<void>;
+  /**
+   * Complete/update the caller's own Person profile (`phone`/`documentId`/
+   * `address`) — the fields gated before donating/apadrinar, requesting an
+   * adoption, or enrolling as a volunteer. Updates the in-session user on
+   * success so the UI reflects the completed profile immediately.
+   */
+  completeProfile: (request: CompleteProfileRequest) => Promise<void>;
   /** Request a password reset (no session change; resolves generically). */
   requestPasswordReset: (request: ForgotPasswordRequest) => Promise<void>;
   /**
@@ -180,6 +204,9 @@ function toSessionUser(user: AuthenticatedUser): SessionUser {
     roles: [],
     organizationId: user.organizationId,
     accountType: user.accountType,
+    phone: user.phone,
+    documentId: user.documentId,
+    address: user.address,
   };
 }
 
@@ -366,6 +393,35 @@ export function SessionProvider({
     [api, establish],
   );
 
+  const signInWithGoogle = useCallback(
+    async (idToken: string) => {
+      await establish(await api.authApi.googleSignIn({ idToken }));
+    },
+    [api, establish],
+  );
+
+  // Updates the in-session user directly (no re-establishment/roles reload
+  // needed — completing the profile never changes roles or tokens).
+  const completeProfile = useCallback(
+    async (request: CompleteProfileRequest) => {
+      const updated = await api.authApi.completeProfile(request);
+      // Merge only the profile fields — NEVER `roles` (toSessionUser always
+      // starts those at [], which would wipe out the session's real RBAC roles).
+      setUser((prev) =>
+        prev
+          ? {
+              ...prev,
+              name: updated.displayName,
+              phone: updated.phone,
+              documentId: updated.documentId,
+              address: updated.address,
+            }
+          : prev,
+      );
+    },
+    [api],
+  );
+
   // Retry after a 'degraded' roles load, without re-login. The session is already
   // authenticated, so status is left untouched — only rolesStatus/roles change.
   const retryRoles = useCallback(() => loadRoles(), [loadRoles]);
@@ -423,6 +479,8 @@ export function SessionProvider({
       refreshTransparency,
       signIn,
       register,
+      signInWithGoogle,
+      completeProfile,
       requestPasswordReset,
       confirmPasswordReset,
       signOut,
@@ -439,6 +497,8 @@ export function SessionProvider({
       refreshTransparency,
       signIn,
       register,
+      signInWithGoogle,
+      completeProfile,
       requestPasswordReset,
       confirmPasswordReset,
       signOut,

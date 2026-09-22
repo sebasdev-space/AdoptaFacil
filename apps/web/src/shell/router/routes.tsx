@@ -24,6 +24,7 @@ import { AnimalDetailPage } from '../pages/animal-detail-page';
 import { GeneralPortalPage } from '../../features/catalog';
 import { HomePage, NotFoundPage } from '../../features/_layout';
 import {
+  CompleteProfilePage,
   ForgotPasswordPage,
   LoginPage,
   RegisterPage,
@@ -200,6 +201,11 @@ export function AppRoutes() {
               authenticated shell's home moved to /inicio (nav entry updated to
               match). Not an index route anymore — there is no bare protected "". */}
           <Route path="inicio" element={<HomePage />} />
+          {/* T-Google-SignIn: "Completa tu perfil" — reached when donar/
+              apadrinar, solicitar adopción o inscribirse a voluntariado
+              responde 422 INCOMPLETE_PROFILE. Cualquier autenticado (no
+              gated por rol; el gate real vive en los 3 endpoints backend). */}
+          <Route path="perfil/completar" element={<CompleteProfilePage />} />
           {/* M04 · adopciones (T-028a): tablero de evaluación (org) + solicitud (persona).
               F1-02: el tablero de evaluación solo tenía el gate del ITEM de nav (#86) —
               tecleando la URL directo, cualquier autenticado entraba a la vista de gestión.

@@ -5,6 +5,7 @@ import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { purgeOrganizations } from './support/cleanup';
+import { completeTestProfile } from './support/profile';
 
 /**
  * M05 donation certificates (F-3, RF14): the certificate is issued
@@ -83,6 +84,7 @@ describe('Donation certificates (M05: RF14, ESAL-RTE gating, no cross-org/donor 
       .expect(201);
     donorToken = donorReg.body.tokens.accessToken;
     orgIds.push(donorReg.body.user.organizationId);
+    await completeTestProfile(admin, donorReg.body.user.id);
 
     const otherDonorReg = await request(server)
       .post('/auth/register/person')
@@ -94,6 +96,7 @@ describe('Donation certificates (M05: RF14, ESAL-RTE gating, no cross-org/donor 
       .expect(201);
     otherDonorToken = otherDonorReg.body.tokens.accessToken;
     orgIds.push(otherDonorReg.body.user.organizationId);
+    await completeTestProfile(admin, otherDonorReg.body.user.id);
   });
 
   afterAll(async () => {

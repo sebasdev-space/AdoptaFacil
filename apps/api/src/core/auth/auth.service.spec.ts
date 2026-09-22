@@ -1,4 +1,5 @@
 import type { ConfigService } from '@nestjs/config';
+import type { IdentityPort } from '@adoptafacil/contracts';
 import type { AuditService } from '../audit/audit.service';
 import type { NotificationPort } from '../notifications/notification.port';
 import type { PrismaService } from '../../prisma/prisma.service';
@@ -54,8 +55,9 @@ function makeService(tx: TxMock): { service: AuthService; withOrgContext: jest.M
   const config = {
     get: (key: string) => (key === 'WEB_BASE_URL' ? 'http://localhost:5173' : undefined),
   } as unknown as ConfigService<Env, true>;
+  const identity = { verifyGoogleIdToken: jest.fn() } as unknown as IdentityPort;
   return {
-    service: new AuthService(prisma, passwords, tokens, notifications, audit, config),
+    service: new AuthService(prisma, passwords, tokens, notifications, identity, audit, config),
     withOrgContext,
   };
 }

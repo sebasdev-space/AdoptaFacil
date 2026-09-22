@@ -5,6 +5,7 @@ import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { purgeOrganizations } from './support/cleanup';
+import { completeTestProfile } from './support/profile';
 
 /**
  * Sponsorships base end-to-end (RF17 · T-056): an org defines a plan for its
@@ -58,6 +59,7 @@ describe('Sponsorships base (RF17 · T-056)', () => {
       .expect(201);
     personToken = person.body.tokens.accessToken;
     orgIds.push(person.body.user.organizationId);
+    await completeTestProfile(admin, person.body.user.id);
 
     const personB = await request(server)
       .post('/auth/register/person')
@@ -65,6 +67,7 @@ describe('Sponsorships base (RF17 · T-056)', () => {
       .expect(201);
     personBToken = personB.body.tokens.accessToken;
     orgIds.push(personB.body.user.organizationId);
+    await completeTestProfile(admin, personB.body.user.id);
 
     const animal = await request(server)
       .post('/animals')

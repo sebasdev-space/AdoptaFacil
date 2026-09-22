@@ -185,6 +185,15 @@ model User {
   accountType    String   @map("account_type")
   email          String
   displayName    String   @map("display_name")
+  /// Contact phone (T-Google-SignIn, profile-completion gate). Nullable: unset
+  /// until the Person completes their profile via `PATCH /auth/me/profile`.
+  phone          String?
+  /// National id / cédula (T-Google-SignIn, profile-completion gate).
+  documentId     String?  @map("document_id")
+  /// Free-text address/city of residence (T-Google-SignIn, profile-completion
+  /// gate) — a single free-text field is enough per the business decision;
+  /// no separate city/address normalization.
+  address        String?
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
@@ -233,6 +242,16 @@ model AuthCredential {
   accountType    String   @map("account_type")
   email          String   @unique
   passwordHash   String   @map("password_hash")
+  /// 'password' | 'google' (T-Google-SignIn). A 'google' credential still has a
+  /// `passwordHash` — a random, unusable-to-guess value hashed the same way as
+  /// a real password (no separate "no password" state; simplest safe default,
+  /// mirrors how the rest of auth already treats passwordHash as required).
+  authProvider   String   @default("password") @map("auth_provider")
+  /// Google's stable `sub` claim (T-Google-SignIn). NULL for a password-only
+  /// credential; unique when present so two Google accounts never collide.
+  /// Auto-link on Google Sign-In is by EMAIL (see AuthService.googleSignIn),
+  /// not by this column — this is bookkeeping/anti-spoofing, not the lookup key.
+  googleSub      String?  @unique @map("google_sub")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 

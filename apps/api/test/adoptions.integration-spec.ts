@@ -5,6 +5,7 @@ import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { purgeOrganizations } from './support/cleanup';
+import { completeTestProfile } from './support/profile';
 
 /**
  * M04 adoptions (T-028a) end-to-end: an authenticated PERSON applies to adopt a
@@ -62,6 +63,7 @@ describe('Adoptions (M04: request + evaluation)', () => {
       .expect(201);
     personToken = personReg.body.tokens.accessToken;
     orgIds.push(personReg.body.user.organizationId);
+    await completeTestProfile(admin, personReg.body.user.id);
 
     const otherReg = await request(server)
       .post('/auth/register/organization')

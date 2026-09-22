@@ -6,6 +6,7 @@ import request from 'supertest';
 import { computeBreakdown } from '@adoptafacil/contracts';
 import { AppModule } from '../src/app.module';
 import { purgeOrganizations } from './support/cleanup';
+import { completeTestProfile } from './support/profile';
 
 /**
  * M13 dashboards (RF24, S-8): PlatformAdmin consolidates the three existing
@@ -58,6 +59,7 @@ describe('Platform dashboards (M13, RF24, S-8)', () => {
       })
       .expect(201);
     orgIds.push(res.body.user.organizationId);
+    await completeTestProfile(admin, res.body.user.id);
     return {
       token: res.body.tokens.accessToken,
       orgId: res.body.user.organizationId,

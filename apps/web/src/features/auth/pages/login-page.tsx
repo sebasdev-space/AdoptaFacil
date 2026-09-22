@@ -1,10 +1,11 @@
-import { useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useRef, useState, type KeyboardEvent } from 'react';
 import { Link, useLocation, useNavigate, type Location } from 'react-router-dom';
 import { Button } from '@adoptafacil/ui';
 import { useSession } from '../../../shell/auth';
 import { AuthLayout } from '../components/auth-layout';
 import { Field } from '../components/field';
 import { FormAlert } from '../components/form-alert';
+import { GoogleSignInButton } from '../components/google-sign-in-button';
 import { collectErrors, validateEmail } from '../validation';
 
 interface FromState {
@@ -17,7 +18,7 @@ interface FromState {
  * lands back on the route the guard bounced them from.
  */
 export function LoginPage() {
-  const { signIn } = useSession();
+  const { signIn, signInWithGoogle } = useSession();
   const navigate = useNavigate();
   const location = useLocation();
   // Return to the guarded origin PRESERVING its query string, so a deep link with
@@ -63,6 +64,21 @@ export function LoginPage() {
   const onEnter = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') void handleSubmit();
   };
+
+  const handleGoogleCredential = useCallback(
+    async (idToken: string) => {
+      setFormError(null);
+      setSubmitting(true);
+      try {
+        await signInWithGoogle(idToken);
+        navigate(from, { replace: true });
+      } catch {
+        setFormError('No pudimos iniciar sesión con Google. Inténtalo de nuevo.');
+        setSubmitting(false);
+      }
+    },
+    [signInWithGoogle, navigate, from],
+  );
 
   return (
     <AuthLayout
@@ -119,6 +135,13 @@ export function LoginPage() {
       >
         {submitting ? 'Ingresando…' : 'Iniciar sesión'}
       </Button>
+
+      <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
+        <span className="h-px flex-1 bg-border" />
+        o
+        <span className="h-px flex-1 bg-border" />
+      </div>
+      <GoogleSignInButton onCredential={handleGoogleCredential} disabled={submitting} />
     </AuthLayout>
   );
 }

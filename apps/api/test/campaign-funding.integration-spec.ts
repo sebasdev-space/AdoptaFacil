@@ -7,6 +7,7 @@ import { AppModule } from '../src/app.module';
 import { CampaignFundingService } from '../src/modules/campaigns/campaign-funding.service';
 import { computeProgress } from '../src/modules/campaigns/campaign-progress';
 import { purgeOrganizations } from './support/cleanup';
+import { completeTestProfile } from './support/profile';
 
 /**
  * Real campaign funding end-to-end (RF15 · T-055): an APPROVED campaign-attributed
@@ -112,6 +113,7 @@ describe('Campaign funding (RF15 · T-055)', () => {
       .expect(201);
     personToken = person.body.tokens.accessToken;
     orgIds.push(person.body.user.organizationId);
+    await completeTestProfile(admin, person.body.user.id);
 
     campaignX = await createCampaign(tokenA);
     campaignZ = await createCampaign(tokenB);

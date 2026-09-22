@@ -1,5 +1,5 @@
 // Typed API layer of the app shell (T-022).
-export { ApiError, toApiError } from './api-error';
+export { ApiError, toApiError, isIncompleteProfileError, missingProfileFields } from './api-error';
 export {
   ApiClient,
   type ApiClientConfig,
@@ -28,8 +28,12 @@ export type {
   AuthTokens,
   AuthenticatedUser,
   AuthSession,
+  CompleteProfileRequest,
+  GoogleSignInRequest,
+  IncompleteProfileError,
   LoginRequest,
   LoginResponse,
+  ProfileRequiredField,
   RegisterRequest,
   RegisterOrganizationRequest,
   RegisterPersonRequest,
@@ -37,5 +41,6 @@ export type {
   ForgotPasswordRequest,
   ResetPasswordRequest,
 } from './auth-contract';
+export { PROFILE_REQUIRED_FIELDS } from './auth-contract';
 // `Role` enum (runtime value) — RBAC gating compares against these, not strings.
 export { Role } from './auth-contract';

@@ -5,6 +5,7 @@ import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { purgeOrganizations } from './support/cleanup';
+import { completeTestProfile } from './support/profile';
 
 /**
  * "Registrar fallecimiento" (M07 hallazgo QA en vivo): `POST
@@ -63,6 +64,7 @@ describe('Animal death registration (M07 hallazgo QA, POST /animals/:id/register
       .send({ displayName: tag, email: `m07-death-p-${tag}-${randomUUID()}@test.local`, password })
       .expect(201);
     orgIds.push(res.body.user.organizationId);
+    await completeTestProfile(admin, res.body.user.id);
     return { token: res.body.tokens.accessToken, userId: res.body.user.id };
   }
 

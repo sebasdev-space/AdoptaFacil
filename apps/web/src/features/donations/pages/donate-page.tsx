@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { Donation } from '@adoptafacil/contracts';
 import {
   buttonVariants,
@@ -12,7 +12,7 @@ import {
   useToast,
 } from '@adoptafacil/ui';
 import { PageContainer, PageHeader } from '../../_layout';
-import { useApiClient } from '../../../shell/api';
+import { isIncompleteProfileError, useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
 import { createDonation } from '../api/donations-api';
 import { DonateForm, type DonateFormValues } from '../components/donate-form';
@@ -68,6 +68,8 @@ export function DonatePage() {
   const { user } = useSession();
   const { toast } = useToast();
   const target = useDonationTarget();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState<Donation | null>(null);
@@ -104,7 +106,19 @@ export function DonatePage() {
         title: 'Donación registrada',
         description: 'Te enviaremos el recibo automático al confirmarse el pago.',
       });
-    } catch {
+    } catch (error) {
+      // T-Google-SignIn (business rule #3): donating requires a complete
+      // profile (phone/documentId/address) — send the person to complete it,
+      // then let them retry the donation themselves from where they left off.
+      if (isIncompleteProfileError(error)) {
+        navigate('/perfil/completar', {
+          state: {
+            from: location,
+            reason: 'Antes de donar necesitamos tu teléfono, documento de identidad y dirección.',
+          },
+        });
+        return;
+      }
       toast({
         title: 'No se pudo procesar la donación',
         description: 'Inténtalo de nuevo en un momento.',

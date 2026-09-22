@@ -71,6 +71,60 @@ export interface AuthenticatedUser {
   displayName: string;
   accountType: AccountType;
   organizationId: string;
+  // --- Person profile fields (T-Google-SignIn) -------------------------------
+  // ADDITIVE, optional: populated once the account completes its profile (see
+  // `CompleteProfileInput`/`PROFILE_REQUIRED_FIELDS` below). Absent/undefined
+  // for an Organization account (which never gates on these) and for a Person
+  // that hasn't completed their profile yet.
+  phone?: string;
+  documentId?: string;
+  address?: string;
+}
+
+/** Google Sign-In (`POST /auth/google`): the ID token from Google Identity
+ *  Services. Verified via `IdentityPort`; auto-links to an existing
+ *  `AuthCredential` by email or creates a NEW lightweight Person account —
+ *  NEVER an Organization (registering one stays the long NIT/legal-rep form).
+ *  Ends the same way as password login/register: a fresh `AuthSession`. */
+export interface GoogleSignInInput {
+  idToken: string;
+}
+
+// ============================================================================
+// Profile-completion gate (T-Google-SignIn). A Person account (via Google or
+// password) must have all three fields below before: creating a donation or
+// sponsorship, creating an adoption request, or enrolling in a volunteer
+// opportunity. No other action is gated by this (browsing, registering an
+// organization, etc. are always allowed).
+// ============================================================================
+
+/** The 3 fields the profile-completion gate requires. Order is stable — it is
+ *  also the order `missing` is reported in by `IncompleteProfileError`. */
+export const PROFILE_REQUIRED_FIELDS = ['phone', 'documentId', 'address'] as const;
+
+/** One of the 3 gated profile fields. */
+export type ProfileRequiredField = (typeof PROFILE_REQUIRED_FIELDS)[number];
+
+/** `PATCH /users/me/profile` — completes/updates the caller's own Person
+ *  profile. Every field is independently optional so a caller can fill in
+ *  just the ones still missing; omitted fields are left unchanged. */
+export interface CompleteProfileInput {
+  phone?: string;
+  documentId?: string;
+  address?: string;
+}
+
+/**
+ * Error BODY (not a class — this is a wire shape) returned with HTTP 422 by
+ * every gated endpoint (donations/sponsorships, adoption requests, volunteer
+ * enrollment) when the actor's profile is missing one or more required
+ * fields. `missing` lists ONLY the still-missing fields, in
+ * `PROFILE_REQUIRED_FIELDS` order. The web's "Completa tu perfil" screen
+ * matches on `error === 'INCOMPLETE_PROFILE'`.
+ */
+export interface IncompleteProfileError {
+  error: 'INCOMPLETE_PROFILE';
+  missing: ProfileRequiredField[];
 }
 
 /** Returned by register and login: the user plus their fresh tokens. */

@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { validateEnv } from './config/env.validation';
 import { AuditModule } from './core/audit/audit.module';
 import { AuthModule } from './core/auth/auth.module';
+import { IdentityModule } from './core/identity/identity.module';
 import { NotificationModule } from './core/notifications/notification.module';
 import { PaymentModule } from './core/payments/payment.module';
 import { RbacModule } from './core/rbac/rbac.module';
@@ -53,6 +54,9 @@ import { RedisModule } from './redis/redis.module';
     StorageModule,
     // Shared PaymentPort provider (T-052): binds the fake adapter, global.
     PaymentModule,
+    // Shared IdentityPort provider (T-Google-SignIn): binds the fake Google
+    // Sign-In verifier by default, global.
+    IdentityModule,
     HealthModule,
     // Feature modules (registered last; core modules above are unchanged).
     OrgModule,

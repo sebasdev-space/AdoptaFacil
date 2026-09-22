@@ -6,6 +6,7 @@ import request from 'supertest';
 import { computeBreakdown } from '@adoptafacil/contracts';
 import { AppModule } from '../src/app.module';
 import { purgeOrganizations } from './support/cleanup';
+import { completeTestProfile } from './support/profile';
 
 /**
  * M15b (F-5, RF26) — conciliación básica: recaudado (donaciones `approved`,
@@ -60,6 +61,7 @@ describe('Reconciliation report (M15b, F-5, RF26: recaudado vs. dispersado)', ()
       })
       .expect(201);
     orgIds.push(res.body.user.organizationId);
+    await completeTestProfile(admin, res.body.user.id);
     return {
       token: res.body.tokens.accessToken,
       orgId: res.body.user.organizationId,

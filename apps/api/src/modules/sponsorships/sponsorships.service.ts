@@ -22,6 +22,7 @@ import { AuditService } from '../../core/audit/audit.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../core/tenant/tenant-context.service';
 import type { RequestUser } from '../../core/auth/auth.types';
+import { requireCompleteProfile } from '../../core/auth/require-complete-profile';
 import { checkSponsorshipTransition } from './sponsorship-status';
 import { clampLimit } from './sponsorship-plans.service';
 
@@ -175,6 +176,7 @@ export class SponsorshipsService {
    * TODO(T-057): this is where a real PaymentPort collection would be started.
    */
   async subscribe(actor: RequestUser, input: CreateSponsorshipInput): Promise<Sponsorship> {
+    await requireCompleteProfile(this.prisma, actor);
     const rows = await this.prisma.$queryRaw<SponsorshipRawRow[]>(
       Prisma.sql`SELECT * FROM create_sponsorship(${input.planId}::uuid, ${actor.id}::uuid)`,
     );

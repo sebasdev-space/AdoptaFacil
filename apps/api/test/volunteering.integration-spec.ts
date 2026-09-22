@@ -5,6 +5,7 @@ import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { purgeOrganizations } from './support/cleanup';
+import { completeTestProfile } from './support/profile';
 
 /**
  * M08 volunteering (RF18/RF19) end-to-end: publish an opportunity → public
@@ -60,6 +61,7 @@ describe('Volunteering (M08, RF18/RF19)', () => {
       })
       .expect(201);
     orgIds.push(res.body.user.organizationId);
+    await completeTestProfile(admin, res.body.user.id);
     return {
       token: res.body.tokens.accessToken,
       orgId: res.body.user.organizationId,

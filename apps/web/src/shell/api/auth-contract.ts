@@ -9,6 +9,8 @@
  */
 import type {
   AuthSession,
+  CompleteProfileInput,
+  GoogleSignInInput,
   LoginDto,
   PasswordResetConfirmDto,
   PasswordResetRequestDto,
@@ -22,7 +24,11 @@ export type {
   AuthTokens,
   AuthenticatedUser,
   AuthSession,
+  CompleteProfileInput,
+  GoogleSignInInput,
+  IncompleteProfileError,
   LoginDto,
+  ProfileRequiredField,
   RegisterOrganizationDto,
   RegisterPersonDto,
   PasswordResetRequestDto,
@@ -30,6 +36,7 @@ export type {
   RefreshDto,
   LogoutDto,
 } from '@adoptafacil/contracts';
+export { PROFILE_REQUIRED_FIELDS } from '@adoptafacil/contracts';
 
 // `Role` is an ENUM (a runtime value, not just a type): RBAC gating compares
 // against `Role.Owner` etc., never against loose strings. Re-exported here so the
@@ -50,6 +57,14 @@ export type ForgotPasswordRequest = PasswordResetRequestDto;
 
 /** Payload to confirm a reset (step 2: token from the link + new password). */
 export type ResetPasswordRequest = PasswordResetConfirmDto;
+
+/** Payload submitted to `POST /auth/google` — the raw ID token from Google
+ *  Identity Services (or the FakeIdentityAdapter's documented test format). */
+export type GoogleSignInRequest = GoogleSignInInput;
+
+/** Payload submitted to `PATCH /auth/me/profile` — every field independently
+ *  optional (only what's still missing needs to be sent). */
+export type CompleteProfileRequest = CompleteProfileInput;
 
 // --- Web-only registration input model ---------------------------------------
 // The backend exposes `/auth/register/organization` and `/auth/register/person`

@@ -6,6 +6,7 @@ import request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { CampaignFundingService } from '../src/modules/campaigns/campaign-funding.service';
 import { purgeOrganizations } from './support/cleanup';
+import { completeTestProfile } from './support/profile';
 
 /**
  * Donations webhook → campaign funding enganche (T-057). When the gateway webhook
@@ -57,6 +58,7 @@ describe('Donations webhook → campaign funding enganche (T-057)', () => {
       .expect(201);
     personToken = personReg.body.tokens.accessToken;
     orgIds.push(personReg.body.user.organizationId);
+    await completeTestProfile(admin, personReg.body.user.id);
 
     const campaignRes = await request(server)
       .post('/campaigns')

@@ -19,6 +19,7 @@ import { AuditService } from '../../core/audit/audit.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../core/tenant/tenant-context.service';
 import type { RequestUser } from '../../core/auth/auth.types';
+import { requireCompleteProfile } from '../../core/auth/require-complete-profile';
 import {
   NOTIFICATION_PORT,
   type NotificationPort,
@@ -146,6 +147,8 @@ export class VolunteerEnrollmentsService {
 
   /** Enroll in an opportunity — cross-tenant (SECURITY DEFINER). */
   async enroll(actor: RequestUser, opportunityId: string): Promise<VolunteerEnrollment> {
+    await requireCompleteProfile(this.prisma, actor);
+
     let rows: EnrollmentRawRow[];
     try {
       rows = await this.prisma.$queryRaw<EnrollmentRawRow[]>(

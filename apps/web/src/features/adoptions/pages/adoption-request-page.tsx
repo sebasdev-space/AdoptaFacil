@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ADOPTION_MESSAGE_MIN_LENGTH,
   type AdoptionAnimalSnapshot,
@@ -16,7 +16,7 @@ import {
   useToast,
 } from '@adoptafacil/ui';
 import { PageContainer, PageHeader } from '../../_layout';
-import { useApiClient } from '../../../shell/api';
+import { isIncompleteProfileError, useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
 import { validateEmail, validateRequired } from '../../auth/validation';
 import { createAdoptionRequest } from '../api/adoptions-api';
@@ -64,6 +64,8 @@ export function AdoptionRequestPage() {
   const { user } = useSession();
   const { toast } = useToast();
   const target = useAdoptionTarget();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const [fullName, setFullName] = useState(user?.name ?? '');
   const [email, setEmail] = useState(user?.email ?? '');
@@ -118,6 +120,18 @@ export function AdoptionRequestPage() {
       setDone(true);
       toast({ title: 'Solicitud enviada', description: 'La organización la revisará pronto.' });
     } catch (error) {
+      // T-Google-SignIn (business rule #3): an adoption request requires a
+      // complete profile (phone/documentId/address).
+      if (isIncompleteProfileError(error)) {
+        navigate('/perfil/completar', {
+          state: {
+            from: location,
+            reason:
+              'Antes de solicitar una adopción necesitamos tu teléfono, documento de identidad y dirección.',
+          },
+        });
+        return;
+      }
       const status = (error as { status?: number }).status;
       toast({
         title: 'No se pudo enviar la solicitud',

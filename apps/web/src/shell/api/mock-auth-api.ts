@@ -1,7 +1,9 @@
 import type {
   AuthTokens,
   AuthenticatedUser,
+  CompleteProfileRequest,
   ForgotPasswordRequest,
+  GoogleSignInRequest,
   LoginRequest,
   LoginResponse,
   RegisterRequest,
@@ -120,6 +122,52 @@ export class MockAuthApi implements AuthApi {
 
     this.accounts.set(email, { password: request.password, user });
     return Promise.resolve({ user, tokens: this.issueTokens() });
+  }
+
+  /**
+   * Mirrors the backend's FakeIdentityAdapter primary token format
+   * (`fake:<email>:<name>`, see `@adoptafacil/contracts/identity.ts`):
+   * auto-links by email to an existing mock account, or creates a
+   * lightweight Person account the first time — never an Organization.
+   */
+  googleSignIn(request: GoogleSignInRequest): Promise<LoginResponse> {
+    const match = /^fake:([^:]+):(.*)$/.exec(request.idToken);
+    if (!match) {
+      return Promise.reject(
+        new ApiError(400, 'invalid_token', 'Token de Google inválido (modo prueba)'),
+      );
+    }
+    const [, rawEmail, name] = match;
+    const email = normalizeEmail(rawEmail);
+    const existing = this.accounts.get(email);
+    if (existing) {
+      return Promise.resolve({ user: existing.user, tokens: this.issueTokens() });
+    }
+    const user: AuthenticatedUser = {
+      id: this.nextId('usr'),
+      email,
+      displayName: name || email,
+      accountType: 'person',
+      organizationId: this.nextId('org'),
+    };
+    this.accounts.set(email, { password: this.nextId('google-nopwd'), user });
+    return Promise.resolve({ user, tokens: this.issueTokens() });
+  }
+
+  completeProfile(request: CompleteProfileRequest): Promise<AuthenticatedUser> {
+    const [entry] = this.accounts.entries();
+    if (!entry) {
+      return Promise.reject(new ApiError(401, 'unauthorized', 'No hay sesión activa'));
+    }
+    const [email, account] = entry;
+    const user: AuthenticatedUser = {
+      ...account.user,
+      ...(request.phone !== undefined ? { phone: request.phone } : {}),
+      ...(request.documentId !== undefined ? { documentId: request.documentId } : {}),
+      ...(request.address !== undefined ? { address: request.address } : {}),
+    };
+    this.accounts.set(email, { ...account, user });
+    return Promise.resolve(user);
   }
 
   requestPasswordReset(_request: ForgotPasswordRequest): Promise<void> {

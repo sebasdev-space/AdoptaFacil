@@ -1,10 +1,23 @@
-import { Body, Controller, Get, HttpCode, Inject, Post, Req, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Inject,
+  Patch,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import type {
   AuthSession,
   AuthTokens,
   AuthenticatedUser,
+  CompleteProfileInput,
+  GoogleSignInInput,
   LoginDto,
   LogoutDto,
   PasswordResetConfirmDto,
@@ -20,6 +33,8 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import type { RequestUser } from './auth.types';
 import { clearRefreshCookie, REFRESH_COOKIE_NAME, setRefreshCookie } from './refresh-cookie.util';
 import {
+  completeProfileSchema,
+  googleSignInSchema,
   loginSchema,
   logoutSchema,
   passwordResetConfirmSchema,
@@ -167,5 +182,38 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   me(@CurrentUser() user: RequestUser): Promise<AuthenticatedUser> {
     return this.auth.getAuthenticatedUser(user);
+  }
+
+  /**
+   * Google Sign-In (T-Google-SignIn): logs into an existing account (any
+   * account type, matched by email) or creates a lightweight new PERSON
+   * account — never an Organization. Same throttle budget as password login
+   * (both are "get me a session" entry points).
+   */
+  @Post('google')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  async googleSignIn(
+    @Body(new ZodValidationPipe(googleSignInSchema)) dto: GoogleSignInInput,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthSession> {
+    const session = await this.auth.googleSignIn(dto);
+    this.mirrorRefreshCookie(res, session.tokens.refreshToken);
+    return session;
+  }
+
+  /**
+   * Complete/update the caller's own Person profile (T-Google-SignIn):
+   * `phone`/`documentId`/`address` — the 3 fields the donation/sponsorship,
+   * adoption-request and volunteer-enrollment endpoints gate on (422
+   * `INCOMPLETE_PROFILE` otherwise, see `core/auth/require-complete-profile.ts`).
+   */
+  @Patch('me/profile')
+  @UseGuards(JwtAuthGuard)
+  completeProfile(
+    @CurrentUser() user: RequestUser,
+    @Body(new ZodValidationPipe(completeProfileSchema)) dto: CompleteProfileInput,
+  ): Promise<AuthenticatedUser> {
+    return this.auth.completeProfile(user, dto);
   }
 }

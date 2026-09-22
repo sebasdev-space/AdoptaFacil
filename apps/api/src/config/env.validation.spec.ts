@@ -57,3 +57,32 @@ describe('validateEnv — PAYMENT_DRIVER fail-fast (T-052)', () => {
     ).not.toThrow();
   });
 });
+
+describe('validateEnv — AUTH_IDENTITY_DRIVER fail-fast (T-Google-SignIn)', () => {
+  it('boots with the default fake driver (no GOOGLE_OAUTH_CLIENT_ID needed)', () => {
+    expect(() => validateEnv({ ...BASE })).not.toThrow();
+    expect(validateEnv({ ...BASE }).AUTH_IDENTITY_DRIVER).toBe('fake');
+  });
+
+  it('fails fast when driver=google and GOOGLE_OAUTH_CLIENT_ID is missing', () => {
+    expect(() => validateEnv({ ...BASE, AUTH_IDENTITY_DRIVER: 'google' })).toThrow(
+      /GOOGLE_OAUTH_CLIENT_ID/,
+    );
+  });
+
+  it('rejects an empty-string GOOGLE_OAUTH_CLIENT_ID the same as missing', () => {
+    expect(() =>
+      validateEnv({ ...BASE, AUTH_IDENTITY_DRIVER: 'google', GOOGLE_OAUTH_CLIENT_ID: '' }),
+    ).toThrow(/GOOGLE_OAUTH_CLIENT_ID/);
+  });
+
+  it('accepts driver=google when GOOGLE_OAUTH_CLIENT_ID is present', () => {
+    expect(() =>
+      validateEnv({
+        ...BASE,
+        AUTH_IDENTITY_DRIVER: 'google',
+        GOOGLE_OAUTH_CLIENT_ID: 'dummy-client-id.apps.googleusercontent.com',
+      }),
+    ).not.toThrow();
+  });
+});
