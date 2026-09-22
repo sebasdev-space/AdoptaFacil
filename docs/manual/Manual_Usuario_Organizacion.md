@@ -146,9 +146,14 @@ IVA sobre esa comisión y comisión de la pasarela de pago.
 
 ![Donaciones recibidas](img/19-donaciones-recibidas.png)
 
-**Importante sobre el dinero:** AdoptaFácil nunca custodia tus fondos. El recaudo se consolida vía Wompi
-y se dispersa a tu cuenta bancaria registrada al día siguiente hábil (T+1) — la plataforma no retiene
-saldos en ningún momento.
+**Importante sobre el dinero — atención, cambio temporal:** el modelo de AdoptaFácil es que la
+plataforma nunca custodia tus fondos: el recaudo se consolida (ahora vía MercadoPago) y se
+dispersa a tu cuenta bancaria registrada al día hábil siguiente (T+1). **Esa dispersión automática
+está pausada mientras MercadoPago aprueba un permiso especial ("Disbursements") sobre la cuenta de
+la plataforma** — sin esa aprobación, el dinero recaudado por MercadoPago queda en la cuenta de la
+plataforma sin una forma automática de transferirlo a la tuya. En cuanto MercadoPago apruebe el
+permiso, la dispersión automática vuelve a funcionar. Mientras tanto, si tienes donaciones
+recaudadas pendientes de recibir, contacta al equipo de AdoptaFácil.
 
 ## 7. Gestión de campañas
 
@@ -282,8 +287,11 @@ sobre las donaciones que tú mismo recibes — nunca sobre las adopciones ni por
 banco de recursos.
 
 **¿AdoptaFácil retiene mi dinero en algún momento?**
-No. El recaudo se consolida vía Wompi y se dispersa a tu cuenta bancaria registrada al día hábil
-siguiente (T+1) — la plataforma nunca custodia saldos.
+Por diseño, no: el recaudo se consolida vía MercadoPago y se dispersa a tu cuenta bancaria
+registrada al día hábil siguiente (T+1) — la plataforma nunca custodia saldos como modelo de
+negocio. Ahora mismo, sin embargo, esa dispersión automática está pausada mientras MercadoPago
+aprueba un permiso especial sobre la cuenta de la plataforma (ver sección 6) — es una limitación
+temporal de la integración, no una decisión de negocio.
 
 **¿Quién revisa mis documentos institucionales?**
 El equipo de AdoptaFácil (roles de plataforma), no otra organización ni tu propio equipo.

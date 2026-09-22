@@ -123,7 +123,7 @@ Al pulsar "Donar", ves el formulario de aporte:
 
 Antes de pagar, AdoptaFácil siempre muestra el desglose completo: lo que pagas, el apoyo de
 sostenimiento a la plataforma (4% + IVA sobre ese 4%, nunca sobre el total), la comisión de la pasarela
-de pago (Wompi, un costo real de un tercero) y el neto que efectivamente recibe la organización. Puedes
+de pago (MercadoPago, un costo real de un tercero) y el neto que efectivamente recibe la organización. Puedes
 marcar la casilla para cubrir tú ambos costos, de modo que la organización reciba el 100% de tu aporte.
 
 ![Desglose de donación](img/11-donar-desglose.png)
@@ -253,7 +253,7 @@ apoyo sobre las donaciones que la propia organización recibe — nunca sobre la
 
 **¿Por qué veo un cargo por "comisión de la pasarela" además del apoyo a AdoptaFácil?**
 Son dos cosas distintas. El apoyo de sostenimiento es lo que AdoptaFácil retiene para operar. La
-comisión de la pasarela es un costo real cobrado por el proveedor de pagos (Wompi), un tercero.
+comisión de la pasarela es un costo real cobrado por el proveedor de pagos (MercadoPago), un tercero.
 
 **¿Puedo verificar públicamente que un certificado de donación es auténtico?**
 Sí. El código QR del certificado lleva a una página pública de verificación que confirma su autenticidad
