@@ -10,8 +10,6 @@ publicas campañas, coordinas voluntariado y personalizas tu portal público. Si
 personas que adoptan/donan, consulta el _Manual de Usuario — Personas_.
 
 Las capturas de este manual provienen de sesiones reales de la aplicación, con datos de demostración.
-Las secciones marcadas _(pendiente captura)_ describen funciones reales y operativas que aún no tienen
-una captura incluida en esta versión.
 
 ## Índice
 
@@ -74,7 +72,10 @@ Desde Formalización registras al representante legal vigente de tu organizació
 La firma se cifra antes de guardarse (AES-256-GCM) y **nunca** se expone en texto plano por ningún
 endpoint ni en ningún reporte — solo se usa para respaldar el certificado de donación real y la
 formalización. Si la firma no cumple los requisitos mínimos de validación, el documento queda en estado
-"Observado" con el motivo explicado. _(Pendiente captura.)_
+"Observado" con el motivo explicado.
+
+![Representante legal y firma](img/44-organizacion-representante-legal.png)
+_Representante legal vigente y formulario para registrar uno nuevo con firma._
 
 ### Documentos institucionales
 
@@ -92,10 +93,13 @@ organización._
 ### Verificación DIAN
 
 Si tu organización ya está en etapa Formal o ESAL, puedes solicitar la verificación ante la DIAN desde
-esta misma sección. Mientras se procesa, el estado se muestra "En procesamiento" y el sistema reintenta
-automáticamente (a los 5 minutos, 30 minutos, 2 horas y 24 horas) antes de marcar un error definitivo. Si
-tu organización todavía es Informal, la verificación se bloquea hasta que avances de etapa.
-_(Pendiente captura.)_
+esta misma sección (pestaña "Formalización"). Mientras se procesa, el estado se muestra "En
+procesamiento" y el sistema reintenta automáticamente (a los 5 minutos, 30 minutos, 2 horas y 24 horas)
+antes de marcar un error definitivo. Si tu organización todavía es Informal, la verificación se bloquea
+hasta que avances de etapa.
+
+![Formalización con verificación DIAN](img/45-organizacion-verificacion-dian.png)
+_Línea de tiempo de formalización, con la etiqueta "RTE verificado ante la DIAN" una vez confirmada._
 
 ## 4. Gestión de animales
 
@@ -197,7 +201,9 @@ y suspende el apadrinamiento; el resto lo coordinas tú directamente con cada pa
 Publica oportunidades de voluntariado, revisa las inscripciones y aprueba las horas que cada voluntario
 registra. Si un voluntario es estudiante cursando su servicio social (grados 10°–11°), el sistema calcula
 automáticamente su avance hacia las 80 horas exigidas y habilita su certificado al completarlas.
-_(Pendiente captura — módulo nuevo.)_
+
+![Voluntariado (gestión)](img/46-organizacion-voluntariado.png)
+_Oportunidades publicadas por tu organización._
 
 ## 10. Banco de recursos
 
@@ -205,7 +211,9 @@ Publica las necesidades físicas de tu organización (comida, insumos, medicamen
 puede ofrecerte una donación en especie contra esa necesidad desde "Necesidades recibidas". Coordinas la
 entrega y dejas evidencia una vez recibida. Tus necesidades activas se muestran tanto en el listado
 público general como dentro de tu propio portal (`/o/tu-organizacion`, sección "Necesita hoy").
-_(Pendiente captura — módulo nuevo.)_
+
+![Banco de recursos (gestión)](img/47-organizacion-recursos.png)
+_Necesidades publicadas por tu organización._
 
 ## 11. Marketplace
 
@@ -213,7 +221,9 @@ Publica tus productos (nombre, precio, stock, categoría e imágenes) en "Market
 catálogo público filtrado por tu organización y **también dentro de tu propio portal público**. Cada
 producto muestra siempre visible el aviso de que AdoptaFácil no garantiza la entrega ni la calidad; el
 contacto del comprador contigo es directo por WhatsApp, sin carrito ni pago en línea.
-_(Pendiente captura — módulo nuevo.)_
+
+![Marketplace (gestión)](img/48-organizacion-marketplace.png)
+_Catálogo de productos de tu organización._
 
 ## 12. Comunidad
 
@@ -221,7 +231,10 @@ Publica novedades, avisos de campaña o eventos en el feed cruzado de Comunidad,
 personas de la plataforma. Solo puedes editar o borrar tus propias publicaciones; la moderación de
 contenido inapropiado la ejerce el equipo de AdoptaFácil (plataforma), no tu organización. Cuando
 publicas algo de tipo "campaña", se notifica automáticamente por correo a las personas que ya te han
-donado antes. _(Pendiente captura — módulo nuevo.)_
+donado antes.
+
+![Comunidad](img/49-organizacion-comunidad.png)
+_Feed cruzado de Comunidad, visto desde una cuenta de organización._
 
 ## 13. Reputación
 
@@ -229,7 +242,10 @@ Solo las personas que hayan tenido una adopción, donación o apadrinamiento rea
 calificarte (1 a 5) y dejar una reseña — la plataforma lo verifica antes de aceptarla, no depende de la
 buena fe de quien reseña. Cada reseña es visible en tu portal público una vez aprobada por el equipo de
 AdoptaFácil. El indicador público (promedio y cantidad de reseñas) se calcula solo con las reseñas ya
-aprobadas. _(Pendiente captura — módulo nuevo.)_
+aprobadas.
+
+![Reputación pública de la organización](img/50-organizacion-reputacion.png)
+_Indicador público y reseñas recibidas por tu organización._
 
 ## 14. Personalización del portal
 
