@@ -20,6 +20,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,cjs,mjs,json,md,yml,yaml}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,cjs,mjs,json,md,yml,yaml}\"",
     "setup:env": "node scripts/setup-env.mjs",
+    "docs:manuals": "node scripts/generate-docx-manuals.mjs",
     "seed:admin": "pnpm --filter @adoptafacil/api run seed:admin",
     "seed:demo": "pnpm --filter @adoptafacil/api run seed:demo",
     "seed:breeds": "pnpm --filter @adoptafacil/api run seed:breeds",
@@ -37,9 +38,13 @@
     "eslint": "^9.17.0",
     "eslint-config-prettier": "^9.1.0",
     "globals": "^15.14.0",
+    "html-to-docx": "^1.8.0",
     "husky": "^9.1.7",
     "lint-staged": "^15.3.0",
+
+    "marked": "^18.0.13",
     "playwright": "^1.63.0",
+
     "prettier": "^3.4.2",
     "prisma": "^5.22.0",
     "turbo": "^2.3.3",
