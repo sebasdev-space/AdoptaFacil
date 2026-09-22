@@ -235,6 +235,14 @@ export class AuthService {
    */
   async googleSignIn(dto: GoogleSignInInput): Promise<AuthSession> {
     const claims = await this.identity.verifyGoogleIdToken(dto.idToken);
+    if (!claims.emailVerified) {
+      // Auto-link trusts `claims.email` to enter an EXISTING account by
+      // email match alone — that is only safe when the provider itself
+      // vouches the caller controls that mailbox. An unverified email must
+      // never reach the lookup below (for either auto-link or account
+      // creation), or this becomes an account-takeover vector.
+      throw new UnauthorizedException('Google account email is not verified.');
+    }
     const normalizedEmail = claims.email.trim().toLowerCase();
 
     const existing = await this.prisma.authCredential.findUnique({

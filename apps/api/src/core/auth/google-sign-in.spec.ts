@@ -177,3 +177,31 @@ describe('AuthService.googleSignIn — auto-link by email', () => {
     );
   });
 });
+
+describe('AuthService.googleSignIn — unverified email', () => {
+  it('rejects BEFORE the auto-link lookup when Google reports emailVerified: false', async () => {
+    // A malicious/misconfigured token claiming an unverified email must never
+    // reach the AuthCredential lookup — otherwise it becomes a way to log into
+    // ANY existing account just by knowing its email address.
+    const claims: IdentityClaims = {
+      email: 'victima@example.com',
+      name: 'Atacante',
+      emailVerified: false,
+      sub: 'google-sub-unverified',
+    };
+    const existingCredential = {
+      userId: 'usr-victim',
+      organizationId: 'org-victim',
+      accountType: 'organization',
+      email: 'victima@example.com',
+      authProvider: 'password',
+    };
+    const { service, tx } = makeService({ existingCredential, claims });
+
+    await expect(service.googleSignIn({ idToken: 'irrelevant-mocked-token' })).rejects.toThrow(
+      'not verified',
+    );
+
+    expect(tx.authCredential.create).not.toHaveBeenCalled();
+  });
+});
