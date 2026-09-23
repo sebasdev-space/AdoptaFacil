@@ -1,11 +1,25 @@
 /**
  * Cascarón del portal público — header/hero/footer/CTA/sidebar (§M14,
- * rediseño T-D04, reestructuración sin tabs). Mismo criterio que
+ * rediseño "editorial" T-D06, reestructuración sin tabs). Mismo criterio que
  * `public-catalog.module.scss`: solo tokens YA dinámicos por organización
  * (--primary/--secondary/--accent/--radius) o globales de
- * `packages/ui/src/styles/globals.scss`, más la escala REFACTOR-VISUAL v2
- * (`--shadow-*`/`--r-*`/`--fs-*`/`--font-*`) — ningún color nuevo.
+ * `packages/ui/src/styles/globals.scss` — ningún color nuevo, y el color de
+ * marca se reserva para CTA/acentos puntuales, nunca para pintar superficies
+ * grandes (T-D06, §28).
+ *
+ * Escala de radios/sombras PROPIA y controlada (T-D06) — ver el doc comment
+ * de `public-catalog.module.scss` para el porqué. `--r-full` queda solo
+ * para lo genuinamente circular (avatar del logo, íconos-bullet, botones
+ * de ícono).
  */
+
+$radius-xs: 6px;
+$radius-sm: 8px;
+$radius-md: 12px;
+$radius-lg: 16px;
+$shadow-soft: 0 2px 8px rgba(20, 30, 40, 0.04);
+$shadow-soft-md: 0 6px 20px rgba(20, 30, 40, 0.06);
+$border-subtle: hsl(var(--border) / 0.35);
 
 // ---------------------------------------------------------------------------
 // Header
@@ -80,8 +94,8 @@
 }
 
 .header__navLink {
-  padding: 0.5rem 0.875rem;
-  border-radius: var(--r-full);
+  padding: 0.5rem 0.75rem;
+  border-radius: $radius-sm;
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);
   color: hsl(var(--foreground) / 0.8);
@@ -103,6 +117,53 @@
 .header__navLink--active:hover {
   background: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
+}
+
+// Botón propio (no `buttonVariants()`) — mismo motivo que
+// `public-catalog.module.scss`: el primitivo compartido usa `--r-full` en
+// TODA la app por convención de REFACTOR-VISUAL v2; tocarlo excede el
+// alcance de este rediseño del portal.
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0 1.125rem;
+  border-radius: $radius-sm;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  transition: var(--transition-base);
+  transition-property: opacity;
+}
+
+.btn--sm {
+  height: 2.375rem;
+}
+
+.btn--lg {
+  height: 2.75rem;
+  padding: 0 1.5rem;
+}
+
+.btn--primary {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.btn--primary:hover {
+  opacity: 0.92;
+}
+
+.btn--outline {
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  border: 1px solid $border-subtle;
+}
+
+.btn--outline:hover {
+  border-color: hsl(var(--primary) / 0.4);
+  color: hsl(var(--primary));
 }
 
 .header__actions {
@@ -131,78 +192,6 @@
 }
 
 // ---------------------------------------------------------------------------
-// Hero — items "Adopta / Apadrina / Dona" (íconos con leyenda)
-// ---------------------------------------------------------------------------
-
-.heroActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.5rem;
-  padding-top: 0.5rem;
-}
-
-.heroAction {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  text-align: left;
-}
-
-.heroAction__icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 2.5rem;
-  width: 2.5rem;
-  flex-shrink: 0;
-  border-radius: var(--r-full);
-  background: color-mix(in srgb, hsl(var(--primary)) 12%, hsl(var(--card)));
-  color: hsl(var(--primary));
-}
-
-.heroAction__label {
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
-  color: hsl(var(--foreground));
-  line-height: 1.2;
-}
-
-.heroAction__caption {
-  font-size: var(--fs-xs);
-  color: hsl(var(--muted-foreground));
-}
-
-.heroCover {
-  width: 100%;
-  height: 100%;
-  min-height: 14rem;
-  border-radius: var(--r-xl);
-  overflow: hidden;
-  box-shadow: var(--shadow-lg);
-}
-
-.heroCover__img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.heroCover__fallback {
-  width: 100%;
-  height: 100%;
-  min-height: 14rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, hsl(var(--primary)) 22%, hsl(var(--card))),
-    color-mix(in srgb, hsl(var(--accent)) 35%, hsl(var(--card)))
-  );
-  color: hsl(var(--primary) / 0.5);
-}
-
-// ---------------------------------------------------------------------------
 // Panel lateral (Campaña / Síguenos) — lista con ícono + flecha
 // ---------------------------------------------------------------------------
 
@@ -217,7 +206,7 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 0.25rem;
-  border-radius: var(--r-md);
+  border-radius: $radius-sm;
   color: hsl(var(--foreground));
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);
@@ -256,74 +245,20 @@
 }
 
 // ---------------------------------------------------------------------------
-// "Necesita hoy" — mosaico de íconos por categoría
-// ---------------------------------------------------------------------------
-
-.needsGrid {
-  display: grid;
-  gap: 0.875rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-
-  @media (min-width: 640px) {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-.needTile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 1.25rem 0.75rem;
-  border-radius: var(--r-lg);
-  border: 1px solid hsl(var(--border) / 0.4);
-  background: hsl(var(--card));
-  text-align: center;
-  transition: var(--transition-base);
-  transition-property: transform, box-shadow, border-color;
-}
-
-.needTile:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-sm);
-  border-color: hsl(var(--primary) / 0.35);
-}
-
-.needTile__icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 2.75rem;
-  width: 2.75rem;
-  border-radius: var(--r-full);
-  background: color-mix(in srgb, hsl(var(--primary)) 12%, hsl(var(--card)));
-  color: hsl(var(--primary));
-}
-
-.needTile__label {
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  color: hsl(var(--foreground));
-}
-
-.needTile__progress {
-  font-size: var(--fs-xs);
-  color: hsl(var(--muted-foreground));
-}
-
-// ---------------------------------------------------------------------------
 // Banner CTA ("Cómo ayudar")
 // ---------------------------------------------------------------------------
 
+// Fondo neutro (T-D06, §28: el color de marca no pinta superficies
+// grandes) — el acento de marca vive solo en el botón.
 .ctaBanner {
   display: flex;
   flex-direction: column;
   gap: 1rem;
   align-items: flex-start;
-  padding: 2rem;
-  border-radius: var(--r-xl);
-  background: color-mix(in srgb, hsl(var(--primary)) 8%, hsl(var(--card)));
-  border: 1px solid hsl(var(--primary) / 0.15);
+  padding: 1.75rem 2rem;
+  border-radius: $radius-lg;
+  background: hsl(var(--muted) / 0.5);
+  border: 1px solid $border-subtle;
 
   @media (min-width: 768px) {
     flex-direction: row;

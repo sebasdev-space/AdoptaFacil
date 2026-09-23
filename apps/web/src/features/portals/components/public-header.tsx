@@ -1,5 +1,5 @@
 import type { OrganizationPublic } from '@adoptafacil/contracts';
-import { buttonVariants, cn } from '@adoptafacil/ui';
+import { cn } from '@adoptafacil/ui';
 import { IconGift, IconPaw, IconSearch } from './portal-icons';
 import { buildDonateHref } from './portal-donate-cta';
 import styles from '../styles/public-portal.module.scss';
@@ -36,7 +36,7 @@ export function PublicHeader({ organization, navItems }: PublicHeaderProps) {
       <div
         className={cn(
           styles.header__inner,
-          'mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 xl:px-12',
+          'mx-auto w-full px-4 sm:px-6 lg:w-[94vw] lg:max-w-[1500px] lg:px-0',
         )}
       >
         <a href="#portal-top" className={styles.header__brand}>
@@ -71,7 +71,7 @@ export function PublicHeader({ organization, navItems }: PublicHeaderProps) {
         <div className={styles.header__actions}>
           <a
             href={buildDonateHref(organization)}
-            className={cn(buttonVariants({ size: 'sm' }))}
+            className={cn(styles.btn, styles['btn--sm'], styles['btn--primary'])}
             data-testid="public-header-donate"
           >
             <IconGift className="mr-1.5 h-4 w-4" />

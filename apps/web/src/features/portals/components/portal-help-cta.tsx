@@ -1,5 +1,5 @@
 import type { OrganizationPublic } from '@adoptafacil/contracts';
-import { buttonVariants, cn } from '@adoptafacil/ui';
+import { cn } from '@adoptafacil/ui';
 import { buildDonateHref } from './portal-donate-cta';
 import { IconGift } from './portal-icons';
 import styles from '../styles/public-portal.module.scss';
@@ -31,7 +31,7 @@ export function PortalHelpCta({ organization }: PortalHelpCtaProps) {
         </div>
         <a
           href={buildDonateHref(organization)}
-          className={cn(buttonVariants({ size: 'lg' }))}
+          className={cn(styles.btn, styles['btn--lg'], styles['btn--primary'])}
           data-testid="portal-help-cta-donate"
         >
           <IconGift className="mr-1.5 h-4 w-4" />

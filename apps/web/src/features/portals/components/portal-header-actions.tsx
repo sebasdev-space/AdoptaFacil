@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom';
 import { cn } from '@adoptafacil/ui';
 import type { OrganizationPublic } from '@adoptafacil/contracts';
 import { buildDonateHref } from './portal-donate-cta';
-import { IconGift, IconHeart, IconHome } from './portal-icons';
 import styles from '../styles/public-portal.module.scss';
 
 export interface PortalHeaderActionsProps {
@@ -11,12 +10,11 @@ export interface PortalHeaderActionsProps {
 }
 
 /**
- * Fila de acciones principales del portal público (rediseño T-D04): tres
- * ítems ícono+leyenda (Adoptar/Apadrinar/Donar) en el hero, no botones
- * sueltos. Cada control fija su `aria-label`/nombre accesible explícito
- * ("Adoptar"/"Apadrinar"/"Donar") porque el texto visible incluye una
- * leyenda descriptiva adicional (p. ej. "Cambia una vida") que NO debe
- * formar parte del nombre accesible.
+ * Fila de acciones principales del hero (rediseño "editorial" T-D06):
+ * jerarquía clara — "Adoptar" es el único botón sólido (color de marca),
+ * "Apadrinar"/"Donar" son botones claros con borde sutil. Antes eran tres
+ * bloques ícono+leyenda de igual peso visual; el feedback directo pidió
+ * quitar esa decoración y dejar botones simples con jerarquía real.
  *
  * "Donar" reutiliza `buildDonateHref` TAL CUAL (misma ruta/query params que
  * `PortalDonateCta`, sin duplicar esa lógica).
@@ -33,57 +31,29 @@ export interface PortalHeaderActionsProps {
  */
 export function PortalHeaderActions({ organization, onBrowseCatalog }: PortalHeaderActionsProps) {
   return (
-    <div data-testid="portal-header-actions">
-      <div className={styles.heroActions}>
-        <button
-          type="button"
-          className={cn(styles.heroAction)}
-          onClick={onBrowseCatalog}
-          aria-label="Adoptar"
-        >
-          <span aria-hidden className={styles.heroAction__icon}>
-            <IconHome className="h-5 w-5" />
-          </span>
-          <span aria-hidden>
-            <span className={styles.heroAction__label}>Adoptar</span>
-            <br />
-            <span className={styles.heroAction__caption}>Cambia una vida</span>
-          </span>
-        </button>
-
-        <button
-          type="button"
-          className={cn(styles.heroAction)}
-          onClick={onBrowseCatalog}
-          aria-label="Apadrinar"
-        >
-          <span aria-hidden className={styles.heroAction__icon}>
-            <IconHeart className="h-5 w-5" />
-          </span>
-          <span aria-hidden>
-            <span className={styles.heroAction__label}>Apadrinar</span>
-            <br />
-            <span className={styles.heroAction__caption}>Acompaña su historia</span>
-          </span>
-        </button>
-
-        <Link
-          to={buildDonateHref(organization)}
-          className={cn(styles.heroAction)}
-          data-testid="portal-donate-cta"
-          aria-label="Donar"
-        >
-          <span aria-hidden className={styles.heroAction__icon}>
-            <IconGift className="h-5 w-5" />
-          </span>
-          <span aria-hidden>
-            <span className={styles.heroAction__label}>Donar</span>
-            <br />
-            <span className={styles.heroAction__caption}>Ayúdanos a seguir</span>
-          </span>
-        </Link>
-      </div>
-      <p className="mt-2 text-xs text-muted-foreground">
+    <div data-testid="portal-header-actions" className="flex flex-wrap items-center gap-2.5">
+      <button
+        type="button"
+        className={cn(styles.btn, styles['btn--sm'], styles['btn--primary'])}
+        onClick={onBrowseCatalog}
+      >
+        Adoptar
+      </button>
+      <button
+        type="button"
+        className={cn(styles.btn, styles['btn--sm'], styles['btn--outline'])}
+        onClick={onBrowseCatalog}
+      >
+        Apadrinar
+      </button>
+      <Link
+        to={buildDonateHref(organization)}
+        className={cn(styles.btn, styles['btn--sm'], styles['btn--outline'])}
+        data-testid="portal-donate-cta"
+      >
+        Donar
+      </Link>
+      <p className="w-full text-xs text-muted-foreground">
         Tu aporte es transparente: verás el desglose completo antes de pagar.
       </p>
     </div>

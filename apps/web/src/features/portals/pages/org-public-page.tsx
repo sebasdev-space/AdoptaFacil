@@ -237,7 +237,7 @@ export function OrgPublicPage({ slugOverride }: OrgPublicPageProps = {}) {
       )}
       <main
         id="portal-top"
-        className="mx-auto w-full max-w-screen-2xl px-4 py-10 sm:px-6 lg:px-8 xl:px-12"
+        className="mx-auto w-full px-4 py-10 sm:px-6 lg:w-[94vw] lg:max-w-[1500px] lg:px-0"
         style={{ ...themeStyle, scrollMarginTop: '5rem' }}
       >
         {state === 'loading' && <Skeleton className="h-72 w-full" />}
@@ -281,9 +281,9 @@ export function OrgPublicPage({ slugOverride }: OrgPublicPageProps = {}) {
                 `PortalThemeConfig.socialNavPosition` —
                 `packages/contracts/src/portals.ts`) — no uno nuevo. En mobile
                 el panel lateral se apila debajo (grid de 1 columna). */}
-            <div className="grid gap-6 lg:grid-cols-3" data-testid="portal-main-grid">
+            <div className="grid gap-8 lg:grid-cols-[1fr_320px]" data-testid="portal-main-grid">
               <div
-                className={`space-y-6 lg:col-span-2 ${layout.socialNavPosition === 'left' ? 'lg:order-last' : ''}`}
+                className={`space-y-6 ${layout.socialNavPosition === 'left' ? 'lg:order-last' : ''}`}
               >
                 {/* "Mascotas en adopción" (kind 'pets', §M03/T-052),
                     "Productos" (kind 'products', §M10, F-MKT-PORTAL-1) y
@@ -347,7 +347,7 @@ export function OrgPublicPage({ slugOverride }: OrgPublicPageProps = {}) {
         )}
       </main>
       {state === 'ready' && view && (
-        <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6 lg:px-8 xl:px-12">
+        <div className="mx-auto w-full px-4 sm:px-6 lg:w-[94vw] lg:max-w-[1500px] lg:px-0">
           <PublicFooter organization={view.profile.organization} navItems={navItems} />
         </div>
       )}

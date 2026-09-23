@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { CampaignPublic } from '@adoptafacil/contracts';
-import { Card, CardContent, CardHeader, CardTitle, EmptyState, Skeleton } from '@adoptafacil/ui';
+import { Skeleton } from '@adoptafacil/ui';
 import { fetchPublicOrgCampaigns } from '../api/public-campaigns';
 import { CampaignCard } from '../../campaigns/components/campaign-card';
+import styles from '../styles/public-catalog.module.scss';
 
 const PAGE_SIZE = 12;
 const HEADING_ID = 'portal-section-campaigns';
@@ -27,6 +28,9 @@ export interface PortalCampaignsSectionProps {
  * `CampaignPublic` no expone un campo de imagen (ni lo usa `CampaignCard` en
  * el portafolio general) — se muestra título, categoría, organización, avance
  * (meta/recaudado) y vencimiento, que es exactamente lo que el contrato trae.
+ *
+ * Rediseño "editorial" T-D06: sin `Card` envolvente — heading plano +
+ * contenido, compacto (vive en el panel lateral angosto).
  */
 export function PortalCampaignsSection({ slug }: PortalCampaignsSectionProps) {
   const [items, setItems] = useState<CampaignPublic[]>([]);
@@ -50,37 +54,35 @@ export function PortalCampaignsSection({ slug }: PortalCampaignsSectionProps) {
   }, [slug]);
 
   return (
-    <section aria-labelledby={HEADING_ID} data-testid="portal-campaigns-section">
-      <Card>
-        <CardHeader>
-          <CardTitle id={HEADING_ID}>Campaña activa</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {state === 'loading' && <Skeleton className="h-40 w-full" />}
-          {state === 'error' && (
-            <EmptyState title="No se pudo cargar" description="Inténtalo de nuevo más tarde." />
-          )}
-          {state === 'ready' && items.length === 0 && (
-            <EmptyState
-              title="Sin campañas activas"
-              description="Esta organización no tiene una campaña de recaudación activa por ahora."
-            />
-          )}
-          {state === 'ready' && items.length > 0 && (
-            // Lista de una sola columna (3ra iteración del pulido visual):
-            // esta sección vive en el panel lateral angosto del portal
-            // público, no en un catálogo ancho — un grid de 2-3 columnas
-            // pensado para viewport ancho dejaba cada tarjeta apachurrada
-            // con espacio muerto al lado. Cada campaña ocupa el ancho
-            // completo del panel.
-            <div className="flex flex-col gap-3">
-              {items.map((campaign) => (
-                <CampaignCard key={campaign.id} campaign={campaign} />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+    <section
+      aria-labelledby={HEADING_ID}
+      data-testid="portal-campaigns-section"
+      className="space-y-3"
+    >
+      <h2 id={HEADING_ID} className={styles.heading} style={{ fontSize: 'var(--fs-h3)' }}>
+        Campaña activa
+      </h2>
+      {state === 'loading' && <Skeleton className="h-40 w-full" />}
+      {state === 'error' && (
+        <p className="text-sm text-muted-foreground">
+          <span className="block font-medium text-foreground">No se pudo cargar</span>
+          Inténtalo de nuevo más tarde.
+        </p>
+      )}
+      {state === 'ready' && items.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          Esta organización no tiene una campaña de recaudación activa por ahora.
+        </p>
+      )}
+      {state === 'ready' && items.length > 0 && (
+        // Lista de una sola columna: esta sección vive en el panel lateral
+        // angosto del portal público. Cada campaña ocupa el ancho completo.
+        <div className="flex flex-col gap-3">
+          {items.map((campaign) => (
+            <CampaignCard key={campaign.id} campaign={campaign} />
+          ))}
+        </div>
+      )}
     </section>
   );
 }

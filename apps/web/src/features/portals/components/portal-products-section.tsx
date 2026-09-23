@@ -1,16 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { ProductPublic } from '@adoptafacil/contracts';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  EmptyState,
-  Skeleton,
-} from '@adoptafacil/ui';
+import { Button, Skeleton } from '@adoptafacil/ui';
 import { listPublicProducts } from '../../marketplace/api/public-marketplace';
 import { ProductCard } from '../../marketplace/components/product-card';
+import styles from '../styles/public-catalog.module.scss';
 
 const PAGE_SIZE = 12;
 const HEADING_ID = 'portal-section-products';
@@ -31,6 +24,11 @@ export interface PortalProductsSectionProps {
  * `ProductCard` TAL CUAL — la misma tarjeta del catálogo público general—
  * para no duplicarla ni divergir visualmente (incluye el aviso de no
  * garantía de entrega y el enlace de WhatsApp en el detalle).
+ *
+ * Rediseño "editorial" T-D06: sin envolver en `Card` — heading plano +
+ * contenido (mismo criterio que `PortalAdoptionSection`) — y estado vacío
+ * de una sola línea, no la caja punteada genérica de `EmptyState`
+ * (`packages/ui`, compartida por toda la app; no se toca aquí).
  */
 export function PortalProductsSection({ organizationId }: PortalProductsSectionProps) {
   const [items, setItems] = useState<ProductPublic[]>([]);
@@ -74,38 +72,40 @@ export function PortalProductsSection({ organizationId }: PortalProductsSectionP
   };
 
   return (
-    <section aria-labelledby={HEADING_ID} data-testid="portal-products-section">
-      <Card>
-        <CardHeader>
-          <CardTitle id={HEADING_ID}>Productos</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {state === 'loading' && <Skeleton className="h-40 w-full" />}
-          {state === 'error' && (
-            <EmptyState title="No se pudo cargar" description="Inténtalo de nuevo más tarde." />
+    <section
+      aria-labelledby={HEADING_ID}
+      data-testid="portal-products-section"
+      className="space-y-3"
+    >
+      <h2 id={HEADING_ID} className={styles.heading}>
+        Productos
+      </h2>
+      {state === 'loading' && <Skeleton className="h-40 w-full" />}
+      {state === 'error' && (
+        <p className="text-sm text-muted-foreground">
+          <span className="block font-medium text-foreground">No se pudo cargar</span>
+          Inténtalo de nuevo más tarde.
+        </p>
+      )}
+      {state === 'ready' && items.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          Esta organización no tiene productos activos en el marketplace por ahora.
+        </p>
+      )}
+      {state === 'ready' && items.length > 0 && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {items.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+          {items.length < total && (
+            <Button variant="outline" disabled={loadingMore} onClick={() => void loadMore()}>
+              {loadingMore ? 'Cargando…' : 'Cargar más'}
+            </Button>
           )}
-          {state === 'ready' && items.length === 0 && (
-            <EmptyState
-              title="Sin productos publicados"
-              description="Esta organización no tiene productos activos en el marketplace por ahora."
-            />
-          )}
-          {state === 'ready' && items.length > 0 && (
-            <>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {items.map((product) => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
-              {items.length < total && (
-                <Button variant="outline" disabled={loadingMore} onClick={() => void loadMore()}>
-                  {loadingMore ? 'Cargando…' : 'Cargar más'}
-                </Button>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+        </div>
+      )}
     </section>
   );
 }

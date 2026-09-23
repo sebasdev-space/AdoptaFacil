@@ -9,7 +9,7 @@ import {
   type AnimalSummary,
   type OrganizationPublic,
 } from '@adoptafacil/contracts';
-import { EmptyState, Input, buttonVariants, cn } from '@adoptafacil/ui';
+import { EmptyState, Input, cn } from '@adoptafacil/ui';
 import { fetchPublicAnimals } from '../api/public-animals';
 import { AnimalCard } from './animal-card';
 import {
@@ -250,7 +250,7 @@ export function PortalAdoptionSection({ slug, organization }: PortalAdoptionSect
 
           <button
             type="button"
-            className={cn(buttonVariants({ size: 'default' }), styles.searchButton)}
+            className={cn(styles.btn, styles['btn--primary'], styles.searchButton)}
             onClick={() =>
               document.getElementById(HEADING_ID)?.scrollIntoView({ behavior: 'smooth' })
             }

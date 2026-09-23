@@ -77,7 +77,6 @@ export function PortalProfileSection({
   return (
     <section aria-labelledby={HEADING_ID}>
       <div className={styles.hero2}>
-        <div aria-hidden className={styles.hero2__glow} />
         <div className={styles.hero2__grid}>
           <div className={styles.hero2__text}>
             <div className="flex flex-wrap items-center gap-2">

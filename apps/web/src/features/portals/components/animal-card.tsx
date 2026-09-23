@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { AnimalSummary, OrganizationPublic } from '@adoptafacil/contracts';
-import { Badge, Button, buttonVariants, cn } from '@adoptafacil/ui';
+import { cn } from '@adoptafacil/ui';
 import {
   SEX_LABELS,
   SIZE_LABELS,
@@ -13,7 +13,7 @@ import {
   buildSponsorHref,
 } from '../model/animals-catalog';
 import { buildDonateHref } from './portal-donate-cta';
-import { IconGift, IconHeart, IconHome } from './portal-icons';
+import { IconHeart } from './portal-icons';
 import styles from '../styles/public-catalog.module.scss';
 
 export interface AnimalCardProps {
@@ -123,16 +123,14 @@ export function AnimalCard({ slug, animal, organization, onOpenDetail }: AnimalC
 
         <div className={styles.card__body}>
           <p className={styles.card__name}>{animal.name}</p>
-          <div className={styles.card__meta}>
-            {animal.breed && <span>{animal.breed}</span>}
-            {animal.breed && age && <span aria-hidden>·</span>}
-            {age && <span>{age}</span>}
-          </div>
-          <div className={styles.card__badges}>
-            <Badge variant="secondary">{SPECIES_LABELS[animal.species]}</Badge>
-            <Badge variant="outline">{SEX_LABELS[animal.sex]}</Badge>
-            <Badge variant="outline">{SIZE_LABELS[animal.size]}</Badge>
-          </div>
+          {animal.breed && <p className={styles.card__meta}>{animal.breed}</p>}
+          {/* Texto plano separado por "·" (T-D06, §14) — nunca tres badges
+              enormes; el nombre es el elemento visual más importante. */}
+          <p className={styles.card__meta}>
+            {[SPECIES_LABELS[animal.species], SEX_LABELS[animal.sex], SIZE_LABELS[animal.size], age]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
         </div>
       </Link>
 
@@ -151,32 +149,22 @@ export function AnimalCard({ slug, animal, organization, onOpenDetail }: AnimalC
       <div className={styles.card__actions}>
         <Link
           to={buildAdoptionRequestHref(animal.organizationId, animal)}
-          className={cn(buttonVariants({ size: 'sm' }), styles.card__actionPrimary)}
+          className={cn(styles.btn, styles['btn--primary'])}
         >
-          <IconHome className="mr-1.5 h-4 w-4" />
           Adoptar
         </Link>
-        <Link
-          to={buildSponsorHref(animal, organization?.name)}
-          className={cn(buttonVariants({ size: 'sm', variant: 'outline' }))}
-        >
-          <IconHeart className="mr-1.5 h-4 w-4" />
-          Apadrinar
-        </Link>
-        {organization ? (
-          <Link
-            to={buildDonateHref(organization)}
-            className={cn(buttonVariants({ size: 'sm', variant: 'outline' }))}
-          >
-            <IconGift className="mr-1.5 h-4 w-4" />
-            Donar
+        {/* Apadrinar/Donar: acciones secundarias LIGERAS (texto, no botones
+            con borde) — jerarquía clara frente a "Adoptar" (T-D06, §15). */}
+        <div className={styles.card__actionSecondary}>
+          <Link to={buildSponsorHref(animal, organization?.name)} className={styles.card__link}>
+            Apadrinar
           </Link>
-        ) : (
-          <Button size="sm" variant="outline" disabled>
-            <IconGift className="mr-1.5 h-4 w-4" />
-            Donar
-          </Button>
-        )}
+          {organization && (
+            <Link to={buildDonateHref(organization)} className={styles.card__link}>
+              Donar
+            </Link>
+          )}
+        </div>
       </div>
     </article>
   );
