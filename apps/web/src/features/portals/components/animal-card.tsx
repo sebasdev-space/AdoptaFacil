@@ -77,11 +77,12 @@ export function AnimalCard({ slug, animal, organization, onOpenDetail }: AnimalC
   const [favorited, setFavorited] = useState(false);
 
   return (
-    <article className={styles.card} data-testid="animal-card">
+    <article className={styles.card}>
       <Link
         to={detailHref}
         state={{ animal }}
         aria-label={`Ver detalle de ${animal.name}`}
+        data-testid="animal-card"
         className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onClick={(event) => {
           if (!onOpenDetail) return;
