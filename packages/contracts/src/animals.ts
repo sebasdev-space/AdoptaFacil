@@ -492,3 +492,61 @@ export interface ClinicalReminder {
 
 /** How a user resolves a reminder. */
 export type ReminderResolution = 'acknowledge' | 'dismiss';
+
+// ============================================================================
+// M03 ANIMAL BEHAVIOR DISCLOSURE (S-9, FSD v3.5 Doc 4 · "Safe Harbor" del
+// refugio, Art. 2353 inciso 2 C.C.). Additive. A bounded, per-animal
+// declaration of known temperament/health facts, e-signed by org staff BEFORE
+// any Placement other than a straight adoption can be generated (M04, Fabián —
+// see the migration's `animal_behavior_disclosure_current()` cross-module read).
+// Append-only, same "vigente = most recent" convention as
+// `LegalRepresentative`. All timestamps are ISO-8601 UTC.
+// ============================================================================
+
+/**
+ * Known compatibility with children — closed set, matches the FSD's exact
+ * three options (no partial/free-text alternative: this is a legal disclosure,
+ * not a UX nicety).
+ */
+export type ChildrenCompatibility = 'yes' | 'with_supervision' | 'not_recommended';
+
+/**
+ * One declaration (the CURRENT one is the most recently `declaredAt` for the
+ * animal). Immutable once created — re-declaring inserts a new row, it never
+ * edits a prior one. `signatureHash` is a SHA-256 seal computed server-side
+ * over the canonical declaration content at signature time; recomputing it
+ * from the returned fields lets anyone verify nothing was altered after signing.
+ */
+export interface AnimalBehaviorDisclosure {
+  id: string;
+  organizationId: string;
+  animalId: string;
+  /** The authenticated org member who submitted this declaration. */
+  declaredByUserId: string;
+  /** Full name TYPED at signature time (the FSD's e-signature captures the
+   *  name as entered at signing, not necessarily the account's own display
+   *  name). */
+  signedByName: string;
+  /** Free text on reactivity toward other animals, if any. */
+  reactivityNotes?: string;
+  biteHistory: boolean;
+  /** Required (in practice) when `biteHistory` is true. */
+  biteHistoryDetail?: string;
+  childrenCompatibility: ChildrenCompatibility;
+  medicalConditionsRelevant?: string;
+  /** SHA-256 hex, computed server-side — the immutability seal. */
+  signatureHash: string;
+  /** ISO-8601 UTC. */
+  declaredAt: string;
+}
+
+/** Declare (or re-declare) an animal's behavior disclosure. Signs and creates
+ *  atomically — there is no separate "sign later" step. */
+export interface CreateAnimalBehaviorDisclosureInput {
+  signedByName: string;
+  reactivityNotes?: string;
+  biteHistory: boolean;
+  biteHistoryDetail?: string;
+  childrenCompatibility: ChildrenCompatibility;
+  medicalConditionsRelevant?: string;
+}

@@ -38,12 +38,17 @@ import type { PrismaClient } from '@prisma/client';
 // through normal RLS-scoped writes) but their DELETE/TRUNCATE triggers
 // reject removal for every role the same way — purged here under replica
 // mode too.
+// animal_behavior_disclosures (M03, S-9, FSD v3.5 Doc 4) is append-only from
+// day one, same convention — purged BEFORE animals (its FK parent, ON DELETE
+// CASCADE, but cascade delivery still fires the child's own reject-DELETE
+// trigger, so it needs its own explicit purge under replica mode too).
 const APPEND_ONLY_TABLES = [
   'audit_logs',
   'formalization_transitions',
   'organization_documents',
   'clinical_event_attachments',
   'clinical_events',
+  'animal_behavior_disclosures',
   'animals',
   'sponsorship_status_history',
   'legal_representatives',

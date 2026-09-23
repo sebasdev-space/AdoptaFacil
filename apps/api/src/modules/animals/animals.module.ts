@@ -2,6 +2,8 @@ import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../../core/auth/auth.module';
 import { SponsorshipsModule } from '../sponsorships/sponsorships.module';
+import { AnimalBehaviorDisclosureController } from './animal-behavior-disclosure.controller';
+import { AnimalBehaviorDisclosureService } from './animal-behavior-disclosure.service';
 import { AnimalsController } from './animals.controller';
 import { AnimalsService } from './animals.service';
 import { BulkImportService } from './bulk-import.service';
@@ -37,12 +39,14 @@ import { PublicAnimalsService } from './public-animals.service';
   imports: [AuthModule, BullModule.registerQueue({ name: REMINDERS_QUEUE }), SponsorshipsModule],
   controllers: [
     AnimalsController,
+    AnimalBehaviorDisclosureController,
     ClinicalController,
     RemindersController,
     PublicAnimalsController,
   ],
   providers: [
     AnimalsService,
+    AnimalBehaviorDisclosureService,
     BulkImportService,
     CarnetService,
     ClinicalService,

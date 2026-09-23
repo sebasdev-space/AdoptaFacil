@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-100">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AdoptaFácil — Document Suite v1.0 & Form Schemas</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              navy: '#0B132B',
+              navyDark: '#060B18',
+              navyLight: '#1C2541',
+              teal: '#0D9488',
+              mint: '#10B981',
+              mintLight: '#D1FAE5',
+              grayBg: '#F8FAFC'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+            serif: ['Merriweather', 'ui-serif', 'Georgia', 'serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'monospace']
+          },
+          boxShadow: {
+            'paper': '0 1px 3px rgba(0,0,0,0.05), 0 10px 25px -5px rgba(11, 19, 43, 0.08), 0 8px 10px -6px rgba(11, 19, 43, 0.03)',
+            'paper-deep': '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Fuentes tipográficas -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Merriweather:ital,wght@0,300;0,400;0,700;1,300&display=swap" rel="stylesheet">
+
+  <style>
+    @media print {
+      body { background: white !important; padding: 0 !important; }
+      .no-print { display: none !important; }
+      .paper-sheet { 
+        box-shadow: none !important; 
+        border: none !important; 
+        margin: 0 !important; 
+        width: 100% !important; 
+        max-width: 100% !important;
+        padding: 1.5cm !important;
+      }
+      .page-break { page-break-before: always; }
+    }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #F1F5F9; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+  </style>
+</head>
+
+<body class="h-full flex flex-col font-sans text-slate-800 antialiased overflow-hidden">
+
+  <!-- ========================================================================= -->
+  <!-- BARRA DE NAVEGACIÓN PRINCIPAL (TOPBAR) -->
+  <!-- ========================================================================= -->
+  <header class="no-print bg-brand-navy border-b border-brand-navyLight shrink-0 z-50 text-white shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Identidad AdoptaFácil -->
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-brand-navyLight border border-brand-teal/40 flex items-center justify-center p-2 relative shadow-inner">
+          <svg viewBox="0 0 24 24" fill="none" class="w-full h-full text-brand-mint" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="currentColor" fill-opacity="0.2" stroke="currentColor" stroke-width="1.8"/>
+            <circle cx="9" cy="9" r="1.5" fill="#38BDF8"/>
+            <circle cx="15" cy="9" r="1.5" fill="#10B981"/>
+          </svg>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="font-bold text-lg tracking-tight text-white">adopta<span class="text-brand-mint font-extrabold">fácil</span></span>
+            <span class="text-[10px] font-mono font-bold tracking-wider px-2 py-0.5 rounded bg-brand-teal/20 text-brand-mint border border-brand-teal/30">FSD v3.5 · SUITE JURÍDICA</span>
+          </div>
+          <p class="text-xs text-slate-400">Motor de Automatización Contractual y Schemas de Entrada</p>
+        </div>
+      </div>
+
+      <!-- Controles de Modo: Datos Renderizados vs Template Handlebars -->
+      <div class="flex items-center space-x-3">
+        
+        <!-- Conmutador de Modo -->
+        <div class="bg-brand-navyLight p-1 rounded-lg border border-slate-700 flex items-center text-xs">
+          <button id="btnModeRender" onclick="setViewMode('rendered')" class="px-3 py-1.5 rounded-md font-medium transition flex items-center space-x-1.5 bg-brand-teal text-white shadow">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+            <span>Vista Previa (Mock Data)</span>
+          </button>
+          <button id="btnModeTemplate" onclick="setViewMode('template')" class="px-3 py-1.5 rounded-md font-medium transition text-slate-300 hover:text-white flex items-center space-x-1.5">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+            <span>Plantilla Raw (Handlebars)</span>
+          </button>
+        </div>
+
+        <!-- Copiar Plantilla -->
+        <button onclick="copyCurrentTemplate()" class="px-3 py-1.5 bg-brand-navyLight hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs font-semibold rounded-lg transition flex items-center space-x-1.5" title="Copiar código fuente del documento">
+          <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+          <span id="copyBtnText">Copiar</span>
+        </button>
+
+        <!-- Imprimir / PDF -->
+        <button onclick="window.print()" class="px-3 py-1.5 bg-brand-mint hover:bg-emerald-400 text-brand-navy font-bold text-xs rounded-lg shadow transition flex items-center space-x-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+          <span>Exportar PDF</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========================================================================= -->
+  <!-- CUERPO DE TRABAJO: SIDEBAR + ÁREA DOCUMENTAL -->
+  <!-- ========================================================================= -->
+  <div class="flex-1 flex overflow-hidden">
+
+    <!-- SIDEBAR DE SELECCIÓN (NO-PRINT) -->
+    <aside class="no-print w-80 bg-white border-r border-slate-200 flex flex-col shrink-0 custom-scrollbar overflow-y-auto">
+      <div class="p-4 border-b border-slate-100">
+        <h2 class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Document Suite Oficial (8 Documentos)</h2>
+        <p class="text-xs text-slate-500 mt-0.5">Selecciona el artefacto jurídico para auditar o extraer.</p>
+      </div>
+
+      <nav class="p-3 space-y-1.5 flex-1" id="docNav">
+        <!-- DOC 1 -->
+        <button onclick="switchDoc('doc1')" class="doc-btn w-full text-left p-2.5 rounded-lg text-xs transition border flex flex-col space-y-1 bg-brand-navy text-white border-brand-navy shadow-sm" data-id="doc1">
+          <div class="flex items-center justify-between">
+            <span class="font-bold flex items-center space-x-1.5">
+              <span class="w-4 h-4 rounded bg-brand-teal text-white flex items-center justify-center text-[10px]">1</span>
+              <span>Formulario de Postulación</span>
+            </span>
+            <span class="text-[9px] bg-brand-teal/40 text-brand-mint font-mono px-1.5 py-0.2 rounded uppercase">Frontend</span>
+          </div>
+          <span class="text-[11px] text-slate-300">Schema de captura React con declaraciones juradas (RF10).</span>
+        </button>
+
+        <!-- DOC 2 -->
+        <button onclick="switchDoc('doc2')" class="doc-btn w-full text-left p-2.5 rounded-lg text-xs transition border flex flex-col space-y-1 text-slate-700 bg-white hover:bg-slate-50 border-slate-200" data-id="doc2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold flex items-center space-x-1.5">
+              <span class="w-4 h-4 rounded bg-slate-200 text-slate-700 flex items-center justify-center text-[10px]">2</span>
+              <span>Contrato Adopción Definitiva</span>
+            </span>
+            <span class="text-[9px] bg-slate-100 text-slate-600 font-mono px-1.5 py-0.2 rounded uppercase">PDF · Hash</span>
+          </div>
+          <span class="text-[11px] text-slate-500">Cesión condicional, cláusula penal civil (Art. 1601 C.C.).</span>
+        </button>
+
+        <!-- DOC 3 -->
+        <button onclick="switchDoc('doc3')" class="doc-btn w-full text-left p-2.5 rounded-lg text-xs transition border flex flex-col space-y-1 text-slate-700 bg-white hover:bg-slate-50 border-slate-200" data-id="doc3">
+          <div class="flex items-center justify-between">
+            <span class="font-bold flex items-center space-x-1.5">
+              <span class="w-4 h-4 rounded bg-slate-200 text-slate-700 flex items-center justify-center text-[10px]">3</span>
+              <span>Comodato Salida Temporal</span>
+            </span>
+            <span class="text-[9px] bg-amber-50 text-amber-700 font-mono border border-amber-200 px-1.5 py-0.2 rounded uppercase">Art. 2200</span>
+          </div>
+          <span class="text-[11px] text-slate-500">Mera tenencia, carácter precario y culpa levísima.</span>
+        </button>
+
+        <!-- DOC 4 -->
+        <button onclick="switchDoc('doc4')" class="doc-btn w-full text-left p-2.5 rounded-lg text-xs transition border flex flex-col space-y-1 text-slate-700 bg-white hover:bg-slate-50 border-slate-200" data-id="doc4">
+          <div class="flex items-center justify-between">
+            <span class="font-bold flex items-center space-x-1.5">
+              <span class="w-4 h-4 rounded bg-slate-200 text-slate-700 flex items-center justify-center text-[10px]">4</span>
+              <span>Declaración de Comportamiento</span>
+            </span>
+            <span class="text-[9px] bg-blue-50 text-blue-700 font-mono border border-blue-200 px-1.5 py-0.2 rounded uppercase">Art. 2353</span>
+          </div>
+          <span class="text-[11px] text-slate-500">Safe Harbor del Refugio por vicios ocultos de conducta.</span>
+        </button>
+
+        <!-- DOC 5 -->
+        <button onclick="switchDoc('doc5')" class="doc-btn w-full text-left p-2.5 rounded-lg text-xs transition border flex flex-col space-y-1 text-slate-700 bg-white hover:bg-slate-50 border-slate-200" data-id="doc5">
+          <div class="flex items-center justify-between">
+            <span class="font-bold flex items-center space-x-1.5">
+              <span class="w-4 h-4 rounded bg-slate-200 text-slate-700 flex items-center justify-center text-[10px]">5</span>
+              <span>Acta de Retorno de Salida</span>
+            </span>
+            <span class="text-[9px] bg-slate-100 text-slate-600 font-mono px-1.5 py-0.2 rounded uppercase">Placement</span>
+          </div>
+          <span class="text-[11px] text-slate-500">Verificación física, 2 fotos obligatorias y cierre formal.</span>
+        </button>
+
+        <!-- DOC 6 -->
+        <button onclick="switchDoc('doc6')" class="doc-btn w-full text-left p-2.5 rounded-lg text-xs transition border flex flex-col space-y-1 text-slate-700 bg-white hover:bg-slate-50 border-slate-200" data-id="doc6">
+          <div class="flex items-center justify-between">
+            <span class="font-bold flex items-center space-x-1.5">
+              <span class="w-4 h-4 rounded bg-slate-200 text-slate-700 flex items-center justify-center text-[10px]">6</span>
+              <span>Certificado Donación DIAN</span>
+            </span>
+            <span class="text-[9px] bg-emerald-50 text-emerald-700 font-mono border border-emerald-200 px-1.5 py-0.2 rounded uppercase">Art. 125-3</span>
+          </div>
+          <span class="text-[11px] text-slate-500">Exclusivo ESAL con RTE vigente. Descuento 25% Renta.</span>
+        </button>
+
+        <!-- DOC 7 -->
+        <button onclick="switchDoc('doc7')" class="doc-btn w-full text-left p-2.5 rounded-lg text-xs transition border flex flex-col space-y-1 text-slate-700 bg-white hover:bg-slate-50 border-slate-200" data-id="doc7">
+          <div class="flex items-center justify-between">
+            <span class="font-bold flex items-center space-x-1.5">
+              <span class="w-4 h-4 rounded bg-slate-200 text-slate-700 flex items-center justify-center text-[10px]">7</span>
+              <span>Acta Donación en Especie</span>
+            </span>
+            <span class="text-[9px] bg-slate-100 text-slate-600 font-mono px-1.5 py-0.2 rounded uppercase">Recursos</span>
+          </div>
+          <span class="text-[11px] text-slate-500">Regla del menor valor: Costo fiscal vs. comercial.</span>
+        </button>
+
+        <!-- DOC 8 -->
+        <button onclick="switchDoc('doc8')" class="doc-btn w-full text-left p-2.5 rounded-lg text-xs transition border flex flex-col space-y-1 text-slate-700 bg-white hover:bg-slate-50 border-slate-200" data-id="doc8">
+          <div class="flex items-center justify-between">
+            <span class="font-bold flex items-center space-x-1.5">
+              <span class="w-4 h-4 rounded bg-slate-200 text-slate-700 flex items-center justify-center text-[10px]">8</span>
+              <span>Constancia Servicio Social</span>
+            </span>
+            <span class="text-[9px] bg-purple-50 text-purple-700 font-mono border border-purple-200 px-1.5 py-0.2 rounded uppercase">Res. 4210</span>
+          </div>
+          <span class="text-[11px] text-slate-500">Bitácora de 80h mínimas. No es certificado escolar.</span>
+        </button>
+      </nav>
+
+      <!-- Panel de Compliance y Garantías -->
+      <div class="p-3 bg-slate-50 border-t border-slate-200 text-[11px] space-y-2">
+        <div class="font-bold text-slate-700 flex items-center space-x-1">
+          <svg class="w-3.5 h-3.5 text-brand-teal" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+          <span>Garantía de Blindaje LegalTech</span>
+        </div>
+        <ul class="text-slate-500 space-y-1 font-mono text-[10px]">
+          <li>• Hash SHA-256 Server-Side (Dcto 2364)</li>
+          <li>• Sello Append-Only Inmutable (Object Lock)</li>
+          <li>• Mandato de Recaudo (Art. 2142 C.C.)</li>
+          <li>• Portal de Contacto (Ley 2439/2024)</li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- ÁREA CENTRAL DE VISUALIZACIÓN (DOCUMENT VIEWER) -->
+    <main class="flex-1 bg-slate-200/70 p-4 sm:p-8 custom-scrollbar overflow-y-auto flex justify-center">
+      
+      <!-- CONTENEDOR TIPO HOJA OFICIAL -->
+      <div class="paper-sheet w-full max-w-4xl bg-white rounded-lg shadow-paper border border-slate-300 p-8 sm:p-12 relative flex flex-col min-h-full">
+
+        <!-- ================================================================= -->
+        <!-- DOC 1: FORMULARIO DE POSTULACIÓN Y EVALUACIÓN DE ADOPCIÓN -->
+        <!-- ================================================================= -->
+        <div id="doc1-container" class="doc-panel">
+          
+          <!-- Vista Renderizada (Componente React en producción) -->
+          <div class="view-rendered">
+            <div class="border-b border-slate-200 pb-5 mb-6">
+              <div class="flex justify-between items-start">
+                <div>
+                  <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 font-mono">
+                    Módulo M04 · Requerimiento RF10
+                  </span>
+                  <h1 class="text-xl sm:text-2xl font-extrabold text-brand-navy mt-2">Formulario Oficial de Postulación y Evaluación de Adopción</h1>
+                  <p class="text-xs text-slate-500 mt-1">Este formulario alimenta la entidad <code class="font-mono text-brand-teal">Placement</code> con <code class="font-mono text-brand-teal">placementType = ADOPCION</code> en estado <code class="font-mono text-amber-600">SOLICITADA</code>.</p>
+                </div>
+                <div class="hidden sm:block text-right">
+                  <div class="text-[11px] font-mono text-slate-400">SCHEMA ID: <span class="font-bold text-slate-700">AdoptionRequest.v1</span></div>
+                  <div class="text-[10px] text-emerald-600 font-semibold flex items-center justify-end space-x-1 mt-0.5">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    <span>Validación Server-Side Activa</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <form class="space-y-8" onsubmit="event.preventDefault(); alert('POST /api/v1/placements enviado con éxito. Validación bloqueante completada.');">
+              
+              <!-- SECCIÓN A: IDENTIFICACIÓN -->
+              <div class="bg-slate-50 p-4 sm:p-5 rounded-xl border border-slate-200 space-y-4">
+                <div class="flex items-center space-x-2 border-b border-slate-200 pb-2">
+                  <span class="w-5 h-5 rounded-full bg-brand-navy text-brand-mint text-[11px] font-bold flex items-center justify-center">A</span>
+                  <h3 class="text-xs font-bold text-brand-navy uppercase tracking-wider">Identificación del Solicitante (Precargado desde Auth0)</h3>
+                </div>
+                
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                  <div>
+                    <label class="block font-medium text-slate-500 mb-1">Nombre Completo (Verificado)</label>
+                    <input type="text" value="Andrés Felipe Gámez Arias" readonly class="w-full bg-slate-200/70 border border-slate-300 rounded-lg px-3 py-2 font-semibold text-slate-700 cursor-not-allowed"/>
+                  </div>
+                  <div>
+                    <label class="block font-medium text-slate-500 mb-1">Documento de Identidad</label>
+                    <input type="text" value="Cédula de Ciudadanía 1.004.356.866" readonly class="w-full bg-slate-200/70 border border-slate-300 rounded-lg px-3 py-2 font-semibold text-slate-700 cursor-not-allowed"/>
+                  </div>
+                  <div>
+                    <label class="block font-medium text-slate-500 mb-1">Correo Electrónico (Auth0 Validado)</label>
+                    <input type="email" value="andres.gamez@ejemplo.com" readonly class="w-full bg-slate-200/70 border border-slate-300 rounded-lg px-3 py-2 font-semibold text-slate-700 cursor-not-allowed"/>
+                  </div>
+                  <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Teléfono Móvil (Contacto Inmediato) *</label>
+                    <input type="tel" value="+57 318 259 1566" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-teal focus:border-transparent outline-none"/>
+                  </div>
+                  <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Ciudad / Municipio de Residencia *</label>
+                    <input type="text" value="Bogotá D.C." class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-teal focus:border-transparent outline-none"/>
+                  </div>
+                  <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Ocupación / Actividad Económica *</label>
+                    <input type="text" value="Desarrollador de Software" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-teal focus:border-transparent outline-none"/>
+                  </div>
+                  <div class="sm:col-span-3">
+                    <label class="block font-semibold text-slate-700 mb-1">Dirección Exacta de Residencia *</label>
+                    <input type="text" value="Calle 140 # 15-20, Apto 402, Usaquén" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-teal focus:border-transparent outline-none"/>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SECCIÓN B: NÚCLEO FAMILIAR -->
+              <div class="bg-slate-50 p-4 sm:p-5 rounded-xl border border-slate-200 space-y-4">
+                <div class="flex items-center space-x-2 border-b border-slate-200 pb-2">
+                  <span class="w-5 h-5 rounded-full bg-brand-navy text-brand-mint text-[11px] font-bold flex items-center justify-center">B</span>
+                  <h3 class="text-xs font-bold text-brand-navy uppercase tracking-wider">Composición del Núcleo Familiar y Convivencia</h3>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Número de personas que habitan el hogar *</label>
+                    <input type="number" min="1" value="3" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-teal outline-none"/>
+                  </div>
+                  <div>
+                    <label class="block font-semibold text-slate-700 mb-1">¿Habitan niños o menores de edad en la vivienda? *</label>
+                    <select class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-teal outline-none">
+                      <option>No</option>
+                      <option selected>Sí (Indicar edades abajo)</option>
+                    </select>
+                  </div>
+                  <div class="sm:col-span-2">
+                    <label class="block font-semibold text-slate-700 mb-1">Edades de los menores o miembros vulnerables</label>
+                    <input type="text" value="Hermano menor (14 años)" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-teal outline-none"/>
+                  </div>
+
+                  <!-- REGLA BLOQUEANTE DE CONSENSO -->
+                  <div class="sm:col-span-2 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs">
+                    <div class="flex items-start space-x-2.5">
+                      <input type="checkbox" checked id="checkConsenso" class="mt-0.5 w-4 h-4 rounded text-brand-teal focus:ring-0 cursor-pointer"/>
+                      <label for="checkConsenso" class="text-emerald-950 font-medium cursor-pointer">
+                        <strong>Compuerta Bloqueante:</strong> Declaro que la totalidad de los miembros del núcleo familiar están de acuerdo con la adopción responsable de este animal.
+                        <span class="block text-[11px] text-emerald-800 mt-0.5">Si no existe consenso unánime, el sistema bloquea automáticamente la postulación.</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SECCIÓN C: VIVIENDA -->
+              <div class="bg-slate-50 p-4 sm:p-5 rounded-xl border border-slate-200 space-y-4">
+                <div class="flex items-center space-x-2 border-b border-slate-200 pb-2">
+                  <span class="w-5 h-5 rounded-full bg-brand-navy text-brand-mint text-[11px] font-bold flex items-center justify-center">C</span>
+                  <h3 class="text-xs font-bold text-brand-navy uppercase tracking-wider">Características del Inmueble y Seguridad</h3>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Tipo de Vivienda *</label>
+                    <select class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-teal outline-none">
+                      <option selected>Apartamento con balcón enmallado/protegido</option>
+                      <option>Casa con patio interior cerrado</option>
+                      <option>Finca / Casa campestre con cerca perimetral</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Régimen de Tenencia *</label>
+                    <select class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-teal outline-none">
+                      <option selected>Propiedad Familiar / Propia</option>
+                      <option>Arriendo (Adjuntar autorización expresa del arrendador)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- SECCIÓN D Y E: CAPACIDAD Y MOTIVACIÓN -->
+              <div class="bg-slate-50 p-4 sm:p-5 rounded-xl border border-slate-200 space-y-4">
+                <div class="flex items-center space-x-2 border-b border-slate-200 pb-2">
+                  <span class="w-5 h-5 rounded-full bg-brand-navy text-brand-mint text-[11px] font-bold flex items-center justify-center">D</span>
+                  <h3 class="text-xs font-bold text-brand-navy uppercase tracking-wider">Capacidad de Cuidado, Presupuesto y Plan de Contingencia</h3>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Presupuesto mensual estimado para manutención y veterinaria *</label>
+                    <select class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-teal outline-none">
+                      <option>Menos de $150.000 COP</option>
+                      <option selected>$150.000 a $300.000 COP</option>
+                      <option>Más de $300.000 COP</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block font-semibold text-slate-700 mb-1">Tiempo diario disponible para paseos y estimulación *</label>
+                    <select class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-teal outline-none">
+                      <option>Menos de 2 horas</option>
+                      <option selected>2 a 4 horas diarias</option>
+                      <option>Más de 4 horas diarias</option>
+                    </select>
+                  </div>
+                  <div class="sm:col-span-2">
+                    <label class="block font-semibold text-slate-700 mb-1">Plan de contingencia ante mudanza, viaje o cambio laboral imprevisto * (Mínimo 30 caracteres)</label>
+                    <textarea rows="2" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-teal outline-none">En caso de viaje laboral, mi madre cuidará del animal en casa; si ocurre mudanza, buscaremos exclusivamente inmuebles que admitan mascotas con zonas verdes cercanas.</textarea>
+                  </div>
+                  <div class="sm:col-span-2">
+                    <label class="block font-semibold text-slate-700 mb-1">¿Por qué deseas adoptar a este animal en particular? * (Mínimo 50 caracteres según RF10)</label>
+                    <textarea rows="2" class="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-brand-teal outline-none">Buscamos un compañero fiel para nuestra familia. Contamos con el tiempo y el compromiso de brindarle amor, salud preventiva y la estabilidad que merece por el resto de su vida.</textarea>
+                  </div>
+                </div>
+              </div>
+
+              <!-- DECLARACIONES JURÍDICAS OBLIGATORIAS (PIE VINCULANTE) -->
+              <div class="p-5 rounded-xl bg-amber-50/80 border border-amber-200 text-xs space-y-3">
+                <div class="flex items-center space-x-2 text-amber-900 font-bold text-xs uppercase tracking-wider">
+                  <svg class="w-4 h-4 text-amber-700 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                  <span>Declaraciones Jurídicas Vinculantes del Solicitante (Ley 1480/2011 y Ley 1581/2012)</span>
+                </div>
+                
+                <ol class="list-decimal pl-5 space-y-2 text-slate-800 leading-relaxed text-[11px]">
+                  <li><strong>Veracidad bajo juramento:</strong> Declaro bajo la gravedad del juramento que la totalidad de los datos suministrados son reales, fidedignos y verificables. Entiendo que cualquier falsedad u ocultamiento facultará la terminación inmediata del proceso y la rescisión de cualquier contrato futuro.</li>
+                  <li><strong>Habeas Data y Tratamiento de Datos:</strong> Autorizo expresa e inequívocamente a la Organización y a AdoptaFácil a tratar mis datos para fines de scoring, verificación de antecedentes y seguimiento post-adopción conforme al Decreto 1074 de 2015.</li>
+                  <li><strong>Autonomía en la decisión y Portal de Contacto:</strong> Reconozco que la postulación NO constituye reserva, promesa ni adjudicación de la adopción. La aprobación final es facultad privativa y discrecional del refugio. AdoptaFácil actúa como intermediario tecnológico sin responsabilidad sobre dicha decisión.</li>
+                </ol>
+
+                <div class="pt-3 border-t border-amber-200/70">
+                  <label class="flex items-center space-x-2.5 cursor-pointer font-bold text-brand-navy">
+                    <input type="checkbox" required checked class="w-4 h-4 rounded text-brand-teal focus:ring-0"/>
+                    <span>He leído, comprendo y acepto de forma irrevocable las tres declaraciones anteriores.</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- CTA FINAL -->
+              <div class="flex justify-end pt-2">
+                <button type="submit" class="px-6 py-3 bg-brand-navy hover:bg-brand-navyLight text-white text-xs font-bold rounded-xl shadow-md transition flex items-center space-x-2">
+                  <span>Radicar Solicitud de Adopción (Status: SOLICITADA)</span>
+                  <svg class="w-4 h-4 text-brand-mint" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Vista Template Handlebars -->
+          <div class="view-template hidden font-mono text-[11px] bg-slate-900 text-slate-100 p-6 rounded-xl overflow-x-auto custom-scrollbar">
+            <pre><code>&lt;!-- SCHEMA REACT JSON-SCHEMA / FORMIK / REACT-HOOK-FORM --&gt;
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AdoptionApplicationSchema",
+  "type": "object",
+  "required": [
+    "applicant_id", "applicant_phone", "applicant_city", "applicant_address",
+    "household_consensus", "housing_tenure", "monthly_budget_range",
+    "daily_time_availability", "contingency_plan", "motivation_letter",
+    "legal_declarations_accepted"
+  ],
+  "properties": {
+    "applicant_id": { "type": "string", "format": "uuid", "default": "{{user.id}}" },
+    "applicant_name": { "type": "string", "default": "{{user.name}}" },
+    "applicant_doc": { "type": "string", "default": "{{user.document_number}}" },
+    "applicant_email": { "type": "string", "format": "email", "default": "{{user.email}}" },
+    "applicant_phone": { "type": "string", "pattern": "^(\\+57)?3[0-9]{9}$" },
+    "household_total": { "type": "integer", "minimum": 1 },
+    "household_has_minors": { "type": "boolean" },
+    "household_consensus": { "type": "boolean", "const": true },
+    "housing_type": { "type": "string", "enum": ["APARTMENT", "HOUSE", "RANCH"] },
+    "housing_tenure": { "type": "string", "enum": ["OWNED", "RENTED", "FAMILY"] },
+    "landlord_permission_doc_id": { "type": "string", "nullable": true },
+    "monthly_budget_range": { "type": "string", "enum": ["TIER_1", "TIER_2", "TIER_3"] },
+    "daily_time_availability": { "type": "string", "enum": ["LT_2H", "2H_TO_4H", "GT_4H"] },
+    "contingency_plan": { "type": "string", "minLength": 30 },
+    "motivation_letter": { "type": "string", "minLength": 50 },
+    "legal_declarations_accepted": { "type": "boolean", "const": true }
+  }
+}</code></pre>
+          </div>
+
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- DOC 2: CONTRATO DE ADOPCIÓN DEFINITIVA (PDF LEGAL CON HASH) -->
+        <!-- ================================================================= -->
+        <div id="doc2-container" class="doc-panel hidden">
+          
+          <!-- Vista Renderizada -->
+          <div class="view-rendered font-serif text-xs text-slate-900 leading-relaxed space-y-5">
+            
+            <!-- Metadata de Seguridad y Hash de Sellado -->
+            <div class="no-print bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-[11px] font-sans flex items-center justify-between text-emerald-900 mb-4">
+              <div class="flex items-center space-x-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span><strong>Estado Documental:</strong> FIRMADO E INMUTABLE (Object Lock: RETAIN_UNTIL_2036)</span>
+              </div>
+              <span class="font-mono text-[10px] bg-white px-2 py-0.5 rounded border border-emerald-200">Hash SHA-256 Validado</span>
+            </div>
+
+            <div class="text-center border-b-2 border-brand-navy pb-4 font-sans">
+              <span class="text-[10px] uppercase tracking-widest font-bold text-slate-500">República de Colombia · Sistema Registral AdoptaFácil</span>
+              <h1 class="text-lg font-extrabold text-brand-navy uppercase mt-1">Contrato Bilateral de Adopción de Animal de Compañía</h1>
+              <p class="text-xs font-mono text-slate-600 mt-0.5">Consecutivo Transaccional: <span class="font-bold text-brand-navy">PLC-2026-0889-ADOP</span> · Hash Identificador: <span class="font-bold">c3ab88...e94f</span></p>
+            </div>
+
+            <p class="text-justify leading-relaxed">
+              Entre los suscritos, a saber: de una parte, <strong>FUNDACIÓN HACHIKOS PROTECCIÓN ANIMAL</strong>, entidad legalmente constituida, identificada con NIT <strong>901.452.128-4</strong>, con domicilio principal en la ciudad de Bogotá D.C., representada para efectos de este acto por <strong>CLAUDIA ROCÍO VÁSQUEZ SÁNCHEZ</strong>, mayor de edad, identificada con cédula de ciudadanía No. <strong>52.189.442</strong>, quien en adelante se denominará <strong>"LA ORGANIZACIÓN"</strong> o <strong>"EL CEDENTE"</strong>; y de otra parte, <strong>ANDRÉS FELIPE GÁMEZ ARIAS</strong>, mayor de edad, domiciliado en la ciudad de Bogotá D.C., identificado con cédula de ciudadanía No. <strong>1.004.356.866</strong>, quien en adelante se denominará <strong>"EL ADOPTANTE"</strong> o <strong>"EL CESIONARIO"</strong>; se ha convenido celebrar el presente Contrato de Adopción de Animal de Compañía, previas las siguientes consideraciones:
+            </p>
+
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded font-sans text-[11px] leading-relaxed">
+              <strong>CONSIDERACIONES INSTITUCIONALES:</strong> 
+              <strong>Primera.</strong> Que el artículo 1° de la Ley 1774 de 2016 reconoce a los animales la calidad de seres sintientes, modificando el artículo 655 del Código Civil, subsistiendo sobre ellos el régimen de propiedad mueble susceptible de cesión y reivindicación civil. 
+              <strong>Segunda.</strong> Que AdoptaFácil opera como un Portal de Contacto e infraestructura tecnológica conforme al artículo 5°, numeral 18, de la Ley 1480 de 2011 (adicionado por el artículo 6° de la Ley 2439 de 2024), limitando su función a la facilitación de la firma electrónica y trazabilidad documental sin ser parte contractual.
+            </div>
+
+            <h3 class="font-sans font-bold text-xs uppercase tracking-wide text-brand-navy pt-2 border-b border-slate-200">Cláusulas Contractuales Vinculantes</h3>
+
+            <p class="text-justify">
+              <strong>CLÁUSULA PRIMERA. — Individualización del Animal y Snapshot Clínico:</strong> LA ORGANIZACIÓN transfiere a título de adopción el animal de compañía con las siguientes características individuales: Nombre: <strong>Firulais</strong>; Especie: <strong>Canino</strong>; Raza predominante: <strong>Mestizo</strong>; Sexo: <strong>Macho</strong>; Edad estimada: <strong>2 años</strong>; Estado reproductivo: <strong>Esterilizado quirúrgicamente</strong>; Microchip subcutáneo: <strong>968000010488219</strong>. Se anexa de forma inmutable el historial veterinario completo bajo el hash criptográfico SHA-256 <code class="font-mono text-[10px] bg-slate-100 p-0.5 rounded">e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</code>, el cual el ADOPTANTE declara conocer y aceptar.
+            </p>
+
+            <p class="text-justify">
+              <strong>CLÁUSULA SEGUNDA. — Naturaleza de la Transferencia y Gratuidad:</strong> La entrega se realiza a título gratuito. La propiedad definitiva queda sometida a la condición resolutoria expresa regulada en la Cláusula Séptima. Cualquier aporte económico voluntario realizado por el ADOPTANTE tiene naturaleza de donación no condicionante de la adopción.
+            </p>
+
+            <p class="text-justify">
+              <strong>CLÁUSULA TERCERA. — Obligaciones de Tenencia Responsable y Bienestar:</strong> En cumplimiento de la Ley 84 de 1989 y la Ley 1774 de 2016, el ADOPTANTE se obliga a: (a) Proporcionar alimentación balanceada y agua potable continua; (b) Garantizar atención médico-veterinaria anual y plan vacunal vigente; (c) Conducirlo en espacio público provisto de collar y traílla de seguridad; (d) No someterlo a mutilaciones estéticas (caudectomía, otectomía); (e) Brindarle espacio físico techado, seco y ventilado, prohibiéndose su permanencia permanente a la intemperie, en terrazas o amarrado.
+            </p>
+
+            <p class="text-justify">
+              <strong>CLÁUSULA CUARTA. — Prohibición Absoluta de Disposición a Terceros:</strong> Se prohíbe de forma tajante comercializar, vender, dar en prenda, ceder, donar o entregar el animal a terceras personas naturales o jurídicas sin la autorización previa, expresa y escrita de LA ORGANIZACIÓN. En caso de imposibilidad sobreviniente de manutención, el ADOPTANTE se obliga a restituir materialmente al animal a la ORGANIZACIÓN.
+            </p>
+
+            <p class="text-justify">
+              <strong>CLÁUSULA QUINTA. — Régimen de Seguimiento Post-Adopción (M04):</strong> El ADOPTANTE se obliga a responder los cuestionarios de seguimiento y remitir evidencias fotográficas y en video a través de la plataforma AdoptaFácil en los hitos programados: 15 días, 3 meses, 6 meses y 1 año posterior a la suscripción, permitiendo visitas de verificación domiciliaria concertadas.
+            </p>
+
+            <p class="text-justify">
+              <strong>CLÁUSULA SEXTA. — Cláusula Penal Civil Tasada (Arts. 1592 y 1601 del Código Civil):</strong> En caso de abandono, extravío negligente no reportado en 24 horas, o devolución unilateral e injustificada, el ADOPTANTE pagará a LA ORGANIZACIÓN una pena compensatoria tasada exclusivamente sobre los costos médicos, quirúrgicos y operativos reales documentados en el expediente de rescate:
+              <br/>
+              <span class="font-sans text-[11px] block bg-slate-50 p-2 my-1.5 border rounded">
+                • Procedimiento Quirúrgico de Esterilización: $140.000 COP (Fac. Soporte: FAC-982)<br/>
+                • Esquema Profiláctico Vacunal (Séxtuple + Rabia): $85.000 COP (Fac. Soporte: FAC-1044)<br/>
+                • Implantación y Registro de Microchip ISO 11784: $65.000 COP (Fac. Soporte: FAC-1102)<br/>
+                <strong>VALOR TOTAL CLÁUSULA PENAL: DOSCIENTOS NOVENTA MIL PESOS M/CTE ($290.000 COP).</strong>
+              </span>
+              La presente cláusula penal se pacta en observancia estricta del límite legal previsto en el artículo 1601 del Código Civil, sin exceder el valor de las obligaciones devengadas.
+            </p>
+
+            <p class="text-justify">
+              <strong>CLÁUSULA SÉPTIMA. — Condición Resolutoria Expresa y Restitución Civil:</strong> El incumplimiento grave de cualquiera de las obligaciones estipuladas faculta a LA ORGANIZACIÓN a declarar rescindido el pleno derecho del contrato y exigir la restitución civil inmediata del animal conforme a la acción de protección sobre semovientes del artículo 655 del Código Civil.
+            </p>
+
+            <p class="text-justify">
+              <strong>CLÁUSULA OCTAVA. — Canalización por Maltrato Animal:</strong> Todo indicio de crueldad, negligencia grave o maltrato animal será denunciado ante la Fiscalía General de la Nación a través del Grupo Especial para la Lucha Contra el Maltrato Animal (GELMA) bajo el artículo 339A del Código Penal.
+            </p>
+
+            <p class="text-justify">
+              <strong>CLÁUSULA NOVENA. — Exención de Responsabilidad para AdoptaFácil:</strong> La plataforma AdoptaFácil queda exonerada de toda responsabilidad por vicios ocultos de salud preexistentes, temperamento sobreviniente o perjuicios a terceros ocasionados por el animal.
+            </p>
+
+            <p class="text-justify">
+              <strong>CLÁUSULA DÉCIMA. — Validez de la Firma Electrónica:</strong> Las partes acuerdan que la firma electrónica simple estampada a través de la plataforma cumple con los estándares de confiabilidad, integridad y no repudio exigidos por la Ley 527 de 1999 y los artículos 3° y 4° del Decreto 2364 de 2012.
+            </p>
+
+            <!-- CERTIFICADO CRIPTOGRÁFICO DE FIRMAS (LEY 527/1999) -->
+            <div class="mt-8 pt-4 border-t-2 border-brand-navy font-sans grid grid-cols-1 sm:grid-cols-2 gap-4 text-[10px]">
+              <div class="p-3 bg-slate-50 border border-slate-200 rounded space-y-1">
+                <div class="font-bold text-brand-navy uppercase tracking-wider">Cedente / Organización</div>
+                <div class="font-semibold text-slate-800">Claudia Rocío Vásquez Sánchez</div>
+                <div class="text-slate-500">C.C. 52.189.442 · Rep. Legal Fundación Hachikos</div>
+                <div class="text-slate-500">IP: 186.84.90.12 · Timestamp UTC: 2026-09-12T14:22:10Z</div>
+                <div class="font-mono text-[9px] text-slate-400 truncate">SHA-256: 7f83b1657ff1fc53b92dc18148a1d65dfc...</div>
+              </div>
+
+              <div class="p-3 bg-slate-50 border border-slate-200 rounded space-y-1">
+                <div class="font-bold text-brand-navy uppercase tracking-wider">Cesionario / Adoptante</div>
+                <div class="font-semibold text-slate-800">Andrés Felipe Gámez Arias</div>
+                <div class="text-slate-500">C.C. 1.004.356.866 · Adoptante Verificado</div>
+                <div class="text-slate-500">IP: 190.158.42.88 · Timestamp UTC: 2026-09-12T14:35:04Z</div>
+                <div class="font-mono text-[9px] text-slate-400 truncate">SHA-256: 4a44dc528c1e403d7697422936a012257...</div>
+              </div>
+            </div>
+
+            <div class="text-center font-mono text-[9px] text-slate-400 mt-3">
+              Documento Sellado: <span class="text-slate-600">urn:adoptafacil:vault:contract:2026:plc-0889-final.pdf</span> · Digest: a8f5c9e2b104882199b78a9c3d4e5f6a
+            </div>
+          </div>
+
+          <!-- Vista Template Handlebars -->
+          <div class="view-template hidden font-mono text-[11px] bg-slate-900 text-slate-100 p-6 rounded-xl overflow-x-auto custom-scrollbar">
+            <pre><code>&lt;!-- CONTRATO DE ADOPCIÓN (HANDLEBARS TEMPLATE) --&gt;
+&lt;div class="contract-container"&gt;
+  &lt;h1&gt;CONTRATO BILATERAL DE ADOPCIÓN No. {{placement.id}}&lt;/h1&gt;
+  &lt;p&gt;Entre {{organizacion.razon_social}} (NIT: {{organizacion.nit}}), representada por {{organizacion.representante_legal.nombre}} (C.C. {{organizacion.representante_legal.documento}}), y {{adoptante.nombre}} (C.C. {{adoptante.documento}})...&lt;/p&gt;
+  
+  &lt;h3&gt;CLÁUSULA PRIMERA — INDIVIDUALIZACIÓN&lt;/h3&gt;
+  &lt;p&gt;Nombre: {{animal.nombre}} | Especie: {{animal.especie}} | Microchip: {{animal.microchip}} | Hash Clínico: {{animal.expediente_hash}}&lt;/p&gt;
+
+  &lt;h3&gt;CLÁUSULA SEXTA — PENALIDAD TASADA&lt;/h3&gt;
+  {{#each contrato.penalidad.costos_documentados}}
+    &lt;div&gt;{{this.concepto}}: ${{this.valor}} COP (Soporte: {{this.factura_id}})&lt;/div&gt;
+  {{/each}}
+  &lt;p&gt;Total Cláusula Penal: ${{contrato.penalidad.monto_total}} COP conforme al Art. 1601 C.C.&lt;/p&gt;
+
+  &lt;!-- Metadatos Criptográficos --&gt;
+  &lt;footer&gt;
+    &lt;div&gt;Org Hash: {{firma.organizacion.hash_sha256}} | UTC: {{firma.organizacion.timestamp_utc}}&lt;/div&gt;
+    &lt;div&gt;Adoptante Hash: {{firma.adoptante.hash_sha256}} | UTC: {{firma.adoptante.timestamp_utc}}&lt;/div&gt;
+    &lt;div&gt;Final Sealed Hash: {{documento.hash_final}}&lt;/div&gt;
+  &lt;/footer&gt;
+&lt;/div&gt;</code></pre>
+          </div>
+
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- DOC 3: COMODATO PRECARIO SALIDAS TEMPORALES -->
+        <!-- ================================================================= -->
+        <div id="doc3-container" class="doc-panel hidden">
+          
+          <!-- Vista Renderizada -->
+          <div class="view-rendered font-serif text-xs text-slate-900 leading-relaxed space-y-5">
+            <div class="text-center border-b-2 border-brand-teal pb-4 font-sans">
+              <span class="text-[10px] uppercase tracking-widest font-bold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded border border-amber-200">Régimen Civil Especial · Art. 2200 y 2219 Código Civil</span>
+              <h1 class="text-lg font-extrabold text-brand-navy uppercase mt-1">Contrato de Comodato Precario de Animal de Compañía</h1>
+              <p class="text-xs text-slate-500 font-sans">Modalidad: <span class="font-bold text-brand-navy font-mono">SALIDA_TEMPORAL / SOCIALIZACIÓN</span> · Contrato No. <span class="font-mono font-bold">CMD-2026-0312</span></p>
+            </div>
+
+            <p class="text-justify">
+              Entre <strong>FUNDACIÓN HACHIKOS PROTECCIÓN ANIMAL</strong> (NIT 901.452.128-4), en calidad de <strong>EL COMODANTE</strong>, y <strong>ANDRÉS FELIPE GÁMEZ ARIAS</strong> (C.C. 1.004.356.866), en calidad de <strong>EL COMODATARIO</strong>, se celebra el presente contrato de comodato precario sobre el ejemplar canino <strong>Firulais</strong> (Microchip: 968000010488219), sujeto a las siguientes cláusulas:
+            </p>
+
+            <div class="space-y-3 text-justify">
+              <p><strong>PRIMERA. — Naturaleza Jurídica y Propiedad:</strong> El presente contrato corresponde a un comodato o préstamo de uso gratuito regulado por el artículo 2200 del Código Civil. El COMODANTE conserva en todo momento la propiedad y titularidad jurídica sobre el semoviente. El COMODATARIO adquiere únicamente la mera tenencia material temporal con estricta obligación de restitución.</p>
+              
+              <p><strong>SEGUNDA. — Término Estipulado:</strong> El comodato inicia el día <strong>15 de septiembre de 2026 a las 09:00 horas</strong> y vence de pleno derecho el <strong>17 de septiembre de 2026 a las 18:00 horas</strong>, momento en el cual el animal debe ser reintegrado en las instalaciones del refugio.</p>
+
+              <p><strong>TERCERA. — Carácter Precario y Restitución Inmediata (Art. 2219 C.C.):</strong> Las partes pactan de forma expresa que el comodato tiene carácter precario. EL COMODANTE podrá revocarlo y exigir la restitución inmediata del animal en cualquier momento, sin necesidad de motivación y sin que el plazo pactado sea oponible.</p>
+
+              <p><strong>CUARTA. — Diligencia Máxima y Culpa Levísima (Art. 2203 C.C.):</strong> El COMODATARIO está obligado a emplear el mayor cuidado y diligencia en la conservación y custodia del animal, respondiendo jurídicamente hasta de <strong>culpa levísima</strong> por todo daño, deterioro, extravío o detrimento que sufra el ejemplar.</p>
+
+              <p><strong>QUINTA. — Responsabilidad por Daños a Terceros (Art. 2353 C.C.):</strong> Quien se sirve del animal responde civilmente por cualquier mordedura, lesión o perjuicio que cause a terceros o bienes durante la tenencia material, salvo que se demuestre vicio de comportamiento preexistente no informado en la Declaración de Comportamiento anexa.</p>
+
+              <p><strong>SEXTA. — Gratuidad:</strong> El contrato es rigurosamente gratuito. Queda prohibido cualquier cobro de tarifa o estipendio por la tenencia temporal.</p>
+            </div>
+
+            <!-- Bloque de Firmas -->
+            <div class="mt-6 pt-4 border-t border-slate-200 font-sans grid grid-cols-2 gap-4 text-[10px]">
+              <div class="p-2.5 bg-slate-50 border rounded">
+                <div class="font-bold text-brand-navy">Comodante (Refugio)</div>
+                <div>Claudia Rocío Vásquez Sánchez · C.C. 52.189.442</div>
+                <div class="font-mono text-[9px] text-slate-400">Timestamp: 2026-09-14T11:00:22Z</div>
+              </div>
+              <div class="p-2.5 bg-slate-50 border rounded">
+                <div class="font-bold text-brand-navy">Comodatario (Tenencia Temporal)</div>
+                <div>Andrés Felipe Gámez Arias · C.C. 1.004.356.866</div>
+                <div class="font-mono text-[9px] text-slate-400">Timestamp: 2026-09-14T11:15:40Z</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vista Template Handlebars -->
+          <div class="view-template hidden font-mono text-[11px] bg-slate-900 text-slate-100 p-6 rounded-xl overflow-x-auto custom-scrollbar">
+            <pre><code>&lt;!-- CONTRATO COMODATO PRECARIO (HANDLEBARS) --&gt;
+&lt;h2&gt;CONTRATO DE COMODATO PRECARIO No. {{placement.id}}&lt;/h2&gt;
+&lt;p&gt;Comodante: {{organizacion.razon_social}} | Comodatario: {{comodatario.nombre}}&lt;/p&gt;
+&lt;p&gt;Vigencia: Desde {{placement.fecha_inicio}} hasta {{placement.fecha_fin}}&lt;/p&gt;
+&lt;p&gt;Amparado en la Declaración Conductual Hash: {{disclosure.hash_sha256}}&lt;/p&gt;
+&lt;p&gt;Estándar de Diligencia: Culpa Levísima (Art. 2203 C.C.). Carácter Precario (Art. 2219 C.C.)&lt;/p&gt;</code></pre>
+          </div>
+
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- DOC 4: DECLARACIÓN CONDUCTUAL DEL ANIMAL (SAFE HARBOR) -->
+        <!-- ================================================================= -->
+        <div id="doc4-container" class="doc-panel hidden">
+          
+          <!-- Vista Renderizada -->
+          <div class="view-rendered font-sans text-xs text-slate-900 space-y-4">
+            <div class="border-b-2 border-blue-600 pb-3 flex justify-between items-start">
+              <div>
+                <span class="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 uppercase tracking-wider">Safe Harbor Refugio · Art. 2353 Inciso 2 C.C.</span>
+                <h2 class="text-base sm:text-lg font-extrabold text-brand-navy mt-1">Declaración Obligatoria de Comportamiento y Temperamento Canino</h2>
+                <p class="text-[11px] text-slate-500">Documento bloqueante: Previo y obligatorio a la generación de cualquier Comodato Temporal.</p>
+              </div>
+              <span class="font-mono text-[11px] bg-slate-100 text-slate-600 px-2 py-1 rounded border">DOC-4-BEHAVIOR</span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3 rounded-lg border text-xs">
+              <div><strong>Animal Evaluado:</strong> Firulais (ID: ANM-0941)</div>
+              <div><strong>Especie / Sexo:</strong> Canino Mestizo / Macho Esterilizado</div>
+              <div><strong>Evaluador Institucional:</strong> Claudia Rocío Vásquez Sánchez</div>
+              <div><strong>Fecha de Valoración:</strong> 12 de septiembre de 2026</div>
+            </div>
+
+            <div class="space-y-2 border rounded-lg p-3 text-xs divide-y divide-slate-100">
+              <div class="flex justify-between items-center py-1.5">
+                <span class="text-slate-600">Reactividad observada frente a otros caninos:</span>
+                <span class="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">NO OBSERVADA (Sociable)</span>
+              </div>
+              <div class="flex justify-between items-center py-1.5">
+                <span class="text-slate-600">Reactividad o fijación frente a felinos:</span>
+                <span class="font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">MODERADA (Requiere supervisión)</span>
+              </div>
+              <div class="flex justify-between items-center py-1.5">
+                <span class="text-slate-600">Historial o antecedentes conocidos de mordedura:</span>
+                <span class="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">SIN ANTECEDENTES REGISTRADOS</span>
+              </div>
+              <div class="flex justify-between items-center py-1.5">
+                <span class="text-slate-600">Tolerancia y compatibilidad con niños menores:</span>
+                <span class="font-bold text-brand-navy bg-slate-100 px-2 py-0.5 rounded">COMPATIBLE BAJO SUPERVISIÓN</span>
+              </div>
+              <div class="flex justify-between items-center py-1.5">
+                <span class="text-slate-600">Condición médica / Requerimiento dietario:</span>
+                <span class="font-semibold text-slate-800">Alimento seco senior (digestión sensible). Sin medicación activa.</span>
+              </div>
+            </div>
+
+            <div class="p-3 bg-blue-50 border border-blue-200 rounded text-[11px] text-blue-900 leading-relaxed">
+              <strong>Efecto Jurídico Institucional:</strong> La suscripción de esta constancia exonera a la Organización frente a acciones civiles de regreso derivadas del artículo 2353 del Código Civil, al haber informado de manera diligente las cualidades y vicios conocidos del animal antes de la entrega material.
+            </div>
+
+            <div class="pt-2 flex justify-between items-center border-t text-[10px] font-mono text-slate-500">
+              <div>Firma Electrónica Evaluador: <strong>Claudia Vásquez (Refugio)</strong></div>
+              <div>Hash SHA-256: 8f4a2c91b5...62e1</div>
+            </div>
+          </div>
+
+          <!-- Vista Template Handlebars -->
+          <div class="view-template hidden font-mono text-[11px] bg-slate-900 text-slate-100 p-6 rounded-xl overflow-x-auto custom-scrollbar">
+            <pre><code>&lt;!-- ANIMAL BEHAVIOR DISCLOSURE (HANDLEBARS) --&gt;
+&lt;div class="behavior-disclosure"&gt;
+  &lt;h3&gt;DECLARACIÓN DE COMPORTAMIENTO No. {{disclosure.id}}&lt;/h3&gt;
+  &lt;p&gt;Animal: {{animal.nombre}} | Refugio: {{organizacion.razon_social}}&lt;/p&gt;
+  &lt;div&gt;Reactividad Perros: {{disclosure.reactivity_notes}}&lt;/div&gt;
+  &lt;div&gt;Antecedente Mordedura: {{#if disclosure.bite_history}}SÍ: {{disclosure.bite_history_detail}}{{else}}NO{{/if}}&lt;/div&gt;
+  &lt;div&gt;Compatibilidad Niños: {{disclosure.children_compatibility}}&lt;/div&gt;
+  &lt;div&gt;Hash Firma Server-Side: {{firma.declarante.hash_sha256}}&lt;/div&gt;
+&lt;/div&gt;</code></pre>
+          </div>
+
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- DOC 5: ACTA DE RETORNO Y RECEPCIÓN FÍSICA -->
+        <!-- ================================================================= -->
+        <div id="doc5-container" class="doc-panel hidden">
+          
+          <!-- Vista Renderizada -->
+          <div class="view-rendered font-sans text-xs text-slate-900 space-y-4">
+            <div class="border-b pb-3 flex justify-between items-start">
+              <div>
+                <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded uppercase">Fin del Placement · Reingreso al Catálogo</span>
+                <h2 class="text-base sm:text-lg font-extrabold text-brand-navy mt-1">Acta de Verificación Física, Triage y Retorno</h2>
+                <p class="text-[11px] text-slate-500">Cierre de custodia temporal. Reactiva automáticamente el estado a <code class="font-mono text-brand-teal font-bold">DISPONIBLE</code>.</p>
+              </div>
+              <span class="font-mono text-[11px] text-emerald-600 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded font-bold">RETORNO CONFORME</span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-3 rounded-lg border text-xs">
+              <div><strong>Fecha y Hora de Retorno:</strong> 17-Sep-2026 17:45 UTC-5</div>
+              <div><strong>Peso al Regresar:</strong> 18.2 Kg (Sin variación)</div>
+              <div><strong>Verificado por:</strong> Dr. Camilo Pérez (Vet. Refugio)</div>
+            </div>
+
+            <div class="border rounded-lg p-3 space-y-2">
+              <h4 class="font-bold text-brand-navy uppercase text-[11px]">Chequeo de Integridad Física (Triage de Entrada)</h4>
+              <div class="grid grid-cols-2 gap-2 text-[11px]">
+                <div class="flex items-center space-x-1 text-emerald-700 font-medium">
+                  <svg class="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                  <span>Sin lesiones dérmicas ni heridas visibles</span>
+                </div>
+                <div class="flex items-center space-x-1 text-emerald-700 font-medium">
+                  <svg class="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                  <span>Almohadillas plantares íntegras</span>
+                </div>
+                <div class="flex items-center space-x-1 text-emerald-700 font-medium">
+                  <svg class="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                  <span>Estado anímico: Alerta, dócil y responsivo</span>
+                </div>
+                <div class="flex items-center space-x-1 text-emerald-700 font-medium">
+                  <svg class="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                  <span>Incidentes con terceros: NINGUNO</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- EVIDENCIA FOTOGRÁFICA OBLIGATORIA (CONSTRAINT DE BASE DE DATOS min_two_photos) -->
+            <div class="border rounded-lg p-3">
+              <span class="font-bold text-brand-navy uppercase text-[11px] block mb-2">Evidencias Fotográficas Obligatorias (Regla: min_two_photos):</span>
+              <div class="grid grid-cols-2 gap-3 text-center">
+                <div class="h-28 bg-slate-100 rounded-lg border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-500 text-[10px] p-2">
+                  <svg class="w-6 h-6 text-slate-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                  <span>Foto 1: Vista Lateral / Estado General (OK)</span>
+                  <span class="font-mono text-[8px] text-slate-400">img_retorno_01_a9f8.jpg</span>
+                </div>
+                <div class="h-28 bg-slate-100 rounded-lg border-2 border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-500 text-[10px] p-2">
+                  <svg class="w-6 h-6 text-slate-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                  <span>Foto 2: Detalle Almohadillas / Hocico (OK)</span>
+                  <span class="font-mono text-[8px] text-slate-400">img_retorno_02_b3c2.jpg</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="text-right font-mono text-[10px] text-emerald-700 font-bold">
+              ✓ ACTA REGISTRADA · Animal.status = DISPONIBLE (Sincronizado)
+            </div>
+          </div>
+
+          <!-- Vista Template Handlebars -->
+          <div class="view-template hidden font-mono text-[11px] bg-slate-900 text-slate-100 p-6 rounded-xl overflow-x-auto custom-scrollbar">
+            <pre><code>&lt;!-- PLACEMENT RETURN (HANDLEBARS) --&gt;
+&lt;h3&gt;ACTA DE RETORNO No. {{placement_return.id}}&lt;/h3&gt;
+&lt;p&gt;Placement Asociado: {{placement.id}} | Fecha: {{placement_return.returned_at}}&lt;/p&gt;
+&lt;p&gt;Condición Física: {{placement_return.physical_condition_notes}}&lt;/p&gt;
+&lt;div&gt;Fotos Soportadas: {{placement_return.photo_evidence.length}} (Validación: &gt;= 2)&lt;/div&gt;
+&lt;div&gt;Incidente Reportado: {{placement_return.incident_reported}}&lt;/div&gt;
+&lt;p&gt;Verificado por: {{placement_return.verified_by_user_id}}&lt;/p&gt;</code></pre>
+          </div>
+
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- DOC 6: CERTIFICADO DE DONACIÓN CON EFECTOS TRIBUTARIOS (DIAN RTE) -->
+        <!-- ================================================================= -->
+        <div id="doc6-container" class="doc-panel hidden">
+          
+          <!-- Vista Renderizada -->
+          <div class="view-rendered font-serif text-xs text-slate-900 leading-relaxed space-y-6">
+            
+            <div class="text-center border-b-2 border-emerald-600 pb-4 font-sans">
+              <span class="text-[10px] uppercase tracking-widest font-bold text-emerald-800 bg-emerald-50 px-3 py-0.5 rounded border border-emerald-200">Régimen Tributario Especial DIAN · Art. 125-3 E.T.</span>
+              <h1 class="text-lg font-extrabold text-brand-navy uppercase mt-1.5">Certificado Oficial de Donación con Efectos Tributarios</h1>
+              <p class="text-xs text-slate-600 font-sans">Año Gravable: <span class="font-bold text-brand-navy font-mono">2026</span> · Certificado Consecutivo No. <span class="font-mono font-bold">CERT-2026-00452</span></p>
+            </div>
+
+            <p class="text-justify leading-relaxed">
+              <strong>FUNDACIÓN HACHIKOS PROTECCIÓN ANIMAL</strong>, entidad sin ánimo de lucro legalmente constituida, identificada con NIT <strong>901.452.128-4</strong>, con domicilio principal en Bogotá D.C., debidamente calificada y actualizada en el <strong>Régimen Tributario Especial (RTE)</strong> del impuesto sobre la renta mediante Resolución DIAN No. <strong>002145 de 2024</strong>, conforme al artículo 356-2 del Estatuto Tributario y el Decreto 1625 de 2016,
+            </p>
+
+            <div class="text-center font-sans font-extrabold text-sm text-brand-navy tracking-widest py-1">
+              CERTIFICA:
+            </div>
+
+            <p class="text-justify leading-relaxed">
+              Que <strong>ANDRÉS FELIPE GÁMEZ ARIAS</strong>, persona natural identificada con cédula de ciudadanía No. <strong>1.004.356.866</strong>, con domicilio en Bogotá D.C. y correo electrónico <span class="font-mono text-[11px]">andres.gamez@ejemplo.com</span>, efectuó a título de donación voluntaria en dinero a favor de esta entidad, durante el período fiscal correspondiente al año gravable <strong>2026</strong>, la suma acumulada de:
+            </p>
+
+            <!-- Monto Destacado -->
+            <div class="text-center font-sans font-bold text-base bg-slate-50 border border-slate-200 p-3 rounded-lg text-brand-navy shadow-inner">
+              $ 600.000 COP
+              <span class="block text-xs font-normal text-slate-600 mt-0.5 font-serif italic">(SEISCIENTOS MIL PESOS MONEDA CORRIENTE)</span>
+            </div>
+
+            <!-- Tabla de Trazabilidad Transaccional -->
+            <div class="font-sans text-[10px]">
+              <table class="w-full border border-slate-200 rounded overflow-hidden">
+                <thead class="bg-slate-100 text-slate-700">
+                  <tr>
+                    <th class="p-2 text-left">Fecha Transacción</th>
+                    <th class="p-2 text-left">Clase de Bien</th>
+                    <th class="p-2 text-left">Forma de Recaudo</th>
+                    <th class="p-2 text-left">Destinación Específica</th>
+                    <th class="p-2 text-right">Valor Aportado</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 text-slate-600">
+                  <tr>
+                    <td class="p-2">15-Feb-2026</td>
+                    <td class="p-2">Dineraria</td>
+                    <td class="p-2">Wompi / Contrato de Mandato</td>
+                    <td class="p-2">Campaña Esterilización Invierno</td>
+                    <td class="p-2 text-right font-mono font-semibold">$ 300.000 COP</td>
+                  </tr>
+                  <tr>
+                    <td class="p-2">12-Jun-2026</td>
+                    <td class="p-2">Dineraria</td>
+                    <td class="p-2">Wompi / Contrato de Mandato</td>
+                    <td class="p-2">Atención Urgencias Clínicas</td>
+                    <td class="p-2 text-right font-mono font-semibold">$ 300.000 COP</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Leyenda Informativa Tributaria Obligatoria -->
+            <div class="p-3 bg-amber-50/70 border border-amber-200 rounded text-[10px] font-sans text-slate-700 text-justify leading-relaxed">
+              <strong>Nota Informativa sobre Descuento Tributario (Art. 257 E.T.):</strong> Conforme al artículo 257 del Estatuto Tributario, la presente donación otorga derecho a un <strong>descuento tributario en el impuesto sobre la renta equivalente al veinticinco por ciento (25%)</strong> del valor donado en el año gravable de la erogación, sin exceder el límite establecido en el artículo 258 del mismo estatuto. Este documento no constituye liquidación definitiva de impuestos; cada contribuyente debe validar su aplicabilidad con su asesor tributario.
+            </div>
+
+            <!-- Bloque de Firma Calculada (Num. 2 Art. 1.2.1.4.3 Dcto 1625/2016) -->
+            <div class="pt-6 border-t border-slate-200 font-sans flex justify-between items-end text-[10px]">
+              <div>
+                <div class="text-slate-400">Expedición: Bogotá D.C., 15 de enero de 2027</div>
+                <div class="font-mono text-[9px] text-slate-400">Hash de Certificación: b19e8a27c0...3f4e</div>
+              </div>
+              <div class="text-right">
+                <div class="font-bold text-brand-navy">Claudia Rocío Vásquez Sánchez</div>
+                <div class="text-slate-600">Representante Legal · Calificación RTE Vigente</div>
+                <div class="text-slate-400 font-mono text-[9px]">Firmante Único Calculado: REPR_LEGAL_ESAL</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vista Template Handlebars -->
+          <div class="view-template hidden font-mono text-[11px] bg-slate-900 text-slate-100 p-6 rounded-xl overflow-x-auto custom-scrollbar">
+            <pre><code>&lt;!-- CERTIFICADO DE DONACIÓN RTE DIAN (HANDLEBARS) --&gt;
+&lt;div class="dian-certificate"&gt;
+  &lt;h2&gt;CERTIFICADO DE DONACIÓN No. {{certificado.consecutivo}}&lt;/h2&gt;
+  &lt;p&gt;ESAL: {{organizacion.razon_social}} (NIT: {{organizacion.nit}}) - RTE Vigente: {{organizacion.rte_vigente}}&lt;/p&gt;
+  &lt;p&gt;Donante: {{donante.nombre_o_razon_social}} (Doc: {{donante.documento}})&lt;/p&gt;
+  &lt;p&gt;Monto Total: ${{certificado.valor_en_numeros}} COP ({{certificado.valor_en_letras}})&lt;/p&gt;
+  
+  &lt;!-- Firmante Dinámico --&gt;
+  {{#if organizacion.requiere_revisor_fiscal}}
+    &lt;div&gt;Revisor Fiscal: {{certificado.firmante.nombre}} - TP: {{certificado.firmante.tarjeta_profesional}}&lt;/div&gt;
+  {{else if organizacion.has_contador_publico}}
+    &lt;div&gt;Contador: {{certificado.firmante.nombre}} - TP: {{certificado.firmante.tarjeta_profesional}}&lt;/div&gt;
+  {{else}}
+    &lt;div&gt;Rep. Legal: {{certificado.firmante.nombre}} - C.C. {{certificado.firmante.documento}}&lt;/div&gt;
+  {{/if}}
+&lt;/div&gt;</code></pre>
+          </div>
+
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- DOC 7: ACTA BILATERAL DE DONACIÓN EN ESPECIE -->
+        <!-- ================================================================= -->
+        <div id="doc7-container" class="doc-panel hidden">
+          
+          <!-- Vista Renderizada -->
+          <div class="view-rendered font-sans text-xs text-slate-900 space-y-4">
+            <div class="border-b pb-3 flex justify-between items-start">
+              <div>
+                <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded uppercase">Módulo M09 · Banco de Recursos Físicos</span>
+                <h2 class="text-base sm:text-lg font-extrabold text-brand-navy mt-1">Acta de Entrega y Cuantificación de Donación en Especie</h2>
+                <p class="text-[11px] text-slate-500">Valoración por Regla del Menor Valor (Concepto DIAN 730/2024: Costo Fiscal vs. Comercial).</p>
+              </div>
+              <span class="font-mono text-[11px] bg-slate-100 text-slate-700 px-2 py-1 rounded border font-semibold">ACTA-ESP-2026-018</span>
+            </div>
+
+            <p class="text-justify text-xs leading-relaxed">
+              En Bogotá D.C., comparecen <strong>ANDRÉS FELIPE GÁMEZ ARIAS</strong> (C.C. 1.004.356.866), denominado <strong>EL DONANTE</strong>, y la <strong>FUNDACIÓN HACHIKOS</strong> (NIT 901.452.128-4), representada por <strong>CLAUDIA ROCÍO VÁSQUEZ</strong>, formalizando la entrega real y material de los siguientes bienes de consumo veterinario:
+            </p>
+
+            <!-- Tabla de Inventario de Bienes -->
+            <table class="w-full border border-slate-200 text-xs rounded overflow-hidden">
+              <thead class="bg-slate-50 font-bold text-slate-700">
+                <tr>
+                  <th class="p-2 text-left">Ítem / Descripción</th>
+                  <th class="p-2 text-center">Cantidad</th>
+                  <th class="p-2 text-center">F. Vencimiento</th>
+                  <th class="p-2 text-right">Costo Fiscal Sop.</th>
+                  <th class="p-2 text-right">Valor Comercial</th>
+                  <th class="p-2 text-right">Valor Certificado</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr>
+                  <td class="p-2">Alimento Seco Canino Adulto (Bulto 25 Kg)</td>
+                  <td class="p-2 text-center font-mono">4 Unds</td>
+                  <td class="p-2 text-center font-mono">11-2027</td>
+                  <td class="p-2 text-right font-mono">$ 110.000</td>
+                  <td class="p-2 text-right font-mono">$ 125.000</td>
+                  <td class="p-2 text-right font-mono font-bold text-emerald-700">$ 110.000</td>
+                </tr>
+                <tr>
+                  <td class="p-2">Antiparasitario Simparica Trio 20-40 Kg</td>
+                  <td class="p-2 text-center font-mono">6 Cajas</td>
+                  <td class="p-2 text-center font-mono">08-2028</td>
+                  <td class="p-2 text-right font-mono">$ 85.000</td>
+                  <td class="p-2 text-right font-mono">$ 92.000</td>
+                  <td class="p-2 text-right font-mono font-bold text-emerald-700">$ 85.000</td>
+                </tr>
+              </tbody>
+              <tfoot class="bg-slate-50 font-bold border-t">
+                <tr>
+                  <td colspan="5" class="p-2 text-right">TOTAL VALOR CERTIFICADO (REGLA MENOR VALOR):</td>
+                  <td class="p-2 text-right font-mono text-emerald-800 text-sm">$ 950.000 COP</td>
+                </tr>
+              </tfoot>
+            </table>
+
+            <div class="p-2.5 bg-slate-50 border rounded text-[11px] text-slate-600 leading-relaxed">
+              <strong>Soporte Tributario Anexo:</strong> El valor certificado se tasó sobre el menor valor demostrado en Factura Electrónica de Venta No. <span class="font-mono font-bold text-slate-800">SETP-99214</span> aportada por el Donante. Ambas partes declaran la recepción de los bienes en perfecto estado de higiene y sellado hermético.
+            </div>
+
+            <!-- Firmas -->
+            <div class="grid grid-cols-2 gap-4 pt-3 border-t text-[10px]">
+              <div>
+                <div class="font-bold text-brand-navy">Por el Donante</div>
+                <div>Andrés Felipe Gámez Arias · C.C. 1.004.356.866</div>
+                <div class="font-mono text-[9px] text-slate-400">Timestamp: 2026-09-12T16:00:15Z</div>
+              </div>
+              <div class="text-right">
+                <div class="font-bold text-brand-navy">Por la Organización Receptora</div>
+                <div>Claudia Vásquez · Fundación Hachikos</div>
+                <div class="font-mono text-[9px] text-slate-400">Timestamp: 2026-09-12T16:04:22Z</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vista Template Handlebars -->
+          <div class="view-template hidden font-mono text-[11px] bg-slate-900 text-slate-100 p-6 rounded-xl overflow-x-auto custom-scrollbar">
+            <pre><code>&lt;!-- DONACIÓN EN ESPECIE (HANDLEBARS) --&gt;
+&lt;h3&gt;ACTA DE DONACIÓN EN ESPECIE No. {{resource_donation.id}}&lt;/h3&gt;
+&lt;p&gt;Donante: {{donante.nombre_o_razon_social}} | Receptor: {{organizacion.razon_social}}&lt;/p&gt;
+{{#each resource_donation.items}}
+  &lt;div&gt;{{this.descripcion}} - Cant: {{this.cantidad}} {{this.unidad}} - Certificado: ${{this.certified_value}}&lt;/div&gt;
+{{/each}}
+&lt;p&gt;Total Certificado: ${{resource_donation.total_certified_value}} COP&lt;/p&gt;
+&lt;p&gt;Regla: MIN(Costo Fiscal, Comercial) según Concepto DIAN 730/2024&lt;/p&gt;</code></pre>
+          </div>
+
+        </div>
+
+        <!-- ================================================================= -->
+        <!-- DOC 8: CONSTANCIA DE HORAS DE SERVICIO SOCIAL Y VOLUNTARIADO -->
+        <!-- ================================================================= -->
+        <div id="doc8-container" class="doc-panel hidden">
+          
+          <!-- Vista Renderizada -->
+          <div class="view-rendered font-serif text-xs text-slate-900 leading-relaxed space-y-5">
+            <div class="text-center border-b-2 border-purple-800 pb-4 font-sans">
+              <span class="text-[10px] uppercase tracking-widest font-bold text-purple-800 bg-purple-50 px-3 py-0.5 rounded border border-purple-200">Resolución 4210 de 1996 · Ministerio de Educación Nacional</span>
+              <h1 class="text-lg font-extrabold text-brand-navy uppercase mt-1.5">Constancia de Ejecución Material de Horas de Voluntariado</h1>
+              <p class="text-xs text-slate-500 font-sans">Soporte Operativo para Homologación de Servicio Social Estudiantil Obligatorio (Grados 10° y 11°)</p>
+            </div>
+
+            <p class="text-justify leading-relaxed">
+              La <strong>FUNDACIÓN HACHIKOS PROTECCIÓN ANIMAL</strong> (NIT 901.452.128-4), mediante la presente hace constar que el(la) estudiante <strong>VALENTINA GÁMEZ</strong>, identificado(a) con Tarjeta de Identidad No. <strong>1.083.455.120</strong>, quien actúa con la debida autorización de su acudiente <strong>Andrés Gámez</strong>, y cursa grado 10° en la institución educativa <strong>COLEGIO MAYOR DE COLOMBIA</strong> (Convenio Institucional Vigente No. <span class="font-mono font-semibold text-slate-800">CONV-EDU-2026-04</span>), ejecutó a satisfacción las siguientes actividades de apoyo comunitario:
+            </p>
+
+            <!-- Bitácora de Horas Verificadas -->
+            <div class="font-sans text-[11px]">
+              <table class="w-full border border-slate-200 rounded overflow-hidden">
+                <thead class="bg-slate-100 text-slate-700">
+                  <tr>
+                    <th class="p-2 text-left">Fecha</th>
+                    <th class="p-2 text-center">Horas</th>
+                    <th class="p-2 text-left">Actividad Comunitaria Realizada</th>
+                    <th class="p-2 text-left">Supervisor del Refugio</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 text-slate-600">
+                  <tr>
+                    <td class="p-2 font-mono">02-Ago-2026</td>
+                    <td class="p-2 text-center font-bold font-mono">20 h</td>
+                    <td class="p-2">Jornada de higiene, aseo y enriquecimiento ambiental en caniles</td>
+                    <td class="p-2">Claudia Vásquez</td>
+                  </tr>
+                  <tr>
+                    <td class="p-2 font-mono">09-Ago-2026</td>
+                    <td class="p-2 text-center font-bold font-mono">20 h</td>
+                    <td class="p-2">Apoyo logístico en feria barrial de adopción y pedagogía ciudadana</td>
+                    <td class="p-2">Nicolás Valenzuela</td>
+                  </tr>
+                  <tr>
+                    <td class="p-2 font-mono">16-Ago-2026</td>
+                    <td class="p-2 text-center font-bold font-mono">20 h</td>
+                    <td class="p-2">Organización de bodega y clasificación de donaciones de alimento</td>
+                    <td class="p-2">Brian Sánchez</td>
+                  </tr>
+                  <tr>
+                    <td class="p-2 font-mono">23-Ago-2026</td>
+                    <td class="p-2 text-center font-bold font-mono">20 h</td>
+                    <td class="p-2">Paseo guiado y cepillado de caninos geriátricos del refugio</td>
+                    <td class="p-2">Claudia Vásquez</td>
+                  </tr>
+                </tbody>
+                <tfoot class="bg-purple-50 font-bold text-purple-950 border-t border-purple-200">
+                  <tr>
+                    <td class="p-2 text-right">TOTAL HORAS EFECTIVAS CERTIFICADAS:</td>
+                    <td class="p-2 text-center font-mono text-sm font-extrabold text-purple-900">80 h</td>
+                    <td colspan="2" class="p-2 text-right text-[10px] uppercase font-mono">Intensidad Mínima Legal Res. 4210 Cumplida</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <!-- Declaración de Alcance No Homologatorio -->
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded font-sans text-[10px] text-slate-600 text-justify leading-relaxed">
+              <strong>LIMITACIÓN DE ALCANCE INSTITUCIONAL:</strong> La presente constancia certifica estrictamente la ejecución fáctica de las horas descritas en nuestras sedes. Conforme al artículo 6° de la Resolución 4210 de 1996 del Ministerio de Educación Nacional, la facultad de validar, homologar y expedir el Certificado de Cumplimiento del Servicio Social Estudiantil Obligatorio conducente al título de bachiller corresponde de forma exclusiva a la respectiva Institución Educativa.
+            </div>
+
+            <div class="pt-4 border-t border-slate-200 font-sans flex justify-between items-end text-[10px]">
+              <div>
+                <div class="text-slate-400">Bogotá D.C., 28 de agosto de 2026</div>
+                <div class="font-mono text-[9px] text-slate-400">Hash Bitácora: e8a12d...41b0</div>
+              </div>
+              <div class="text-right">
+                <div class="font-bold text-brand-navy">Claudia Rocío Vásquez Sánchez</div>
+                <div class="text-slate-600">Directora / Representante Legal · Fundación Hachikos</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vista Template Handlebars -->
+          <div class="view-template hidden font-mono text-[11px] bg-slate-900 text-slate-100 p-6 rounded-xl overflow-x-auto custom-scrollbar">
+            <pre><code>&lt;!-- SERVICIO SOCIAL ESTUDIANTIL (HANDLEBARS) --&gt;
+&lt;h2&gt;CONSTANCIA DE HORAS DE VOLUNTARIADO No. {{constancia.id}}&lt;/h2&gt;
+&lt;p&gt;Voluntario: {{voluntario.nombre}} (Doc: {{voluntario.documento}})&lt;/p&gt;
+{{#if voluntario.is_minor}}
+  &lt;p&gt;Acudiente Autorizante: {{voluntario.acudiente.nombre}} (Doc: {{voluntario.acudiente.documento}})&lt;/p&gt;
+{{/if}}
+&lt;p&gt;Colegio en Convenio: {{voluntario.colegio.nombre}} (Convenio: {{convenio.id}})&lt;/p&gt;
+
+&lt;!-- Detalle de Horas --&gt;
+{{#each voluntario.bitacora}}
+  &lt;div&gt;{{this.fecha}} - {{this.horas}} horas - {{this.actividad}} (Supervisor: {{this.supervisor}})&lt;/div&gt;
+{{/each}}
+&lt;p&gt;Total Horas Ejecutadas: {{voluntario.total_horas}} horas (Mínimo: 80h Res. 4210/1996)&lt;/p&gt;
+&lt;p&gt;Nota: La homologación formal compete exclusivamente a la Institución Educativa.&lt;/p&gt;</code></pre>
+          </div>
+
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- SCRIPT DE INTERACTIVIDAD (SWITCHING, TEMPLATES Y COPIADO) -->
+  <!-- ========================================================================= -->
+  <script>
+    // Estado global de la vista
+    let currentDocId = 'doc1';
+    let currentMode = 'rendered'; // 'rendered' | 'template'
+
+    // Cambiar de Documento
+    function switchDoc(docId) {
+      currentDocId = docId;
+
+      // Ocultar todos los paneles
+      document.querySelectorAll('.doc-panel').forEach(panel => {
+        panel.classList.add('hidden');
+      });
+
+      // Mostrar el panel seleccionado
+      const activePanel = document.getElementById(`${docId}-container`);
+      if (activePanel) {
+        activePanel.classList.remove('hidden');
+      }
+
+      // Actualizar estados visuales de los botones del Sidebar
+      document.querySelectorAll('.doc-btn').forEach(btn => {
+        if (btn.getAttribute('data-id') === docId) {
+          btn.className = "doc-btn w-full text-left p-2.5 rounded-lg text-xs transition border flex flex-col space-y-1 bg-brand-navy text-white border-brand-navy shadow-sm";
+          const numSpan = btn.querySelector('span > span');
+          if (numSpan) {
+            numSpan.className = "w-4 h-4 rounded bg-brand-teal text-white flex items-center justify-center text-[10px]";
+          }
+        } else {
+          btn.className = "doc-btn w-full text-left p-2.5 rounded-lg text-xs transition border flex flex-col space-y-1 text-slate-700 bg-white hover:bg-slate-50 border-slate-200";
+          const numSpan = btn.querySelector('span > span');
+          if (numSpan) {
+            numSpan.className = "w-4 h-4 rounded bg-slate-200 text-slate-700 flex items-center justify-center text-[10px]";
+          }
+        }
+      });
+
+      // Asegurar que el modo actual se refleje en el nuevo documento
+      applyViewMode();
+    }
+
+    // Cambiar entre Renderizado con Mock Data y Plantilla Cruda
+    function setViewMode(mode) {
+      currentMode = mode;
+      
+      const btnRender = document.getElementById('btnModeRender');
+      const btnTemplate = document.getElementById('btnModeTemplate');
+
+      if (mode === 'rendered') {
+        btnRender.className = "px-3 py-1.5 rounded-md font-medium transition flex items-center space-x-1.5 bg-brand-teal text-white shadow";
+        btnTemplate.className = "px-3 py-1.5 rounded-md font-medium transition text-slate-300 hover:text-white flex items-center space-x-1.5";
+      } else {
+        btnTemplate.className = "px-3 py-1.5 rounded-md font-medium transition flex items-center space-x-1.5 bg-brand-teal text-white shadow";
+        btnRender.className = "px-3 py-1.5 rounded-md font-medium transition text-slate-300 hover:text-white flex items-center space-x-1.5";
+      }
+
+      applyViewMode();
+    }
+
+    // Aplicar el modo de visualización en el documento activo
+    function applyViewMode() {
+      const activePanel = document.getElementById(`${currentDocId}-container`);
+      if (!activePanel) return;
+
+      const renderedView = activePanel.querySelector('.view-rendered');
+      const templateView = activePanel.querySelector('.view-template');
+
+      if (currentMode === 'rendered') {
+        if (renderedView) renderedView.classList.remove('hidden');
+        if (templateView) templateView.classList.add('hidden');
+      } else {
+        if (renderedView) renderedView.classList.add('hidden');
+        if (templateView) templateView.classList.remove('hidden');
+      }
+    }
+
+    // Copiar código del template actual
+    function copyCurrentTemplate() {
+      const activePanel = document.getElementById(`${currentDocId}-container`);
+      if (!activePanel) return;
+
+      const codeElement = activePanel.querySelector('.view-template pre code');
+      if (!codeElement) return;
+
+      const textToCopy = codeElement.innerText;
+      navigator.clipboard.writeText(textToCopy).then(() => {
+        const copyBtnText = document.getElementById('copyBtnText');
+        copyBtnText.innerText = '¡Copiado!';
+        setTimeout(() => {
+          copyBtnText.innerText = 'Copiar';
+        }, 2000);
+      });
+    }
+
+    // Inicializar en el primer documento
+    document.addEventListener('DOMContentLoaded', () => {
+      switchDoc('doc1');
+    });
+  </script>
+</body>
+</html>

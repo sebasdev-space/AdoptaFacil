@@ -36,10 +36,11 @@ model Animal {
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 
-  breed          AnimalBreed?      @relation(fields: [breedId], references: [id])
-  photos         AnimalPhoto[]
-  clinicalEvents ClinicalEvent[]
-  reminders      ClinicalReminder[]
+  breed              AnimalBreed?               @relation(fields: [breedId], references: [id])
+  photos             AnimalPhoto[]
+  clinicalEvents     ClinicalEvent[]
+  reminders          ClinicalReminder[]
+  behaviorDisclosures AnimalBehaviorDisclosure[]
 
   @@index([organizationId])
   @@index([organizationId, isActive])
@@ -167,4 +168,47 @@ model ClinicalReminder {
   @@index([organizationId, status])
   @@index([animalId])
   @@map("clinical_reminders")
+}
+
+/// Mandatory behavior disclosure for an animal — the "Safe Harbor" declaration
+/// (Art. 2353 inciso 2 C.C., FSD v3.5 Doc 4, S-9). A bounded, per-animal record
+/// of known temperament/health facts, e-signed by an org staff member (name
+/// typed at signature time, `signedByName` — may differ from the account's own
+/// display name, same "firma electrónica simple" convention the FSD uses
+/// throughout). Tenant-scoped (RLS ENABLE+FORCE+tenant_isolation) AND fully
+/// append-only (same pattern as `legal_representatives`/`clinical_events`):
+/// re-declaring never mutates a prior row — it inserts a new one; "vigente" is
+/// always the most recently `declaredAt` row for the animal, computed at read
+/// time. `signatureHash` is a SHA-256 seal over the canonical disclosure
+/// content, computed server-side at signature time (same technique as
+/// `adoption-contract-hash.ts` in M04, replicated here rather than imported —
+/// no cross-module dependency).
+///
+/// CROSS-MODULE (M04, Fabián): the Placement engine must find a CURRENT row
+/// here before generating a comodato contract for SALIDA_TEMPORAL/
+/// HOGAR_DE_PASO — see `animal_behavior_disclosure_current()` in this
+/// migration's SQL, the ONLY path across the module boundary.
+model AnimalBehaviorDisclosure {
+  id                        String   @id @default(uuid()) @db.Uuid
+  organizationId            String   @map("organization_id") @db.Uuid
+  animalId                  String   @map("animal_id") @db.Uuid
+  declaredByUserId          String   @map("declared_by_user_id") @db.Uuid
+  /// Full name typed at signature time (the FSD's e-signature captures the
+  /// name as entered at signing, not necessarily the account's display name).
+  signedByName              String   @map("signed_by_name")
+  reactivityNotes           String?  @map("reactivity_notes")
+  biteHistory               Boolean  @default(false) @map("bite_history")
+  biteHistoryDetail         String?  @map("bite_history_detail")
+  /// 'yes' | 'with_supervision' | 'not_recommended' (app-level enum, ChildrenCompatibility).
+  childrenCompatibility     String   @map("children_compatibility")
+  medicalConditionsRelevant String?  @map("medical_conditions_relevant")
+  signatureHash             String   @map("signature_hash")
+  declaredAt                DateTime @default(now()) @map("declared_at")
+
+  animal Animal @relation(fields: [animalId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([animalId])
+  @@index([animalId, declaredAt])
+  @@map("animal_behavior_disclosures")
 }
