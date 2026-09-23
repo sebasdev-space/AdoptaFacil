@@ -107,6 +107,17 @@ export function CameraIcon(props: IconProps) {
   );
 }
 
+/** Declaración de comportamiento (S-9, "Safe Harbor" Art. 2353 C.C.) — un
+ *  escudo simple, sin relación con ningún ícono de marca externo. */
+export function ShieldIcon(props: IconProps) {
+  return (
+    <svg {...base} {...props}>
+      <path d="M12 3 4.5 6v6c0 4.5 3 7.7 7.5 9 4.5-1.3 7.5-4.5 7.5-9V6L12 3Z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
 export function PawEmptyIcon(props: IconProps) {
   return (
     <svg {...base} {...props}>

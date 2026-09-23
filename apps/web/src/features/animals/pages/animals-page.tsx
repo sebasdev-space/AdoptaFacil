@@ -28,6 +28,7 @@ import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
 import { AnimalDetailPanel } from '../components/animal-detail-panel';
 import { AnimalFormModal } from '../components/animal-form-modal';
+import { AnimalBehaviorDisclosureModal } from '../components/animal-behavior-disclosure-modal';
 import { AnimalSponsorshipPlanModal } from '../components/animal-sponsorship-plan-modal';
 import { BulkImportDialog } from '../components/bulk-import-dialog';
 import { MissingSlugBanner } from '../components/missing-slug-banner';
@@ -113,6 +114,7 @@ export function AnimalsPage() {
   const [deleting, setDeleting] = useState(false);
   const [bulkImportOpen, setBulkImportOpen] = useState(false);
   const [sponsorshipTarget, setSponsorshipTarget] = useState<Animal | null>(null);
+  const [behaviorDisclosureTarget, setBehaviorDisclosureTarget] = useState<Animal | null>(null);
   // Problema real detectado (sin ningún aviso previo): un animal registrado
   // sin que la organización tenga `slug` configurado no aparece en el
   // catálogo público. `GET /org/profile` ya lo puede leer cualquier miembro
@@ -343,6 +345,7 @@ export function AnimalsPage() {
                   }}
                   onDelete={setDeleteTarget}
                   onSponsor={setSponsorshipTarget}
+                  onDeclareBehavior={setBehaviorDisclosureTarget}
                   onReactivate={(a) => void reactivate(a)}
                   onBack={() => setSelectedId(null)}
                 />
@@ -376,6 +379,15 @@ export function AnimalsPage() {
           onOpenChange={(next) => !next && setSponsorshipTarget(null)}
           animalId={sponsorshipTarget.id}
           animalName={sponsorshipTarget.name}
+        />
+      )}
+
+      {behaviorDisclosureTarget && (
+        <AnimalBehaviorDisclosureModal
+          open={behaviorDisclosureTarget !== null}
+          onOpenChange={(next) => !next && setBehaviorDisclosureTarget(null)}
+          animalId={behaviorDisclosureTarget.id}
+          animalName={behaviorDisclosureTarget.name}
         />
       )}
 

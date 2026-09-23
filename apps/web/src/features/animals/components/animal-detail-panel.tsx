@@ -12,7 +12,7 @@ import {
 import { AnimalCarnetSection } from './animal-carnet-section';
 import { AnimalRegistroClinicoSection } from './animal-registro-clinico-section';
 import { IconButton } from './icon-button';
-import { FolderIcon, HeartIcon, PawEmptyIcon, PencilIcon, TrashIcon } from './icons';
+import { FolderIcon, HeartIcon, PawEmptyIcon, PencilIcon, ShieldIcon, TrashIcon } from './icons';
 import styles from './animal-detail-panel.module.scss';
 
 const SEX_LABELS: Record<AnimalSex, string> = {
@@ -52,6 +52,7 @@ export interface AnimalDetailPanelProps {
   onEdit: (animal: Animal) => void;
   onDelete: (animal: Animal) => void;
   onSponsor: (animal: Animal) => void;
+  onDeclareBehavior: (animal: Animal) => void;
   onReactivate: (animal: Animal) => void;
   /** Solo se usa en móvil (`lg:hidden`) para volver a la lista. */
   onBack: () => void;
@@ -72,6 +73,7 @@ export function AnimalDetailPanel({
   onEdit,
   onDelete,
   onSponsor,
+  onDeclareBehavior,
   onReactivate,
   onBack,
 }: AnimalDetailPanelProps) {
@@ -139,6 +141,13 @@ export function AnimalDetailPanel({
               icon={<HeartIcon />}
               label="Apadrinamiento"
               onClick={() => onSponsor(animal)}
+            />
+          )}
+          {canManage && (
+            <IconButton
+              icon={<ShieldIcon />}
+              label="Declaración de comportamiento"
+              onClick={() => onDeclareBehavior(animal)}
             />
           )}
           {isInactive && canManage && (
