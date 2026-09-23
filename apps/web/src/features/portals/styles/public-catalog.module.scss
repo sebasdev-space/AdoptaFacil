@@ -33,6 +33,7 @@
   font-size: var(--fs-h2);
   font-weight: var(--fw-semibold);
   color: hsl(var(--foreground));
+  scroll-margin-top: 5rem;
 }
 
 .search {
@@ -102,28 +103,68 @@
   box-shadow: var(--shadow-xs);
 }
 
-.filters {
+.searchRow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.625rem;
+  padding: 0.75rem;
+  border-radius: var(--r-lg);
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border) / 0.4);
+  box-shadow: var(--shadow-xs);
 }
 
-.filterSelect {
-  min-width: 9rem;
+.filterField {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   height: 2.375rem;
-  padding: 0 0.625rem;
+  padding: 0 0.75rem;
   border-radius: var(--r-md);
   border: 1px solid hsl(var(--border) / 0.6);
-  background: hsl(var(--card));
-  color: hsl(var(--foreground));
-  font-size: var(--fs-sm);
+  background: hsl(var(--background));
+  color: hsl(var(--muted-foreground));
   cursor: pointer;
 }
 
-.filterSelect:focus-visible {
+.filterField:focus-within {
+  border-color: hsl(var(--primary) / 0.5);
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.35);
+}
+
+.filterField__select {
+  border: none;
+  background: transparent;
+  color: hsl(var(--foreground));
+  font-size: var(--fs-sm);
+  cursor: pointer;
   outline: none;
-  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.5);
+  max-width: 9rem;
+}
+
+.searchButton {
+  flex-shrink: 0;
+}
+
+.toolbarRow2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.sortField {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.sortField__label {
+  font-size: var(--fs-sm);
+  color: hsl(var(--muted-foreground));
+  white-space: nowrap;
 }
 
 .clearFilters {
@@ -170,6 +211,7 @@
 }
 
 .card {
+  position: relative;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -215,6 +257,32 @@
   width: 100%;
   height: 100%;
   color: hsl(var(--muted-foreground) / 0.6);
+}
+
+.card__favorite {
+  position: absolute;
+  top: 0.625rem;
+  right: 0.625rem;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2rem;
+  width: 2rem;
+  border-radius: var(--r-full);
+  background: hsl(var(--card) / 0.9);
+  color: hsl(var(--muted-foreground));
+  box-shadow: var(--shadow-xs);
+  transition: var(--transition-base);
+  transition-property: color, transform;
+}
+
+.card__favorite:hover {
+  transform: scale(1.08);
+}
+
+.card__favorite[aria-pressed='true'] {
+  color: hsl(var(--destructive));
 }
 
 .card__badgeNew {
@@ -326,6 +394,18 @@
 
 .loadMore {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
   padding-top: 0.5rem;
+}
+
+.loadMore__button {
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
+.loadMore__caption {
+  font-size: var(--fs-xs);
+  color: hsl(var(--muted-foreground));
 }

@@ -1,11 +1,11 @@
 .hero {
   position: relative;
-  height: 12rem;
+  height: 14rem;
   overflow: hidden;
-  background: var(--navy);
+  background: linear-gradient(135deg, hsl(var(--primary) / 0.18), hsl(var(--accent) / 0.35));
 
   @media (min-width: 640px) {
-    height: 15rem;
+    height: 20rem;
   }
 }
 
@@ -19,11 +19,11 @@
   position: absolute;
   right: -2.5rem;
   top: -2.5rem;
-  height: 16rem;
-  width: 16rem;
+  height: 18rem;
+  width: 18rem;
   border-radius: var(--r-full);
-  background: var(--brand);
-  opacity: 0.2;
+  background: hsl(var(--primary));
+  opacity: 0.25;
   filter: blur(64px);
 }
 
@@ -65,9 +65,13 @@
 
 .name {
   font-family: var(--font-display);
-  font-size: var(--fs-h2);
+  font-size: var(--fs-h1);
   font-weight: var(--fw-semibold);
   letter-spacing: -0.01em;
+
+  @media (min-width: 640px) {
+    font-size: var(--fs-display);
+  }
 }
 
 .meta {

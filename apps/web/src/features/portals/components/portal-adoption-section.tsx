@@ -9,9 +9,19 @@ import {
   type AnimalSummary,
   type OrganizationPublic,
 } from '@adoptafacil/contracts';
-import { EmptyState, Input, cn } from '@adoptafacil/ui';
+import { EmptyState, Input, buttonVariants, cn } from '@adoptafacil/ui';
 import { fetchPublicAnimals } from '../api/public-animals';
 import { AnimalCard } from './animal-card';
+import {
+  IconCalendar,
+  IconCat,
+  IconChevronDown,
+  IconDog,
+  IconGender,
+  IconPaw,
+  IconRuler,
+  IconSearch,
+} from './portal-icons';
 import {
   AGE_BUCKET_LABELS,
   CATALOG_SORT_LABELS,
@@ -153,103 +163,148 @@ export function PortalAdoptionSection({ slug, organization }: PortalAdoptionSect
       </div>
 
       <div className={cn(styles.toolbar, 'mb-5')}>
-        <div className={styles.search}>
-          <svg
-            aria-hidden
-            viewBox="0 0 24 24"
-            className={cn(styles.search__icon, 'h-4 w-4')}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <circle cx="11" cy="11" r="7" />
-            <path d="m21 21-4.3-4.3" strokeLinecap="round" />
-          </svg>
-          <Input
-            type="search"
-            className={styles.search__input}
-            placeholder="Buscar por nombre o raza…"
-            aria-label="Buscar por nombre o raza"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </div>
+        <div className={styles.searchRow}>
+          <div className={styles.search}>
+            <IconSearch aria-hidden className={cn(styles.search__icon, 'h-4 w-4')} />
+            <Input
+              type="search"
+              className={styles.search__input}
+              placeholder="Buscar por nombre, raza o característica…"
+              aria-label="Buscar por nombre o raza"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </div>
 
-        <div className={styles.pills} role="group" aria-label="Filtrar por especie">
-          {speciesFilters.map((f) => (
-            <button
-              key={f}
-              type="button"
-              className={cn(styles.pill, species === f && styles['pill--active'])}
-              aria-pressed={species === f}
-              onClick={() => setSpecies(f)}
+          <label className={styles.filterField}>
+            <IconPaw aria-hidden className="h-4 w-4" />
+            <select
+              className={styles.filterField__select}
+              aria-label="Filtrar por tipo de animal"
+              value={species}
+              onChange={(event) => setSpecies(event.target.value as Filter<AnimalSpecies>)}
             >
-              {f === 'all' ? 'Todas' : SPECIES_LABELS[f]}
-            </button>
-          ))}
+              <option value="all">Tipo: todos</option>
+              {ANIMAL_SPECIES.map((s) => (
+                <option key={s} value={s}>
+                  {SPECIES_LABELS[s]}
+                </option>
+              ))}
+            </select>
+            <IconChevronDown aria-hidden className="h-3.5 w-3.5" />
+          </label>
+
+          <label className={styles.filterField}>
+            <IconGender aria-hidden className="h-4 w-4" />
+            <select
+              className={styles.filterField__select}
+              aria-label="Filtrar por sexo"
+              value={sex}
+              onChange={(event) => setSex(event.target.value as Filter<AnimalSex>)}
+            >
+              <option value="all">Sexo: todos</option>
+              {ANIMAL_SEXES.map((s) => (
+                <option key={s} value={s}>
+                  {SEX_LABELS[s]}
+                </option>
+              ))}
+            </select>
+            <IconChevronDown aria-hidden className="h-3.5 w-3.5" />
+          </label>
+
+          <label className={styles.filterField}>
+            <IconCalendar aria-hidden className="h-4 w-4" />
+            <select
+              className={styles.filterField__select}
+              aria-label="Filtrar por edad"
+              value={age}
+              onChange={(event) => setAge(event.target.value as Filter<AgeBucket>)}
+            >
+              <option value="all">Edad: todas</option>
+              {(Object.keys(AGE_BUCKET_LABELS) as AgeBucket[]).map((bucket) => (
+                <option key={bucket} value={bucket}>
+                  {AGE_BUCKET_LABELS[bucket]}
+                </option>
+              ))}
+            </select>
+            <IconChevronDown aria-hidden className="h-3.5 w-3.5" />
+          </label>
+
+          <label className={styles.filterField}>
+            <IconRuler aria-hidden className="h-4 w-4" />
+            <select
+              className={styles.filterField__select}
+              aria-label="Filtrar por tamaño"
+              value={size}
+              onChange={(event) => setSize(event.target.value as Filter<AnimalSize>)}
+            >
+              <option value="all">Tamaño: todos</option>
+              {ANIMAL_SIZES.map((s) => (
+                <option key={s} value={s}>
+                  {SIZE_LABELS[s]}
+                </option>
+              ))}
+            </select>
+            <IconChevronDown aria-hidden className="h-3.5 w-3.5" />
+          </label>
+
+          <button
+            type="button"
+            className={cn(buttonVariants({ size: 'default' }), styles.searchButton)}
+            onClick={() =>
+              document.getElementById(HEADING_ID)?.scrollIntoView({ behavior: 'smooth' })
+            }
+          >
+            Buscar
+          </button>
         </div>
 
-        <div className={styles.filters}>
-          <select
-            className={styles.filterSelect}
-            aria-label="Filtrar por sexo"
-            value={sex}
-            onChange={(event) => setSex(event.target.value as Filter<AnimalSex>)}
-          >
-            <option value="all">Sexo: todos</option>
-            {ANIMAL_SEXES.map((s) => (
-              <option key={s} value={s}>
-                {SEX_LABELS[s]}
-              </option>
+        <div className={styles.toolbarRow2}>
+          <div className={styles.pills} role="group" aria-label="Filtrar por especie">
+            {speciesFilters.map((f) => (
+              <button
+                key={f}
+                type="button"
+                className={cn(styles.pill, species === f && styles['pill--active'])}
+                aria-pressed={species === f}
+                onClick={() => setSpecies(f)}
+              >
+                {f === 'all' ? (
+                  <IconPaw aria-hidden className="h-3.5 w-3.5" />
+                ) : f === 'dog' ? (
+                  <IconDog aria-hidden className="h-3.5 w-3.5" />
+                ) : f === 'cat' ? (
+                  <IconCat aria-hidden className="h-3.5 w-3.5" />
+                ) : (
+                  <IconPaw aria-hidden className="h-3.5 w-3.5" />
+                )}
+                {f === 'all' ? 'Todos' : SPECIES_LABELS[f]}
+              </button>
             ))}
-          </select>
+          </div>
 
-          <select
-            className={styles.filterSelect}
-            aria-label="Filtrar por tamaño"
-            value={size}
-            onChange={(event) => setSize(event.target.value as Filter<AnimalSize>)}
-          >
-            <option value="all">Tamaño: todos</option>
-            {ANIMAL_SIZES.map((s) => (
-              <option key={s} value={s}>
-                {SIZE_LABELS[s]}
-              </option>
-            ))}
-          </select>
-
-          <select
-            className={styles.filterSelect}
-            aria-label="Filtrar por edad"
-            value={age}
-            onChange={(event) => setAge(event.target.value as Filter<AgeBucket>)}
-          >
-            <option value="all">Edad: todas</option>
-            {(Object.keys(AGE_BUCKET_LABELS) as AgeBucket[]).map((bucket) => (
-              <option key={bucket} value={bucket}>
-                {AGE_BUCKET_LABELS[bucket]}
-              </option>
-            ))}
-          </select>
-
-          <select
-            className={styles.filterSelect}
-            aria-label="Ordenar por"
-            value={sort}
-            onChange={(event) => setSort(event.target.value as CatalogSort)}
-          >
-            {(Object.keys(CATALOG_SORT_LABELS) as CatalogSort[]).map((s) => (
-              <option key={s} value={s}>
-                {CATALOG_SORT_LABELS[s]}
-              </option>
-            ))}
-          </select>
-
-          {hasActiveFilters && (
-            <button type="button" className={styles.clearFilters} onClick={clearFilters}>
-              Limpiar filtros
-            </button>
-          )}
+          <div className={styles.sortField}>
+            {hasActiveFilters && (
+              <button type="button" className={styles.clearFilters} onClick={clearFilters}>
+                Limpiar filtros
+              </button>
+            )}
+            <label className={styles.sortField__label} htmlFor="portal-catalog-sort">
+              Ordenar por
+            </label>
+            <select
+              id="portal-catalog-sort"
+              className={styles.filterField__select}
+              value={sort}
+              onChange={(event) => setSort(event.target.value as CatalogSort)}
+            >
+              {(Object.keys(CATALOG_SORT_LABELS) as CatalogSort[]).map((s) => (
+                <option key={s} value={s}>
+                  {CATALOG_SORT_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -280,12 +335,16 @@ export function PortalAdoptionSection({ slug, organization }: PortalAdoptionSect
             <div className={styles.loadMore}>
               <button
                 type="button"
-                className={styles.pill}
+                className={cn(styles.pill, styles.loadMore__button)}
                 disabled={loadingMore}
                 onClick={() => void loadMore()}
               >
-                {loadingMore ? 'Cargando…' : 'Cargar más'}
+                {loadingMore ? 'Cargando…' : 'Cargar más animales'}
+                <IconChevronDown aria-hidden className="h-3.5 w-3.5" />
               </button>
+              <p className={styles.loadMore__caption}>
+                Mostrando {rawItems.length} de {rawTotal} animales
+              </p>
             </div>
           )}
         </div>

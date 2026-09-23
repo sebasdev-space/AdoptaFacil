@@ -333,7 +333,10 @@ describe('OrgPublicPage — rich public portal', () => {
     expect(screen.getByText('hola@patitas.org')).toBeInTheDocument();
     expect(screen.getByText('900123456-7')).toBeInTheDocument();
     expect(screen.getByText('Bogotá, Cundinamarca, Colombia')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Sitio web' })).toHaveAttribute(
+    // "Sitio web" also appears (icon-only) in the footer (T-D04) — scope to
+    // the sidebar, which still shows the full visible link.
+    const sidebar = within(screen.getByTestId('portal-side-panel'));
+    expect(sidebar.getByRole('link', { name: 'Sitio web' })).toHaveAttribute(
       'href',
       'https://patitas.org',
     );
@@ -430,28 +433,40 @@ describe('OrgPublicPage — rich public portal', () => {
     expect(screen.queryByRole('heading', { name: 'Mascotas en adopción' })).not.toBeInTheDocument();
   });
 
-  describe('S2-PORTAL: tabs + layout', () => {
-    it('always shows the "Portafolio" tab; hides "Nosotros"/"Información" while empty', async () => {
+  describe('S2-PORTAL: secciones ancladas (rediseño T-D04, sin tabs)', () => {
+    it('always shows "Mascotas en adopción"; hides "Nosotros"/"Información" while empty', async () => {
       renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
       await screen.findByRole('heading', { name: /Refugio Patitas/ });
 
-      expect(screen.getByRole('tab', { name: 'Portafolio' })).toBeInTheDocument();
-      expect(screen.queryByRole('tab', { name: 'Nosotros' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('tab', { name: 'Información' })).not.toBeInTheDocument();
-      // Contenido de siempre (catálogo + sidebar) sigue ahí, sin cambios.
+      // Ya no hay tabs (rediseño T-D04): las secciones son anclas reales,
+      // siempre visibles cuando tienen contenido — "Nosotros"/"Información"
+      // simplemente no se montan mientras estén vacías.
+      expect(screen.queryByRole('tab')).not.toBeInTheDocument();
       expect(screen.getByRole('heading', { name: 'Mascotas en adopción' })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: 'Nosotros' })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('heading', { name: 'Información de contacto' }),
+      ).not.toBeInTheDocument();
+      // Y el header nuevo trae solo las anclas con destino real.
+      const nav = within(screen.getByTestId('public-header'));
+      expect(nav.getByRole('link', { name: 'Animales' })).toHaveAttribute(
+        'href',
+        '#portal-section-pets',
+      );
+      expect(nav.queryByRole('link', { name: 'Nosotros' })).not.toBeInTheDocument();
+      expect(nav.queryByRole('link', { name: 'Contacto' })).not.toBeInTheDocument();
     });
 
-    it('shows "Nosotros" with the real content when aboutUs is set', async () => {
+    it('shows "Nosotros" with the real content, inline, when aboutUs is set', async () => {
       stubFetch({ org: { ...ORG, aboutUs: 'Somos un refugio con 10 años de historia.' } });
       renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
       await screen.findByRole('heading', { name: /Refugio Patitas/ });
 
-      const tab = screen.getByRole('tab', { name: 'Nosotros' });
-      await userEvent.click(tab);
       expect(
         await screen.findByText('Somos un refugio con 10 años de historia.'),
       ).toBeInTheDocument();
+      const nav = within(screen.getByTestId('public-header'));
+      expect(nav.getByRole('link', { name: 'Nosotros' })).toHaveAttribute('href', '#portal-about');
     });
 
     it('shows "Información" with hours/address/phones when extendedContact is set, and embeds an already-embeddable map URL', async () => {
@@ -469,7 +484,6 @@ describe('OrgPublicPage — rich public portal', () => {
       renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
       await screen.findByRole('heading', { name: /Refugio Patitas/ });
 
-      await userEvent.click(screen.getByRole('tab', { name: 'Información' }));
       expect(await screen.findByText('Lun-Vie 9am-5pm')).toBeInTheDocument();
       expect(screen.getByText('Calle 45 #12-34, Bogotá')).toBeInTheDocument();
       expect(screen.getByText('3001234567')).toBeInTheDocument();
@@ -486,7 +500,6 @@ describe('OrgPublicPage — rich public portal', () => {
       renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
       await screen.findByRole('heading', { name: /Refugio Patitas/ });
 
-      await userEvent.click(screen.getByRole('tab', { name: 'Información' }));
       expect(await screen.findByTitle('Ubicación en el mapa')).toHaveAttribute(
         'src',
         'https://maps.google.com/maps?q=Bogota&output=embed',
@@ -500,7 +513,6 @@ describe('OrgPublicPage — rich public portal', () => {
       renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
       await screen.findByRole('heading', { name: /Refugio Patitas/ });
 
-      await userEvent.click(screen.getByRole('tab', { name: 'Información' }));
       const link = await screen.findByRole('link', { name: /Ver en mapa/ });
       expect(link).toHaveAttribute('href', 'https://www.openstreetmap.org/way/123');
       expect(screen.queryByTitle('Ubicación en el mapa')).not.toBeInTheDocument();
@@ -519,8 +531,9 @@ describe('OrgPublicPage — rich public portal', () => {
       renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
       await screen.findByRole('heading', { name: /Refugio Patitas/ });
 
-      const sidebar = screen.getByRole('link', { name: 'Sitio web' }).closest('aside');
-      expect(sidebar?.className).toContain('lg:order-first');
+      const panel = screen.getByTestId('portal-side-panel');
+      expect(within(panel).getByRole('link', { name: 'Sitio web' })).toBeInTheDocument();
+      expect(panel.className).toContain('lg:order-first');
     });
   });
 
@@ -566,26 +579,17 @@ describe('OrgPublicPage — rich public portal', () => {
       const adoptar = within(actions).getByRole('button', { name: 'Adoptar' });
       const apadrinar = within(actions).getByRole('button', { name: 'Apadrinar' });
 
-      // Neither reimplements a new flow: both just land on the real catalog
-      // tab ("Portafolio"), where the existing per-animal actions live.
-      await userEvent.click(screen.getByRole('tab', { name: 'Nosotros' }));
-      expect(screen.getByRole('tab', { name: 'Portafolio' })).toHaveAttribute(
-        'data-state',
-        'inactive',
-      );
+      // Neither reimplements a new flow (rediseño T-D04, ya sin tabs): ambos
+      // solo desplazan a la sección real "Mascotas en adopción", donde viven
+      // los flujos por-animal de siempre.
+      const scrollSpy = vi.mocked(Element.prototype.scrollIntoView);
+      scrollSpy.mockClear();
 
       await userEvent.click(adoptar);
-      expect(screen.getByRole('tab', { name: 'Portafolio' })).toHaveAttribute(
-        'data-state',
-        'active',
-      );
+      expect(scrollSpy).toHaveBeenCalledTimes(1);
 
-      await userEvent.click(screen.getByRole('tab', { name: 'Nosotros' }));
       await userEvent.click(apadrinar);
-      expect(screen.getByRole('tab', { name: 'Portafolio' })).toHaveAttribute(
-        'data-state',
-        'active',
-      );
+      expect(scrollSpy).toHaveBeenCalledTimes(2);
     });
 
     it('2da iteración: "Campaña activa" y "Síguenos" viven juntas en UN panel lateral junto a las tabs (no sueltas arriba)', async () => {
@@ -637,15 +641,14 @@ describe('OrgPublicPage — rich public portal', () => {
 
       const panel = screen.getByTestId('portal-side-panel');
       const campaign = await screen.findByTestId('portal-campaigns-section');
-      const social = screen.getByRole('link', { name: 'Sitio web' });
+      const social = within(panel).getByRole('link', { name: 'Sitio web' });
 
       // Same lateral panel (aside), not two loose blocks in a horizontal strip.
       expect(panel).toContainElement(campaign);
       expect(panel).toContainElement(social);
-      // The panel is a sibling of the tabs column, not above/before it —
-      // it's a two-column layout (grid), not a stacked strip.
-      const tabsList = screen.getByRole('tablist');
-      expect(panel.parentElement).toBe(tabsList.closest('[class*="grid"]'));
+      // The panel is a sibling of the main content column, not above/before
+      // it — it's a two-column layout (grid), not a stacked strip.
+      expect(panel.parentElement).toBe(screen.getByTestId('portal-main-grid'));
     });
 
     it('shows "Transparencia — libro público" with a ComingSoon modal (no real ledger data)', async () => {

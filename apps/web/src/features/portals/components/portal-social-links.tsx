@@ -1,36 +1,31 @@
+import type { ComponentType } from 'react';
 import type { OrganizationPublic } from '@adoptafacil/contracts';
-import { Card, CardContent, CardHeader, CardTitle } from '@adoptafacil/ui';
+import { Card, CardContent, CardHeader, CardTitle, cn } from '@adoptafacil/ui';
+import {
+  IconArrowRight,
+  IconFacebook,
+  IconGlobe,
+  IconInstagram,
+  IconMail,
+  IconTikTok,
+  IconWhatsapp,
+  type IconProps,
+} from './portal-icons';
+import styles from '../styles/public-portal.module.scss';
 
 export interface PortalSocialLinksProps {
   organization: Pick<OrganizationPublic, 'socialLinks' | 'whatsapp' | 'contactEmail'>;
 }
 
-/** Ícono de enlace externo genérico (sin depender de una librería de marcas). */
-function LinkIcon() {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M10 14 21 3" />
-      <path d="M15 3h6v6" />
-      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-    </svg>
-  );
-}
-
-const SOCIAL_LABELS = {
-  instagram: 'Instagram',
-  facebook: 'Facebook',
-  tiktok: 'TikTok',
-  website: 'Sitio web',
-} as const;
+const SOCIAL_META: Record<
+  'instagram' | 'facebook' | 'tiktok' | 'website',
+  { label: string; Icon: ComponentType<IconProps> }
+> = {
+  instagram: { label: 'Instagram', Icon: IconInstagram },
+  facebook: { label: 'Facebook', Icon: IconFacebook },
+  tiktok: { label: 'TikTok', Icon: IconTikTok },
+  website: { label: 'Sitio web', Icon: IconGlobe },
+};
 
 /**
  * Sidebar del portal público (§M14, pulido visual T-D02): redes sociales + contacto.
@@ -40,7 +35,7 @@ const SOCIAL_LABELS = {
 export function PortalSocialLinks({ organization }: PortalSocialLinksProps) {
   const socialEntries = (['instagram', 'facebook', 'tiktok', 'website'] as const).flatMap((key) => {
     const url = organization.socialLinks?.[key];
-    return url ? [{ key, label: SOCIAL_LABELS[key], url }] : [];
+    return url ? [{ key, url, ...SOCIAL_META[key] }] : [];
   });
 
   const whatsappHref = organization.whatsapp
@@ -58,17 +53,15 @@ export function PortalSocialLinks({ organization }: PortalSocialLinksProps) {
         <CardTitle>Síguenos</CardTitle>
       </CardHeader>
       <CardContent>
-        <ul className="space-y-2.5">
-          {socialEntries.map(({ key, label, url }) => (
+        <ul className={styles.socialList}>
+          {socialEntries.map(({ key, label, url, Icon }) => (
             <li key={key}>
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-              >
-                <LinkIcon />
-                {label}
+              <a href={url} target="_blank" rel="noopener noreferrer" className={styles.socialRow}>
+                <span aria-hidden className={styles.socialRow__icon}>
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className={styles.socialRow__label}>{label}</span>
+                <IconArrowRight aria-hidden className={cn('h-4 w-4', styles.socialRow__arrow)} />
               </a>
             </li>
           ))}
@@ -78,21 +71,24 @@ export function PortalSocialLinks({ organization }: PortalSocialLinksProps) {
                 href={whatsappHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                className={styles.socialRow}
               >
-                <LinkIcon />
-                WhatsApp
+                <span aria-hidden className={styles.socialRow__icon}>
+                  <IconWhatsapp className="h-4 w-4" />
+                </span>
+                <span className={styles.socialRow__label}>WhatsApp</span>
+                <IconArrowRight aria-hidden className={cn('h-4 w-4', styles.socialRow__arrow)} />
               </a>
             </li>
           )}
           {organization.contactEmail && (
             <li>
-              <a
-                href={`mailto:${organization.contactEmail}`}
-                className="flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-              >
-                <LinkIcon />
-                {organization.contactEmail}
+              <a href={`mailto:${organization.contactEmail}`} className={styles.socialRow}>
+                <span aria-hidden className={styles.socialRow__icon}>
+                  <IconMail className="h-4 w-4" />
+                </span>
+                <span className={styles.socialRow__label}>{organization.contactEmail}</span>
+                <IconArrowRight aria-hidden className={cn('h-4 w-4', styles.socialRow__arrow)} />
               </a>
             </li>
           )}
