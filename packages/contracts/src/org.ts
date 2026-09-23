@@ -273,6 +273,17 @@ export interface VerificationLevel {
   /** Document types still required for the next tier (missing OR expired) — the
    *  reason the org is not yet at `nextLevel`. Empty at the top of the ladder. */
   blockedBy?: string[];
+  // --- S-10 enrichment (FSD v3.5 Sección A, additive) -------------------------
+  /**
+   * Progress toward `nextLevel`, 0-100, computed EXCLUSIVELY from the same
+   * approved/current-document (and formalization-floor, when the tier has
+   * one) requirements `blockedBy` is already derived from — never a separate,
+   * hand-tracked value. `100` when there is no `nextLevel` (topped out, or the
+   * ladder has no tiers at all — "nothing left to block you"). Optional only
+   * for backward compatibility with other `VerificationLevel` constructors;
+   * `computeVerificationLevel` always populates it.
+   */
+  percentComplete?: number;
 }
 
 /**

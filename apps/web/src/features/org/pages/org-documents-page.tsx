@@ -57,13 +57,39 @@ const STATUS_LABELS: Record<DocumentStatus, string> = {
   [DocumentStatus.Expired]: 'Vencido',
 };
 
+// FSD v3.5 Sección A.3: OBSERVADO comunica "corregible, casi listo" (amarillo)
+// — DISTINTO de RECHAZADO, "empieza de nuevo" (rojo). Compartir el mismo tono
+// pierde la señal de si hay que editar o reemplazar por completo.
 const STATUS_BADGE_VARIANT: Record<DocumentStatus, BadgeProps['variant']> = {
   [DocumentStatus.Pending]: 'warning',
   [DocumentStatus.UnderReview]: 'warning',
-  [DocumentStatus.Observed]: 'destructive',
+  [DocumentStatus.Observed]: 'warning',
   [DocumentStatus.Approved]: 'success',
   [DocumentStatus.Rejected]: 'destructive',
   [DocumentStatus.Expired]: 'destructive',
+};
+
+/** Prefijo del motivo por estado (FSD A.3) — el motivo siempre visible en el
+ *  cuerpo de la tarjeta, nunca oculto tras un clic. */
+const STATUS_NOTE_PREFIX: Partial<Record<DocumentStatus, string>> = {
+  [DocumentStatus.Observed]: 'Necesita corrección',
+  [DocumentStatus.Rejected]: 'Rechazado — no es válido para este requisito',
+};
+
+const STATUS_NOTE_CLASS: Partial<Record<DocumentStatus, string>> = {
+  [DocumentStatus.Observed]: 'doc-card__note--warning',
+};
+
+/** Acción disponible por estado (FSD A.3): "Subsanar" (corregir lo mismo) es
+ *  un verbo distinto de "Cargar documento nuevo" (empezar de cero) — la
+ *  organización necesita saber cuál de los dos está haciendo. */
+const UPDATE_BUTTON_LABEL: Record<DocumentStatus, string> = {
+  [DocumentStatus.Pending]: 'Actualizar',
+  [DocumentStatus.UnderReview]: 'Actualizar',
+  [DocumentStatus.Observed]: 'Subsanar',
+  [DocumentStatus.Approved]: 'Actualizar',
+  [DocumentStatus.Rejected]: 'Cargar documento nuevo',
+  [DocumentStatus.Expired]: 'Cargar documento nuevo',
 };
 
 /** Card border/background per status — dashed+muted for "sin subir" is handled
@@ -80,6 +106,14 @@ const STATUS_CARD_CLASSES: Record<DocumentStatus, string> = {
 /** Formatea un instante UTC en hora de Colombia para la UI. */
 function formatCO(iso?: string): string {
   return iso ? new Date(iso).toLocaleString('es-CO', { timeZone: 'America/Bogota' }) : '—';
+}
+
+/** The first REAL document type still blocking the next verification level —
+ *  `blockedBy` can also contain a `formalization:<state>` sentinel (a
+ *  non-document gate, see `verification.ts`), which this filters out. `undefined`
+ *  when nothing is blocking (topped out) or the only blocker is formalization. */
+function nextRequiredDocumentType(blockedBy: string[] | undefined): DocumentType | undefined {
+  return blockedBy?.find((t): t is DocumentType => t in TYPE_LABELS);
 }
 
 /** The current (highest-version) document per type, or `undefined` when a type
@@ -229,6 +263,8 @@ export function OrgDocumentsPage() {
   const byType = latestByType(documents);
   const showFriendlyVerificationHint =
     verification !== null && verification.level === 0 && documents.length === 0;
+  const nextDocType = verification ? nextRequiredDocumentType(verification.blockedBy) : undefined;
+  const remainingDocCount = verification?.blockedBy?.filter((t) => t in TYPE_LABELS).length ?? 0;
 
   return (
     <PageContainer>
@@ -247,11 +283,19 @@ export function OrgDocumentsPage() {
               <CardContent className="space-y-2">
                 {showFriendlyVerificationHint ? (
                   <p className={styles['verification-hint']}>
-                    Sube tus documentos para iniciar la verificación.
+                    Sube tus documentos para iniciar la verificación. 0% completado.
                   </p>
                 ) : (
                   <>
-                    <Badge>{verification.label ?? `Nivel ${verification.level}`}</Badge>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge>{verification.label ?? `Nivel ${verification.level}`}</Badge>
+                      {/* FSD v3.5 A.1: "% completado" — derivado EXCLUSIVAMENTE de
+                          documentos aprobados/vigentes por `computeVerificationLevel`,
+                          nunca escrito a mano en el frontend. */}
+                      <span className={styles['verification-hint']}>
+                        {verification.percentComplete ?? 0}% completado
+                      </span>
+                    </div>
                     {verification.blockedBy && verification.blockedBy.length > 0 && (
                       <p className={styles['verification-hint']}>
                         Para el nivel {verification.nextLevel} faltan (o están vencidos):{' '}
@@ -262,6 +306,29 @@ export function OrgDocumentsPage() {
                       </p>
                     )}
                   </>
+                )}
+
+                {/* FSD v3.5 A.2: CTA "Siguiente paso" — el título/copy sale de
+                    TYPE_LABELS (config de requisitos ya existente), nunca
+                    hardcodeado. Ausente cuando lo único bloqueando es un piso de
+                    formalización (sin documento concreto que subir aquí) o cuando
+                    no hay nada bloqueando. */}
+                {nextDocType && canManage && (
+                  <div className={styles['next-step']}>
+                    <div>
+                      <p className={styles['next-step__title']}>
+                        Siguiente paso: sube {TYPE_LABELS[nextDocType]}
+                      </p>
+                      <p className={styles['next-step__description']}>
+                        {remainingDocCount > 1
+                          ? `Te falta este documento (y ${remainingDocCount - 1} más) para el nivel ${verification.nextLevel}.`
+                          : `Te falta este documento para el nivel ${verification.nextLevel}.`}
+                      </p>
+                    </div>
+                    <Button size="sm" onClick={() => openUpload(nextDocType)}>
+                      Subir documento
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -298,7 +365,15 @@ export function OrgDocumentsPage() {
                           </p>
                         )}
                         {doc.reviewNote && (
-                          <p className={styles['doc-card__note']}>Motivo: {doc.reviewNote}</p>
+                          <p
+                            className={cn(
+                              styles['doc-card__note'],
+                              STATUS_NOTE_CLASS[doc.status] &&
+                                styles[STATUS_NOTE_CLASS[doc.status]!],
+                            )}
+                          >
+                            {STATUS_NOTE_PREFIX[doc.status] ?? 'Motivo'}: {doc.reviewNote}
+                          </p>
                         )}
                         <div className={styles['doc-card__actions']}>
                           <Button
@@ -311,7 +386,7 @@ export function OrgDocumentsPage() {
                           </Button>
                           {canManage && (
                             <Button size="sm" variant="outline" onClick={() => openUpload(type)}>
-                              Actualizar
+                              {UPDATE_BUTTON_LABEL[doc.status]}
                             </Button>
                           )}
                         </div>
