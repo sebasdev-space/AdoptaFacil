@@ -54,3 +54,23 @@ export function checkCertificateEligibility(
   }
   return { eligible: false, missingHours: Math.round((minHours - approvedHours) * 100) / 100 };
 }
+
+/**
+ * S-12 (FSD v3.5 Doc 8): a MINOR's student-service constancia must name a
+ * guardian who authorized the engagement — the client's own template shows
+ * "quien actúa con la debida autorización de su acudiente". Only applies when
+ * BOTH `appliesToStudentService` and `isMinor` are true; general volunteering
+ * or an adult's enrollment never needs this. The check is at ISSUANCE (not
+ * enrollment) — see `VolunteerEnrollment.guardianName`'s doc comment for why.
+ */
+export function missingGuardianInfo(
+  appliesToStudentService: boolean,
+  isMinor: boolean,
+  guardianName: string | null | undefined,
+  guardianDocument: string | null | undefined,
+): boolean {
+  if (!appliesToStudentService || !isMinor) {
+    return false;
+  }
+  return !guardianName?.trim() || !guardianDocument?.trim();
+}

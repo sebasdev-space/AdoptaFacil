@@ -1,5 +1,6 @@
 import {
   checkCertificateEligibility,
+  missingGuardianInfo,
   studentServiceMinHours,
   sumApprovedHours,
 } from './volunteer-certificate-eligibility';
@@ -75,5 +76,33 @@ describe('checkCertificateEligibility (RF19: "no se certifican horas parciales")
       eligible: false,
       missingHours: 0.67,
     });
+  });
+});
+
+describe('missingGuardianInfo (S-12, FSD v3.5 Doc 8)', () => {
+  it('is false for general volunteering, regardless of guardian fields', () => {
+    expect(missingGuardianInfo(false, true, null, null)).toBe(false);
+  });
+
+  it('is false for an adult (isMinor=false) student-service enrollment', () => {
+    expect(missingGuardianInfo(true, false, null, null)).toBe(false);
+  });
+
+  it('is true for a minor student-service enrollment with no guardian info', () => {
+    expect(missingGuardianInfo(true, true, null, null)).toBe(true);
+    expect(missingGuardianInfo(true, true, undefined, undefined)).toBe(true);
+  });
+
+  it('is true when only ONE of name/document is present', () => {
+    expect(missingGuardianInfo(true, true, 'Andrés Gámez', null)).toBe(true);
+    expect(missingGuardianInfo(true, true, null, '123456')).toBe(true);
+  });
+
+  it('is true for whitespace-only values', () => {
+    expect(missingGuardianInfo(true, true, '   ', '   ')).toBe(true);
+  });
+
+  it('is false once BOTH guardian name and document are present', () => {
+    expect(missingGuardianInfo(true, true, 'Andrés Gámez', '123456')).toBe(false);
   });
 });

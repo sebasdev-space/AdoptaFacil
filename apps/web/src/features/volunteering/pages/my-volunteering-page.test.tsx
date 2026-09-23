@@ -31,6 +31,13 @@ const PUBLIC_OPPORTUNITY = {
   appliesToStudentService: false,
 };
 
+const STUDENT_SERVICE_OPPORTUNITY = {
+  ...PUBLIC_OPPORTUNITY,
+  id: 'op-2',
+  title: 'Servicio social — bodega de donaciones',
+  appliesToStudentService: true,
+};
+
 const ACCEPTED_MINE = {
   id: 'en-1',
   organizationId: 'org-1',
@@ -96,6 +103,62 @@ describe('MyVolunteeringPage (RF18/RF19)', () => {
       );
       expect(post).toBeDefined();
       expect(JSON.parse(String(post?.init?.body))).toEqual({ opportunityId: 'op-1' });
+    });
+  });
+
+  it('S-12: a student-service opportunity opens the guardian/school modal instead of enrolling directly', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    stubFetch((url, init) => {
+      calls.push({ url, init });
+      if (init?.method === 'POST' && url.includes('/volunteer-enrollments')) {
+        return { ...ACCEPTED_MINE, id: 'en-2', status: 'pending' };
+      }
+      if (url.includes('/public/volunteer-opportunities')) {
+        return {
+          items: [STUDENT_SERVICE_OPPORTUNITY],
+          total: 1,
+          limit: 50,
+          offset: 0,
+        };
+      }
+      if (url.includes('/volunteer-enrollments/mine')) return [];
+      if (url.includes('/service-hours/mine')) return [];
+      if (url.includes('/volunteer-certificates/mine')) return [];
+      return {};
+    });
+    renderShell({ route: '/voluntariado', ...sessionWith([]) });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Inscribirme' }));
+
+    // The modal opens — no enrollment POST fired yet just from the click.
+    expect(
+      await screen.findByText(/Inscripción a "Servicio social — bodega de donaciones"/),
+    ).toBeInTheDocument();
+    expect(calls.some((c) => c.init?.method === 'POST')).toBe(false);
+
+    fireEvent.click(screen.getByLabelText('Soy menor de edad'));
+    fireEvent.change(screen.getByLabelText('Nombre completo del acudiente'), {
+      target: { value: 'Andrés Gámez' },
+    });
+    fireEvent.change(screen.getByLabelText('Documento del acudiente'), {
+      target: { value: '123456' },
+    });
+    fireEvent.change(screen.getByLabelText('Colegio (opcional)'), {
+      target: { value: 'Colegio Mayor de Colombia' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Inscribirme' }));
+
+    expect(await screen.findByText('Inscripción enviada')).toBeInTheDocument();
+    const post = calls.find(
+      (c) => c.init?.method === 'POST' && c.url.includes('/volunteer-enrollments'),
+    );
+    expect(post).toBeDefined();
+    expect(JSON.parse(String(post?.init?.body))).toEqual({
+      opportunityId: 'op-2',
+      isMinor: true,
+      guardianName: 'Andrés Gámez',
+      guardianDocument: '123456',
+      schoolName: 'Colegio Mayor de Colombia',
     });
   });
 

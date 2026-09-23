@@ -65,7 +65,7 @@ describe('VolunteerEnrollmentsService.enroll — profile-completion gate', () =>
   it('rejects with 422 INCOMPLETE_PROFILE BEFORE touching the enrollment DB write', async () => {
     const { service, queryRaw } = makeService({ phone: null, documentId: null, address: null });
 
-    const error = await service.enroll(ACTOR, 'opp-1').catch((e) => e);
+    const error = await service.enroll(ACTOR, { opportunityId: 'opp-1' }).catch((e) => e);
 
     expect(error).toBeInstanceOf(IncompleteProfileException);
     expect(error.getResponse()).toEqual({
@@ -82,7 +82,7 @@ describe('VolunteerEnrollmentsService.enroll — profile-completion gate', () =>
       address: 'Calle 1 #2-3',
     });
 
-    const enrollment = await service.enroll(ACTOR, 'opp-1');
+    const enrollment = await service.enroll(ACTOR, { opportunityId: 'opp-1' });
 
     expect(enrollment.id).toBe('enr-1');
     expect(queryRaw).toHaveBeenCalledTimes(1);

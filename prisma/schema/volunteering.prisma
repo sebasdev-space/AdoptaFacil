@@ -72,6 +72,15 @@ model VolunteerEnrollment {
   decidedByUserId         String?   @map("decided_by_user_id") @db.Uuid
   decidedAt               DateTime? @map("decided_at")
   createdAt               DateTime  @default(now()) @map("created_at")
+  /// S-12 (FSD v3.5 Doc 8) — declared by the volunteer at signup, only
+  /// meaningful when `appliesToStudentService`. NOT required at signup time
+  /// (a minor may enroll before supplying guardian info) — enforced instead
+  /// at certificate issuance, see `VolunteerCertificatesService.issue`.
+  isMinor                 Boolean   @default(false) @map("is_minor")
+  guardianName            String?   @map("guardian_name")
+  guardianDocument        String?   @map("guardian_document")
+  schoolName              String?   @map("school_name")
+  schoolAgreementCode     String?   @map("school_agreement_code")
 
   opportunity  VolunteerOpportunity  @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   serviceHours ServiceHours[]
@@ -137,6 +146,17 @@ model VolunteerCertificate {
   appliesToStudentService Boolean  @map("applies_to_student_service")
   issuedByUserId          String   @map("issued_by_user_id") @db.Uuid
   issuedAt                DateTime @default(now()) @map("issued_at")
+  /// S-12 (FSD v3.5 Doc 8) — snapshotted from the enrollment at issuance time,
+  /// same rationale as `volunteerName`/`organizationName` above. Present only
+  /// for a minor's student-service enrollment.
+  guardianName            String?  @map("guardian_name")
+  guardianDocument        String?  @map("guardian_document")
+  schoolName              String?  @map("school_name")
+  schoolAgreementCode     String?  @map("school_agreement_code")
+  /// Day-by-day log of every APPROVED `ServiceHours` session, derived (not
+  /// duplicated capture) and snapshotted at issuance — see
+  /// `VolunteerCertificateBitacoraEntry` in the contract.
+  bitacora                Json     @default("[]")
 
   enrollment VolunteerEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
 

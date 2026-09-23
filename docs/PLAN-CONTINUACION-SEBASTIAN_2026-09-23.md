@@ -149,7 +149,25 @@ Pasos:
 10. PR `feat(m01): wizard de formalización y porcentaje según FSD v3.5`.
 ```
 
-### S-11 · M01 — Campos de firmante dinámico para el certificado DIAN (dato que Fabián necesita de ti)
+### S-11 · M01 — Campos de firmante dinámico para el certificado DIAN — ✅ RESUELTO SIN CÓDIGO (23-sep)
+
+**Resultado de investigar el código real de Fabián antes de construir nada** (`donation-certificates.service.ts`,
+`certificate-document.tsx`, PR #155): su propio TODO dice textualmente que solo está esperando el
+**nombre** del representante legal — algo que S-1 (`GET /org/legal-representative`, PR #162) YA
+resuelve — no la lógica de "revisor fiscal / contador público" del Doc 6. Esa distinción viene de
+`docs/PlanDeAuditoria.html`, un documento que el propio archivo etiqueta como "Vista Previa (Mock
+Data)", sin regla de negocio confirmada por el cliente sobre cuándo una organización "requiere"
+un revisor fiscal (depende de tipo de sociedad/ingresos según la ley colombiana). Construir
+`requiere_revisor_fiscal`/`has_contador_publico` ahora sería inventar un requisito no confirmado,
+además de redundante (Fabián no está bloqueado por eso).
+
+**Decisión (con el usuario, 23-sep):** no se construye nada. Queda pendiente un mensaje para
+Fabián (a consolidar con los demás) avisándole que S-1 ya está listo para que muestre el nombre
+real del representante legal en el certificado. El tema revisor fiscal/contador queda registrado
+aquí como **pendiente de confirmación del cliente**, no como tarea de desarrollo.
+
+<details>
+<summary>Especificación original (no ejecutada)</summary>
 
 **Por qué:** el Doc 6 del cliente (certificado de donación, `docs/PlanDeAuditoria.html`) resuelve
 el firmante dinámicamente: revisor fiscal si la organización lo requiere, si no un contador
@@ -179,6 +197,8 @@ Pasos:
 6. PR `feat(m01): campos de firmante dinámico para certificado DIAN (FSD Doc 6)`.
 7. Avísale a @fabian que ya está publicado.
 ```
+
+</details>
 
 ---
 
@@ -264,11 +284,11 @@ redacte texto legal definitivo basado en una referencia incompleta.
 
 ## Resumen de afectaciones cruzadas a vigilar
 
-| Actividad                      | Necesitas de Fabián                                                                                  | Él necesita de ti                                                                                          |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| S-9 (AnimalBehaviorDisclosure) | —                                                                                                    | El contrato/endpoint de solo lectura, **antes** de que él construya el Placement engine (comodato/retorno) |
-| S-11 (firmante DIAN)           | Confirmar cómo resuelve hoy el firmante en su certificado (M05) — puede volver innecesario este ítem | Los campos nuevos de Organization/LegalRepresentative, si los sigue necesitando                            |
-| Onboarding financiero (A.4)    | Definir juntos quién publica `OrganizationPayoutAccount` y dónde vive el modal                       | —                                                                                                          |
-| S-10, S-12                     | Ninguna                                                                                              | Ninguna                                                                                                    |
+| Actividad                      | Necesitas de Fabián                                                            | Él necesita de ti                                                                                          |
+| ------------------------------ | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- |
+| S-9 (AnimalBehaviorDisclosure) | —                                                                              | El contrato/endpoint de solo lectura, **antes** de que él construya el Placement engine (comodato/retorno) |
+| S-11 (firmante DIAN)           | ✅ Resuelto por investigación de código (23-sep) — no era necesario            | Avisarle que S-1 (`GET /org/legal-representative`) ya está listo para el nombre del representante legal    |
+| Onboarding financiero (A.4)    | Definir juntos quién publica `OrganizationPayoutAccount` y dónde vive el modal | —                                                                                                          |
+| S-10, S-12                     | Ninguna                                                                        | Ninguna                                                                                                    |
 
 Todo lo demás: trabaja directo, sin pedir permiso.
