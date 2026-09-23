@@ -8,7 +8,11 @@ import {
 } from '@nestjs/common';
 import { Prisma, type VolunteerCertificate as CertificateRow } from '@prisma/client';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-import type { Paginated, VolunteerCertificate } from '@adoptafacil/contracts';
+import type {
+  Paginated,
+  VolunteerCertificate,
+  VolunteerCertificateBitacoraEntry,
+} from '@adoptafacil/contracts';
 import { AuditService } from '../../core/audit/audit.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../core/tenant/tenant-context.service';
@@ -19,6 +23,7 @@ import {
 } from '../../core/notifications/notification.port';
 import {
   checkCertificateEligibility,
+  missingGuardianInfo,
   studentServiceMinHours,
   sumApprovedHours,
 } from './volunteer-certificate-eligibility';
@@ -43,6 +48,11 @@ function toCertificate(row: CertificateRow): VolunteerCertificate {
     appliesToStudentService: row.appliesToStudentService,
     issuedByUserId: row.issuedByUserId,
     issuedAt: row.issuedAt.toISOString(),
+    guardianName: row.guardianName ?? undefined,
+    guardianDocument: row.guardianDocument ?? undefined,
+    schoolName: row.schoolName ?? undefined,
+    schoolAgreementCode: row.schoolAgreementCode ?? undefined,
+    bitacora: (row.bitacora as unknown as VolunteerCertificateBitacoraEntry[]) ?? [],
   };
 }
 
@@ -61,10 +71,22 @@ interface CertificateMineRow {
   appliesToStudentService: boolean;
   issuedByUserId: string;
   issuedAt: string;
+  guardianName: string | null;
+  guardianDocument: string | null;
+  schoolName: string | null;
+  schoolAgreementCode: string | null;
+  bitacora: VolunteerCertificateBitacoraEntry[];
 }
 
 function fromMineRow(row: CertificateMineRow): VolunteerCertificate {
-  return { ...row };
+  return {
+    ...row,
+    guardianName: row.guardianName ?? undefined,
+    guardianDocument: row.guardianDocument ?? undefined,
+    schoolName: row.schoolName ?? undefined,
+    schoolAgreementCode: row.schoolAgreementCode ?? undefined,
+    bitacora: row.bitacora ?? [],
+  };
 }
 
 /** Raw snake_case row from `volunteer_certificate_for_viewer(...)` — a plain
@@ -85,6 +107,11 @@ interface CertificateViewerRow {
   applies_to_student_service: boolean;
   issued_by_user_id: string;
   issued_at: Date;
+  guardian_name: string | null;
+  guardian_document: string | null;
+  school_name: string | null;
+  school_agreement_code: string | null;
+  bitacora: VolunteerCertificateBitacoraEntry[];
 }
 
 function fromViewerRow(row: CertificateViewerRow): VolunteerCertificate {
@@ -102,6 +129,11 @@ function fromViewerRow(row: CertificateViewerRow): VolunteerCertificate {
     appliesToStudentService: row.applies_to_student_service,
     issuedByUserId: row.issued_by_user_id,
     issuedAt: row.issued_at.toISOString(),
+    guardianName: row.guardian_name ?? undefined,
+    guardianDocument: row.guardian_document ?? undefined,
+    schoolName: row.school_name ?? undefined,
+    schoolAgreementCode: row.school_agreement_code ?? undefined,
+    bitacora: row.bitacora ?? [],
   };
 }
 
@@ -163,7 +195,7 @@ export class VolunteerCertificatesService {
 
       const hoursEntries = await tx.serviceHours.findMany({
         where: { enrollmentId },
-        select: { status: true, hours: true },
+        orderBy: { date: 'asc' },
       });
       const totalApprovedHours = sumApprovedHours(hoursEntries);
       const minHours = studentServiceMinHours();
@@ -178,6 +210,23 @@ export class VolunteerCertificatesService {
             `para alcanzar el mínimo de ${minHours} horas del servicio social estudiantil (Resolución 4210/1996, art. 6°).`,
         );
       }
+      // S-12 (FSD v3.5 Doc 8): a minor's student-service certificate names the
+      // guardian who authorized it. Enforced HERE (issuance), not at signup —
+      // an org can request the missing guardian info from the volunteer and
+      // simply hold off on issuing until it's on the enrollment.
+      if (
+        missingGuardianInfo(
+          enrollment.appliesToStudentService,
+          enrollment.isMinor,
+          enrollment.guardianName,
+          enrollment.guardianDocument,
+        )
+      ) {
+        throw new BadRequestException(
+          'No se puede emitir el certificado: falta el nombre y documento del acudiente ' +
+            'para esta inscripción de servicio social de un menor de edad.',
+        );
+      }
 
       const opportunity = await tx.volunteerOpportunity.findUniqueOrThrow({
         where: { id: enrollment.opportunityId },
@@ -185,6 +234,35 @@ export class VolunteerCertificatesService {
       const organization = await tx.organization.findUniqueOrThrow({
         where: { id: organizationId },
       });
+
+      // Bitácora (FSD Doc 8): derived from the enrollment's OWN approved
+      // sessions — never a separate capture. Supervisor name is a live join
+      // against `users` (org staff, same tenant as this tx, unlike the
+      // cross-tenant volunteer) — best-effort, absent if a lookup ever fails.
+      const approvedHoursEntries = hoursEntries.filter((entry) => entry.status === 'approved');
+      const supervisorIds = [
+        ...new Set(
+          approvedHoursEntries
+            .map((entry) => entry.decidedByUserId)
+            .filter((id): id is string => id !== null),
+        ),
+      ];
+      const supervisors =
+        supervisorIds.length > 0
+          ? await tx.user.findMany({
+              where: { id: { in: supervisorIds } },
+              select: { id: true, displayName: true },
+            })
+          : [];
+      const supervisorNameById = new Map(supervisors.map((s) => [s.id, s.displayName]));
+      const bitacora: VolunteerCertificateBitacoraEntry[] = approvedHoursEntries.map((entry) => ({
+        date: entry.date.toISOString(),
+        hours: entry.hours,
+        description: entry.description,
+        supervisorName: entry.decidedByUserId
+          ? supervisorNameById.get(entry.decidedByUserId)
+          : undefined,
+      }));
 
       const row = await tx.volunteerCertificate.create({
         data: {
@@ -199,6 +277,11 @@ export class VolunteerCertificatesService {
           periodEnd: opportunity.endDate,
           appliesToStudentService: enrollment.appliesToStudentService,
           issuedByUserId: actorUserId,
+          guardianName: enrollment.guardianName,
+          guardianDocument: enrollment.guardianDocument,
+          schoolName: enrollment.schoolName,
+          schoolAgreementCode: enrollment.schoolAgreementCode,
+          bitacora: bitacora as unknown as Prisma.InputJsonValue,
         },
       });
       await this.audit.recordWithTx(tx, {
@@ -307,6 +390,15 @@ export class VolunteerCertificatesService {
     drawLine('Certificado de voluntariado', { size: 18, useBold: true });
     y -= 10;
     drawLine(`Se certifica que ${row.volunteerName}`, { size: 12 });
+    if (row.guardianName) {
+      // S-12 (FSD v3.5 Doc 8): "quien actúa con la debida autorización de su
+      // acudiente" — only present for a minor's student-service certificate.
+      drawLine(
+        `quien actúa con la debida autorización de su acudiente ${row.guardianName}` +
+          (row.guardianDocument ? ` (Doc. ${row.guardianDocument}),` : ','),
+        { size: 10 },
+      );
+    }
     drawLine(`participó en "${row.opportunityTitle}"`, { size: 12 });
     drawLine(`del ${formatCO(row.periodStart)} al ${formatCO(row.periodEnd)},`, { size: 12 });
     drawLine(`completando ${row.totalApprovedHours} horas efectivas.`, { size: 12, useBold: true });
@@ -315,9 +407,31 @@ export class VolunteerCertificatesService {
       drawLine('Válido para servicio social estudiantil (Resolución 4210/1996, art. 6°).', {
         size: 10,
       });
+      if (row.schoolName) {
+        drawLine(
+          `Institución educativa: ${row.schoolName}` +
+            (row.schoolAgreementCode ? ` (Convenio ${row.schoolAgreementCode})` : ''),
+          { size: 10 },
+        );
+      }
     }
     y -= 20;
     drawLine(`Emitido el ${formatCO(row.issuedAt)}.`, { size: 10 });
+
+    if (row.bitacora.length > 0) {
+      y -= 20;
+      drawLine('Bitácora de horas certificadas:', { size: 11, useBold: true });
+      // No pagination (matches this generator's existing simplicity — same
+      // as the rest of the layout above); a very long bitácora will simply
+      // run off the single A4 page, same limitation the rest of this PDF
+      // already has.
+      for (const entry of row.bitacora) {
+        const supervisor = entry.supervisorName ? ` · Supervisor: ${entry.supervisorName}` : '';
+        drawLine(`${formatCO(entry.date)} — ${entry.hours}h — ${entry.description}${supervisor}`, {
+          size: 9,
+        });
+      }
+    }
 
     const bytes = await pdf.save();
     return Buffer.from(bytes);

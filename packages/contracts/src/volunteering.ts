@@ -135,6 +135,22 @@ export interface VolunteerEnrollment {
   decidedAt?: string;
   /** ISO-8601 UTC. */
   createdAt: string;
+
+  // --- S-12 enrichment (FSD v3.5 Doc 8, additive) -----------------------------
+  // Only meaningful when `appliesToStudentService` is true — captured at
+  // enrollment (the volunteer's own identity context), not required upfront
+  // (a minor may enroll before supplying guardian info); ISSUING a certificate
+  // for a minor's student-service enrollment without guardian info is what
+  // actually blocks (see VolunteerCertificatesService.issue).
+  /** Declared by the volunteer at signup. */
+  isMinor?: boolean;
+  /** Required (enforced at certificate issuance, not at signup) when `isMinor`. */
+  guardianName?: string;
+  guardianDocument?: string;
+  /** School the student attends, for the constancia (Doc 8). */
+  schoolName?: string;
+  /** Institutional agreement/convenio code with the school, if any. */
+  schoolAgreementCode?: string;
 }
 
 /** "Mis inscripciones" projection (cross-tenant, by identity) — enriched with
@@ -145,9 +161,17 @@ export interface VolunteerEnrollmentMine extends VolunteerEnrollment {
   opportunityTitle: string;
 }
 
-/** Enroll in an opportunity — any authenticated Person. */
+/** Enroll in an opportunity — any authenticated Person. The guardian/school
+ *  fields only make sense when the opportunity `appliesToStudentService`; the
+ *  frontend only asks for them in that case, but nothing here REQUIRES them —
+ *  see {@link VolunteerEnrollment}'s enrichment doc comment for why. */
 export interface CreateVolunteerEnrollmentInput {
   opportunityId: string;
+  isMinor?: boolean;
+  guardianName?: string;
+  guardianDocument?: string;
+  schoolName?: string;
+  schoolAgreementCode?: string;
 }
 
 /** Owner/Administrator decision on a pending enrollment. `reason` is REQUIRED
@@ -222,6 +246,23 @@ export interface DecideServiceHoursInput {
  */
 export const DEFAULT_STUDENT_SERVICE_MIN_HOURS = 80;
 
+/**
+ * One day's session in the certificate's bitácora (FSD v3.5 Doc 8) — SNAPSHOTTED
+ * at issuance from the enrollment's APPROVED `ServiceHours` rows (never a
+ * separate capture: the task explicitly prefers deriving from data that
+ * already exists over duplicating entry). `supervisorName` is resolved
+ * server-side from the approving staff member's `decidedByUserId`; absent if
+ * that lookup fails for any reason (never blocks issuance over a display detail).
+ */
+export interface VolunteerCertificateBitacoraEntry {
+  /** ISO-8601 UTC. */
+  date: string;
+  hours: number;
+  /** The session's own `ServiceHours.description`, doubling as "actividad". */
+  description: string;
+  supervisorName?: string;
+}
+
 export interface VolunteerCertificate {
   id: string;
   organizationId: string;
@@ -241,4 +282,18 @@ export interface VolunteerCertificate {
   issuedByUserId: string;
   /** ISO-8601 UTC. */
   issuedAt: string;
+
+  // --- S-12 enrichment (FSD v3.5 Doc 8, additive) -----------------------------
+  /** Snapshotted from the enrollment at issuance time — see
+   *  {@link VolunteerEnrollment.guardianName}. Present only when the
+   *  enrollment was a minor's student-service engagement. */
+  guardianName?: string;
+  guardianDocument?: string;
+  schoolName?: string;
+  schoolAgreementCode?: string;
+  /** Day-by-day log of every APPROVED session, oldest first — see
+   *  {@link VolunteerCertificateBitacoraEntry}. Empty array (never absent) when
+   *  there are no approved sessions, though issuance itself already requires
+   *  approved hours to exist. */
+  bitacora: VolunteerCertificateBitacoraEntry[];
 }

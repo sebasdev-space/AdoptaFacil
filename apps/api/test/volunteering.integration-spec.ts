@@ -79,11 +79,11 @@ describe('Volunteering (M08, RF18/RF19)', () => {
       appliesToStudentService,
     });
 
-  const enroll = (token: string, opportunityId: string) =>
+  const enroll = (token: string, opportunityId: string, extra: Record<string, unknown> = {}) =>
     request(server)
       .post('/volunteer-enrollments')
       .set('Authorization', `Bearer ${token}`)
-      .send({ opportunityId });
+      .send({ opportunityId, ...extra });
 
   const decideEnrollment = (token: string, id: string, body: Record<string, unknown>) =>
     request(server)
@@ -308,6 +308,106 @@ describe('Volunteering (M08, RF18/RF19)', () => {
     expect(mineHours.body.filter((h: { status: string }) => h.status === 'rejected')).toHaveLength(
       1,
     );
+  });
+
+  it('S-12: a minor student-service enrollment without guardian info blocks issuance, even at the hour minimum', async () => {
+    const opportunity = await publishOpportunity(org.token, true).expect(201);
+    const enrolled = await enroll(volunteer.token, opportunity.body.id, { isMinor: true }).expect(
+      201,
+    );
+    expect(enrolled.body.isMinor).toBe(true);
+    expect(enrolled.body.guardianName).toBeUndefined();
+    const enrollmentId = enrolled.body.id;
+    await decideEnrollment(org.token, enrollmentId, { decision: 'accept' }).expect(200);
+
+    for (const date of [
+      '2026-09-10T00:00:00.000Z',
+      '2026-09-11T00:00:00.000Z',
+      '2026-09-12T00:00:00.000Z',
+      '2026-09-13T00:00:00.000Z',
+    ]) {
+      const logged = await logHours(volunteer.token, {
+        enrollmentId,
+        date,
+        hours: 20,
+        description: 'Jornada de apoyo',
+      }).expect(201);
+      await decideHours(org.token, logged.body.id, { decision: 'approve' }).expect(200);
+    }
+
+    // 80 approved hours — the RF19 minimum is met, but issuance is STILL
+    // blocked because this is a minor's student-service enrollment with no
+    // guardian on file (S-12, FSD v3.5 Doc 8).
+    const blocked = await issueCertificate(org.token, enrollmentId).expect(400);
+    expect(blocked.body.message).toMatch(/acudiente/i);
+  });
+
+  it('S-12: a minor student-service enrollment WITH guardian + school issues a certificate with a derived bitácora', async () => {
+    const opportunity = await publishOpportunity(org.token, true).expect(201);
+    const enrolled = await enroll(volunteer.token, opportunity.body.id, {
+      isMinor: true,
+      guardianName: 'Andrés Gámez',
+      guardianDocument: '1.004.356.866',
+      schoolName: 'Colegio Mayor de Colombia',
+      schoolAgreementCode: 'CONV-EDU-2026-04',
+    }).expect(201);
+    const enrollmentId = enrolled.body.id;
+    await decideEnrollment(org.token, enrollmentId, { decision: 'accept' }).expect(200);
+
+    const sessions = [
+      { date: '2026-09-12T00:00:00.000Z', hours: 20, description: 'Jornada de higiene' },
+      { date: '2026-09-13T00:00:00.000Z', hours: 20, description: 'Apoyo logístico' },
+      { date: '2026-09-14T00:00:00.000Z', hours: 20, description: 'Feria de adopción' },
+      { date: '2026-09-15T00:00:00.000Z', hours: 20, description: 'Bodega de donaciones' },
+    ];
+    for (const session of sessions) {
+      const logged = await logHours(volunteer.token, { enrollmentId, ...session }).expect(201);
+      await decideHours(org.token, logged.body.id, { decision: 'approve' }).expect(200);
+    }
+
+    const issued = await issueCertificate(org.token, enrollmentId).expect(201);
+    expect(issued.body.totalApprovedHours).toBe(80);
+    expect(issued.body.guardianName).toBe('Andrés Gámez');
+    expect(issued.body.guardianDocument).toBe('1.004.356.866');
+    expect(issued.body.schoolName).toBe('Colegio Mayor de Colombia');
+    expect(issued.body.schoolAgreementCode).toBe('CONV-EDU-2026-04');
+
+    // Bitácora derived from the SAME approved sessions — never a separate
+    // capture — oldest first, with the approving org member as supervisor.
+    expect(issued.body.bitacora).toHaveLength(4);
+    expect(issued.body.bitacora[0]).toMatchObject({
+      hours: 20,
+      description: 'Jornada de higiene',
+      supervisorName: 'Owner',
+    });
+    expect(issued.body.bitacora[3]).toMatchObject({
+      hours: 20,
+      description: 'Bodega de donaciones',
+      supervisorName: 'Owner',
+    });
+
+    // The PDF renders without error and reflects the bitácora + guardian info.
+    const pdf = await request(server)
+      .get(`/volunteer-certificates/${issued.body.id}/pdf`)
+      .set('Authorization', `Bearer ${volunteer.token}`)
+      .buffer()
+      .parse(binaryParser)
+      .expect(200);
+    expect((pdf.body as Buffer).subarray(0, 5).toString('utf8')).toBe('%PDF-');
+  });
+
+  it('S-12: general volunteering (not student-service) is NEVER blocked by guardian info, even for a declared minor', async () => {
+    const opportunity = await publishOpportunity(org.token, false).expect(201);
+    const enrolled = await enroll(volunteer.token, opportunity.body.id, { isMinor: true }).expect(
+      201,
+    );
+    await decideEnrollment(org.token, enrolled.body.id, { decision: 'accept' }).expect(200);
+
+    // General volunteering has no hour minimum — issuable immediately, no
+    // guardian gate applies (S-12's gate is scoped to appliesToStudentService).
+    const issued = await issueCertificate(org.token, enrolled.body.id).expect(201);
+    expect(issued.body.totalApprovedHours).toBe(0);
+    expect(issued.body.bitacora).toEqual([]);
   });
 
   it('tenant isolation: another org cannot decide on this enrollment, read its certificate, or see it in its own queue', async () => {

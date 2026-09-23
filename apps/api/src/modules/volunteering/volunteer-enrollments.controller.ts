@@ -53,7 +53,7 @@ export class VolunteerEnrollmentsController {
     @Body(new ZodValidationPipe(createVolunteerEnrollmentSchema))
     dto: CreateVolunteerEnrollmentInput,
   ): Promise<VolunteerEnrollment> {
-    return this.service.enroll(actor, dto.opportunityId);
+    return this.service.enroll(actor, dto);
   }
 
   @Get('mine')

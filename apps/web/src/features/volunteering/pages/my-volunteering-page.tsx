@@ -21,6 +21,7 @@ import {
 } from '@adoptafacil/ui';
 import { PageContainer, PageHeader } from '../../_layout';
 import { isIncompleteProfileError, useApiClient } from '../../../shell/api';
+import { StudentServiceEnrollmentModal } from '../components/student-service-enrollment-modal';
 import { downloadVolunteerCertificatePdf } from '../lib/certificate';
 import {
   ENROLLMENT_STATUS_LABELS,
@@ -49,6 +50,9 @@ export function MyVolunteeringPage() {
   const [hours, setHours] = useState<ServiceHours[]>([]);
   const [certificates, setCertificates] = useState<VolunteerCertificate[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [studentServiceTarget, setStudentServiceTarget] =
+    useState<VolunteerOpportunityPublic | null>(null);
 
   const [logForEnrollmentId, setLogForEnrollmentId] = useState<string | null>(null);
   const [logDate, setLogDate] = useState('');
@@ -189,7 +193,11 @@ export function MyVolunteeringPage() {
                       <Button
                         size="sm"
                         disabled={enrolledOpportunityIds.has(opportunity.id)}
-                        onClick={() => void enroll(opportunity.id)}
+                        onClick={() =>
+                          opportunity.appliesToStudentService
+                            ? setStudentServiceTarget(opportunity)
+                            : void enroll(opportunity.id)
+                        }
                       >
                         {enrolledOpportunityIds.has(opportunity.id) ? 'Ya inscrito' : 'Inscribirme'}
                       </Button>
@@ -335,6 +343,18 @@ export function MyVolunteeringPage() {
                           {certificate.totalApprovedHours} horas efectivas · emitido{' '}
                           {formatBogota(certificate.issuedAt)}
                         </p>
+                        {certificate.schoolName && (
+                          <p className="text-xs text-muted-foreground">
+                            {certificate.schoolName}
+                            {certificate.schoolAgreementCode &&
+                              ` · Convenio ${certificate.schoolAgreementCode}`}
+                          </p>
+                        )}
+                        {certificate.guardianName && (
+                          <p className="text-xs text-muted-foreground">
+                            Acudiente: {certificate.guardianName}
+                          </p>
+                        )}
                       </div>
                       <Button
                         size="sm"
@@ -350,6 +370,24 @@ export function MyVolunteeringPage() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {studentServiceTarget && (
+        <StudentServiceEnrollmentModal
+          open={studentServiceTarget !== null}
+          onOpenChange={(next) => !next && setStudentServiceTarget(null)}
+          opportunityId={studentServiceTarget.id}
+          opportunityTitle={studentServiceTarget.title}
+          onEnrolled={() => void loadAll()}
+          onIncompleteProfile={() =>
+            navigate('/perfil/completar', {
+              state: {
+                reason:
+                  'Antes de inscribirte como voluntario necesitamos tu teléfono, documento de identidad y dirección.',
+              },
+            })
+          }
+        />
       )}
     </PageContainer>
   );

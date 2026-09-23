@@ -9,6 +9,7 @@ import {
 import { Prisma } from '@prisma/client';
 import type { VolunteerEnrollment as EnrollmentRow } from '@prisma/client';
 import {
+  type CreateVolunteerEnrollmentInput,
   type DecideVolunteerEnrollmentInput,
   type Paginated,
   type VolunteerEnrollment,
@@ -47,6 +48,11 @@ interface EnrollmentRawRow {
   decided_by_user_id: string | null;
   decided_at: Date | null;
   created_at: Date;
+  is_minor: boolean;
+  guardian_name: string | null;
+  guardian_document: string | null;
+  school_name: string | null;
+  school_agreement_code: string | null;
 }
 
 /** One JSONB element from `volunteer_enrollments_for_user(...)` — already
@@ -64,6 +70,11 @@ interface EnrollmentMineRow {
   decidedByUserId: string | null;
   decidedAt: string | null;
   createdAt: string;
+  isMinor: boolean;
+  guardianName: string | null;
+  guardianDocument: string | null;
+  schoolName: string | null;
+  schoolAgreementCode: string | null;
 }
 
 function toEnrollment(row: EnrollmentRow): VolunteerEnrollment {
@@ -80,6 +91,11 @@ function toEnrollment(row: EnrollmentRow): VolunteerEnrollment {
     decidedByUserId: row.decidedByUserId ?? undefined,
     decidedAt: row.decidedAt?.toISOString(),
     createdAt: row.createdAt.toISOString(),
+    isMinor: row.isMinor,
+    guardianName: row.guardianName ?? undefined,
+    guardianDocument: row.guardianDocument ?? undefined,
+    schoolName: row.schoolName ?? undefined,
+    schoolAgreementCode: row.schoolAgreementCode ?? undefined,
   };
 }
 
@@ -97,6 +113,11 @@ function fromRawRow(row: EnrollmentRawRow): VolunteerEnrollment {
     decidedByUserId: row.decided_by_user_id ?? undefined,
     decidedAt: row.decided_at?.toISOString(),
     createdAt: row.created_at.toISOString(),
+    isMinor: row.is_minor,
+    guardianName: row.guardian_name ?? undefined,
+    guardianDocument: row.guardian_document ?? undefined,
+    schoolName: row.school_name ?? undefined,
+    schoolAgreementCode: row.school_agreement_code ?? undefined,
   };
 }
 
@@ -116,6 +137,11 @@ function toMine(row: EnrollmentMineRow): VolunteerEnrollmentMine {
     decidedByUserId: row.decidedByUserId ?? undefined,
     decidedAt: row.decidedAt ?? undefined,
     createdAt: row.createdAt,
+    isMinor: row.isMinor,
+    guardianName: row.guardianName ?? undefined,
+    guardianDocument: row.guardianDocument ?? undefined,
+    schoolName: row.schoolName ?? undefined,
+    schoolAgreementCode: row.schoolAgreementCode ?? undefined,
   };
 }
 
@@ -145,14 +171,27 @@ export class VolunteerEnrollmentsService {
     return organizationId;
   }
 
-  /** Enroll in an opportunity — cross-tenant (SECURITY DEFINER). */
-  async enroll(actor: RequestUser, opportunityId: string): Promise<VolunteerEnrollment> {
+  /** Enroll in an opportunity — cross-tenant (SECURITY DEFINER). Guardian/
+   *  school fields (S-12) are best-effort passthrough — never required here,
+   *  see {@link CreateVolunteerEnrollmentInput}'s doc comment for why. */
+  async enroll(
+    actor: RequestUser,
+    input: CreateVolunteerEnrollmentInput,
+  ): Promise<VolunteerEnrollment> {
     await requireCompleteProfile(this.prisma, actor);
+    const { opportunityId } = input;
 
     let rows: EnrollmentRawRow[];
     try {
       rows = await this.prisma.$queryRaw<EnrollmentRawRow[]>(
-        Prisma.sql`SELECT * FROM create_volunteer_enrollment(${opportunityId}::uuid, ${actor.id}::uuid)`,
+        Prisma.sql`SELECT * FROM create_volunteer_enrollment(
+          ${opportunityId}::uuid, ${actor.id}::uuid,
+          ${input.isMinor ?? false}::boolean,
+          ${input.guardianName ?? null}::text,
+          ${input.guardianDocument ?? null}::text,
+          ${input.schoolName ?? null}::text,
+          ${input.schoolAgreementCode ?? null}::text
+        )`,
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
