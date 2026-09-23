@@ -1,16 +1,30 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { AnimalSummary } from '@adoptafacil/contracts';
-import { Badge, Card } from '@adoptafacil/ui';
+import type { AnimalSummary, OrganizationPublic } from '@adoptafacil/contracts';
+import { Badge, Button, buttonVariants, cn } from '@adoptafacil/ui';
 import {
   SEX_LABELS,
+  SIZE_LABELS,
   SPECIES_LABELS,
   ageLabel,
+  isRecentlyPublished,
   publicAnimalDetailHref,
+  buildAdoptionRequestHref,
+  buildSponsorHref,
 } from '../model/animals-catalog';
+import { buildDonateHref } from './portal-donate-cta';
+import styles from '../styles/public-catalog.module.scss';
 
 export interface AnimalCardProps {
   slug: string;
   animal: AnimalSummary;
+  /**
+   * Organización dueña del animal — solo para construir el enlace "Donar"
+   * (`buildDonateHref`, la donación es POR ORGANIZACIÓN, no por animal). Sin
+   * este prop la tarjeta simplemente omite ese botón (nunca inventa un enlace
+   * incompleto).
+   */
+  organization?: Pick<OrganizationPublic, 'id' | 'name' | 'logoUrl' | 'nit' | 'location'>;
   /**
    * Cuando se pasa, un clic normal (botón izquierdo, sin teclas modificadoras)
    * NO navega — llama a esto en su lugar (pulido visual: el catálogo general
@@ -25,12 +39,7 @@ export interface AnimalCardProps {
 /** Silueta simple (huella), usada como fallback cuando el animal no tiene foto. */
 function PawPlaceholder() {
   return (
-    <svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      className="h-10 w-10 text-muted-foreground/50"
-      fill="currentColor"
-    >
+    <svg aria-hidden viewBox="0 0 24 24" className="h-12 w-12" fill="currentColor">
       <circle cx="7" cy="8" r="2.2" />
       <circle cx="12" cy="5.5" r="2.2" />
       <circle cx="17" cy="8" r="2.2" />
@@ -40,22 +49,34 @@ function PawPlaceholder() {
 }
 
 /**
- * Tarjeta pública de un animal adoptable (§M14/M03, pulido visual T-D02). Solo
- * campos PÚBLICOS de `AnimalSummary` (foto, nombre, especie, raza, edad, sexo) —
- * nada clínico. El detalle individual (`/o/:slug/animales/:animalId`, T-052) YA
- * existe y está cableado — se conserva el enlace tal cual (nav-state con el
- * `AnimalSummary`, para que el detalle no vuelva a pedir la lista).
+ * Tarjeta pública de un animal adoptable (§M14/M03, rediseño "marketplace"
+ * T-D03). Solo campos PÚBLICOS de `AnimalSummary` (foto, nombre, especie,
+ * raza, edad, sexo, tamaño, fecha de publicación) — nada clínico. El detalle
+ * individual (`/o/:slug/animales/:animalId`, T-052) YA existe y está
+ * cableado — se conserva el enlace tal cual (nav-state con el `AnimalSummary`,
+ * para que el detalle no vuelva a pedir la lista).
+ *
+ * Deliberadamente SIN ícono de favorito: no existe ninguna funcionalidad de
+ * favoritos en el backend (ni tabla, ni endpoint) — se omite en vez de
+ * simular un botón que no hace nada (alcance visual, no de producto).
  */
-export function AnimalCard({ slug, animal, onOpenDetail }: AnimalCardProps) {
+export function AnimalCard({ slug, animal, organization, onOpenDetail }: AnimalCardProps) {
   const age = ageLabel(animal.computedAge);
+  const isNew = isRecentlyPublished(animal.createdAt);
+  const detailHref = publicAnimalDetailHref(slug, animal.id);
+  // La foto pública puede apuntar a un storage-ref roto/expirado (StoragePort
+  // stub en Ola 1) — si `<img>` falla, cae al mismo placeholder que "sin foto",
+  // en vez de dejar un hueco de color sólido sin ícono.
+  const [photoFailed, setPhotoFailed] = useState(false);
+  const showPhoto = Boolean(animal.photoUrl) && !photoFailed;
 
   return (
-    <Card className="overflow-hidden transition hover:shadow-md">
+    <article className={styles.card} data-testid="animal-card">
       <Link
-        to={publicAnimalDetailHref(slug, animal.id)}
+        to={detailHref}
         state={{ animal }}
-        data-testid="animal-card"
-        className="block transition hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        aria-label={`Ver detalle de ${animal.name}`}
+        className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onClick={(event) => {
           if (!onOpenDetail) return;
           const isPlainLeftClick =
@@ -69,34 +90,72 @@ export function AnimalCard({ slug, animal, onOpenDetail }: AnimalCardProps) {
           onOpenDetail(animal);
         }}
       >
-        {animal.photoUrl ? (
-          <img
-            src={animal.photoUrl}
-            alt={animal.name}
-            className="aspect-[4/3] w-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <div
-            aria-hidden
-            className="flex aspect-[4/3] w-full items-center justify-center bg-muted"
-          >
-            <PawPlaceholder />
-          </div>
-        )}
-        <div className="space-y-1.5 p-4">
-          <p className="font-semibold leading-none">{animal.name}</p>
-          <div className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+        <div className={styles.card__photoWrap}>
+          {showPhoto ? (
+            <img
+              src={animal.photoUrl}
+              alt={animal.name}
+              className={styles.card__photo}
+              loading="lazy"
+              onError={() => setPhotoFailed(true)}
+            />
+          ) : (
+            <div
+              aria-hidden
+              className={styles.card__placeholder}
+              style={{ color: 'hsl(var(--muted-foreground) / 0.5)' }}
+            >
+              <PawPlaceholder />
+            </div>
+          )}
+          {isNew && (
+            <span className={styles.card__badgeNew} data-testid="animal-card-new-badge">
+              Nuevo
+            </span>
+          )}
+        </div>
+
+        <div className={styles.card__body}>
+          <p className={styles.card__name}>{animal.name}</p>
+          <div className={styles.card__meta}>
             {animal.breed && <span>{animal.breed}</span>}
             {animal.breed && age && <span aria-hidden>·</span>}
             {age && <span>{age}</span>}
           </div>
-          <div className="flex flex-wrap gap-1.5 pt-1">
+          <div className={styles.card__badges}>
             <Badge variant="secondary">{SPECIES_LABELS[animal.species]}</Badge>
             <Badge variant="outline">{SEX_LABELS[animal.sex]}</Badge>
+            <Badge variant="outline">{SIZE_LABELS[animal.size]}</Badge>
           </div>
         </div>
       </Link>
-    </Card>
+
+      <div className={styles.card__actions}>
+        <Link
+          to={buildAdoptionRequestHref(animal.organizationId, animal)}
+          className={cn(buttonVariants({ size: 'sm' }), styles.card__actionPrimary)}
+        >
+          Adoptar
+        </Link>
+        <Link
+          to={buildSponsorHref(animal, organization?.name)}
+          className={cn(buttonVariants({ size: 'sm', variant: 'outline' }))}
+        >
+          Apadrinar
+        </Link>
+        {organization ? (
+          <Link
+            to={buildDonateHref(organization)}
+            className={cn(buttonVariants({ size: 'sm', variant: 'outline' }))}
+          >
+            Donar
+          </Link>
+        ) : (
+          <Button size="sm" variant="outline" disabled>
+            Donar
+          </Button>
+        )}
+      </div>
+    </article>
   );
 }

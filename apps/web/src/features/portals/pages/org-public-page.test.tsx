@@ -413,8 +413,10 @@ describe('OrgPublicPage — rich public portal', () => {
     await screen.findByRole('heading', { name: /Refugio Patitas/ });
 
     // KPI integrado en el header (3ra iteración): número grande + label
-    // debajo, en elementos separados — no una sola tarjeta/cadena.
-    expect(await screen.findByText('3')).toBeInTheDocument();
+    // debajo, en elementos separados — no una sola tarjeta/cadena. Se
+    // desambigua con `selector: 'p'` porque el catálogo (T-D03) también
+    // muestra el mismo total en su propio contador ("X de Y animales").
+    expect(await screen.findByText('3', { selector: 'p' })).toBeInTheDocument();
     expect(screen.getByText('animales disponibles')).toBeInTheDocument();
   });
 
@@ -545,8 +547,9 @@ describe('OrgPublicPage — rich public portal', () => {
       await screen.findByRole('heading', { name: /Refugio Patitas/ });
 
       // KPI integrado en el mismo panel del header (3ra iteración) — no una
-      // tarjeta flotante aparte.
-      expect(await screen.findByText('7')).toBeInTheDocument();
+      // tarjeta flotante aparte. Se desambigua con `selector: 'p'` porque el
+      // catálogo (T-D03) también muestra el mismo total en su contador.
+      expect(await screen.findByText('7', { selector: 'p' })).toBeInTheDocument();
       expect(screen.getByText('animales disponibles')).toBeInTheDocument();
       // No fabricated metrics: those fields don't exist in the contract yet.
       expect(screen.queryByText(/Adopciones/)).not.toBeInTheDocument();

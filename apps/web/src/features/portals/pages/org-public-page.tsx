@@ -286,7 +286,11 @@ export function OrgPublicPage({ slugOverride }: OrgPublicPageProps = {}) {
                         día deje de ser placeholder aparecería aquí también. */}
                     {portafolioSections?.map((section) =>
                       section.kind === 'pets' ? (
-                        <PortalAdoptionSection key={section.kind} slug={slug as string} />
+                        <PortalAdoptionSection
+                          key={section.kind}
+                          slug={slug as string}
+                          organization={view.profile.organization}
+                        />
                       ) : section.kind === 'products' ? (
                         <PortalProductsSection
                           key={section.kind}
