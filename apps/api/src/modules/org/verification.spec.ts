@@ -150,4 +150,55 @@ describe('verification level computation (T-103)', () => {
       expect(level.blockedBy).toBeUndefined();
     });
   });
+
+  // S-10 (FSD v3.5 Sección A "% completado") — derived EXCLUSIVELY from the
+  // same requirement counts `blockedBy` already uses, never a separate metric.
+  describe('percentComplete', () => {
+    it('is 0% with zero documents approved (Informal · 0% completado, FSD A.1)', () => {
+      const level = computeVerificationLevel([], FormalizationState.Informal, LEVELS, NOW);
+      expect(level.level).toBe(0);
+      expect(level.percentComplete).toBe(0);
+    });
+
+    it('is 100% once the top tier is reached (nothing left blocking)', () => {
+      const level = computeVerificationLevel(
+        [
+          doc(DocumentType.Rut, DocumentStatus.Approved, FUTURE),
+          doc(DocumentType.ExistenceRepresentationCertificate, DocumentStatus.Approved, null),
+        ],
+        FormalizationState.Informal,
+        LEVELS,
+        NOW,
+      );
+      expect(level.percentComplete).toBe(100);
+    });
+
+    it('is 100% with an empty catalog (nothing configured to block progress)', () => {
+      const level = computeVerificationLevel([], FormalizationState.Informal, [], NOW);
+      expect(level.percentComplete).toBe(100);
+    });
+
+    it('is 50% for a 2-requirement tier (1 doc approved) with a formalization gate still unmet', () => {
+      const level = computeVerificationLevel(
+        [doc(DocumentType.Rut, DocumentStatus.Approved, FUTURE)],
+        FormalizationState.EnProceso,
+        LEVELS_WITH_FORMALIZATION,
+        NOW,
+      );
+      // tier 2: requiredDocuments=[Rut] (met) + minFormalizationState (unmet) → 1/2 = 50%.
+      expect(level.percentComplete).toBe(50);
+    });
+
+    it('progresses within a multi-document tier as each document is approved', () => {
+      const partial = computeVerificationLevel(
+        [doc(DocumentType.Rut, DocumentStatus.Approved, FUTURE)],
+        FormalizationState.Informal,
+        LEVELS,
+        NOW,
+      );
+      // tier 2 needs [Rut, ExistenceRepresentationCertificate]; only Rut met → 1/2 = 50%.
+      expect(partial.level).toBe(1);
+      expect(partial.percentComplete).toBe(50);
+    });
+  });
 });

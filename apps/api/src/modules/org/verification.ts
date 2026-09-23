@@ -138,13 +138,21 @@ export function computeVerificationLevel(
         : [];
     const missing = [...missingDocuments, ...missingFormalization];
     if (missing.length > 0) {
-      // First unmet tier: this is what the org is blocked on.
+      // First unmet tier: this is what the org is blocked on. Progress toward
+      // it (S-10, FSD v3.5 Sección A "% completado") is derived from the SAME
+      // requirement counts as `missing` above — never a separate metric.
+      const totalRequirements =
+        tier.requiredDocuments.length + (tier.minFormalizationState ? 1 : 0);
+      const metRequirements = totalRequirements - missing.length;
+      const percentComplete =
+        totalRequirements > 0 ? Math.round((metRequirements / totalRequirements) * 100) : 0;
       return {
         level: achievedLevel,
         label,
         criteria: [...new Set(criteria)],
         nextLevel: tier.level,
         blockedBy: missing,
+        percentComplete,
       };
     }
     achievedLevel = tier.level;
@@ -157,5 +165,6 @@ export function computeVerificationLevel(
 
   // Reached the top of the configured ladder (or the ladder is empty). Dedupe:
   // consecutive tiers commonly repeat the same required document (S1-05).
-  return { level: achievedLevel, label, criteria: [...new Set(criteria)] };
+  // No `nextLevel` ⇒ nothing left to block progress ⇒ 100% (S-10).
+  return { level: achievedLevel, label, criteria: [...new Set(criteria)], percentComplete: 100 };
 }

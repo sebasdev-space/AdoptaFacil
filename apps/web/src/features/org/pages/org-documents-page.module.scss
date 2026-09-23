@@ -3,6 +3,31 @@
   color: var(--text-muted);
 }
 
+// FSD v3.5 Sección A.2: CTA fijo con el siguiente paso concreto (qué
+// documento subir), no solo un recuento genérico de lo que falta.
+.next-step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-radius: var(--r-md);
+  border: 1px solid hsl(var(--primary) / 0.3);
+  background-color: hsl(var(--primary) / 0.05);
+  padding: 0.75rem 1rem;
+}
+
+.next-step__title {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-dark);
+}
+
+.next-step__description {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
 .doc-grid {
   display: grid;
   gap: 1rem;
@@ -23,7 +48,14 @@
   background-color: hsl(var(--warning) / 0.05);
 }
 
-.doc-card--observed,
+// FSD v3.5 Sección A.3: OBSERVADO ("corregible, casi listo") y RECHAZADO
+// ("empieza de nuevo") deben distinguirse visualmente — comparten el MISMO
+// tono aquí sería perder la señal de si hay que editar o reemplazar.
+.doc-card--observed {
+  border-color: hsl(var(--warning) / 0.6);
+  background-color: hsl(var(--warning) / 0.08);
+}
+
 .doc-card--rejected,
 .doc-card--expired {
   border-color: hsl(var(--destructive) / 0.5);
@@ -76,6 +108,10 @@
 .doc-card__note {
   font-size: var(--fs-xs);
   color: hsl(var(--destructive));
+}
+
+.doc-card__note--warning {
+  color: hsl(var(--warning));
 }
 
 .doc-card__actions {
