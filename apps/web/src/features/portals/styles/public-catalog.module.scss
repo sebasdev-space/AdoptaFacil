@@ -1,0 +1,469 @@
+/**
+ * Catálogo público de animales (§M14/M03, rediseño "editorial" T-D06).
+ * Archivo DEDICADO y aislado (CSS Modules) — pensado como base de un futuro
+ * Design System del portal público, pero por ahora solo lo consume esta
+ * sección.
+ *
+ * Color: SIEMPRE los tokens HSL ya dinámicos por organización
+ * (`--primary`/`--secondary`/`--accent`/`--ring`/`--radius`, aplicados por
+ * `OrgPublicPage` vía `brandTokensToStyle`) o los globales de
+ * `packages/ui/src/styles/globals.scss` — nunca un color fijo nuevo. El color
+ * de marca se reserva para CTA principal, estado activo y acentos puntuales
+ * (nunca para pintar superficies grandes).
+ *
+ * Escala de radios/sombras (T-D06, feedback directo): PROPIA y CONTROLADA,
+ * deliberadamente más chica que `packages/ui/src/styles/tokens.scss`
+ * (--r-full/--shadow-lg leían como "dashboard SaaS" — demasiado redondeo,
+ * demasiada sombra). `--r-full` queda solo para lo genuinamente circular
+ * (el botón de favorito). Todo lo demás usa esta escala:
+ *   radius-xs 6px · radius-sm 8px (botones/inputs) · radius-md 12px
+ *   (tarjetas) · radius-lg 16px (contenedores grandes)
+ * Sombras casi imperceptibles — nunca `--shadow-lg` del sistema global.
+ */
+
+$radius-xs: 6px;
+$radius-sm: 8px;
+$radius-md: 12px;
+$radius-lg: 16px;
+$shadow-soft: 0 2px 8px rgba(20, 30, 40, 0.04);
+$shadow-soft-md: 0 6px 20px rgba(20, 30, 40, 0.06);
+$border-subtle: hsl(var(--border) / 0.35);
+
+// ---------------------------------------------------------------------------
+// Contador + barra de herramientas (buscador, filtros, orden)
+// ---------------------------------------------------------------------------
+
+.toolbar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.heading {
+  font-family: var(--font-display);
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-semibold);
+  color: hsl(var(--foreground));
+  scroll-margin-top: 5rem;
+}
+
+.search {
+  position: relative;
+  width: 100%;
+  max-width: 26rem;
+}
+
+.search__icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: hsl(var(--primary));
+  pointer-events: none;
+}
+
+.search__input {
+  width: 100%;
+  padding-left: 2.25rem;
+}
+
+.counter {
+  font-size: var(--fs-sm);
+  color: hsl(var(--muted-foreground));
+}
+
+.counter__value {
+  font-weight: var(--fw-semibold);
+  color: hsl(var(--foreground));
+}
+
+// ---------------------------------------------------------------------------
+// Píldoras de categoría (especie) + filtros dinámicos
+// ---------------------------------------------------------------------------
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 2.5rem;
+  padding: 0 0.875rem;
+  border-radius: $radius-sm;
+  border: 1px solid $border-subtle;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  transition: var(--transition-base);
+  transition-property: background-color, border-color, color;
+}
+
+.pill:hover {
+  border-color: hsl(var(--primary) / 0.4);
+}
+
+.pill--active {
+  border-color: hsl(var(--primary));
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.searchRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.75rem;
+  border-radius: $radius-lg;
+  background: hsl(var(--card));
+  border: 1px solid $border-subtle;
+}
+
+.filterField {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.5rem;
+  padding: 0 0.75rem;
+  border-radius: $radius-sm;
+  border: 1px solid $border-subtle;
+  background: hsl(var(--background));
+  color: hsl(var(--primary));
+  cursor: pointer;
+}
+
+.filterField:focus-within {
+  border-color: hsl(var(--primary) / 0.5);
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.25);
+}
+
+.filterField__select {
+  border: none;
+  background: transparent;
+  color: hsl(var(--foreground));
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  outline: none;
+  max-width: 9rem;
+}
+
+// Botones propios del catálogo (T-D06): el primitivo compartido
+// `packages/ui` Button usa `--r-full` (cápsula) en TODA la app por
+// convención de REFACTOR-VISUAL v2 — tocarlo saldría del alcance de este
+// rediseño (afectaría cada pantalla, no solo el portal). Para el radio
+// rectangular ~8px que pide este rediseño, el catálogo usa sus propias
+// clases en vez de `buttonVariants()`.
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  height: 2.375rem;
+  padding: 0 1rem;
+  border-radius: $radius-sm;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  transition: var(--transition-base);
+  transition-property: background-color, border-color, opacity;
+}
+
+.btn--primary {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: 1px solid hsl(var(--primary));
+}
+
+.btn--primary:hover {
+  opacity: 0.92;
+}
+
+.btn--outline {
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  border: 1px solid $border-subtle;
+}
+
+.btn--outline:hover {
+  border-color: hsl(var(--primary) / 0.4);
+  color: hsl(var(--primary));
+}
+
+.searchButton {
+  flex-shrink: 0;
+}
+
+.toolbarRow2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.sortField {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.sortField__label {
+  font-size: var(--fs-sm);
+  color: hsl(var(--muted-foreground));
+  white-space: nowrap;
+}
+
+.clearFilters {
+  font-size: var(--fs-sm);
+  color: hsl(var(--muted-foreground));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.clearFilters:hover {
+  color: hsl(var(--foreground));
+}
+
+// ---------------------------------------------------------------------------
+// Grid + tarjeta del animal
+// ---------------------------------------------------------------------------
+
+.grid {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+@media (min-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+// Máximo 3 columnas (T-D06, feedback directo: "priorizar calidad visual >
+// cantidad de tarjetas por fila" — antes llegaba a 4 y se veían
+// comprimidas). El catálogo comparte fila con el sidebar, así que 3
+// columnas dentro de esa columna ancha ya dan tarjetas con buen espacio.
+@media (min-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: hsl(var(--card));
+  border: 1px solid $border-subtle;
+  border-radius: $radius-md;
+  box-shadow: $shadow-soft;
+  transition: var(--transition-base);
+  transition-property: transform, box-shadow, border-color;
+}
+
+.card:hover,
+.card:focus-within {
+  transform: translateY(-2px);
+  box-shadow: $shadow-soft-md;
+  border-color: hsl(var(--primary) / 0.3);
+}
+
+.card__photoWrap {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  width: 100%;
+  background: hsl(var(--muted));
+  overflow: hidden;
+}
+
+.card__photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: var(--transition-base);
+  transition-property: transform;
+}
+
+.card:hover .card__photo {
+  transform: scale(1.04);
+}
+
+.card__placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: hsl(var(--muted-foreground) / 0.6);
+}
+
+.card__favorite {
+  position: absolute;
+  top: 0.625rem;
+  right: 0.625rem;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2rem;
+  width: 2rem;
+  // Círculo genuino (ícono de favorito) — el único lugar del catálogo
+  // donde `--r-full` sigue siendo correcto (T-D06, §3).
+  border-radius: var(--r-full);
+  background: hsl(var(--card) / 0.9);
+  color: hsl(var(--muted-foreground));
+  box-shadow: $shadow-soft;
+  transition: var(--transition-base);
+  transition-property: color, transform;
+}
+
+.card__favorite:hover {
+  transform: scale(1.08);
+}
+
+.card__favorite[aria-pressed='true'] {
+  color: hsl(var(--destructive));
+}
+
+.card__badgeNew {
+  position: absolute;
+  top: 0.625rem;
+  left: 0.625rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: $radius-xs;
+  background: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+}
+
+.card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 1.125rem;
+  flex: 1 1 auto;
+}
+
+// El nombre es el elemento más importante de la tarjeta (T-D06, §14) — todo
+// lo demás (raza/edad/sexo/tamaño) es texto plano y discreto, nunca badges.
+.card__name {
+  font-family: var(--font-display);
+  font-size: var(--fs-h3);
+  font-weight: var(--fw-semibold);
+  color: hsl(var(--foreground));
+  line-height: 1.2;
+}
+
+.card__meta {
+  font-size: var(--fs-sm);
+  color: hsl(var(--muted-foreground));
+  line-height: 1.4;
+}
+
+.card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0 1.125rem 1.125rem;
+}
+
+.card__actionSecondary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.card__link {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: hsl(var(--primary));
+}
+
+.card__link:hover {
+  text-decoration: underline;
+}
+
+// ---------------------------------------------------------------------------
+// Estado vacío / carga (skeleton shimmer)
+// ---------------------------------------------------------------------------
+
+.skeletonCard {
+  border-radius: $radius-md;
+  overflow: hidden;
+  border: 1px solid $border-subtle;
+  background: hsl(var(--card));
+}
+
+.skeletonPhoto {
+  aspect-ratio: 4 / 3;
+  width: 100%;
+}
+
+.skeletonLine {
+  height: 0.85rem;
+  border-radius: $radius-xs;
+  margin: 0.75rem 1rem 0;
+}
+
+.skeletonLine:last-child {
+  margin-bottom: 1rem;
+  width: 60%;
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 25%,
+    hsl(var(--muted) / 0.5) 37%,
+    hsl(var(--muted)) 63%
+  );
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: none;
+  }
+}
+
+.loadMore {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+}
+
+.loadMore__button {
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
+.loadMore__caption {
+  font-size: var(--fs-xs);
+  color: hsl(var(--muted-foreground));
+}

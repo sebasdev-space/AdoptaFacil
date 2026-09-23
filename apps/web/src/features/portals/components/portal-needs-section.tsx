@@ -1,16 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { ResourceNeedPublic } from '@adoptafacil/contracts';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  EmptyState,
-  Skeleton,
-} from '@adoptafacil/ui';
+import { Button, Skeleton } from '@adoptafacil/ui';
 import { listPublicNeeds } from '../../resources/api/public-resources';
 import { NeedCard } from '../../resources/components/need-card';
+import styles from '../styles/public-catalog.module.scss';
 
 const PAGE_SIZE = 12;
 const HEADING_ID = 'portal-section-needs';
@@ -32,6 +25,9 @@ export interface PortalNeedsSectionProps {
  * por `listPublicNeeds` (blindaje T-028c), estado vacío explícito, "cargar
  * más" real. Reutiliza `NeedCard` TAL CUAL —la misma tarjeta del catálogo
  * público general (`/recursos`)— para no duplicarla ni divergir visualmente.
+ *
+ * Rediseño "editorial" T-D06: mismo criterio que `PortalProductsSection` —
+ * sin `Card` envolvente, estado vacío de una sola línea.
  */
 export function PortalNeedsSection({ organizationId }: PortalNeedsSectionProps) {
   const [items, setItems] = useState<ResourceNeedPublic[]>([]);
@@ -75,38 +71,36 @@ export function PortalNeedsSection({ organizationId }: PortalNeedsSectionProps) 
   };
 
   return (
-    <section aria-labelledby={HEADING_ID} data-testid="portal-needs-section">
-      <Card>
-        <CardHeader>
-          <CardTitle id={HEADING_ID}>Necesita hoy</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {state === 'loading' && <Skeleton className="h-40 w-full" />}
-          {state === 'error' && (
-            <EmptyState title="No se pudo cargar" description="Inténtalo de nuevo más tarde." />
+    <section aria-labelledby={HEADING_ID} data-testid="portal-needs-section" className="space-y-3">
+      <h2 id={HEADING_ID} className={styles.heading}>
+        Necesita hoy
+      </h2>
+      {state === 'loading' && <Skeleton className="h-40 w-full" />}
+      {state === 'error' && (
+        <p className="text-sm text-muted-foreground">
+          <span className="block font-medium text-foreground">No se pudo cargar</span>
+          Inténtalo de nuevo más tarde.
+        </p>
+      )}
+      {state === 'ready' && items.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          Esta organización no tiene necesidades publicadas por ahora.
+        </p>
+      )}
+      {state === 'ready' && items.length > 0 && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {items.map((need) => (
+              <NeedCard key={need.id} need={need} />
+            ))}
+          </div>
+          {items.length < total && (
+            <Button variant="outline" disabled={loadingMore} onClick={() => void loadMore()}>
+              {loadingMore ? 'Cargando…' : 'Cargar más'}
+            </Button>
           )}
-          {state === 'ready' && items.length === 0 && (
-            <EmptyState
-              title="Sin necesidades activas"
-              description="Esta organización no tiene necesidades publicadas por ahora."
-            />
-          )}
-          {state === 'ready' && items.length > 0 && (
-            <>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {items.map((need) => (
-                  <NeedCard key={need.id} need={need} />
-                ))}
-              </div>
-              {items.length < total && (
-                <Button variant="outline" disabled={loadingMore} onClick={() => void loadMore()}>
-                  {loadingMore ? 'Cargando…' : 'Cargar más'}
-                </Button>
-              )}
-            </>
-          )}
-        </CardContent>
-      </Card>
+        </div>
+      )}
     </section>
   );
 }

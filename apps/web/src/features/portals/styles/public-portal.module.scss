@@ -1,0 +1,369 @@
+/**
+ * Cascarón del portal público — header/hero/footer/CTA/sidebar (§M14,
+ * rediseño "editorial" T-D06, reestructuración sin tabs). Mismo criterio que
+ * `public-catalog.module.scss`: solo tokens YA dinámicos por organización
+ * (--primary/--secondary/--accent/--radius) o globales de
+ * `packages/ui/src/styles/globals.scss` — ningún color nuevo, y el color de
+ * marca se reserva para CTA/acentos puntuales, nunca para pintar superficies
+ * grandes (T-D06, §28).
+ *
+ * Escala de radios/sombras PROPIA y controlada (T-D06) — ver el doc comment
+ * de `public-catalog.module.scss` para el porqué. `--r-full` queda solo
+ * para lo genuinamente circular (avatar del logo, íconos-bullet, botones
+ * de ícono).
+ */
+
+$radius-xs: 6px;
+$radius-sm: 8px;
+$radius-md: 12px;
+$radius-lg: 16px;
+$shadow-soft: 0 2px 8px rgba(20, 30, 40, 0.04);
+$shadow-soft-md: 0 6px 20px rgba(20, 30, 40, 0.06);
+$border-subtle: hsl(var(--border) / 0.35);
+
+// ---------------------------------------------------------------------------
+// Header
+// ---------------------------------------------------------------------------
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: hsl(var(--background) / 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid hsl(var(--border) / 0.4);
+}
+
+.header__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.header__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 0;
+}
+
+.header__logo {
+  height: 2.5rem;
+  width: 2.5rem;
+  flex-shrink: 0;
+  border-radius: var(--r-full);
+  object-fit: cover;
+  border: 1px solid hsl(var(--border) / 0.4);
+}
+
+.header__logoFallback {
+  display: flex;
+  height: 2.5rem;
+  width: 2.5rem;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-full);
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-weight: var(--fw-bold);
+  font-size: var(--fs-sm);
+}
+
+.header__name {
+  font-family: var(--font-display);
+  font-weight: var(--fw-semibold);
+  font-size: var(--fs-body-lg);
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header__nav {
+  display: none;
+  align-items: center;
+  gap: 0.25rem;
+
+  @media (min-width: 1024px) {
+    display: flex;
+  }
+}
+
+.header__navLink {
+  padding: 0.5rem 0.75rem;
+  border-radius: $radius-sm;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: hsl(var(--foreground) / 0.8);
+  transition: var(--transition-base);
+  transition-property: background-color, color;
+  white-space: nowrap;
+}
+
+.header__navLink:hover {
+  color: hsl(var(--foreground));
+  background: hsl(var(--muted));
+}
+
+.header__navLink--active {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.header__navLink--active:hover {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+// Botón propio (no `buttonVariants()`) — mismo motivo que
+// `public-catalog.module.scss`: el primitivo compartido usa `--r-full` en
+// TODA la app por convención de REFACTOR-VISUAL v2; tocarlo excede el
+// alcance de este rediseño del portal.
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0 1.125rem;
+  border-radius: $radius-sm;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  transition: var(--transition-base);
+  transition-property: opacity;
+}
+
+.btn--sm {
+  height: 2.375rem;
+}
+
+.btn--lg {
+  height: 2.75rem;
+  padding: 0 1.5rem;
+}
+
+.btn--primary {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+}
+
+.btn--primary:hover {
+  opacity: 0.92;
+}
+
+.btn--outline {
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  border: 1px solid $border-subtle;
+}
+
+.btn--outline:hover {
+  border-color: hsl(var(--primary) / 0.4);
+  color: hsl(var(--primary));
+}
+
+.header__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.header__iconButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.5rem;
+  width: 2.5rem;
+  border-radius: var(--r-full);
+  border: 1px solid hsl(var(--border) / 0.5);
+  color: hsl(var(--foreground));
+  background: hsl(var(--card));
+  flex-shrink: 0;
+}
+
+.header__iconButton:hover {
+  border-color: hsl(var(--primary) / 0.5);
+  color: hsl(var(--primary));
+}
+
+// ---------------------------------------------------------------------------
+// Panel lateral (Campaña / Síguenos) — lista con ícono + flecha
+// ---------------------------------------------------------------------------
+
+.socialList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.socialRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.25rem;
+  border-radius: $radius-sm;
+  color: hsl(var(--foreground));
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  transition: var(--transition-base);
+  transition-property: background-color, color;
+}
+
+.socialRow:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--primary));
+}
+
+.socialRow__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2rem;
+  width: 2rem;
+  flex-shrink: 0;
+  border-radius: var(--r-full);
+  background: color-mix(in srgb, hsl(var(--primary)) 10%, hsl(var(--card)));
+  color: hsl(var(--primary));
+}
+
+.socialRow__label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.socialRow__arrow {
+  color: hsl(var(--muted-foreground));
+  flex-shrink: 0;
+}
+
+// ---------------------------------------------------------------------------
+// Banner CTA ("Cómo ayudar")
+// ---------------------------------------------------------------------------
+
+// Fondo neutro (T-D06, §28: el color de marca no pinta superficies
+// grandes) — el acento de marca vive solo en el botón.
+.ctaBanner {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: flex-start;
+  padding: 1.75rem 2rem;
+  border-radius: $radius-lg;
+  background: hsl(var(--muted) / 0.5);
+  border: 1px solid $border-subtle;
+
+  @media (min-width: 768px) {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.ctaBanner__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-h2);
+  font-weight: var(--fw-semibold);
+  color: hsl(var(--foreground));
+}
+
+.ctaBanner__text {
+  font-size: var(--fs-sm);
+  color: hsl(var(--muted-foreground));
+  max-width: 40rem;
+}
+
+// ---------------------------------------------------------------------------
+// Footer
+// ---------------------------------------------------------------------------
+
+.footer {
+  margin-top: 2rem;
+  padding: 2rem 0 1.5rem;
+  border-top: 1px solid hsl(var(--border) / 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.footer__top {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  @media (min-width: 768px) {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+.footer__brand {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.footer__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem 1rem;
+}
+
+.footer__navLink {
+  font-size: var(--fs-sm);
+  color: hsl(var(--muted-foreground));
+}
+
+.footer__navLink:hover {
+  color: hsl(var(--foreground));
+}
+
+.footer__bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding-top: 1.25rem;
+  border-top: 1px solid hsl(var(--border) / 0.3);
+
+  @media (min-width: 768px) {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+.footer__copyright {
+  font-size: var(--fs-xs);
+  color: hsl(var(--muted-foreground));
+}
+
+.footer__social {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.footer__socialIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.25rem;
+  width: 2.25rem;
+  border-radius: var(--r-full);
+  border: 1px solid hsl(var(--border) / 0.5);
+  color: hsl(var(--foreground));
+}
+
+.footer__socialIcon:hover {
+  border-color: hsl(var(--primary) / 0.5);
+  color: hsl(var(--primary));
+}

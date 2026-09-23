@@ -1,16 +1,31 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { AnimalSummary } from '@adoptafacil/contracts';
-import { Badge, Card } from '@adoptafacil/ui';
+import type { AnimalSummary, OrganizationPublic } from '@adoptafacil/contracts';
+import { cn } from '@adoptafacil/ui';
 import {
   SEX_LABELS,
+  SIZE_LABELS,
   SPECIES_LABELS,
   ageLabel,
+  isRecentlyPublished,
   publicAnimalDetailHref,
+  buildAdoptionRequestHref,
+  buildSponsorHref,
 } from '../model/animals-catalog';
+import { buildDonateHref } from './portal-donate-cta';
+import { IconHeart } from './portal-icons';
+import styles from '../styles/public-catalog.module.scss';
 
 export interface AnimalCardProps {
   slug: string;
   animal: AnimalSummary;
+  /**
+   * Organización dueña del animal — solo para construir el enlace "Donar"
+   * (`buildDonateHref`, la donación es POR ORGANIZACIÓN, no por animal). Sin
+   * este prop la tarjeta simplemente omite ese botón (nunca inventa un enlace
+   * incompleto).
+   */
+  organization?: Pick<OrganizationPublic, 'id' | 'name' | 'logoUrl' | 'nit' | 'location'>;
   /**
    * Cuando se pasa, un clic normal (botón izquierdo, sin teclas modificadoras)
    * NO navega — llama a esto en su lugar (pulido visual: el catálogo general
@@ -25,12 +40,7 @@ export interface AnimalCardProps {
 /** Silueta simple (huella), usada como fallback cuando el animal no tiene foto. */
 function PawPlaceholder() {
   return (
-    <svg
-      aria-hidden
-      viewBox="0 0 24 24"
-      className="h-10 w-10 text-muted-foreground/50"
-      fill="currentColor"
-    >
+    <svg aria-hidden viewBox="0 0 24 24" className="h-12 w-12" fill="currentColor">
       <circle cx="7" cy="8" r="2.2" />
       <circle cx="12" cy="5.5" r="2.2" />
       <circle cx="17" cy="8" r="2.2" />
@@ -40,22 +50,40 @@ function PawPlaceholder() {
 }
 
 /**
- * Tarjeta pública de un animal adoptable (§M14/M03, pulido visual T-D02). Solo
- * campos PÚBLICOS de `AnimalSummary` (foto, nombre, especie, raza, edad, sexo) —
- * nada clínico. El detalle individual (`/o/:slug/animales/:animalId`, T-052) YA
- * existe y está cableado — se conserva el enlace tal cual (nav-state con el
- * `AnimalSummary`, para que el detalle no vuelva a pedir la lista).
+ * Tarjeta pública de un animal adoptable (§M14/M03, rediseño "marketplace"
+ * T-D03). Solo campos PÚBLICOS de `AnimalSummary` (foto, nombre, especie,
+ * raza, edad, sexo, tamaño, fecha de publicación) — nada clínico. El detalle
+ * individual (`/o/:slug/animales/:animalId`, T-052) YA existe y está
+ * cableado — se conserva el enlace tal cual (nav-state con el `AnimalSummary`,
+ * para que el detalle no vuelva a pedir la lista).
+ *
+ * El corazón de "favorito" es SOLO del navegador (estado local del
+ * componente, nunca persistido): no existe ninguna funcionalidad de
+ * favoritos en el backend (ni tabla, ni endpoint). Se implementa así — en
+ * vez de omitirlo — para no dejar el diseño del mockup incompleto, pero
+ * deliberadamente NO se guarda en ningún lado: se pierde al recargar la
+ * página. TODO(client): si el negocio pide favoritos reales, esto necesita
+ * un endpoint propio (probablemente atado a la cuenta del visitante).
  */
-export function AnimalCard({ slug, animal, onOpenDetail }: AnimalCardProps) {
+export function AnimalCard({ slug, animal, organization, onOpenDetail }: AnimalCardProps) {
   const age = ageLabel(animal.computedAge);
+  const isNew = isRecentlyPublished(animal.createdAt);
+  const detailHref = publicAnimalDetailHref(slug, animal.id);
+  // La foto pública puede apuntar a un storage-ref roto/expirado (StoragePort
+  // stub en Ola 1) — si `<img>` falla, cae al mismo placeholder que "sin foto",
+  // en vez de dejar un hueco de color sólido sin ícono.
+  const [photoFailed, setPhotoFailed] = useState(false);
+  const showPhoto = Boolean(animal.photoUrl) && !photoFailed;
+  const [favorited, setFavorited] = useState(false);
 
   return (
-    <Card className="overflow-hidden transition hover:shadow-md">
+    <article className={styles.card}>
       <Link
-        to={publicAnimalDetailHref(slug, animal.id)}
+        to={detailHref}
         state={{ animal }}
+        aria-label={`Ver detalle de ${animal.name}`}
         data-testid="animal-card"
-        className="block transition hover:scale-[1.01] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onClick={(event) => {
           if (!onOpenDetail) return;
           const isPlainLeftClick =
@@ -69,34 +97,76 @@ export function AnimalCard({ slug, animal, onOpenDetail }: AnimalCardProps) {
           onOpenDetail(animal);
         }}
       >
-        {animal.photoUrl ? (
-          <img
-            src={animal.photoUrl}
-            alt={animal.name}
-            className="aspect-[4/3] w-full object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <div
-            aria-hidden
-            className="flex aspect-[4/3] w-full items-center justify-center bg-muted"
-          >
-            <PawPlaceholder />
-          </div>
-        )}
-        <div className="space-y-1.5 p-4">
-          <p className="font-semibold leading-none">{animal.name}</p>
-          <div className="flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
-            {animal.breed && <span>{animal.breed}</span>}
-            {animal.breed && age && <span aria-hidden>·</span>}
-            {age && <span>{age}</span>}
-          </div>
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            <Badge variant="secondary">{SPECIES_LABELS[animal.species]}</Badge>
-            <Badge variant="outline">{SEX_LABELS[animal.sex]}</Badge>
-          </div>
+        <div className={styles.card__photoWrap}>
+          {showPhoto ? (
+            <img
+              src={animal.photoUrl}
+              alt={animal.name}
+              className={styles.card__photo}
+              loading="lazy"
+              onError={() => setPhotoFailed(true)}
+            />
+          ) : (
+            <div
+              aria-hidden
+              className={styles.card__placeholder}
+              style={{ color: 'hsl(var(--muted-foreground) / 0.5)' }}
+            >
+              <PawPlaceholder />
+            </div>
+          )}
+          {isNew && (
+            <span className={styles.card__badgeNew} data-testid="animal-card-new-badge">
+              Nuevo
+            </span>
+          )}
+        </div>
+
+        <div className={styles.card__body}>
+          <p className={styles.card__name}>{animal.name}</p>
+          {animal.breed && <p className={styles.card__meta}>{animal.breed}</p>}
+          {/* Texto plano separado por "·" (T-D06, §14) — nunca tres badges
+              enormes; el nombre es el elemento visual más importante. */}
+          <p className={styles.card__meta}>
+            {[SPECIES_LABELS[animal.species], SEX_LABELS[animal.sex], SIZE_LABELS[animal.size], age]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
         </div>
       </Link>
-    </Card>
+
+      <button
+        type="button"
+        className={styles.card__favorite}
+        aria-pressed={favorited}
+        aria-label={
+          favorited ? `Quitar ${animal.name} de favoritos` : `Guardar ${animal.name} en favoritos`
+        }
+        onClick={() => setFavorited((prev) => !prev)}
+      >
+        <IconHeart className="h-4 w-4" filled={favorited} />
+      </button>
+
+      <div className={styles.card__actions}>
+        <Link
+          to={buildAdoptionRequestHref(animal.organizationId, animal)}
+          className={cn(styles.btn, styles['btn--primary'])}
+        >
+          Adoptar
+        </Link>
+        {/* Apadrinar/Donar: acciones secundarias LIGERAS (texto, no botones
+            con borde) — jerarquía clara frente a "Adoptar" (T-D06, §15). */}
+        <div className={styles.card__actionSecondary}>
+          <Link to={buildSponsorHref(animal, organization?.name)} className={styles.card__link}>
+            Apadrinar
+          </Link>
+          {organization && (
+            <Link to={buildDonateHref(organization)} className={styles.card__link}>
+              Donar
+            </Link>
+          )}
+        </div>
+      </div>
+    </article>
   );
 }

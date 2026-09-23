@@ -165,6 +165,9 @@ export interface AnimalSummary {
   computedAge?: ComputedAge;
   /** Opaque storage ref of the primary photo (StoragePort key). */
   primaryPhotoRef?: string;
+  /** ISO-8601 UTC — recently published catalog UI (e.g. a "Nuevo" badge) reads
+   *  this; absent on projections that don't expose it. */
+  createdAt?: string;
 }
 
 /**

@@ -29,6 +29,7 @@ interface RawItem {
   primaryPhotoRef: string | null;
   birthDate: string | null;
   approximateAgeMonths: number | null;
+  createdAt: string;
 }
 
 interface RawPage {
@@ -190,6 +191,7 @@ export class PublicAnimalsService {
         ? this.storage.resolvePublicUrl(item.primaryPhotoRef)
         : undefined,
       isActive: true,
+      createdAt: item.createdAt,
     };
   }
 }

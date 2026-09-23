@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import type {
   OrganizationPublic,
@@ -7,7 +7,7 @@ import type {
   PortalTheme,
   PortalView,
 } from '@adoptafacil/contracts';
-import { EmptyState, Skeleton, Tabs, TabsContent, TabsList, TabsTrigger } from '@adoptafacil/ui';
+import { EmptyState, Skeleton } from '@adoptafacil/ui';
 import { brandTokensToStyle } from '../../../shell/theme';
 import { buildPortalView } from '../model/portal-view';
 import { safeLogoPosition, safePortalTheme, safeSocialNavPosition } from '../model/theme';
@@ -24,6 +24,9 @@ import { PortalAboutSection } from '../components/portal-about-section';
 import { PortalContactInfoSection } from '../components/portal-contact-info-section';
 import { PortalHeaderActions } from '../components/portal-header-actions';
 import { PortalPublicLedgerSection } from '../components/portal-public-ledger-section';
+import { PublicHeader, type PublicHeaderNavItem } from '../components/public-header';
+import { PublicFooter } from '../components/public-footer';
+import { PortalHelpCta } from '../components/portal-help-cta';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
 
@@ -42,23 +45,24 @@ const DEFAULT_LAYOUT: Layout = { logoPosition: 'left', socialNavPosition: 'right
  * so it only ever shows public fields the backend chooses to expose (never
  * phone/legalName; NIT only once formalized).
  *
- * The portal is a rich, multi-section page (pulido visual T-D02):
- *  - hero + "perfil" — cover/logo, name, type/formalization badges and a real
- *    stats row (location, adoptable animal count, formalization), read straight
- *    from the `OrganizationPublic` contract (inherits any public-field change).
+ * The portal is a rich, single-scroll page (rediseño T-D04 — reemplaza el
+ * layout de tabs por anclas reales, confirmado con el dueño del producto,
+ * `[Excepcion M14]`):
+ *  - `PublicHeader` (nav sticky) + hero (`PortalProfileSection`, cover/logo,
+ *    nombre, badges de tipo/formalización, stats reales) + `PublicFooter` —
+ *    ambos NUEVOS, misma nav (anclas a las secciones reales de abajo).
  *  - the transparency indicator (§M14, T-027) only mounts when it has a REAL
  *    signal to show (verificationLevel > 0) — otherwise it stays unmounted rather
  *    than displaying an always-"No disponible" bar.
- *  - pulido visual (imagen de referencia usada solo como guía, 2 iteraciones):
- *    KPIs reales arriba (`PortalKpis`); acciones principales
- *    (Donar/Adoptar/Apadrinar, `PortalHeaderActions`) junto al nombre/badges
- *    dentro de `PortalProfileSection` (no como barra suelta); y un layout de
- *    dos columnas debajo — columna principal con las tabs
- *    Portafolio/Nosotros/Información, y UN panel lateral con "Campaña
- *    activa" + "Síguenos" juntos, del lado que indique `socialNavPosition`
- *    (S2-REORG, mismo campo real ya usado para el logo/sidebar). En mobile
- *    el panel lateral se apila debajo. Todo con los MISMOS
- *    componentes/rutas de siempre, solo reubicados.
+ *  - layout de dos columnas: columna principal con "Mascotas en adopción" /
+ *    "Productos" / "Necesita hoy" (siempre visibles, ya no detrás de una tab),
+ *    y UN panel lateral con "Campaña activa" + "Síguenos" juntos, del lado que
+ *    indique `socialNavPosition` (S2-REORG, mismo campo real ya usado para el
+ *    logo/sidebar). En mobile el panel lateral se apila debajo. Debajo del
+ *    grid: banner "Cómo ayudar" (`PortalHelpCta`), y "Nosotros"/"Información"
+ *    como secciones ancladas (antes tabs) que solo aparecen con contenido
+ *    real. Todo con los MISMOS componentes/rutas/datos de siempre, solo
+ *    reubicados — ver `docs/PLAN-CONTINUACION-SEBASTIAN_2026-09-23.md`.
  *  - aggregated sections still in `status: 'placeholder'` (transparencia — no
  *    owning module yet) are simply NOT mounted, instead of showing an empty
  *    "Próximamente" card; 'pets', 'products' (F-MKT-PORTAL-1), 'needsToday'
@@ -88,15 +92,15 @@ export function OrgPublicPage({ slugOverride }: OrgPublicPageProps = {}) {
   const [layout, setLayout] = useState<Layout>(DEFAULT_LAYOUT);
   const [state, setState] = useState<LoadState>('loading');
   const [animalTotal, setAnimalTotal] = useState<number | undefined>(undefined);
-  const [activeTab, setActiveTab] = useState('portafolio');
-  const tabsRef = useRef<HTMLDivElement>(null);
 
   // "Adoptar"/"Apadrinar" (pulido visual) no inventan un flujo nuevo: solo
-  // llevan al catálogo real (tab "Portafolio") donde el visitante elige el
-  // animal y sigue la ruta que ya existe (ver `PortalHeaderActions`).
+  // desplazan a la sección real "Mascotas en adopción" (rediseño T-D04, ya
+  // sin tabs) donde el visitante elige el animal y sigue la ruta que ya
+  // existe (ver `PortalHeaderActions`).
   const goToCatalog = () => {
-    setActiveTab('portafolio');
-    tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document
+      .getElementById('portal-section-pets')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   useEffect(() => {
@@ -205,8 +209,9 @@ export function OrgPublicPage({ slugOverride }: OrgPublicPageProps = {}) {
     (section) => section.kind !== 'activeCampaign',
   );
 
-  // Tabs "Nosotros"/"Información" (S2-PORTAL) solo existen cuando hay contenido
-  // REAL que mostrar — nunca una tab vacía. "Portafolio" siempre está (§5.1).
+  // Anclas reales de la nav (header/footer, rediseño T-D04) — solo entran las
+  // que de verdad tienen destino: "Nosotros"/"Contacto" únicamente con
+  // contenido real, nunca un link muerto.
   const aboutUs = view?.profile.organization.aboutUs?.trim();
   const contact = view?.profile.organization.extendedContact;
   const hasContactInfo = Boolean(
@@ -216,122 +221,136 @@ export function OrgPublicPage({ slugOverride }: OrgPublicPageProps = {}) {
       contact.mapUrl ||
       (contact.additionalPhones && contact.additionalPhones.length > 0)),
   );
+  const navItems: PublicHeaderNavItem[] = [
+    { label: 'Inicio', href: '#portal-top' },
+    { label: 'Animales', href: '#portal-section-pets' },
+    { label: 'Cómo ayudar', href: '#portal-help-cta' },
+    ...(aboutUs ? [{ label: 'Nosotros', href: '#portal-about' }] : []),
+    { label: 'Transparencia', href: '#portal-section-public-ledger' },
+    ...(hasContactInfo ? [{ label: 'Contacto', href: '#portal-contact-info' }] : []),
+  ];
 
   return (
-    <main
-      className="mx-auto w-full max-w-screen-2xl px-4 py-10 sm:px-6 lg:px-8 xl:px-12"
-      style={themeStyle}
-    >
-      {state === 'loading' && <Skeleton className="h-72 w-full" />}
-      {state === 'not-found' && (
-        <EmptyState
-          title="Organización no encontrada"
-          description="El enlace no corresponde a ninguna organización."
-        />
-      )}
-      {state === 'error' && (
-        <EmptyState title="No se pudo cargar" description="Inténtalo de nuevo más tarde." />
-      )}
+    <>
       {state === 'ready' && view && (
-        <div className="space-y-8">
-          {hasVerificationSignal && (
-            <div className="flex justify-end">
-              <PortalTransparencyBar organization={view.profile.organization} />
-            </div>
-          )}
-          {/* Header (3ra iteración): perfil + KPI(s) + acciones viven TODOS
-              dentro del mismo panel (`PortalProfileSection`) — ya no hay una
-              tarjeta de KPI flotante aparte ni una fila extra a su lado. */}
-          <PortalProfileSection
-            profile={view.profile}
-            animalCount={animalTotal}
-            logoPosition={layout.logoPosition}
-            actions={
-              <PortalHeaderActions
-                organization={view.profile.organization}
-                onBrowseCatalog={goToCatalog}
-              />
-            }
+        <PublicHeader organization={view.profile.organization} navItems={navItems} />
+      )}
+      <main
+        id="portal-top"
+        className="mx-auto w-full px-4 py-10 sm:px-6 lg:w-[94vw] lg:max-w-[1500px] lg:px-0"
+        style={{ ...themeStyle, scrollMarginTop: '5rem' }}
+      >
+        {state === 'loading' && <Skeleton className="h-72 w-full" />}
+        {state === 'not-found' && (
+          <EmptyState
+            title="Organización no encontrada"
+            description="El enlace no corresponde a ninguna organización."
           />
+        )}
+        {state === 'error' && (
+          <EmptyState title="No se pudo cargar" description="Inténtalo de nuevo más tarde." />
+        )}
+        {state === 'ready' && view && (
+          <div className="space-y-8">
+            {hasVerificationSignal && (
+              <div className="flex justify-end">
+                <PortalTransparencyBar organization={view.profile.organization} />
+              </div>
+            )}
+            {/* Header (3ra iteración): perfil + KPI(s) + acciones viven TODOS
+                dentro del mismo panel (`PortalProfileSection`) — ya no hay una
+                tarjeta de KPI flotante aparte ni una fila extra a su lado. */}
+            <PortalProfileSection
+              profile={view.profile}
+              animalCount={animalTotal}
+              logoPosition={layout.logoPosition}
+              actions={
+                <PortalHeaderActions
+                  organization={view.profile.organization}
+                  onBrowseCatalog={goToCatalog}
+                />
+              }
+            />
 
-          {/* Dos columnas (pulido visual, 2da iteración): columna principal
-              con las tabs Portafolio/Nosotros/Información, y UN panel
-              lateral con "Campaña activa" + "Síguenos" juntos (antes cada
-              uno suelto). El lado lo decide `socialNavPosition`, el mismo
-              campo REAL ya usado arriba para la posición del logo/sidebar
-              (S2-REORG, `PortalThemeConfig.socialNavPosition` —
-              `packages/contracts/src/portals.ts`) — no uno nuevo. En mobile
-              el panel lateral se apila debajo (grid de 1 columna). */}
-          <div className="grid gap-6 lg:grid-cols-3">
-            <div
-              ref={tabsRef}
-              className={`lg:col-span-2 ${layout.socialNavPosition === 'left' ? 'lg:order-last' : ''}`}
-            >
-              {/* Menú de tabs (S2-PORTAL, §5.1): "Portafolio" siempre
-                  presente; "Nosotros"/"Información" solo cuando hay
-                  contenido real. */}
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList>
-                  <TabsTrigger value="portafolio">Portafolio</TabsTrigger>
-                  {aboutUs && <TabsTrigger value="nosotros">Nosotros</TabsTrigger>}
-                  {hasContactInfo && <TabsTrigger value="informacion">Información</TabsTrigger>}
-                </TabsList>
-
-                <TabsContent value="portafolio">
-                  <div className="space-y-6">
-                    {/* "Mascotas en adopción" (kind 'pets', §M03/T-052),
-                        "Productos" (kind 'products', §M10, F-MKT-PORTAL-1) y
-                        "Necesita hoy" (kind 'needsToday', §M09,
-                        F-NEEDS-PORTAL-1); cualquier otra sección que algún
-                        día deje de ser placeholder aparecería aquí también. */}
-                    {portafolioSections?.map((section) =>
-                      section.kind === 'pets' ? (
-                        <PortalAdoptionSection key={section.kind} slug={slug as string} />
-                      ) : section.kind === 'products' ? (
-                        <PortalProductsSection
-                          key={section.kind}
-                          organizationId={view.profile.organization.id}
-                        />
-                      ) : section.kind === 'needsToday' ? (
-                        <PortalNeedsSection
-                          key={section.kind}
-                          organizationId={view.profile.organization.id}
-                        />
-                      ) : (
-                        <PortalPlaceholderSection key={section.kind} section={section} />
-                      ),
-                    )}
-                  </div>
-                </TabsContent>
-
-                {aboutUs && (
-                  <TabsContent value="nosotros">
-                    <PortalAboutSection aboutUs={aboutUs} />
-                  </TabsContent>
+            {/* Dos columnas (pulido visual, 2da iteración): columna principal
+                con "Mascotas en adopción"/"Productos"/"Necesita hoy" SIEMPRE
+                visibles (rediseño T-D04, ya no detrás de una tab), y UN panel
+                lateral con "Campaña activa" + "Síguenos" juntos. El lado lo
+                decide `socialNavPosition`, el mismo campo REAL ya usado
+                arriba para la posición del logo/sidebar (S2-REORG,
+                `PortalThemeConfig.socialNavPosition` —
+                `packages/contracts/src/portals.ts`) — no uno nuevo. En mobile
+                el panel lateral se apila debajo (grid de 1 columna). */}
+            <div className="grid gap-8 lg:grid-cols-[1fr_320px]" data-testid="portal-main-grid">
+              <div
+                className={`space-y-6 ${layout.socialNavPosition === 'left' ? 'lg:order-last' : ''}`}
+              >
+                {/* "Mascotas en adopción" (kind 'pets', §M03/T-052),
+                    "Productos" (kind 'products', §M10, F-MKT-PORTAL-1) y
+                    "Necesita hoy" (kind 'needsToday', §M09,
+                    F-NEEDS-PORTAL-1); cualquier otra sección que algún día
+                    deje de ser placeholder aparecería aquí también. */}
+                {portafolioSections?.map((section) =>
+                  section.kind === 'pets' ? (
+                    <PortalAdoptionSection
+                      key={section.kind}
+                      slug={slug as string}
+                      organization={view.profile.organization}
+                    />
+                  ) : section.kind === 'products' ? (
+                    <PortalProductsSection
+                      key={section.kind}
+                      organizationId={view.profile.organization.id}
+                    />
+                  ) : section.kind === 'needsToday' ? (
+                    <PortalNeedsSection
+                      key={section.kind}
+                      organizationId={view.profile.organization.id}
+                    />
+                  ) : (
+                    <PortalPlaceholderSection key={section.kind} section={section} />
+                  ),
                 )}
+              </div>
 
-                {hasContactInfo && contact && (
-                  <TabsContent value="informacion">
-                    <PortalContactInfoSection contact={contact} />
-                  </TabsContent>
+              <aside
+                className={`space-y-6 ${layout.socialNavPosition === 'left' ? 'lg:order-first' : ''}`}
+                data-testid="portal-side-panel"
+              >
+                {hasActiveCampaignSection && (
+                  <PortalCampaignsSection key="activeCampaign" slug={slug as string} />
                 )}
-              </Tabs>
+                <PortalSocialLinks organization={view.profile.organization} />
+              </aside>
             </div>
 
-            <aside
-              className={`space-y-6 ${layout.socialNavPosition === 'left' ? 'lg:order-first' : ''}`}
-              data-testid="portal-side-panel"
-            >
-              {hasActiveCampaignSection && (
-                <PortalCampaignsSection key="activeCampaign" slug={slug as string} />
-              )}
-              <PortalSocialLinks organization={view.profile.organization} />
-            </aside>
-          </div>
+            <PortalHelpCta organization={view.profile.organization} />
 
-          <PortalPublicLedgerSection />
+            {/* "Nosotros"/"Información" (S2-PORTAL, rediseño T-D04): antes
+                tabs, ahora secciones ancladas siempre visibles cuando hay
+                contenido real — nunca una sección vacía. */}
+            {aboutUs && (
+              <section id="portal-about" style={{ scrollMarginTop: '5rem' }}>
+                <PortalAboutSection aboutUs={aboutUs} />
+              </section>
+            )}
+            {hasContactInfo && contact && (
+              <section id="portal-contact-info" style={{ scrollMarginTop: '5rem' }}>
+                <PortalContactInfoSection contact={contact} />
+              </section>
+            )}
+
+            <div style={{ scrollMarginTop: '5rem' }}>
+              <PortalPublicLedgerSection />
+            </div>
+          </div>
+        )}
+      </main>
+      {state === 'ready' && view && (
+        <div className="mx-auto w-full px-4 sm:px-6 lg:w-[94vw] lg:max-w-[1500px] lg:px-0">
+          <PublicFooter organization={view.profile.organization} navItems={navItems} />
         </div>
       )}
-    </main>
+    </>
   );
 }
