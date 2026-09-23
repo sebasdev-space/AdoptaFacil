@@ -1,17 +1,22 @@
 import type { OrganizationPublic } from '@adoptafacil/contracts';
 import type { PublicHeaderNavItem } from './public-header';
 import {
+  IconArrowRight,
   IconFacebook,
   IconGlobe,
   IconInstagram,
   IconMail,
+  IconPaw,
   IconTikTok,
   IconWhatsapp,
 } from './portal-icons';
 import styles from '../styles/public-portal.module.scss';
 
 export interface PublicFooterProps {
-  organization: Pick<OrganizationPublic, 'name' | 'socialLinks' | 'whatsapp' | 'contactEmail'>;
+  organization: Pick<
+    OrganizationPublic,
+    'name' | 'logoUrl' | 'socialLinks' | 'whatsapp' | 'contactEmail'
+  >;
   navItems: readonly PublicHeaderNavItem[];
 }
 
@@ -78,6 +83,13 @@ export function PublicFooter({ organization, navItems }: PublicFooterProps) {
     <footer className={styles.footer} data-testid="public-footer">
       <div className={styles.footer__top}>
         <div className={styles.footer__brand}>
+          {organization.logoUrl ? (
+            <img src={organization.logoUrl} alt="" className={styles.header__logo} />
+          ) : (
+            <span aria-hidden className={styles.header__logoFallback}>
+              <IconPaw className="h-4 w-4" />
+            </span>
+          )}
           <span className={styles.header__name}>{organization.name}</span>
         </div>
         <nav className={styles.footer__nav} aria-label="Navegación del portal (pie de página)">
@@ -93,22 +105,23 @@ export function PublicFooter({ organization, navItems }: PublicFooterProps) {
         <p className={styles.footer__copyright}>
           © {new Date().getFullYear()} {organization.name}. Todos los derechos reservados.
         </p>
-        {socialIcons.length > 0 && (
-          <div className={styles.footer__social}>
-            {socialIcons.map(({ key, label, href, Icon }) => (
-              <a
-                key={key}
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={label}
-                className={styles.footer__socialIcon}
-              >
-                <Icon className="h-4 w-4" />
-              </a>
-            ))}
-          </div>
-        )}
+        <div className={styles.footer__social}>
+          {socialIcons.map(({ key, label, href, Icon }) => (
+            <a
+              key={key}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={label}
+              className={styles.footer__socialIcon}
+            >
+              <Icon className="h-4 w-4" />
+            </a>
+          ))}
+          <a href="#portal-top" aria-label="Volver arriba" className={styles.footer__socialIcon}>
+            <IconArrowRight aria-hidden className="h-4 w-4 -rotate-90" />
+          </a>
+        </div>
       </div>
     </footer>
   );

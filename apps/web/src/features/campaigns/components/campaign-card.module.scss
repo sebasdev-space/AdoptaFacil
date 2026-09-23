@@ -1,0 +1,86 @@
+/**
+ * `CampaignCard` (§M06, pulido visual) — tarjeta propia (ya no envuelve el
+ * primitivo genérico `Card`) para poder mostrar una cabecera decorativa que
+ * SÍ llegue a los bordes de la tarjeta. `CampaignPublic` no expone un campo
+ * de imagen (ver doc comment del componente) — en vez de dejar la tarjeta
+ * sin cabecera visual, se usa un degradado derivado de los tokens de marca
+ * YA dinámicos por organización (--primary/--accent), nunca una foto
+ * inventada.
+ */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border) / 0.5);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition-base);
+  transition-property: transform, box-shadow, border-color;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: hsl(var(--primary) / 0.35);
+}
+
+.cover {
+  height: 5.5rem;
+  flex-shrink: 0;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, hsl(var(--primary)) 55%, hsl(var(--card))),
+    color-mix(in srgb, hsl(var(--accent)) 70%, hsl(var(--card)))
+  );
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 1.125rem;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--fs-h3);
+  font-weight: var(--fw-semibold);
+  line-height: 1.25;
+  color: hsl(var(--foreground));
+}
+
+.title:hover {
+  text-decoration: underline;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.deadline {
+  font-size: var(--fs-xs);
+  color: hsl(var(--muted-foreground));
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  align-self: flex-start;
+  margin-top: 0.25rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--r-full);
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+}
+
+.cta:hover {
+  opacity: 0.92;
+}

@@ -15,14 +15,18 @@
   position: sticky;
   top: 0;
   z-index: 30;
+  background: hsl(var(--background) / 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid hsl(var(--border) / 0.4);
+}
+
+.header__inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.75rem 0;
-  background: hsl(var(--background) / 0.92);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid hsl(var(--border) / 0.4);
+  padding-top: 1rem;
+  padding-bottom: 1rem;
 }
 
 .header__brand {

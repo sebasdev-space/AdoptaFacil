@@ -1,50 +1,115 @@
-.hero {
+/**
+ * Hero de dos columnas (rediseño T-D05): banner integrado, fondo suave
+ * derivado del color de marca de la organización (--primary), texto a la
+ * izquierda y portada a la derecha — reemplaza el cover-strip + card de
+ * texto apilados de antes (mismo componente, mismos props/tests).
+ */
+
+.hero2 {
   position: relative;
-  height: 14rem;
   overflow: hidden;
-  background: linear-gradient(135deg, hsl(var(--primary) / 0.18), hsl(var(--accent) / 0.35));
+  border-radius: var(--r-2xl);
+  padding: 1.75rem;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, hsl(var(--primary)) 10%, hsl(var(--card))),
+    color-mix(in srgb, hsl(var(--accent)) 55%, hsl(var(--card)))
+  );
+  box-shadow: var(--shadow-sm);
 
   @media (min-width: 640px) {
-    height: 20rem;
+    padding: 2.5rem;
   }
 }
 
-.hero__cover {
+.hero2__glow {
+  position: absolute;
+  right: -3rem;
+  top: -3rem;
+  height: 16rem;
+  width: 16rem;
+  border-radius: var(--r-full);
+  background: hsl(var(--primary));
+  opacity: 0.14;
+  filter: blur(72px);
+  pointer-events: none;
+}
+
+.hero2__grid {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+
+  @media (min-width: 1024px) {
+    flex-direction: row;
+    align-items: center;
+    gap: 2.5rem;
+  }
+}
+
+.hero2__text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+
+  @media (min-width: 1024px) {
+    flex: 1 1 52%;
+  }
+}
+
+.hero2__imageWrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--r-xl);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+
+  @media (min-width: 1024px) {
+    flex: 1 1 44%;
+  }
+}
+
+.hero2__image {
   height: 100%;
   width: 100%;
   object-fit: cover;
 }
 
-.hero__glow {
-  position: absolute;
-  right: -2.5rem;
-  top: -2.5rem;
-  height: 18rem;
-  width: 18rem;
-  border-radius: var(--r-full);
-  background: hsl(var(--primary));
-  opacity: 0.25;
-  filter: blur(64px);
+.hero2__imageFallback {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, hsl(var(--primary)) 30%, hsl(var(--card))),
+    color-mix(in srgb, hsl(var(--accent)) 70%, hsl(var(--card)))
+  );
+}
+
+.hero2__logoWrap {
+  line-height: 0;
 }
 
 .avatar-img {
-  height: 5rem;
-  width: 5rem;
+  height: 4.5rem;
+  width: 4.5rem;
   border-radius: var(--r-full);
   border: 4px solid var(--bg-surface);
   object-fit: cover;
   box-shadow: var(--shadow-md);
 
   @media (min-width: 640px) {
-    height: 6rem;
-    width: 6rem;
+    height: 5.5rem;
+    width: 5.5rem;
   }
 }
 
 .avatar-fallback {
   display: flex;
-  height: 5rem;
-  width: 5rem;
+  height: 4.5rem;
+  width: 4.5rem;
   align-items: center;
   justify-content: center;
   border-radius: var(--r-full);
@@ -57,8 +122,8 @@
   box-shadow: var(--shadow-md);
 
   @media (min-width: 640px) {
-    height: 6rem;
-    width: 6rem;
+    height: 5.5rem;
+    width: 5.5rem;
     font-size: var(--fs-h2);
   }
 }
@@ -68,6 +133,7 @@
   font-size: var(--fs-h1);
   font-weight: var(--fw-semibold);
   letter-spacing: -0.01em;
+  color: hsl(var(--foreground));
 
   @media (min-width: 640px) {
     font-size: var(--fs-display);
@@ -76,34 +142,16 @@
 
 .meta {
   font-size: var(--fs-sm);
-  color: var(--text-muted);
+  color: hsl(var(--muted-foreground));
+}
+
+.meta__stat {
+  font-weight: var(--fw-semibold);
+  color: hsl(var(--foreground));
 }
 
 .description {
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-}
-
-// KPI(s) reales integrados en el mismo panel del header (3ra iteración del
-// pulido visual) — bloques planos, sin tarjeta/sombra propia (ya están
-// dentro de la Card del header), separados por una línea sutil arriba.
-.kpis {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2rem;
-  border-top: 1px solid var(--border-hairline);
-  padding-top: 1rem;
-}
-
-.kpi__value {
-  font-family: var(--font-sans);
-  font-variant-numeric: tabular-nums;
-  font-size: var(--fs-h2);
-  font-weight: var(--fw-extra);
-  color: var(--text-dark);
-}
-
-.kpi__label {
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
+  font-size: var(--fs-body);
+  color: hsl(var(--muted-foreground));
+  max-width: 34rem;
 }

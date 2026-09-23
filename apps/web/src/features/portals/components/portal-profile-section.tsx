@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Badge, Card, CardContent, CardHeader, cn } from '@adoptafacil/ui';
+import { Badge, cn } from '@adoptafacil/ui';
 import {
   FormalizationState,
   type PortalLogoPosition,
@@ -48,12 +48,12 @@ function initials(name: string): string {
 }
 
 /**
- * Sección "perfil": identidad pública REAL de la organización (pulido visual
- * T-D02, reestilado BEM+SCSS en REFACTOR-VISUAL v2 Fase 6) — hero navy con
- * portada opcional + logo, nombre, badges de tipo/formalización, y una fila
- * de stats reales (ubicación, animales disponibles, formalización). Lee
- * directamente `profile.organization` (contrato `OrganizationPublic`), por lo que
- * hereda por contrato cualquier cambio en los campos públicos que publique
+ * Sección "perfil"/hero: identidad pública REAL de la organización (rediseño
+ * T-D05 — banner integrado de dos columnas, texto a la izquierda y portada a
+ * la derecha, en vez del cover-strip apilado + card de texto debajo de antes;
+ * MISMOS props/datos/tests, solo composición). Lee directamente
+ * `profile.organization` (contrato `OrganizationPublic`), por lo que hereda
+ * por contrato cualquier cambio en los campos públicos que publique
  * @sebastian — sin reproyectar. El nivel de verificación NUNCA se muestra aquí
  * (siempre 0 hasta que exista el catálogo, T-103) y las redes sociales/contacto
  * viven en el sidebar (`PortalSocialLinks`), no en esta card.
@@ -76,55 +76,29 @@ export function PortalProfileSection({
 
   return (
     <section aria-labelledby={HEADING_ID}>
-      <Card className="overflow-hidden">
-        {/* Hero: portada navy. El avatar vive en un wrapper HERMANO (relative,
-            sin overflow) — el `.hero` de abajo SÍ tiene `overflow: hidden`
-            (recorta la portada), así que el avatar NO puede ser hijo suyo o
-            su mitad inferior queda cortada por ese mismo overflow (bug
-            corregido en la 2da iteración del pulido visual). */}
-        <div className="relative">
-          <div className={styles.hero}>
-            {cover ? (
-              <img src={cover} alt="" className={styles.hero__cover} />
-            ) : (
-              <div aria-hidden className={styles.hero__glow} />
-            )}
-          </div>
-          <div className={`absolute -bottom-10 z-10 ${LOGO_POSITION_CLASSES[logoPosition]}`}>
-            {org.logoUrl ? (
-              <img src={org.logoUrl} alt={`Logo de ${org.name}`} className={styles['avatar-img']} />
-            ) : (
-              <div aria-hidden className={styles['avatar-fallback']}>
-                {initials(org.name)}
-              </div>
-            )}
-          </div>
-        </div>
+      <div className={styles.hero2}>
+        <div aria-hidden className={styles.hero2__glow} />
+        <div className={styles.hero2__grid}>
+          <div className={styles.hero2__text}>
+            <div className="flex flex-wrap items-center gap-2">
+              <OrgTypeBadge organizationType={organizationType} />
+              {formalizationLabel && (
+                <Badge variant={isEsal ? 'success' : 'secondary'}>
+                  {isEsal ? `✓ ${formalizationLabel}` : formalizationLabel}
+                </Badge>
+              )}
+              {org.rteVigente && <Badge variant="success">RTE vigente</Badge>}
+            </div>
 
-        <CardHeader className="gap-3 pt-12 sm:pt-14">
-          <div className="flex flex-wrap items-center gap-2">
             <h1 id={HEADING_ID} className={styles.name}>
               {org.name}
             </h1>
-            <OrgTypeBadge organizationType={organizationType} />
-            {formalizationLabel && (
-              <Badge variant={isEsal ? 'success' : 'secondary'}>
-                {isEsal ? `✓ ${formalizationLabel}` : formalizationLabel}
-              </Badge>
-            )}
-            {org.rteVigente && <Badge variant="success">RTE vigente</Badge>}
-          </div>
 
-          {/* Segunda línea del header: ubicación/NIT a la izquierda, acciones
-              principales (Donar/Adoptar/Apadrinar) a la derecha, mismo
-              renglón — 3ra iteración del pulido visual. En mobile se apilan
-              en columna (no "ml-auto" + "flex-shrink-0": esa combinación le
-              da a las acciones su ancho de contenido COMPLETO sin permitir
-              que su propio flex-wrap interno reaccione, y los 3 botones se
-              recortaban por el `overflow-hidden` de la Card en vez de
-              apilarse — bug real encontrado en QA visual mobile). */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-            {(location || org.nit) && (
+            {org.description && (
+              <p className={cn('line-clamp-3', styles.description)}>{org.description}</p>
+            )}
+
+            {(location || org.nit || typeof animalCount === 'number') && (
               <p className={styles.meta}>
                 {location && <span>{location}</span>}
                 {location && org.nit && ' · '}
@@ -133,33 +107,42 @@ export function PortalProfileSection({
                     NIT: <span className="text-foreground">{org.nit}</span>
                   </>
                 )}
+                {(location || org.nit) && typeof animalCount === 'number' && ' · '}
+                {typeof animalCount === 'number' && (
+                  <span className={styles.meta__stat}>
+                    {animalCount} {animalCount === 1 ? 'animal disponible' : 'animales disponibles'}
+                  </span>
+                )}
               </p>
             )}
+
             {actions}
           </div>
-        </CardHeader>
 
-        <CardContent className="space-y-4">
-          {/* KPI(s) reales, integrados en el MISMO panel del header (3ra
-              iteración) — ya no una tarjeta flotante aparte. Hoy solo
-              "Animales disponibles" es real (ver PortalKpis, eliminado);
-              cualquier otra métrica de la lista de M01 se agregaría aquí
-              mismo cuando el backend la exponga. */}
-          {typeof animalCount === 'number' && (
-            <div className={styles.kpis}>
-              <div>
-                <p className={styles.kpi__value}>{animalCount}</p>
-                <p className={styles.kpi__label}>
-                  {animalCount === 1 ? 'animal disponible' : 'animales disponibles'}
-                </p>
-              </div>
+          <div className={styles.hero2__imageWrap}>
+            {cover ? (
+              <img src={cover} alt="" className={styles.hero2__image} />
+            ) : (
+              <div aria-hidden className={styles.hero2__imageFallback} />
+            )}
+            <div
+              className={`${styles.hero2__logoWrap} absolute -bottom-8 z-10 ${LOGO_POSITION_CLASSES[logoPosition]}`}
+            >
+              {org.logoUrl ? (
+                <img
+                  src={org.logoUrl}
+                  alt={`Logo de ${org.name}`}
+                  className={styles['avatar-img']}
+                />
+              ) : (
+                <div aria-hidden className={styles['avatar-fallback']}>
+                  {initials(org.name)}
+                </div>
+              )}
             </div>
-          )}
-          {org.description && (
-            <p className={cn('line-clamp-4', styles.description)}>{org.description}</p>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+        </div>
+      </div>
     </section>
   );
 }

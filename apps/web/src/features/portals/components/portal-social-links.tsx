@@ -51,6 +51,9 @@ export function PortalSocialLinks({ organization }: PortalSocialLinksProps) {
     <Card>
       <CardHeader>
         <CardTitle>Síguenos</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Conoce más de nuestro trabajo y acompáñanos en redes sociales.
+        </p>
       </CardHeader>
       <CardContent>
         <ul className={styles.socialList}>
@@ -93,6 +96,10 @@ export function PortalSocialLinks({ organization }: PortalSocialLinksProps) {
             </li>
           )}
         </ul>
+        <p className="mt-4 text-xs text-muted-foreground">
+          Cada like, comentario y compartir nos ayuda a llegar a más personas que pueden cambiar una
+          vida.
+        </p>
       </CardContent>
     </Card>
   );

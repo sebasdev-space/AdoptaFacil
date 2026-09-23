@@ -415,12 +415,11 @@ describe('OrgPublicPage — rich public portal', () => {
     renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
     await screen.findByRole('heading', { name: /Refugio Patitas/ });
 
-    // KPI integrado en el header (3ra iteración): número grande + label
-    // debajo, en elementos separados — no una sola tarjeta/cadena. Se
-    // desambigua con `selector: 'p'` porque el catálogo (T-D03) también
-    // muestra el mismo total en su propio contador ("X de Y animales").
-    expect(await screen.findByText('3', { selector: 'p' })).toBeInTheDocument();
-    expect(screen.getByText('animales disponibles')).toBeInTheDocument();
+    // KPI real en la línea de meta del hero (rediseño T-D05): "3 animales
+    // disponibles" — el catálogo (T-D03) también muestra el mismo total en
+    // su propio contador ("X de Y animales"), por eso se matchea el texto
+    // completo en vez de solo el número.
+    expect(await screen.findByText('3 animales disponibles')).toBeInTheDocument();
   });
 
   it('shows a clear public 404 for an unknown slug', async () => {
@@ -559,11 +558,8 @@ describe('OrgPublicPage — rich public portal', () => {
       renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
       await screen.findByRole('heading', { name: /Refugio Patitas/ });
 
-      // KPI integrado en el mismo panel del header (3ra iteración) — no una
-      // tarjeta flotante aparte. Se desambigua con `selector: 'p'` porque el
-      // catálogo (T-D03) también muestra el mismo total en su contador.
-      expect(await screen.findByText('7', { selector: 'p' })).toBeInTheDocument();
-      expect(screen.getByText('animales disponibles')).toBeInTheDocument();
+      // KPI real en la línea de meta del hero (rediseño T-D05).
+      expect(await screen.findByText('7 animales disponibles')).toBeInTheDocument();
       // No fabricated metrics: those fields don't exist in the contract yet.
       expect(screen.queryByText(/Adopciones/)).not.toBeInTheDocument();
       expect(screen.queryByText(/Calificación/)).not.toBeInTheDocument();
