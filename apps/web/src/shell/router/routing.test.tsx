@@ -115,36 +115,20 @@ describe('routing — public vs protected', () => {
     expect(screen.queryByText('Elige una organización desde su portal')).not.toBeInTheDocument();
   });
 
-  it('redirects an unauthenticated visitor from /donaciones to login (deny-by-default, T-051)', () => {
+  // Requisito FINAL del cliente (checkout de invitado): donar NUNCA exige
+  // cuenta ni login — reemplaza el viejo comportamiento deny-by-default de
+  // T-051 (la ruta vivía bajo <RequireAuth>). Ahora /donaciones es pública.
+  it('lets an UNAUTHENTICATED visitor reach the donate form directly (guest checkout, no login wall)', async () => {
     renderShell({
       route: '/donaciones?organizationId=org-9&organizationName=Refugio%20Patitas',
       session: { initialStatus: 'unauthenticated' },
     });
-    expect(screen.getByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Donar' })).not.toBeInTheDocument();
-  });
-
-  it('after signing in, returns to the donation flow with the org preserved (returnTo + query, T-051)', async () => {
-    const user = userEvent.setup();
-    render(
-      <AppProviders session={{ initialStatus: 'unauthenticated' }}>
-        <MemoryRouter
-          initialEntries={['/donaciones?organizationId=org-9&organizationName=Refugio%20Patitas']}
-          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-        >
-          <AppRoutes />
-        </MemoryRouter>
-      </AppProviders>,
-    );
-    expect(screen.getByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument();
-
-    await user.type(screen.getByLabelText('Correo electrónico'), 'demo@adoptafacil.org');
-    await user.type(screen.getByLabelText('Contraseña'), 'demo');
-    await user.click(screen.getByRole('button', { name: 'Iniciar sesión' }));
-
-    // Back on the donate flow, org intact (the query survived login).
     expect(await screen.findByRole('heading', { name: 'Donar' })).toBeInTheDocument();
     expect(screen.getByText('Refugio Patitas')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Iniciar sesión' })).not.toBeInTheDocument();
+    // Sin sesión, el formulario pide identidad de invitado en vez de asumir una cuenta.
+    expect(screen.getByTestId('donation-guest-name')).toBeInTheDocument();
+    expect(screen.getByTestId('donation-guest-email')).toBeInTheDocument();
   });
 
   // The "Solicitar adopción" CTA of the public animal detail (T-052) targets this URL.

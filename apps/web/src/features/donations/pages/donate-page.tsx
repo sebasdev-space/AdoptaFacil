@@ -14,6 +14,7 @@ import {
 import { PageContainer, PageHeader } from '../../_layout';
 import { isIncompleteProfileError, useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
+import { PublicFooter, PublicNavbar } from '../../../shell/layout';
 import { createDonation } from '../api/donations-api';
 import { DonateForm, type DonateFormValues } from '../components/donate-form';
 import { MyDonationsList } from '../components/my-donations-list';
@@ -58,14 +59,23 @@ function useDonationTarget(): DonationTarget | null {
 }
 
 /**
- * `/donar` — donación de una PERSONA autenticada a una organización (§M05, P1). Ve el
- * desglose transparente antes de pagar (misma cuenta que el backend), puede marcar
- * "cubro la comisión", y al confirmarse el pago (webhook) se emite un recibo
- * automático. Dato personal bajo Ley 1581.
+ * `/donaciones` — donación a una organización (§M05, P1 + checkout de INVITADO,
+ * requisito final del cliente: donar NUNCA exige cuenta ni login). Ve el desglose
+ * transparente antes de pagar (misma cuenta que el backend), puede marcar
+ * "cubro la comisión" y la donación anónima frente a la organización, y al
+ * confirmarse el pago (webhook) se emite un recibo automático. Dato personal
+ * bajo Ley 1581.
+ *
+ * SEAM resuelto: la ruta vive FUERA de `<RequireAuth>`/`<AppLayout>` (ver
+ * routes.tsx) — esta página arma su propio chrome público (mismo patrón que
+ * `PublicCampaignsPage`) y lee `useSession()` directamente para decidir si
+ * prellena la identidad del donante (con sesión) o pide nombre+correo
+ * (invitado). `POST /donations` acepta ambos casos (`OptionalJwtAuthGuard`).
  */
 export function DonatePage() {
   const client = useApiClient();
-  const { user } = useSession();
+  const { status, user } = useSession();
+  const hasSession = status === 'authenticated';
   const { toast } = useToast();
   const target = useDonationTarget();
   const location = useLocation();
@@ -79,25 +89,67 @@ export function DonatePage() {
     // this branch with the donor's OWN donation history, previously just a
     // static empty-state. Starting a NEW donation still only happens from an
     // org's public portal (/o/:slug → "Donar"), never listed/picked here.
+    // `GET /donations/mine` stays authenticated-only (out of scope here) — a
+    // visitor with no session gets an honest prompt instead of a failed fetch.
     return (
-      <PageContainer>
-        <PageHeader
-          title="Mis donaciones"
-          description="Historial de tus donaciones. Para donar, entra al portal público de una organización."
-        />
-        <MyDonationsList />
-      </PageContainer>
+      <div className="flex min-h-screen flex-col bg-background text-foreground">
+        <PublicNavbar />
+        <main className="flex-1">
+          <PageContainer>
+            {hasSession ? (
+              <>
+                <PageHeader
+                  title="Mis donaciones"
+                  description="Historial de tus donaciones. Para donar, entra al portal público de una organización."
+                />
+                <MyDonationsList />
+              </>
+            ) : (
+              <>
+                <PageHeader
+                  title="Donaciones"
+                  description="Entra al portal público de una organización para donar — no necesitas una cuenta."
+                />
+                <EmptyState
+                  title="Aún no elegiste a quién donar"
+                  description="Explora el catálogo general o el portal de una organización y usa su botón “Donar”."
+                />
+                <p className={styles['done__hint']}>
+                  ¿Ya donaste antes con una cuenta?{' '}
+                  <Link to="/login" className="underline">
+                    Inicia sesión
+                  </Link>{' '}
+                  para ver tu historial.
+                </p>
+              </>
+            )}
+          </PageContainer>
+        </main>
+        <PublicFooter />
+      </div>
     );
   }
 
-  const donate = async ({ intendedAmount, commissionPayer }: DonateFormValues) => {
+  const donate = async ({
+    intendedAmount,
+    commissionPayer,
+    anonymous,
+    guestPayer,
+  }: DonateFormValues) => {
     setSubmitting(true);
     try {
       const donation = await createDonation(client, {
         organizationId: target.organizationId,
         intendedAmount,
         commissionPayer,
-        payer: user?.email ? { fullName: user.name, email: user.email } : undefined,
+        anonymous,
+        // Con sesión: se prellena del donante autenticado (como antes). Sin
+        // sesión (invitado): viene del propio formulario, requerido allí.
+        payer: hasSession
+          ? user?.email
+            ? { fullName: user.name, email: user.email }
+            : undefined
+          : guestPayer,
         // Idempotencia: el servidor deduplica por (org, key); una clave por intento.
         idempotencyKey: crypto.randomUUID(),
       });
@@ -130,74 +182,102 @@ export function DonatePage() {
   };
 
   return (
-    <PageContainer>
-      <PageHeader title="Donar" description={`Tu aporte para ${target.organizationName}.`} />
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            {target.organizationLogoUrl && (
-              <img
-                src={target.organizationLogoUrl}
-                alt=""
-                aria-hidden
-                data-testid="donation-org-logo"
-                className={styles['org-logo']}
-              />
-            )}
-            {target.organizationName}
-          </CardTitle>
-          {/* F2-03: solo lo que ya viaja en el contrato público (mismo endpoint
-              que el portal /o/:slug consume) — el NIT es dato público una vez
-              formalizada la org, nunca se fabrica ni se muestra el de muestra
-              del certificado (RF14, congelado, no se toca aquí). */}
-          {(target.organizationCity || target.organizationNit) && (
-            <p className={styles['org-meta']} data-testid="donation-org-meta">
-              {[target.organizationCity, target.organizationNit && `NIT ${target.organizationNit}`]
-                .filter(Boolean)
-                .join(' · ')}
-            </p>
-          )}
-        </CardHeader>
-        <CardContent>
-          {user?.name && (
-            <p className={styles['donor-identity']} data-testid="donor-identity">
-              Donando como <span className={styles['donor-identity__name']}>{user.name}</span>
-              {user.email && ` (${user.email})`}
-            </p>
-          )}
-          {done ? (
-            <div className={styles.done}>
-              <EmptyState
-                title="¡Gracias por tu donación!"
-                description={`Registramos tu donación de ${formatCop(done.amountCharged)}. Cuando el pago se confirme, te emitiremos el recibo automáticamente.`}
-              />
-              {/* Empalme al certificado REAL (§M05/RF14, F-3): solo un ENLACE, la
-                  lógica de donación no cambia. Lleva únicamente el id de la
-                  donación — el certificado se lee del backend, no se reconstruye
-                  desde nav-state. */}
-              <div className={styles['done__cert']}>
-                <Link
-                  to="/certificado"
-                  state={{ donationId: done.id }}
-                  className={cn(buttonVariants())}
-                  data-testid="view-certificate-cta"
-                >
-                  Ver tu certificado de donación
-                </Link>
-                <p className={styles['done__hint']}>
-                  Disponible una vez se confirme tu pago (organizaciones ESAL con RTE vigente).
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <PublicNavbar />
+      <main className="flex-1">
+        <PageContainer>
+          <PageHeader title="Donar" description={`Tu aporte para ${target.organizationName}.`} />
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                {target.organizationLogoUrl && (
+                  <img
+                    src={target.organizationLogoUrl}
+                    alt=""
+                    aria-hidden
+                    data-testid="donation-org-logo"
+                    className={styles['org-logo']}
+                  />
+                )}
+                {target.organizationName}
+              </CardTitle>
+              {/* F2-03: solo lo que ya viaja en el contrato público (mismo endpoint
+                  que el portal /o/:slug consume) — el NIT es dato público una vez
+                  formalizada la org, nunca se fabrica ni se muestra el de muestra
+                  del certificado (RF14, congelado, no se toca aquí). */}
+              {(target.organizationCity || target.organizationNit) && (
+                <p className={styles['org-meta']} data-testid="donation-org-meta">
+                  {[
+                    target.organizationCity,
+                    target.organizationNit && `NIT ${target.organizationNit}`,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </p>
-              </div>
-            </div>
-          ) : (
-            <DonateForm
-              organizationName={target.organizationName}
-              submitting={submitting}
-              onDonate={(values) => void donate(values)}
-            />
-          )}
-        </CardContent>
-      </Card>
-    </PageContainer>
+              )}
+            </CardHeader>
+            <CardContent>
+              {hasSession && user?.name && (
+                <p className={styles['donor-identity']} data-testid="donor-identity">
+                  Donando como <span className={styles['donor-identity__name']}>{user.name}</span>
+                  {user.email && ` (${user.email})`}
+                </p>
+              )}
+              {done ? (
+                <div className={styles.done}>
+                  <EmptyState
+                    title="¡Gracias por tu donación!"
+                    description={`Registramos tu donación de ${formatCop(done.amountCharged)}. Cuando el pago se confirme, te emitiremos el recibo automáticamente.`}
+                  />
+                  {/* Empalme al certificado REAL (§M05/RF14, F-3): solo un ENLACE, la
+                      lógica de donación no cambia. Lleva únicamente el id de la
+                      donación — el certificado se lee del backend, no se reconstruye
+                      desde nav-state. */}
+                  <div className={styles['done__cert']}>
+                    <Link
+                      to="/certificado"
+                      state={{ donationId: done.id }}
+                      className={cn(buttonVariants())}
+                      data-testid="view-certificate-cta"
+                    >
+                      Ver tu certificado de donación
+                    </Link>
+                    <p className={styles['done__hint']}>
+                      Disponible una vez se confirme tu pago (organizaciones ESAL con RTE vigente).
+                    </p>
+                  </div>
+                  {/* Checkout de invitado: la cuenta se ofrece DESPUÉS de donar, nunca
+                      como precondición (requisito del cliente). Solo tiene sentido para
+                      quien donó sin sesión — un donante ya autenticado no la necesita. */}
+                  {!hasSession && (
+                    <div className={styles['done__cert']}>
+                      <p className={styles['done__hint']}>
+                        ¿Quieres crear una cuenta gratuita en AdoptaFácil para consultar tu
+                        historial de donaciones?
+                      </p>
+                      <Link
+                        to="/register"
+                        className={cn(buttonVariants({ variant: 'outline' }))}
+                        data-testid="create-account-cta"
+                      >
+                        Crear cuenta gratuita
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <DonateForm
+                  organizationName={target.organizationName}
+                  submitting={submitting}
+                  hasSession={hasSession}
+                  onDonate={(values) => void donate(values)}
+                />
+              )}
+            </CardContent>
+          </Card>
+        </PageContainer>
+      </main>
+      <PublicFooter />
+    </div>
   );
 }

@@ -81,7 +81,7 @@ import {
   AdoptionsKanbanPage,
   MyAdoptionRequestsPage,
 } from '../../features/adoptions';
-import { DonatePage, ReceivedDonationsPage } from '../../features/donations';
+import { DonatePage, DonationAccessPage, ReceivedDonationsPage } from '../../features/donations';
 import { SponsorPage, SponsorshipsPage } from '../../features/sponsorships';
 import { CertificateEmissionPage, CertificateVerificationPage } from '../../features/certificates';
 import {
@@ -193,6 +193,24 @@ export function AppRoutes() {
           no auth required to read; an authenticated visitor sees a "leave a
           review" form here instead of on a separate route. */}
       <Route path="/organizaciones/:slug/resenas" element={<OrganizationReputationPage />} />
+      {/* M05 · donación (§M05, requisito FINAL del cliente: donar NUNCA exige
+          cuenta ni login — checkout de invitado, MercadoPago Checkout Pro ya
+          lo soporta). Movida FUERA de <RequireAuth>/<AppLayout> (antes vivía
+          bajo el gate de sesión padre — ver el SEAM que dejó esta nota en la
+          sección protegida de abajo). `POST /donations` usa
+          `OptionalJwtAuthGuard`: si llega un bearer token válido la donación
+          se vincula a esa cuenta (misma UX de siempre para un donante
+          autenticado); sin token, sigue como donación de invitado. La propia
+          página arma su chrome público (mismo patrón que `/campanas`) y lee
+          `useSession()` directamente para decidir si prellena la identidad
+          del donante o pide nombre+correo. */}
+      <Route path="/donaciones" element={<DonatePage />} />
+      {/* Comprobante de INVITADO vía "magic link" (requisito FINAL del cliente:
+          tampoco obligar a registrarse para volver a consultar una donación).
+          Pública, fuera de <RequireAuth> — el token de la query string ES la
+          credencial (`GET /public/donations/access/:token`, sin auth). Mismo
+          SEAM que `/donaciones` y `/verificar/:code` arriba. */}
+      <Route path="/donaciones/comprobante" element={<DonationAccessPage />} />
 
       {/* Protected — guard first, then the shell layout */}
       <Route element={<RequireAuth />}>
@@ -256,17 +274,13 @@ export function AppRoutes() {
               </RequireRoles>
             }
           />
-          {/* M05 · donación P1 (T-050 lógica, T-051 cableado). La org llega por query
-              param (organizationId + organizationName) desde el CTA del portal público;
-              sin org, la página muestra su empty-state con el punto de integración M14.
-              SEAM (donación de invitado): el gate de sesión es este <RequireAuth> padre.
-              Si el cliente habilita checkout anónimo, mover ESTA ruta fuera del guard
-              (o envolver DonatePage en un guard más suave) — cambio localizado, sin
-              tocar la lógica de donación.
-              F1-02: revisado contra el backend — `POST /donations` no lleva `@Roles`
-              (cualquier autenticado dona), así que esta ruta se queda sin role-guard,
-              igual que "Adopciones/solicitar". */}
-          <Route path="donaciones" element={<DonatePage />} />
+          {/* M05 · donación (T-050/T-051, checkout de invitado): la ruta `/donaciones`
+              vivía aquí, gateada por este <RequireAuth> padre — SEAM ya resuelto
+              (requisito FINAL del cliente: donar nunca exige cuenta ni login). Movida
+              fuera de <RequireAuth>/<AppLayout>, declarada arriba junto con las demás
+              rutas públicas (justo después de "/organizaciones/:slug/resenas"). No se
+              borra esta nota para que quien busque "donaciones" en la zona protegida
+              encuentre el puntero. */}
           {/* F-DONACIONES-RECIBIDAS: la contraparte de gestión de org de "donaciones"
               arriba — GET /donations/received (MANAGE_ROLES: Owner/Administrador/
               Operador) ya existía en el backend sin página/ruta en el frontend (lo

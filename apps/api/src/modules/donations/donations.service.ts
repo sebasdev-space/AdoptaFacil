@@ -1,4 +1,6 @@
+import { createHash, randomBytes } from 'node:crypto';
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Inject,
@@ -6,6 +8,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import {
   computeBreakdown,
@@ -15,6 +18,7 @@ import {
   type DonationReceipt,
   type DonationStatus,
   type DonationWithReceipt,
+  type GuestDonationAccess,
   type NormalizedWebhookEvent,
   type PaymentBreakdown,
   type PaymentConcept,
@@ -25,16 +29,31 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../core/tenant/tenant-context.service';
 import { AuditService } from '../../core/audit/audit.service';
 import { PAYMENT_PORT } from '../../core/payments/payment.port';
+import {
+  NOTIFICATION_PORT,
+  type NotificationPort,
+} from '../../core/notifications/notification.port';
 import type { RequestUser } from '../../core/auth/auth.types';
 import { requireCompleteProfile } from '../../core/auth/require-complete-profile';
+import type { Env } from '../../config/env.validation';
 import { CampaignFundingService } from '../campaigns/campaign-funding.service';
 import { DonationCertificatesService } from './donation-certificates.service';
+import { buildDonationAccessLink } from './donation-access-link';
+
+/**
+ * How long a guest's donation access link (magic link) stays valid (client's
+ * own words, final: "acceso seguro... con expiración"). Unlike the password-
+ * reset token this is NOT single-use — the guest may re-open it repeatedly —
+ * and the TTL is generous (30 days) because it's informational access to a
+ * receipt/certificate, not a sensitive account mutation.
+ */
+const DONATION_ACCESS_LINK_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 días
 
 /** Row shape returned by the SECURITY DEFINER donation functions (snake_case). */
 interface DonationRow {
   id: string;
   organization_id: string;
-  donor_user_id: string;
+  donor_user_id: string | null;
   concept_kind: string;
   concept_id: string;
   commission_payer: string;
@@ -46,6 +65,7 @@ interface DonationRow {
   idempotency_key: string;
   status: string;
   payer: DonationDonor | null;
+  anonymous: boolean;
   created_at: Date;
   updated_at: Date;
 }
@@ -62,6 +82,24 @@ interface ReceiptRow {
   created_at: Date;
 }
 
+/** Row shape returned by `donation_certificate_by_donation` (snake_case; same
+ *  `payload` shape as `DonationCertificatesService`'s own `CertificateRow`). */
+interface AccessCertificateRow {
+  id: string;
+  organization_id: string;
+  donation_id: string;
+  code: string;
+  payload: {
+    organizationName: string;
+    organizationNit: string;
+    donorName: string;
+    amount: number;
+    currency: string;
+  };
+  content_hash: string;
+  issued_at: Date;
+}
+
 type DonationModel = Prisma.DonationGetPayload<{ include: { receipt: true } }>;
 type ReceiptModel = Prisma.DonationReceiptGetPayload<Record<string, never>>;
 
@@ -75,15 +113,20 @@ export interface WebhookOutcome {
 @Injectable()
 export class DonationsService {
   private readonly logger = new Logger('Donations');
+  private readonly webBaseUrl: string;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenant: TenantContextService,
     private readonly audit: AuditService,
     @Inject(PAYMENT_PORT) private readonly payment: PaymentPort,
+    @Inject(NOTIFICATION_PORT) private readonly notifications: NotificationPort,
     private readonly campaignFunding: CampaignFundingService,
     private readonly certificates: DonationCertificatesService,
-  ) {}
+    config: ConfigService<Env, true>,
+  ) {
+    this.webBaseUrl = config.get('WEB_BASE_URL', { infer: true });
+  }
 
   private requireOrgId(): string {
     const organizationId = this.tenant.getOrganizationId();
@@ -94,17 +137,35 @@ export class DonationsService {
   }
 
   /**
-   * Create a donation as an authenticated PERSON (§M05, P1). The donation lands in
-   * the BENEFICIARY org's tenant via `create_donation` (SECURITY DEFINER; the donor
-   * is not a member of that org). The commission math is computed HERE with
-   * `computeBreakdown` (the single source — the client never supplies amounts beyond
-   * `intendedAmount`) and the collection is processed through the PaymentPort.
+   * Create a donation as an authenticated PERSON OR a GUEST (§M05, P1 +
+   * guest-checkout requirement: donating must never require an account/login).
+   * The donation lands in the BENEFICIARY org's tenant via `create_donation`
+   * (SECURITY DEFINER; the donor is not a member of that org, and for a guest
+   * there is no donor account at all). The commission math is computed HERE
+   * with `computeBreakdown` (the single source — the client never supplies
+   * amounts beyond `intendedAmount`) and the collection is processed through
+   * the PaymentPort.
+   *
+   * `actor` is `undefined` for a guest (set by `OptionalJwtAuthGuard`, which
+   * never rejects the request). The profile-completion gate
+   * (`requireCompleteProfile`) only applies to an authenticated Persona — it is
+   * skipped entirely for a guest, who has no profile to complete. A guest MUST
+   * supply at least `payer.email` (validated here, not in the zod schema,
+   * because the requirement depends on `actor`) so there is at least one way to
+   * identify/contact them about the donation; `documentId` is a separate,
+   * later concern (collected only when a tax certificate is requested).
    *
    * Idempotent by (organizationId, idempotencyKey): a retry returns the SAME donation
    * without a second charge or a duplicate audit entry.
    */
-  async create(actor: RequestUser, input: CreateDonationInput): Promise<Donation> {
-    await requireCompleteProfile(this.prisma, actor);
+  async create(actor: RequestUser | undefined, input: CreateDonationInput): Promise<Donation> {
+    if (actor) {
+      await requireCompleteProfile(this.prisma, actor);
+    } else if (!input.payer?.email) {
+      throw new BadRequestException(
+        'Para donar sin una cuenta necesitamos al menos tu correo electrónico.',
+      );
+    }
 
     const concept: PaymentConcept = input.concept ?? {
       kind: 'organization',
@@ -138,7 +199,7 @@ export class DonationsService {
       rows = await this.prisma.$queryRaw<DonationRow[]>(Prisma.sql`
         SELECT * FROM create_donation(
           ${input.organizationId}::uuid,
-          ${actor.id}::uuid,
+          ${actor?.id ?? null}::uuid,
           ${concept.kind},
           ${concept.id}::uuid,
           ${input.commissionPayer},
@@ -147,7 +208,8 @@ export class DonationsService {
           ${JSON.stringify(breakdown)}::jsonb,
           ${collection.collectionId},
           ${input.idempotencyKey},
-          ${input.payer ? JSON.stringify(input.payer) : null}::jsonb
+          ${input.payer ? JSON.stringify(input.payer) : null}::jsonb,
+          ${input.anonymous ?? false}
         )
       `);
     } catch (error) {
@@ -165,7 +227,7 @@ export class DonationsService {
 
     await this.audit.record({
       organizationId: input.organizationId,
-      actorUserId: actor.id,
+      actorUserId: actor?.id ?? null,
       action: 'donation.created',
       entityType: 'donation',
       entityId: row.id,
@@ -248,9 +310,142 @@ export class DonationsService {
         amount: donation.intended_amount,
         currency: donation.currency,
       });
+
+      // Client requirement (final): a GUEST donor (no account) must be able to
+      // check their donation later WITHOUT registering. Only for a guest
+      // (donor_user_id IS NULL) — an authenticated donor already has
+      // `/donations/mine`. Best-effort, same reasoning as the certificate
+      // above: the donation is already approved and its receipt already
+      // issued, so a failure here must never fail the webhook response.
+      if (!donation.donor_user_id && donation.payer?.email) {
+        await this.issueGuestAccessLink(
+          donation.id,
+          donation.organization_id,
+          donation.payer.email,
+        );
+      }
     }
 
     return { applied: true, status, donationId: donation.id };
+  }
+
+  /**
+   * Generates + persists a guest donation access token (hashed, never stored
+   * in clear — same principle as the password-reset token) and emails the
+   * resulting "magic link" through the shared NotificationPort. NOT under
+   * tenant context: `DonationAccessLink` carries no `organizationId` and no
+   * RLS (anonymous lookup table, same reasoning as `PasswordResetToken`).
+   * Best-effort: logs and swallows on failure, never throws into the webhook.
+   */
+  private async issueGuestAccessLink(
+    donationId: string,
+    organizationId: string,
+    payerEmail: string,
+  ): Promise<void> {
+    try {
+      const token = randomBytes(32).toString('base64url');
+      const tokenHash = createHash('sha256').update(token).digest('hex');
+      await this.prisma.donationAccessLink.create({
+        data: {
+          donationId,
+          tokenHash,
+          expiresAt: new Date(Date.now() + DONATION_ACCESS_LINK_TTL_MS),
+        },
+      });
+      await this.audit.record({
+        organizationId,
+        actorUserId: null,
+        action: 'donation.access_link_issued',
+        entityType: 'donation',
+        entityId: donationId,
+        // Nunca el token/enlace en claro — solo que se emitió.
+        metadata: {},
+      });
+
+      const accessLink = buildDonationAccessLink(this.webBaseUrl, token);
+      await this.notifications.send({
+        to: payerEmail,
+        subject: 'Tu comprobante de donación en AdoptaFácil',
+        body:
+          'Hola,\n\n' +
+          '¡Gracias por tu donación! Tu pago fue confirmado.\n' +
+          'Puedes consultar el estado, el recibo y el certificado (si aplica) de tu donación ' +
+          'en cualquier momento, sin necesidad de crear una cuenta, con este enlace ' +
+          '(disponible durante 30 días):\n\n' +
+          `${accessLink}\n\n` +
+          'Guarda este correo si quieres volver a consultarlo más adelante.',
+      });
+    } catch (error) {
+      // Nunca el token/enlace/correo en el log — solo que el intento falló.
+      this.logger.warn(
+        `No se pudo emitir el enlace de acceso de invitado para donation=${donationId}: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  /**
+   * PUBLIC read for a GUEST donor's own donation, reached via the magic link
+   * (no session — the token itself IS the credential). Looks up the link by
+   * the HASH of the incoming token (never the raw token) and rejects with a
+   * single, generic 404 whether the token is missing, malformed, unknown, or
+   * expired — the three cases must never be distinguishable to a caller
+   * probing tokens (same principle as `getReceiptForDonor`'s identity guard).
+   * NOT single-use: a valid, unexpired token can be reused freely.
+   */
+  async getByAccessToken(token: string): Promise<GuestDonationAccess> {
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const link = await this.prisma.donationAccessLink.findUnique({ where: { tokenHash } });
+    if (!link || link.expiresAt.getTime() <= Date.now()) {
+      throw new NotFoundException('Enlace no válido o expirado.');
+    }
+
+    const rows = await this.prisma.$queryRaw<DonationRow[]>(Prisma.sql`
+      SELECT * FROM donation_by_id(${link.donationId}::uuid)
+    `);
+    const row = rows[0];
+    if (!row) {
+      // The donation was deleted after the link was issued (shouldn't happen
+      // in practice — FK is ON DELETE CASCADE) — same generic 404.
+      throw new NotFoundException('Enlace no válido o expirado.');
+    }
+
+    const orgNames = await this.organizationNamesById([row.organization_id]);
+    const donation = this.fromRow(row, orgNames.get(row.organization_id));
+
+    let receipt: DonationReceipt | undefined;
+    const receiptRows = await this.prisma.$queryRaw<ReceiptRow[]>(Prisma.sql`
+      SELECT * FROM donation_receipt_by_donation(${row.id}::uuid)
+    `);
+    if (receiptRows[0]) {
+      receipt = this.fromReceiptRow(receiptRows[0]);
+    }
+
+    const certificateRows = await this.prisma.$queryRaw<AccessCertificateRow[]>(Prisma.sql`
+      SELECT * FROM donation_certificate_by_donation(${row.id}::uuid)
+    `);
+    const certificate = certificateRows[0]
+      ? this.fromAccessCertificateRow(certificateRows[0])
+      : undefined;
+
+    return { donation, receipt, certificate };
+  }
+
+  private fromAccessCertificateRow(
+    row: AccessCertificateRow,
+  ): NonNullable<GuestDonationAccess['certificate']> {
+    return {
+      id: row.id,
+      organizationId: row.organization_id,
+      donationId: row.donation_id,
+      code: row.code,
+      organizationName: row.payload.organizationName,
+      organizationNit: row.payload.organizationNit,
+      donorName: row.payload.donorName,
+      amount: row.payload.amount,
+      currency: row.payload.currency as Donation['currency'],
+      issuedAt: row.issued_at.toISOString(),
+      contentHash: row.content_hash,
+    };
   }
 
   /**
@@ -380,12 +575,22 @@ export class DonationsService {
       collectionId: row.collection_id,
       status: row.status as DonationStatus,
       payer: row.payer ?? undefined,
+      anonymous: row.anonymous,
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at.toISOString(),
     };
   }
 
+  /**
+   * The BENEFICIARY org's view of a received donation. When `anonymous` is
+   * true, the donor's identity is masked from the ORG (never from AdoptaFácil
+   * itself — nothing here changes what is persisted, only what this endpoint
+   * returns): both `payer` and `receipt.donor` are omitted, everything else
+   * (amount/date/status/breakdown) stays intact.
+   */
   private fromModel(row: DonationModel): DonationWithReceipt {
+    const anonymous = row.anonymous;
+    const receipt = row.receipt ? this.fromReceiptModel(row.receipt) : undefined;
     return {
       id: row.id,
       organizationId: row.organizationId,
@@ -398,10 +603,11 @@ export class DonationsService {
       breakdown: row.breakdown as unknown as PaymentBreakdown,
       collectionId: row.collectionId,
       status: row.status as DonationStatus,
-      payer: (row.payer as unknown as DonationDonor | null) ?? undefined,
+      payer: anonymous ? undefined : ((row.payer as unknown as DonationDonor | null) ?? undefined),
+      anonymous,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
-      receipt: row.receipt ? this.fromReceiptModel(row.receipt) : undefined,
+      receipt: receipt && anonymous ? { ...receipt, donor: {} } : receipt,
     };
   }
 

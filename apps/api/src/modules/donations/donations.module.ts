@@ -4,6 +4,7 @@ import { CampaignsModule } from '../campaigns/campaigns.module';
 import { DonationsController } from './donations.controller';
 import { DonationsService } from './donations.service';
 import { DonationCertificatePublicController } from './donation-certificate-public.controller';
+import { DonationAccessPublicController } from './donation-access-public.controller';
 import { DonationCertificatesService } from './donation-certificates.service';
 
 /**
@@ -28,10 +29,23 @@ import { DonationCertificatesService } from './donation-certificates.service';
  * the webhook), only when the beneficiary org is an ESAL with RTE vigente.
  * Owns `donation_certificates` (RLS + immutable) and its two SECURITY
  * DEFINER reads (donor, cross-tenant; and public, by code — no auth).
+ *
+ * `DonationAccessPublicController` (guest "magic link" comprobante, requisito
+ * FINAL del cliente): la MISMA `DonationsService` emite el enlace dentro del
+ * webhook de aprobación (solo para un donante invitado) y resuelve la lectura
+ * pública `GET /public/donations/access/:token` (sin auth, el token es la
+ * credencial) — owns `donation_access_links` (sin RLS, mismo patrón que
+ * `PasswordResetToken`) y sus 3 lecturas SECURITY DEFINER acotadas por id de
+ * donación (`donation_by_id`/`donation_receipt_by_donation`/
+ * `donation_certificate_by_donation`).
  */
 @Module({
   imports: [AuthModule, CampaignsModule],
-  controllers: [DonationsController, DonationCertificatePublicController],
+  controllers: [
+    DonationsController,
+    DonationCertificatePublicController,
+    DonationAccessPublicController,
+  ],
   providers: [DonationsService, DonationCertificatesService],
 })
 export class DonationsModule {}

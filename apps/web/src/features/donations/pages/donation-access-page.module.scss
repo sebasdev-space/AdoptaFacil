@@ -1,0 +1,48 @@
+.result__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.result__date {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.fields {
+  display: grid;
+  gap: 1rem;
+}
+
+.fields__label {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.fields__value {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  color: var(--text-dark);
+}
+
+.hint {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.receipt {
+  border-top: 1px solid var(--border);
+  padding-top: 1rem;
+}
+
+.receipt__label {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  color: var(--text-dark);
+}
+
+.receipt__date {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}

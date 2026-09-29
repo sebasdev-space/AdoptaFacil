@@ -78,8 +78,12 @@ export interface Donation {
    * (creación, webhook, `donations/received`) lo dejan `undefined`.
    */
   organizationName?: string;
-  /** Persona autenticada que donó (fijada por el backend desde el JWT). */
-  donorUserId: string;
+  /**
+   * Persona autenticada que donó (fijada por el backend desde el JWT), o `null`
+   * para un donante INVITADO (checkout de invitado — donar no requiere cuenta
+   * ni login).
+   */
+  donorUserId: string | null;
   /** Para qué es la donación (P1: la organización; forward-compat animal/campaña). */
   concept: PaymentConcept;
   /** Quién asume las comisiones — la casilla "cubro la comisión" (P1). */
@@ -96,6 +100,13 @@ export interface Donation {
   status: DonationStatus;
   /** Contacto del donante (opcional; dato personal). */
   payer?: DonationDonor;
+  /**
+   * "Donación anónima frente a la organización": cuando es `true`,
+   * `GET /donations/received` nunca expone `payer`/`receipt.donor` a la
+   * organización beneficiaria. AdoptaFácil sigue conservando el dato real
+   * internamente (legal/certificado) — esto NO afecta lo persistido.
+   */
+  anonymous: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -141,10 +152,16 @@ export interface CreateDonationInput {
   commissionPayer: CommissionPayer;
   /** Concepto; por defecto la propia organización (P1). */
   concept?: PaymentConcept;
-  /** Contacto del donante (opcional). */
+  /**
+   * Contacto del donante (opcional para una Persona autenticada — se puede
+   * prellenar de la sesión; REQUERIDO al menos `email` para un donante
+   * INVITADO, validado en el servicio, no aquí, porque depende del actor).
+   */
   payer?: DonationDonor;
   /** Clave idempotente provista por el cliente. */
   idempotencyKey: string;
+  /** "¿Donar de forma anónima frente a la organización?" (default `false`). */
+  anonymous?: boolean;
 }
 
 /**
@@ -200,4 +217,22 @@ export interface DonationCertificateVerification {
   currency: PaymentCurrency;
   issuedAt: string;
   contentHash: string;
+}
+
+/**
+ * Proyección PÚBLICA de la donación de un donante INVITADO, alcanzada vía el
+ * "magic link" enviado por correo al aprobarse su donación (requisito final
+ * del cliente: tampoco obligar al invitado a crear cuenta para volver a
+ * consultar su donación — mismo principio que el checkout de invitado).
+ * Empaqueta en UNA respuesta lo que un donante AUTENTICADO ya obtiene con tres
+ * llamadas (`GET /donations/mine` + `.../receipt` + `.../certificate`) — sin
+ * inventar una forma nueva: reutiliza `Donation`/`DonationReceipt`/
+ * `DonationCertificate` tal cual. `receipt`/`certificate` solo están
+ * presentes cuando ya existen (donación aprobada; certificado solo si la org
+ * es ESAL con RTE vigente). Nunca incluye el token de acceso.
+ */
+export interface GuestDonationAccess {
+  donation: Donation;
+  receipt?: DonationReceipt;
+  certificate?: DonationCertificate;
 }
