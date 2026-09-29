@@ -362,6 +362,128 @@ describe('F-MIS-DONACIONES-PLUS: detalle + acceso al certificado desde "Mis dona
   });
 });
 
+/**
+ * Checkout de invitado (requisito FINAL del cliente): donar nunca exige cuenta
+ * ni login. Sin `session` explícita, `renderShell` arranca en
+ * `status: 'unauthenticated'` (ver test-utils.tsx / session-context.tsx) — el
+ * mismo estado de un visitante real que nunca inició sesión.
+ */
+describe('DonatePage — checkout de invitado (sin sesión, requisito final del cliente)', () => {
+  it('shows the donate form with guest name/email fields, no donor-identity block', async () => {
+    stubFetch(() => []);
+    renderShell({
+      route: '/donaciones?organizationId=org-1&organizationName=Refugio%20Patitas',
+    });
+
+    await screen.findByRole('heading', { name: 'Donar' });
+    expect(screen.queryByTestId('donor-identity')).not.toBeInTheDocument();
+    expect(screen.getByTestId('donation-guest-name')).toBeInTheDocument();
+    expect(screen.getByTestId('donation-guest-email')).toBeInTheDocument();
+  });
+
+  it('creates the donation with the guest payer and offers creating a free account afterwards', async () => {
+    stubFetch((url) => {
+      if (url.includes('/donations')) {
+        return {
+          id: 'don-guest-1',
+          organizationId: 'org-1',
+          donorUserId: null,
+          concept: { kind: 'organization', id: 'org-1' },
+          commissionPayer: 'organization',
+          intendedAmount: 50000,
+          amountCharged: 50000,
+          currency: 'COP',
+          breakdown: {
+            amountCharged: 50000,
+            gross: 50000,
+            platformFee: 2000,
+            platformIva: 380,
+            gatewayFee: 2025,
+            gatewayIva: 385,
+            net: 45210,
+          },
+          collectionId: 'test_guest',
+          status: 'pending',
+          anonymous: false,
+          createdAt: '2026-09-28T00:00:00.000Z',
+          updatedAt: '2026-09-28T00:00:00.000Z',
+        };
+      }
+      return [];
+    });
+
+    renderShell({
+      route: '/donaciones?organizationId=org-1&organizationName=Refugio%20Patitas',
+    });
+
+    await screen.findByRole('heading', { name: 'Donar' });
+    fireEvent.change(screen.getByPlaceholderText('50000'), { target: { value: '50000' } });
+    fireEvent.change(screen.getByTestId('donation-guest-name'), {
+      target: { value: 'Invitado Test' },
+    });
+    fireEvent.change(screen.getByTestId('donation-guest-email'), {
+      target: { value: 'invitado@test.dev' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Donar a Refugio Patitas/ }));
+
+    expect(await screen.findByText(/¡Gracias por tu donación!/)).toBeInTheDocument();
+    const cta = screen.getByTestId('create-account-cta');
+    expect(cta).toHaveAttribute('href', '/register');
+  });
+
+  it('does NOT offer the account-creation CTA to an already-authenticated donor', async () => {
+    stubFetch((url) => {
+      if (url.includes('/donations')) {
+        return {
+          id: 'don-auth-1',
+          organizationId: 'org-1',
+          donorUserId: 'donor-1',
+          concept: { kind: 'organization', id: 'org-1' },
+          commissionPayer: 'organization',
+          intendedAmount: 50000,
+          amountCharged: 50000,
+          currency: 'COP',
+          breakdown: {
+            amountCharged: 50000,
+            gross: 50000,
+            platformFee: 2000,
+            platformIva: 380,
+            gatewayFee: 2025,
+            gatewayIva: 385,
+            net: 45210,
+          },
+          collectionId: 'test_auth',
+          status: 'pending',
+          anonymous: false,
+          createdAt: '2026-09-28T00:00:00.000Z',
+          updatedAt: '2026-09-28T00:00:00.000Z',
+        };
+      }
+      return [];
+    });
+
+    renderShell({
+      route: '/donaciones?organizationId=org-1&organizationName=Refugio%20Patitas',
+      ...personSession(),
+    });
+
+    await screen.findByRole('heading', { name: 'Donar' });
+    fireEvent.change(screen.getByPlaceholderText('50000'), { target: { value: '50000' } });
+    fireEvent.click(screen.getByRole('button', { name: /Donar a Refugio Patitas/ }));
+
+    expect(await screen.findByText(/¡Gracias por tu donación!/)).toBeInTheDocument();
+    expect(screen.queryByTestId('create-account-cta')).not.toBeInTheDocument();
+  });
+
+  it('shows a public, non-crashing empty-state (not "Mis donaciones") when there is no target and no session', async () => {
+    stubFetch(() => []);
+    renderShell({ route: '/donaciones' });
+
+    expect(await screen.findByText(/Aún no elegiste a quién donar/)).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Mis donaciones' })).not.toBeInTheDocument();
+  });
+});
+
 describe('DonatePage — "with target" is unchanged (non-regression, T-050/T-051)', () => {
   it('still shows the donate form when an org target is present in the query', async () => {
     stubFetch(() => []);

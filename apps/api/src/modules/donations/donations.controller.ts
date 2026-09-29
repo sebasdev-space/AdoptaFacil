@@ -22,6 +22,7 @@ import {
 import type { RequestUser } from '../../core/auth/auth.types';
 import { CurrentUser } from '../../core/auth/current-user.decorator';
 import { JwtAuthGuard } from '../../core/auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../../core/auth/optional-jwt-auth.guard';
 import { ZodValidationPipe } from '../../core/auth/zod-validation.pipe';
 import { Roles } from '../../core/rbac/roles.decorator';
 import { RolesGuard } from '../../core/rbac/roles.guard';
@@ -51,11 +52,17 @@ export class DonationsController {
     private readonly certificates: DonationCertificatesService,
   ) {}
 
-  /** Create a donation (authenticated person). */
+  /**
+   * Create a donation — a PERSON (authenticated) OR a GUEST (no account/login,
+   * client requirement: donating must never be gated behind a login wall).
+   * `OptionalJwtAuthGuard` never rejects the request; it links the donation to
+   * an account ONLY when a valid bearer token is present, same as MercadoPago
+   * Checkout Pro's own guest-checkout support.
+   */
   @Post()
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard)
   create(
-    @CurrentUser() actor: RequestUser,
+    @CurrentUser() actor: RequestUser | undefined,
     @Body(new ZodValidationPipe(createDonationSchema)) dto: CreateDonationInput,
   ): Promise<Donation> {
     return this.service.create(actor, dto);

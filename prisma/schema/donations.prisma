@@ -22,8 +22,12 @@ model Donation {
   id              String   @id @default(uuid()) @db.Uuid
   /// Organización BENEFICIARIA (dueña del recaudo).
   organizationId  String   @map("organization_id") @db.Uuid
-  /// Persona autenticada que donó (fijada por el backend desde el JWT).
-  donorUserId     String   @map("donor_user_id") @db.Uuid
+  /// Persona autenticada que donó (fijada por el backend desde el JWT), o
+  /// `null` para un donante INVITADO (checkout de invitado, requisito del
+  /// cliente: donar no requiere cuenta ni login — ver OptionalJwtAuthGuard en
+  /// `POST /donations`). `payer` sigue siendo el contacto capturado del donante
+  /// (invitado o no); este campo es SOLO la vinculación a una cuenta.
+  donorUserId     String?  @map("donor_user_id") @db.Uuid
   /// PaymentConcept.kind: 'organization' | 'animal' | 'campaign' (P1: organization).
   conceptKind     String   @map("concept_kind")
   /// PaymentConcept.id (org/animal/campaña atribuida); en P1 = organization_id.
@@ -45,6 +49,12 @@ model Donation {
   status          String   @default("pending")
   /// Contacto del donante (DonationDonor; dato personal Ley 1581).
   payer           Json?
+  /// "Donación anónima frente a la organización" (checkout de invitado):
+  /// cuando es `true`, la lectura de la ORG (`GET /donations/received`) NUNCA
+  /// expone `payer`/`receipt.donor` — AdoptaFácil sigue conservando el dato
+  /// real internamente (legal/certificado). No afecta lo persistido, solo lo
+  /// que ese endpoint devuelve.
+  anonymous       Boolean  @default(false)
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
@@ -113,4 +123,31 @@ model DonationCertificate {
 
   @@index([organizationId])
   @@map("donation_certificates")
+}
+
+/// Enlace de acceso "mágico" (RF-comprobante-invitado): el donante INVITADO
+/// (sin cuenta) puede volver a consultar el estado/comprobante/certificado de
+/// SU donación sin loguearse — mismo principio que el checkout de invitado
+/// (requisito final del cliente: nunca obligar a crear cuenta). Mirror de
+/// `PasswordResetToken` (org.prisma:286-297, @sebastian) con dos diferencias
+/// deliberadas: (1) NO es de un solo uso — el donante puede abrirlo varias
+/// veces mientras no expire, así que no hay `usedAt`; (2) el TTL es de 30
+/// días (acceso informativo a un comprobante, no una mutación sensible de
+/// cuenta como el reset de contraseña).
+///
+/// `donationId` referencia `Donation` (mismo archivo) SIN relación Prisma
+/// a propósito: la FK se añade a mano en el SQL de la migración, igual que
+/// `Donation.organizationId` frente a `organizations` (ver el comentario de
+/// cabecera de este archivo) — este enlace es una tabla de lookup anónimo por
+/// token, no dato de negocio tenant-scoped, y por eso tampoco lleva
+/// `organizationId` ni RLS (mismo razonamiento que `PasswordResetToken`: solo
+/// se guarda el HASH SHA-256 del token, nunca el token en claro).
+model DonationAccessLink {
+  id         String   @id @default(uuid()) @db.Uuid
+  donationId String   @map("donation_id") @db.Uuid
+  tokenHash  String   @unique @map("token_hash")
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("donation_access_links")
 }

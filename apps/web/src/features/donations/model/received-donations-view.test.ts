@@ -26,6 +26,7 @@ const BASE: DonationWithReceipt = {
   },
   collectionId: 'test_abc',
   status: 'pending',
+  anonymous: false,
   createdAt: '2026-07-28T21:25:22.299Z',
   updatedAt: '2026-07-28T21:25:22.299Z',
 };

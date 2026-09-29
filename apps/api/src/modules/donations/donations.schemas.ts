@@ -36,5 +36,6 @@ export const createDonationSchema = z
     concept: conceptSchema.optional(),
     payer: donorSchema.optional(),
     idempotencyKey: z.string().trim().min(8).max(200),
+    anonymous: z.boolean().optional().default(false),
   })
   .strict();
