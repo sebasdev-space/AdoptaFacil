@@ -12,10 +12,22 @@ import { TenantContextService } from '../../core/tenant/tenant-context.service';
 import { STORAGE_PORT, type StoragePort } from '../../core/storage/storage.port';
 import {
   LEGAL_REPRESENTATIVE_CONFIG,
+  decryptSignature,
   encryptSignature,
   hashSignature,
   type LegalRepresentativeConfig,
 } from './legal-representative-crypto';
+
+/** The CURRENT legal representative's public identity + DECRYPTED signature
+ *  image bytes — for another module to print on an official document (e.g.
+ *  M08's volunteer certificate). Never the encrypted payload nor the key. */
+export interface LegalRepresentativeSigner {
+  fullName: string;
+  position: string;
+  /** Raw image bytes (PNG, from `SignaturePad`'s canvas export) — ready to
+   *  embed directly in a PDF via `pdf-lib`'s `embedPng`. */
+  signatureImage: Buffer;
+}
 
 function toContract(row: LegalRepresentativeRow): LegalRepresentative {
   return {
@@ -133,5 +145,42 @@ export class LegalRepresentativeService {
       }),
     );
     return row ? toContract(row) : null;
+  }
+
+  /**
+   * Same lookup as {@link getCurrent}, but by an EXPLICIT `organizationId`
+   * instead of the caller's own tenant context — for a cross-module reader
+   * that renders ANOTHER organization's official document (e.g. M08's
+   * volunteer certificate, viewed by the cross-tenant volunteer themselves,
+   * who has no tenant context matching the issuing org). Also decrypts the
+   * signature image here, so the encryption key never leaves this service.
+   *
+   * Returns `null` — never throws — when no legal representative has been
+   * registered, or if the stored bytes fail to decrypt (tampered/corrupted):
+   * a broken signature must never take down certificate generation; the
+   * caller falls back to a generic "Representante Legal" placeholder.
+   */
+  async getCurrentSignerForOrg(organizationId: string): Promise<LegalRepresentativeSigner | null> {
+    const row = await this.prisma.withOrgContext(organizationId, (tx) =>
+      tx.legalRepresentative.findFirst({
+        where: { organizationId },
+        orderBy: { signedAt: 'desc' },
+      }),
+    );
+    if (!row) {
+      return null;
+    }
+
+    const stored = await this.storage.readObject(row.signatureFileRef);
+    if (!stored) {
+      return null;
+    }
+
+    try {
+      const signatureImage = decryptSignature(stored.data, this.config.signatureEncryptionKey);
+      return { fullName: row.fullName, position: row.position, signatureImage };
+    } catch {
+      return null;
+    }
   }
 }

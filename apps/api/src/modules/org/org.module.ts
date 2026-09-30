@@ -87,9 +87,12 @@ import { PlatformSettingsService } from './platform-settings.service';
   ],
   // M13 (S-8): the platform dashboard consolidates the documents/duplicates
   // queue COUNTS by injecting these two services directly and reusing their
-  // existing `.queue()` method — never a parallel count. Exported ONLY these
-  // two (not the whole module's surface) to keep the cross-module dependency
-  // minimal and explicit.
-  exports: [PlatformDocumentsService, PlatformDuplicatesService],
+  // existing `.queue()` method — never a parallel count. `LegalRepresentativeService`
+  // (S-14) is exported for the SAME reason: M08's volunteer certificate reads
+  // the org's current signer + decrypted signature through it, rather than
+  // duplicating the crypto/storage plumbing in another module. Exported ONLY
+  // these (not the whole module's surface) to keep the cross-module
+  // dependency minimal and explicit.
+  exports: [PlatformDocumentsService, PlatformDuplicatesService, LegalRepresentativeService],
 })
 export class OrgModule {}
