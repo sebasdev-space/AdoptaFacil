@@ -431,6 +431,69 @@ describe('DonatePage — checkout de invitado (sin sesión, requisito final del 
     expect(cta).toHaveAttribute('href', '/register');
   });
 
+  it('bug fix: redirects the browser to paymentLinkUrl instead of showing the local "gracias" screen', async () => {
+    const originalLocation = window.location;
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...originalLocation, href: '' },
+    });
+
+    stubFetch((url) => {
+      if (url.includes('/donations')) {
+        return {
+          id: 'don-redirect-1',
+          organizationId: 'org-1',
+          donorUserId: null,
+          concept: { kind: 'organization', id: 'org-1' },
+          commissionPayer: 'organization',
+          intendedAmount: 50000,
+          amountCharged: 50000,
+          currency: 'COP',
+          breakdown: {
+            amountCharged: 50000,
+            gross: 50000,
+            platformFee: 2000,
+            platformIva: 380,
+            gatewayFee: 2025,
+            gatewayIva: 385,
+            net: 45210,
+          },
+          collectionId: 'test_redirect',
+          status: 'pending',
+          anonymous: false,
+          createdAt: '2026-09-28T00:00:00.000Z',
+          updatedAt: '2026-09-28T00:00:00.000Z',
+          paymentLinkUrl: 'https://mp.test/checkout/pref-redirect',
+        };
+      }
+      return [];
+    });
+
+    try {
+      renderShell({
+        route: '/donaciones?organizationId=org-1&organizationName=Refugio%20Patitas',
+      });
+
+      await screen.findByRole('heading', { name: 'Donar' });
+      fireEvent.change(screen.getByPlaceholderText('50000'), { target: { value: '50000' } });
+      fireEvent.change(screen.getByTestId('donation-guest-name'), {
+        target: { value: 'Invitado Test' },
+      });
+      fireEvent.change(screen.getByTestId('donation-guest-email'), {
+        target: { value: 'invitado@test.dev' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: /Donar a Refugio Patitas/ }));
+
+      await waitFor(() => {
+        expect(window.location.href).toBe('https://mp.test/checkout/pref-redirect');
+      });
+      // Never fell back to the local confirmation screen.
+      expect(screen.queryByText(/¡Gracias por tu donación!/)).not.toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
+    }
+  });
+
   it('does NOT offer the account-creation CTA to an already-authenticated donor', async () => {
     stubFetch((url) => {
       if (url.includes('/donations')) {

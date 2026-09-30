@@ -1,4 +1,4 @@
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import type { AuditService } from '../../core/audit/audit.service';
 import type { PrismaService } from '../../prisma/prisma.service';
@@ -161,6 +161,105 @@ describe('DonationsService.create — guest checkout', () => {
       h.service.create(undefined, { ...BASE_INPUT, payer: { fullName: 'Sin correo' } }),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(h.queryRaw).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The MercadoPago checkout redirect bug fix: `PaymentPort.createCollection()`
+ * already returns `paymentLinkUrl` — this was discarded before reaching the
+ * caller. `create()` must attach it to the JUST-CREATED response only, never
+ * persist it, and never attach it on the idempotent-replay short-circuit.
+ */
+describe('DonationsService.create — paymentLinkUrl (checkout redirect fix)', () => {
+  function donationRow() {
+    return {
+      id: 'don-1',
+      organization_id: 'org-1',
+      donor_user_id: null,
+      concept_kind: 'organization',
+      concept_id: 'org-1',
+      commission_payer: 'organization',
+      intended_amount: 50_000,
+      amount_charged: 50_000,
+      currency: 'COP',
+      breakdown: { amountCharged: 50_000, gross: 50_000, net: 48_000 },
+      collection_id: 'col-1',
+      idempotency_key: 'idem-key-guest-1',
+      status: 'pending',
+      payer: { fullName: 'Invitado Test', email: 'guest@test.dev' },
+      anonymous: false,
+      created_at: new Date('2026-09-28T00:00:00.000Z'),
+      updated_at: new Date('2026-09-28T00:00:00.000Z'),
+    };
+  }
+
+  it('attaches the gateway paymentLinkUrl to a freshly-created donation', async () => {
+    const h = makeService();
+    h.createCollection.mockResolvedValueOnce({
+      collectionId: 'col-1',
+      paymentLinkUrl: 'https://mp.test/checkout/pref-1',
+    });
+    h.queryRaw.mockResolvedValueOnce([]); // idempotency pre-check: none yet
+    h.queryRaw.mockResolvedValueOnce([donationRow()]);
+
+    const result = await h.service.create(undefined, {
+      ...BASE_INPUT,
+      payer: { fullName: 'Invitado Test', email: 'guest@test.dev' },
+    });
+
+    expect(result.paymentLinkUrl).toBe('https://mp.test/checkout/pref-1');
+  });
+
+  it('never attaches paymentLinkUrl on an idempotent replay (no fresh gateway call)', async () => {
+    const h = makeService();
+    h.queryRaw.mockResolvedValueOnce([donationRow()]); // idempotency pre-check: found
+
+    const result = await h.service.create(undefined, {
+      ...BASE_INPUT,
+      payer: { fullName: 'Invitado Test', email: 'guest@test.dev' },
+    });
+
+    expect(result.paymentLinkUrl).toBeUndefined();
+    expect(h.createCollection).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * PUBLIC "gracias" lookup (MercadoPago redirect-back) — resolves by
+ * `collectionId` (== the payer's `external_reference`), never distinguishes
+ * an unknown reference from any other 404 reason.
+ */
+describe('DonationsService.getPublicStatusByCollectionId', () => {
+  it('returns status/amount/currency/organizationName for a known collectionId', async () => {
+    const h = makeService();
+    h.queryRaw.mockResolvedValueOnce([
+      {
+        id: 'don-1',
+        organization_id: 'org-1',
+        status: 'approved',
+        amount_charged: 50_000,
+        currency: 'COP',
+      },
+    ]);
+    h.organizationFindMany.mockResolvedValueOnce([{ id: 'org-1', name: 'Refugio Patitas' }]);
+
+    const result = await h.service.getPublicStatusByCollectionId('col-1');
+
+    expect(result).toEqual({
+      status: 'approved',
+      amountCharged: 50_000,
+      currency: 'COP',
+      organizationName: 'Refugio Patitas',
+    });
+  });
+
+  it('throws a generic NotFoundException for an unknown collectionId', async () => {
+    const h = makeService();
+    h.queryRaw.mockResolvedValueOnce([]);
+
+    await expect(h.service.getPublicStatusByCollectionId('does-not-exist')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 });
 

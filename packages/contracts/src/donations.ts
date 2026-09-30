@@ -109,6 +109,19 @@ export interface Donation {
   anonymous: boolean;
   createdAt: string;
   updatedAt: string;
+  /**
+   * URL del checkout de MercadoPago (Checkout Pro) donde el donante completa
+   * el pago. Aditivo y EFÍMERO a propósito: solo viaja en la respuesta de
+   * `POST /donations` (justo tras crearla) — NUNCA se persiste en la fila ni
+   * se vuelve a poblar al releer la donación (`/donations/mine`,
+   * `/donations/received`, el acceso de invitado, etc. la dejan `undefined`).
+   * Un link de checkout de MercadoPago es de corta vida; el flujo de
+   * "consultar mi donación más tarde" ya está cubierto por el recibo/
+   * certificado y, para un invitado, el magic link por correo — nunca por
+   * este campo. El frontend redirige el navegador aquí (`window.location.href`)
+   * en vez de mostrar la pantalla de "gracias" localmente.
+   */
+  paymentLinkUrl?: string;
 }
 
 /**
@@ -235,4 +248,20 @@ export interface GuestDonationAccess {
   donation: Donation;
   receipt?: DonationReceipt;
   certificate?: DonationCertificate;
+}
+
+/**
+ * Proyección PÚBLICA y MÍNIMA para la pantalla de "gracias" post-checkout
+ * (`GET /public/donations/status/:reference`), a la que MercadoPago redirige
+ * al donante de vuelta (`back_urls` + `auto_return`) con `external_reference`
+ * (== nuestro propio `collectionId`) en la query string. Deliberadamente
+ * acotada — mismo criterio de exposición que `DonationCertificateVerification`/
+ * `GuestDonationAccess`: solo estado/monto/nombre de la organización, NUNCA la
+ * identidad del donante ni ids internos.
+ */
+export interface DonationPublicStatus {
+  status: DonationStatus;
+  amountCharged: number;
+  currency: PaymentCurrency;
+  organizationName: string;
 }

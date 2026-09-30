@@ -76,7 +76,12 @@ export function RegisterPersonForm() {
       navigate('/', { replace: true });
     } catch (error) {
       setFormError(
-        ApiError.is(error) && error.code === 'email_taken'
+        // The real API returns a plain 409 with no error body `code` (Nest's
+        // default filter), so the client falls back to `STATUS_CODES[409]` =
+        // 'conflict' (see `shell/api/http.ts`) — 'email_taken' was the MOCK
+        // API's own made-up code and never matched the real backend, so this
+        // branch silently never fired outside tests using the mock.
+        ApiError.is(error) && error.code === 'conflict'
           ? 'Ya existe una cuenta con este correo.'
           : 'No pudimos crear la cuenta. Inténtalo de nuevo.',
       );

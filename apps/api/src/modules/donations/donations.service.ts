@@ -17,6 +17,7 @@ import {
   type DonationDonor,
   type DonationReceipt,
   type DonationStatus,
+  type DonationPublicStatus,
   type DonationWithReceipt,
   type GuestDonationAccess,
   type NormalizedWebhookEvent,
@@ -177,6 +178,9 @@ export class DonationsService {
     // with ON CONFLICT DO NOTHING, so concurrency never duplicates the row.
     const existing = await this.findByIdempotencyKey(input.organizationId, input.idempotencyKey);
     if (existing) {
+      // No `paymentLinkUrl` here on purpose: a retry never calls the gateway
+      // again, so there is no fresh link to attach — the caller's FIRST
+      // response already carried the one (still-live) checkout link.
       return this.fromRow(existing);
     }
 
@@ -240,7 +244,38 @@ export class DonationsService {
       },
     });
 
-    return this.fromRow(row);
+    // `paymentLinkUrl` is attached ONLY here, on the just-created object this
+    // method returns — never persisted (see the field's doc comment on
+    // `Donation`) and never present when the SAME row is read back later
+    // (`fromRow` alone, used by `listMine`/`getByAccessToken`, never sets it).
+    return { ...this.fromRow(row), paymentLinkUrl: collection.paymentLinkUrl };
+  }
+
+  /**
+   * PUBLIC, minimal status read for the post-checkout "gracias" page —
+   * MercadoPago redirects the payer back with `external_reference`, which IS
+   * our own `collectionId` (see `createCollection`'s doc comment). Cross-
+   * tenant (no session, no tenant context) via a bounded SECURITY DEFINER
+   * function, same "never distinguish 404 reasons" principle as
+   * `getByAccessToken`: an unknown reference is a single generic 404, never a
+   * hint about whether one might exist. Deliberately narrow response — status/
+   * amount/org name only, never the payer's identity.
+   */
+  async getPublicStatusByCollectionId(collectionId: string): Promise<DonationPublicStatus> {
+    const rows = await this.prisma.$queryRaw<DonationRow[]>(Prisma.sql`
+      SELECT * FROM donation_by_collection_id(${collectionId})
+    `);
+    const row = rows[0];
+    if (!row) {
+      throw new NotFoundException('Donación no encontrada.');
+    }
+    const orgNames = await this.organizationNamesById([row.organization_id]);
+    return {
+      status: row.status as DonationStatus,
+      amountCharged: row.amount_charged,
+      currency: row.currency as Donation['currency'],
+      organizationName: orgNames.get(row.organization_id) ?? '',
+    };
   }
 
   /**

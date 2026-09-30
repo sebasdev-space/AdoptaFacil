@@ -5,6 +5,7 @@ import { DonationsController } from './donations.controller';
 import { DonationsService } from './donations.service';
 import { DonationCertificatePublicController } from './donation-certificate-public.controller';
 import { DonationAccessPublicController } from './donation-access-public.controller';
+import { DonationStatusPublicController } from './donation-status-public.controller';
 import { DonationCertificatesService } from './donation-certificates.service';
 
 /**
@@ -38,6 +39,11 @@ import { DonationCertificatesService } from './donation-certificates.service';
  * `PasswordResetToken`) y sus 3 lecturas SECURITY DEFINER acotadas por id de
  * donación (`donation_by_id`/`donation_receipt_by_donation`/
  * `donation_certificate_by_donation`).
+ *
+ * `DonationStatusPublicController` (MercadoPago redirect-back "gracias"
+ * page): resolves `GET /public/donations/status/:reference` cross-tenant by
+ * `collection_id` (`donation_by_collection_id`, SECURITY DEFINER) — status/
+ * amount/org name only, no auth, generic 404 on an unknown reference.
  */
 @Module({
   imports: [AuthModule, CampaignsModule],
@@ -45,6 +51,7 @@ import { DonationCertificatesService } from './donation-certificates.service';
     DonationsController,
     DonationCertificatePublicController,
     DonationAccessPublicController,
+    DonationStatusPublicController,
   ],
   providers: [DonationsService, DonationCertificatesService],
 })

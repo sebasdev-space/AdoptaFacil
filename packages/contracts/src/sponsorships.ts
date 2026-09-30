@@ -280,3 +280,21 @@ export interface SponsorshipPublicSummary {
   activePlans: SponsorshipPlanPublic[];
   activeSponsorCount: number;
 }
+
+// ============================================================================
+// Post-checkout "gracias" page (Fabián, payments wiring) — additive, mirrors
+// `DonationPublicStatus` in donations.ts.
+// ============================================================================
+
+/**
+ * PUBLIC, minimal projection for the sponsorship "gracias" page
+ * (`GET /public/sponsorships/status/:reference`), resolved from MercadoPago's
+ * `external_reference` (== the attempt's own `collectionId`) after the
+ * sponsor is redirected back from Checkout Pro. Deliberately narrow — status/
+ * amount/org name only, NEVER the sponsor's identity or any internal id.
+ */
+export interface SponsorshipPaymentPublicStatus {
+  status: SponsorshipPaymentStatus;
+  amount: number;
+  organizationName: string;
+}

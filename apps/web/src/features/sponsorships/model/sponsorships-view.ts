@@ -21,6 +21,28 @@ export const SPONSORSHIP_PERIODICITY_LABELS: Record<SponsorshipPeriodicity, stri
   [SponsorshipPeriodicity.Monthly]: 'Mensual',
 };
 
+/** Etiquetas legibles (es-CO) del estado de un período de cobro (S-5-REDISEÑO,
+ *  usado por la página `/apadrinar/gracias` post-checkout). */
+export const SPONSORSHIP_PAYMENT_STATUS_LABELS: Record<SponsorshipPaymentStatus, string> = {
+  [SponsorshipPaymentStatus.Pending]: 'Pendiente',
+  [SponsorshipPaymentStatus.Paid]: 'Pagado',
+  [SponsorshipPaymentStatus.Failed]: 'Fallido',
+};
+
+/** Variante de badge semántica por estado de período de cobro. */
+export function sponsorshipPaymentStatusVariant(
+  status: SponsorshipPaymentStatus,
+): 'success' | 'warning' | 'destructive' {
+  switch (status) {
+    case SponsorshipPaymentStatus.Paid:
+      return 'success';
+    case SponsorshipPaymentStatus.Pending:
+      return 'warning';
+    case SponsorshipPaymentStatus.Failed:
+      return 'destructive';
+  }
+}
+
 /** Variante de badge semántica por estado. */
 export function sponsorshipStatusVariant(
   status: SponsorshipStatus,

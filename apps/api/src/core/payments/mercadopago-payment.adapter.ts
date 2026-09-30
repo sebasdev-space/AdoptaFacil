@@ -118,6 +118,7 @@ export class MercadoPagoPaymentAdapter implements PaymentPort {
   private readonly accessToken: string;
   private readonly webhookSecret: string;
   private readonly publicBaseUrl: string | undefined;
+  private readonly webBaseUrl: string;
 
   constructor(
     config: ConfigService<Env, true>,
@@ -139,6 +140,10 @@ export class MercadoPagoPaymentAdapter implements PaymentPort {
     // MercadoPago dashboard instead.
     this.publicBaseUrl = config.get('STORAGE_PUBLIC_BASE_URL', { infer: true }) as
       string | undefined;
+    // Where the PAYER's browser lives (same env var/pattern as
+    // auth.service.ts/donations.service.ts) — used to build `back_urls` below,
+    // never for anything server-to-server (that's `publicBaseUrl` above).
+    this.webBaseUrl = (config.get('WEB_BASE_URL', { infer: true }) as string).replace(/\/$/, '');
   }
 
   /**
@@ -165,6 +170,28 @@ export class MercadoPagoPaymentAdapter implements PaymentPort {
       ],
       external_reference: reference,
     };
+    // Where MercadoPago sends the PAYER's browser back after Checkout Pro
+    // (`auto_return: 'approved'` skips MercadoPago's own confirmation screen
+    // for an approved payment). Same URL for success/pending/failure — the
+    // return page itself resolves the real status from `external_reference`
+    // via the new public status endpoint, it never trusts MercadoPago's own
+    // query params directly (undocumented exact shape). ONE shared method
+    // serves both donations and sponsorships (no other signal at this point
+    // besides `concept.kind`) — see `PaymentConceptKind` in this same package.
+    const thanksPath =
+      input.concept.kind === 'sponsorship' ? '/apadrinar/gracias' : '/donaciones/gracias';
+    const thanksUrl = `${this.webBaseUrl}${thanksPath}`;
+    body.back_urls = { success: thanksUrl, pending: thanksUrl, failure: thanksUrl };
+    // MercadoPago's real API REJECTS the whole preference (400
+    // invalid_auto_return) when `auto_return` is set but `back_urls.success`
+    // isn't a URL it recognizes as a genuine public site — a bare `localhost`
+    // origin (local dev without a public tunnel) fails this check. Only ask
+    // for auto-return when we actually have a non-local `webBaseUrl`; without
+    // it, Checkout Pro still shows `back_urls` as a manual "Volver al sitio"
+    // link on its own confirmation screen — one extra click, not a broken flow.
+    if (!/^https?:\/\/localhost(:\d+)?/i.test(this.webBaseUrl)) {
+      body.auto_return = 'approved';
+    }
     if (this.publicBaseUrl) {
       body.notification_url = `${this.publicBaseUrl.replace(/\/$/, '')}/donations/webhook`;
     }

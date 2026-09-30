@@ -188,11 +188,38 @@ describe('Sponsorship recurring billing (S-5-REDISEÑO, M07/RF17, T-057)', () =>
         sponsorshipPaymentId: payment.id,
         attemptNumber: 1,
         collectionId: expect.any(String),
+        // FakePaymentAdapter.createCollection always returns one too (see
+        // payments.ts) — this was the bug: the column already existed but
+        // the write path never populated it until this fix.
+        paymentLinkUrl: expect.any(String),
         expiresAt: expect.any(String),
         result: 'pending',
         createdAt: expect.any(String),
       }),
     );
+  });
+
+  it('PUBLIC "gracias" lookup resolves status/amount/org name by an attempt\'s collectionId, never the sponsor', async () => {
+    const org = await registerOrg('public-status');
+    const sponsor = await registerPerson('public-status');
+    const planId = await createPlan(org, 45_000);
+    const sponsorshipId = await subscribe(sponsor, planId);
+    await billing.runDailyScan();
+
+    const [payment] = await fetchOpenPayment(org.token, sponsorshipId);
+    const collectionId = payment.attempts[0].collectionId;
+
+    const res = await request(server)
+      .get(`/public/sponsorships/status/${collectionId}`)
+      .expect(200);
+    expect(res.body).toEqual({
+      status: 'pending',
+      amount: 45_000,
+      organizationName: `Refugio public-status`,
+    });
+    expect(res.body.sponsorUserId).toBeUndefined();
+
+    await request(server).get('/public/sponsorships/status/does-not-exist').expect(404);
   });
 
   it('walks the FULL tolerant ladder (2 reminders skipped in assertions, 3 attempts) to auto-suspension after 30 elapsed days, never confirming payment via the poller', async () => {
@@ -311,6 +338,10 @@ describe('Sponsorship recurring billing (S-5-REDISEÑO, M07/RF17, T-057)', () =>
       .expect(200);
     expect(retried.body.attempts).toHaveLength(4);
     expect(retried.body.attempts[3]).toMatchObject({ attemptNumber: 4, result: 'pending' });
+    // Sponsor-initiated recovery must ALSO persist the checkout link — the
+    // other half of this bug (createAttemptCollection's automated ladder was
+    // the first half, tested above).
+    expect(retried.body.attempts[3].paymentLinkUrl).toEqual(expect.any(String));
 
     await poller.pollPending();
 

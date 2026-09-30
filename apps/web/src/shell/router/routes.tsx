@@ -81,8 +81,13 @@ import {
   AdoptionsKanbanPage,
   MyAdoptionRequestsPage,
 } from '../../features/adoptions';
-import { DonatePage, DonationAccessPage, ReceivedDonationsPage } from '../../features/donations';
-import { SponsorPage, SponsorshipsPage } from '../../features/sponsorships';
+import {
+  DonatePage,
+  DonationAccessPage,
+  DonationThanksPage,
+  ReceivedDonationsPage,
+} from '../../features/donations';
+import { SponsorPage, SponsorshipThanksPage, SponsorshipsPage } from '../../features/sponsorships';
 import { CertificateEmissionPage, CertificateVerificationPage } from '../../features/certificates';
 import {
   MyVolunteeringPage,
@@ -211,6 +216,16 @@ export function AppRoutes() {
           credencial (`GET /public/donations/access/:token`, sin auth). Mismo
           SEAM que `/donaciones` y `/verificar/:code` arriba. */}
       <Route path="/donaciones/comprobante" element={<DonationAccessPage />} />
+      {/* Bug fix (checkout de MercadoPago REAL, nunca cableado hasta ahora):
+          `back_urls`/`auto_return` de `MercadoPagoPaymentAdapter.createCollection`
+          traen de vuelta al donante aquí, con `external_reference` en la query
+          string — pública, fuera de <RequireAuth> (mismo SEAM que las rutas de
+          arriba). Ver el header comment de `DonationThanksPage`. */}
+      <Route path="/donaciones/gracias" element={<DonationThanksPage />} />
+      {/* Misma pieza que arriba, lado apadrinamiento (RF17/S-5-REDISEÑO): aunque
+          `/apadrinar` (suscribirse/reintentar pago) exige sesión más abajo, este
+          aterrizaje post-pago no depende de ella — ver `SponsorshipThanksPage`. */}
+      <Route path="/apadrinar/gracias" element={<SponsorshipThanksPage />} />
 
       {/* Protected — guard first, then the shell layout */}
       <Route element={<RequireAuth />}>
