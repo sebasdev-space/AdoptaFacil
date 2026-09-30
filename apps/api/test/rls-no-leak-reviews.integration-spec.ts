@@ -105,4 +105,22 @@ describe('RLS cross-org no-leak (reviews)', () => {
       ),
     ).rejects.toThrow();
   });
+
+  // S7-b: the portal-público path (`create_public_review`) inserts with
+  // `author_user_id = NULL` — same tenant_isolation policy, unaffected by the
+  // column becoming nullable. Confirms the anonymous row is isolated exactly
+  // like an authenticated one.
+  it('no-leak: an anonymous (author_user_id NULL) review is still tenant-isolated', async () => {
+    await withOrgContext(prisma, orgA, (tx) =>
+      tx.review.create({
+        data: { organizationId: orgA, authorUserId: null, rating: 4, comment: 'Anónima A' },
+      }),
+    );
+
+    const seenFromA = await withOrgContext(prisma, orgA, (tx) => tx.review.findMany());
+    expect(seenFromA.some((r) => r.comment === 'Anónima A')).toBe(true);
+
+    const seenFromB = await withOrgContext(prisma, orgB, (tx) => tx.review.findMany());
+    expect(seenFromB.some((r) => r.comment === 'Anónima A')).toBe(false);
+  });
 });

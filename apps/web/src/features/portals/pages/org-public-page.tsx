@@ -21,6 +21,7 @@ import { PortalProductsSection } from '../components/portal-products-section';
 import { PortalNeedsSection } from '../components/portal-needs-section';
 import { PortalCampaignsSection } from '../components/portal-campaigns-section';
 import { PortalAboutSection } from '../components/portal-about-section';
+import { PortalReviewsSection } from '../components/portal-reviews-section';
 import { PortalContactInfoSection } from '../components/portal-contact-info-section';
 import { PortalHeaderActions } from '../components/portal-header-actions';
 import { PortalPublicLedgerSection } from '../components/portal-public-ledger-section';
@@ -226,6 +227,7 @@ export function OrgPublicPage({ slugOverride }: OrgPublicPageProps = {}) {
     { label: 'Animales', href: '#portal-section-pets' },
     { label: 'Cómo ayudar', href: '#portal-help-cta' },
     ...(aboutUs ? [{ label: 'Nosotros', href: '#portal-about' }] : []),
+    { label: 'Reseñas', href: '#portal-reviews' },
     { label: 'Transparencia', href: '#portal-section-public-ledger' },
     ...(hasContactInfo ? [{ label: 'Contacto', href: '#portal-contact-info' }] : []),
   ];
@@ -334,6 +336,8 @@ export function OrgPublicPage({ slugOverride }: OrgPublicPageProps = {}) {
                 <PortalAboutSection aboutUs={aboutUs} />
               </section>
             )}
+            <PortalReviewsSection slug={slug as string} />
+
             {hasContactInfo && contact && (
               <section id="portal-contact-info" style={{ scrollMarginTop: '5rem' }}>
                 <PortalContactInfoSection contact={contact} />
