@@ -153,6 +153,18 @@ export function DonatePage() {
         // Idempotencia: el servidor deduplica por (org, key); una clave por intento.
         idempotencyKey: crypto.randomUUID(),
       });
+      // Bug fix (checkout REAL de MercadoPago, nunca cableado hasta ahora):
+      // `paymentLinkUrl` es el link de Checkout Pro donde el donante realmente
+      // paga — navegación de página completa (no del router), porque sale del
+      // SPA hacia MercadoPago y vuelve en `/donaciones/gracias` (back_urls +
+      // auto_return, ver `mercadopago-payment.adapter.ts`). Cuando NO viene
+      // (no debería pasar contra el driver real; ver `FakePaymentAdapter` para
+      // el único caso donde SÍ viene pero apunta a un dominio no navegable),
+      // se conserva la pantalla local de "gracias" tal cual.
+      if (donation.paymentLinkUrl) {
+        window.location.href = donation.paymentLinkUrl;
+        return;
+      }
       setDone(donation);
       toast({
         title: 'Donación registrada',

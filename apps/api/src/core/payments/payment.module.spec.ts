@@ -75,6 +75,7 @@ describe('PaymentModule (T-052)', () => {
       MERCADOPAGO_PUBLIC_KEY: 'TEST-pub-dummy',
       MERCADOPAGO_ACCESS_TOKEN: 'TEST-token-dummy',
       MERCADOPAGO_WEBHOOK_SECRET: 'test_webhook_secret_dummy',
+      WEB_BASE_URL: 'http://localhost:5173',
     });
     expect(port).toBeInstanceOf(MercadoPagoPaymentAdapter);
   });

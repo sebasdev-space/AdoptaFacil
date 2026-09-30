@@ -177,6 +177,77 @@ describe('SponsorPage — sin animalId muestra "Mis apadrinamientos"', () => {
     });
     expect(await screen.findByText('Nuevo cobro generado')).toBeInTheDocument();
   });
+
+  it("bug fix: redirects the browser to the new attempt's paymentLinkUrl instead of just toasting", async () => {
+    const originalLocation = window.location;
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...originalLocation, href: '' },
+    });
+
+    stubFetch((url, init) => {
+      if (url.includes('/retry-payment') && init?.method === 'POST') {
+        return {
+          id: 'pay-1',
+          sponsorshipId: 's-1',
+          organizationId: 'org-1',
+          period: '2026-08',
+          status: 'pending',
+          attempts: [
+            {
+              id: 'att-1',
+              sponsorshipPaymentId: 'pay-1',
+              attemptNumber: 1,
+              collectionId: 'col-1',
+              expiresAt: '2026-08-05T00:00:00.000Z',
+              result: 'expired',
+              createdAt: '2026-08-01T00:00:00.000Z',
+            },
+            {
+              id: 'att-2',
+              sponsorshipPaymentId: 'pay-1',
+              attemptNumber: 2,
+              collectionId: 'col-2',
+              paymentLinkUrl: 'https://mp.test/checkout/sponsorship-2',
+              expiresAt: '2026-08-10T00:00:00.000Z',
+              result: 'pending',
+              createdAt: '2026-08-05T00:00:00.000Z',
+            },
+          ],
+          createdAt: '2026-08-01T00:00:00.000Z',
+        };
+      }
+      if (url.includes('/sponsorships/mine')) {
+        return [
+          sponsorship({
+            status: SponsorshipStatus.Suspended,
+            currentPeriodStatus: SponsorshipPaymentStatus.Failed,
+          }),
+        ];
+      }
+      return [];
+    });
+
+    try {
+      renderShell({ route: '/apadrinar', ...personSession() });
+
+      await screen.findByText('Firulais');
+      fireEvent.click(screen.getByRole('button', { name: 'Pagar de nuevo' }));
+
+      await waitFor(() => {
+        expect(window.location.href).toBe('https://mp.test/checkout/sponsorship-2');
+      });
+      // NOTE: not asserting the absence of a "Nuevo cobro generado" toast here —
+      // `useToast`'s state is a module-level singleton (`memoryState`, shared
+      // across every test in this file, see `use-toast.ts`), so a toast raised
+      // by an EARLIER test in this same file can still be mounted when this one
+      // renders, independent of whether THIS action fires a new one. The real
+      // assertion is the href above: the redirect branch returns before ever
+      // calling `load()`/`toast()` (see `my-sponsorships-list.tsx`).
+    } finally {
+      Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
+    }
+  });
 });
 
 describe('SponsorPage — con animalId confirma el apadrinamiento (plan mensual único)', () => {

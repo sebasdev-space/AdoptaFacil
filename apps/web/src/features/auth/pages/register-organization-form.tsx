@@ -77,7 +77,11 @@ export function RegisterOrganizationForm() {
       navigate('/', { replace: true });
     } catch (error) {
       setFormError(
-        ApiError.is(error) && error.code === 'email_taken'
+        // Same real-vs-mock code mismatch as register-person-form.tsx: the
+        // real API's 409 has no body `code`, so the client falls back to
+        // 'conflict' (STATUS_CODES[409] in `shell/api/http.ts`) — never
+        // 'email_taken', which only the mock API ever sent.
+        ApiError.is(error) && error.code === 'conflict'
           ? 'Ya existe una cuenta con este correo.'
           : 'No pudimos crear la cuenta. Inténtalo de nuevo.',
       );

@@ -1,5 +1,6 @@
 // M07 · Sponsorships (RF17 · T-056) — frontend feature surface (S2-03).
 export { SponsorPage } from './pages/sponsor-page';
+export { SponsorshipThanksPage } from './pages/sponsorship-thanks-page';
 export { SponsorshipsPage } from './pages/sponsorships-page';
 export { MySponsorshipsList } from './components/my-sponsorships-list';
 export {
@@ -19,4 +20,7 @@ export {
   suspendSponsorship,
   reactivateSponsorship,
 } from './api/sponsorships-api';
-export { fetchAnimalSponsorshipSummary } from './api/public-sponsorships';
+export {
+  fetchAnimalSponsorshipSummary,
+  fetchSponsorshipPaymentPublicStatus,
+} from './api/public-sponsorships';

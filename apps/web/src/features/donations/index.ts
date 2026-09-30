@@ -1,6 +1,7 @@
 // M05 · Donations (T-050, P1) — public feature surface.
 export { DonatePage } from './pages/donate-page';
 export { DonationAccessPage } from './pages/donation-access-page';
+export { DonationThanksPage } from './pages/donation-thanks-page';
 export { ReceivedDonationsPage } from './pages/received-donations-page';
 export { DonateForm, type DonateFormValues } from './components/donate-form';
 export { DonationBreakdown } from './components/donation-breakdown';
@@ -30,4 +31,5 @@ export {
   listMyDonations,
   getMyDonationReceipt,
   fetchGuestDonationAccess,
+  fetchDonationPublicStatus,
 } from './api/donations-api';

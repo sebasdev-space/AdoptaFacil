@@ -71,7 +71,18 @@ export function MySponsorshipsList() {
   const retryPayment = async (sponsorship: Sponsorship): Promise<void> => {
     setRetryingId(sponsorship.id);
     try {
-      await retrySponsorshipPayment(client, sponsorship.id);
+      const payment = await retrySponsorshipPayment(client, sponsorship.id);
+      // Bug fix (checkout REAL de MercadoPago, nunca cableado hasta ahora):
+      // el intento recién creado por esta llamada es el ÚLTIMO de la lista
+      // (`attempts` viene ordenado ascendente por `attemptNumber`) — su
+      // `paymentLinkUrl` es donde el padrino realmente paga. Navegación de
+      // página completa (sale del SPA hacia MercadoPago y vuelve en
+      // `/apadrinar/gracias`, back_urls + auto_return).
+      const newAttempt = payment.attempts[payment.attempts.length - 1];
+      if (newAttempt?.paymentLinkUrl) {
+        window.location.href = newAttempt.paymentLinkUrl;
+        return;
+      }
       await load();
       toast({
         title: 'Nuevo cobro generado',

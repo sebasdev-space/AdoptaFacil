@@ -148,6 +148,7 @@ export class SponsorshipBillingService {
           sponsorshipPaymentId: payment.id,
           attemptNumber: 1,
           collectionId: attempt.collectionId,
+          paymentLinkUrl: attempt.paymentLinkUrl,
           idempotencyKey: attempt.idempotencyKey,
           expiresAt: addDays(now, this.ladderConfig().expireAttempt1Day),
         },
@@ -288,6 +289,7 @@ export class SponsorshipBillingService {
           sponsorshipPaymentId: row.payment_id,
           attemptNumber: nextAttemptNumber,
           collectionId: attempt.collectionId,
+          paymentLinkUrl: attempt.paymentLinkUrl,
           idempotencyKey: attempt.idempotencyKey,
           expiresAt: addDays(row.period_started_at, expireByDay),
         },
@@ -377,7 +379,7 @@ export class SponsorshipBillingService {
     period: string,
     attemptNumber: number,
     amount: number,
-  ): Promise<{ collectionId: string; idempotencyKey: string }> {
+  ): Promise<{ collectionId: string; idempotencyKey: string; paymentLinkUrl?: string }> {
     const idempotencyKey = buildAttemptIdempotencyKey(sponsorshipId, period, attemptNumber);
     const collection = await this.payments.createCollection({
       intendedAmount: amount,
@@ -386,7 +388,11 @@ export class SponsorshipBillingService {
       commissionPayer: 'organization',
       idempotencyKey,
     });
-    return { collectionId: collection.collectionId, idempotencyKey };
+    return {
+      collectionId: collection.collectionId,
+      idempotencyKey,
+      paymentLinkUrl: collection.paymentLinkUrl,
+    };
   }
 
   private async notifyBestEffort(to: string, subject: string, body: string): Promise<void> {

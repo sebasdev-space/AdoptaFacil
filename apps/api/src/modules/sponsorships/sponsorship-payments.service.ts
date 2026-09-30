@@ -11,6 +11,7 @@ import {
   type SponsorshipPayment,
   type SponsorshipPaymentAttempt,
   SponsorshipPaymentAttemptResult,
+  type SponsorshipPaymentPublicStatus,
   SponsorshipPaymentStatus,
   SponsorshipStatus,
 } from '@adoptafacil/contracts';
@@ -29,6 +30,13 @@ interface RecoveryContextRow {
   failed_payment_id: string;
   period: string;
   attempt_count: number;
+}
+
+/** Row from `sponsorship_payment_attempt_by_collection_id(...)` (snake_case, raw SQL). */
+interface PublicStatusRow {
+  payment_status: string;
+  organization_name: string;
+  plan_amount: number;
 }
 
 function toAttempt(row: AttemptModel): SponsorshipPaymentAttempt {
@@ -103,6 +111,32 @@ export class SponsorshipPaymentsService {
   }
 
   /**
+   * PUBLIC, minimal status read for the post-checkout "gracias" page —
+   * MercadoPago redirects the sponsor back with `external_reference`, which
+   * IS the attempt's own `collectionId` (same reasoning as
+   * `DonationsService.getPublicStatusByCollectionId`). Cross-tenant, no
+   * session, via a bounded SECURITY DEFINER function; an unknown reference is
+   * a single generic 404. Deliberately narrow — status/amount/org name only,
+   * never the sponsor's identity.
+   */
+  async getPublicStatusByCollectionId(
+    collectionId: string,
+  ): Promise<SponsorshipPaymentPublicStatus> {
+    const rows = await this.prisma.$queryRaw<PublicStatusRow[]>(
+      Prisma.sql`SELECT * FROM sponsorship_payment_attempt_by_collection_id(${collectionId})`,
+    );
+    const row = rows[0];
+    if (!row) {
+      throw new NotFoundException('Apadrinamiento no encontrado.');
+    }
+    return {
+      status: row.payment_status as SponsorshipPaymentStatus,
+      amount: row.plan_amount,
+      organizationName: row.organization_name,
+    };
+  }
+
+  /**
    * Sponsor-initiated recovery (Objetivo 6) — cross-tenant (the sponsor is
    * not a member of the sponsored org), no `@Roles` gate: any authenticated
    * Person may retry ONLY their own suspended sponsorship. Generates a
@@ -160,6 +194,7 @@ export class SponsorshipPaymentsService {
           sponsorshipPaymentId: ctx.failed_payment_id,
           attemptNumber: nextAttemptNumber,
           collectionId: collection.collectionId,
+          paymentLinkUrl: collection.paymentLinkUrl,
           idempotencyKey,
           expiresAt,
         },

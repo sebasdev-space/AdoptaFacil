@@ -8,6 +8,7 @@ import { SponsorshipBillingProcessor } from './sponsorship-billing.processor';
 import { SponsorshipBillingScheduler } from './sponsorship-billing.scheduler';
 import { SponsorshipBillingService } from './sponsorship-billing.service';
 import { SponsorshipPaymentPollerService } from './sponsorship-payment-poller.service';
+import { SponsorshipPaymentStatusPublicController } from './sponsorship-payment-status-public.controller';
 import { SponsorshipPaymentsService } from './sponsorship-payments.service';
 import { SponsorshipPlansController } from './sponsorship-plans.controller';
 import { SponsorshipPlansService } from './sponsorship-plans.service';
@@ -40,7 +41,12 @@ import { SponsorshipsService } from './sponsorships.service';
  */
 @Module({
   imports: [AuthModule, BullModule.registerQueue({ name: SPONSORSHIP_BILLING_QUEUE })],
-  controllers: [SponsorshipPlansController, SponsorshipsController, PublicSponsorshipsController],
+  controllers: [
+    SponsorshipPlansController,
+    SponsorshipsController,
+    PublicSponsorshipsController,
+    SponsorshipPaymentStatusPublicController,
+  ],
   providers: [
     SponsorshipPlansService,
     SponsorshipsService,

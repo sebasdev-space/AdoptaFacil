@@ -115,8 +115,31 @@ describe('Donations (M05: donate + breakdown + receipt)', () => {
     expect(res.body.breakdown).toEqual(expected);
     // Org absorbs the commissions: the net it receives is below the intended amount.
     expect(res.body.breakdown.net).toBeLessThan(50000);
+    // The just-created donation carries the checkout link (FakePaymentAdapter
+    // always returns one too, see payments.ts) — never persisted, only on
+    // THIS response (see the field's doc comment on the `Donation` contract).
+    expect(typeof res.body.paymentLinkUrl).toBe('string');
+    expect(res.body.paymentLinkUrl.length).toBeGreaterThan(0);
     orgDonationId = res.body.id;
     orgCollectionId = res.body.collectionId;
+  });
+
+  it('PUBLIC "gracias" lookup resolves status/amount/org name by collectionId, never the payer', async () => {
+    const res = await request(server)
+      .get(`/public/donations/status/${orgCollectionId}`)
+      .expect(200);
+    expect(res.body).toEqual({
+      status: 'pending',
+      amountCharged: 50000,
+      currency: 'COP',
+      organizationName: 'Refugio Beneficiario',
+    });
+    expect(res.body.payer).toBeUndefined();
+    expect(res.body.id).toBeUndefined();
+  });
+
+  it('PUBLIC "gracias" lookup: an unknown reference is a generic 404', async () => {
+    await request(server).get('/public/donations/status/does-not-exist').expect(404);
   });
 
   it('is idempotent by idempotencyKey: a retry returns the SAME donation (no double charge)', async () => {

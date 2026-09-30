@@ -10,6 +10,7 @@ const ENV: Record<string, unknown> = {
   MERCADOPAGO_ACCESS_TOKEN: 'TEST-token-dummy',
   MERCADOPAGO_WEBHOOK_SECRET: 'test_webhook_secret_dummy',
   STORAGE_PUBLIC_BASE_URL: 'https://api.adoptafacil.test',
+  WEB_BASE_URL: 'https://app.adoptafacil.test',
 };
 
 function makeConfig(overrides: Record<string, unknown> = {}): ConfigService<Env, true> {
@@ -98,6 +99,74 @@ describe('MercadoPagoPaymentAdapter — createCollection (Fase 1, recaudo)', () 
 
     const result = await adapter.createCollection(baseInput);
     expect(result.paymentLinkUrl).toBe('https://mp.test/sandbox/pref-1');
+  });
+
+  it('sends back_urls to /donaciones/gracias + auto_return:approved for a DONATION concept', async () => {
+    const fetchFn = jest.fn<ReturnType<MercadoPagoFetch>, Parameters<MercadoPagoFetch>>(() =>
+      Promise.resolve(jsonResponse({ id: 'pref-1', init_point: 'https://mp.test/x' }, 201)),
+    ) as unknown as MercadoPagoFetch;
+    const adapter = new MercadoPagoPaymentAdapter(makeConfig(), fetchFn);
+
+    await adapter.createCollection({
+      ...baseInput,
+      concept: { kind: 'campaign', id: 'campaign-1' },
+    });
+
+    const [, init] = (fetchFn as jest.Mock).mock.calls[0];
+    const body = JSON.parse(init.body as string);
+    expect(body.back_urls).toEqual({
+      success: 'https://app.adoptafacil.test/donaciones/gracias',
+      pending: 'https://app.adoptafacil.test/donaciones/gracias',
+      failure: 'https://app.adoptafacil.test/donaciones/gracias',
+    });
+    expect(body.auto_return).toBe('approved');
+  });
+
+  it('sends back_urls to /apadrinar/gracias for a SPONSORSHIP concept', async () => {
+    const fetchFn = jest.fn<ReturnType<MercadoPagoFetch>, Parameters<MercadoPagoFetch>>(() =>
+      Promise.resolve(jsonResponse({ id: 'pref-1', init_point: 'https://mp.test/x' }, 201)),
+    ) as unknown as MercadoPagoFetch;
+    const adapter = new MercadoPagoPaymentAdapter(makeConfig(), fetchFn);
+
+    await adapter.createCollection({
+      ...baseInput,
+      concept: { kind: 'sponsorship', id: 'sponsorship-1' },
+    });
+
+    const [, init] = (fetchFn as jest.Mock).mock.calls[0];
+    const body = JSON.parse(init.body as string);
+    expect(body.back_urls).toEqual({
+      success: 'https://app.adoptafacil.test/apadrinar/gracias',
+      pending: 'https://app.adoptafacil.test/apadrinar/gracias',
+      failure: 'https://app.adoptafacil.test/apadrinar/gracias',
+    });
+    expect(body.auto_return).toBe('approved');
+  });
+
+  it('omits auto_return when WEB_BASE_URL is localhost (MercadoPago rejects it: 400 invalid_auto_return)', async () => {
+    const fetchFn = jest.fn<ReturnType<MercadoPagoFetch>, Parameters<MercadoPagoFetch>>(() =>
+      Promise.resolve(jsonResponse({ id: 'pref-1', init_point: 'https://mp.test/x' }, 201)),
+    ) as unknown as MercadoPagoFetch;
+    const adapter = new MercadoPagoPaymentAdapter(
+      makeConfig({ WEB_BASE_URL: 'http://localhost:5173' }),
+      fetchFn,
+    );
+
+    await adapter.createCollection({
+      ...baseInput,
+      concept: { kind: 'campaign', id: 'campaign-1' },
+    });
+
+    const [, init] = (fetchFn as jest.Mock).mock.calls[0];
+    const body = JSON.parse(init.body as string);
+    // back_urls is still sent (MercadoPago shows its own "Volver al sitio"
+    // link even without auto_return) — only the auto-redirect is skipped.
+    expect(body.back_urls).toEqual({
+      success: 'http://localhost:5173/donaciones/gracias',
+      pending: 'http://localhost:5173/donaciones/gracias',
+      failure: 'http://localhost:5173/donaciones/gracias',
+    });
+    expect(body.auto_return).toBeUndefined();
   });
 
   it('omits notification_url when STORAGE_PUBLIC_BASE_URL is not resolvable', async () => {
