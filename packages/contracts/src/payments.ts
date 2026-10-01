@@ -75,6 +75,43 @@ export interface CreateCollectionInput {
   payer?: PaymentPayer;
   /** Caller-supplied key: a retry with the same key must NOT double-charge. */
   idempotencyKey: string;
+  /**
+   * Checkout API (Orders) — T-OrdersAPI. Client-side tokenized card data from
+   * MercadoPago's Card Payment Brick (the card number never reaches our
+   * backend; only this opaque, single-use token does). REQUIRED by the real
+   * `MercadoPagoPaymentAdapter` (it throws a clear error without one) — kept
+   * OPTIONAL on this shared contract so it stays additive (invariant #6):
+   * `FakePaymentAdapter`, existing tests, and callers with no user present to
+   * tokenize a card (`SponsorshipBillingService`'s automated daily cron — see
+   * its header comment for why) keep compiling/working unchanged.
+   */
+  cardToken?: string;
+  /** MercadoPago's own payment method id from the Brick (e.g. 'visa', 'master'). */
+  paymentMethodId?: string;
+  /**
+   * 'credit_card' | 'debit_card' — MercadoPago Orders requires this alongside
+   * `paymentMethodId`. The Card Payment Brick's `onSubmit` callback does not
+   * reliably surface it in every integration; callers default to
+   * 'credit_card' when unknown.
+   * TODO(client): confirm against the live Brick (real test cards) whether
+   * debit needs explicit handling once MercadoPago hands over sandbox access.
+   */
+  paymentMethodType?: 'credit_card' | 'debit_card';
+  /** Installments chosen in the Brick (MercadoPago requires it even for 1). */
+  installments?: number;
+  /**
+   * Split de Pagos 1:1 (T-OAuth-Connect) — the BENEFICIARY organization's own
+   * connected MercadoPago account id (`OrganizationMercadoPagoAccount.mpUserId`),
+   * resolved by the CALLING service (donations/sponsorships), never by the
+   * adapter itself. When present, the real adapter includes
+   * `integration_data.sponsor.id` in the Orders request so 100% of
+   * `amountCharged` routes directly to that account — commission deduction on
+   * a split payment is TODO(client) (no fee field exists in the Orders API as
+   * of this task; see `MercadoPagoPaymentAdapter.createCollection`). Absent
+   * ⇒ the old single-account behavior (everything settles to AdoptaFácil's
+   * own account).
+   */
+  sponsorMpUserId?: string;
 }
 
 export interface CollectionResult {
@@ -196,6 +233,28 @@ export interface PayoutView {
   lastError?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+// ============================================================================
+// Split de Pagos 1:1 (T-OAuth-Connect) — "conectar tu cuenta de Mercado Pago"
+// per organization via OAuth. This is ONLY the connect infra (these DTOs never
+// carry the access/refresh tokens); using the connected `mpUserId` to create an
+// actual split payment at checkout is a separate follow-up, not modeled here.
+// ============================================================================
+
+/** Returned by `GET /org/mercadopago/connect` — the frontend does the actual
+ *  full-page navigation (`window.location.href = authorizeUrl`), same
+ *  pattern as a donation's `paymentLinkUrl`. */
+export interface MercadoPagoConnectUrlView {
+  authorizeUrl: string;
+}
+
+/** Returned by `GET /org/mercadopago/status` — NEVER the tokens, only enough
+ *  to render "Cuenta conectada" vs. the connect button. */
+export interface MercadoPagoConnectStatusView {
+  connected: boolean;
+  connectedAt?: string;
+  mpUserId?: string;
 }
 
 /**
@@ -352,6 +411,12 @@ export class FakePaymentAdapter implements PaymentPort {
   static readonly PROVIDER = 'fake-local';
 
   async createCollection(input: CreateCollectionInput): Promise<CollectionResult> {
+    // `cardToken`/`paymentMethodId`/`paymentMethodType`/`installments`/
+    // `sponsorMpUserId` (T-OrdersAPI, Split 1:1) are accepted — same shape the
+    // real adapter now requires — but deliberately IGNORED here: this double
+    // stays network-free/deterministic, it never calls a real gateway either
+    // way. Keeps every existing caller/test that never supplies them (e.g. the
+    // sponsorship billing cron) compiling and behaving exactly as before.
     const collectionId = `fake-col-${stableHash(input.idempotencyKey)}`;
     return {
       collectionId,

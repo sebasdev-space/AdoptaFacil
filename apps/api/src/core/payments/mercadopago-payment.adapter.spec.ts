@@ -9,8 +9,6 @@ const ENV: Record<string, unknown> = {
   MERCADOPAGO_PUBLIC_KEY: 'TEST-pub-dummy',
   MERCADOPAGO_ACCESS_TOKEN: 'TEST-token-dummy',
   MERCADOPAGO_WEBHOOK_SECRET: 'test_webhook_secret_dummy',
-  STORAGE_PUBLIC_BASE_URL: 'https://api.adoptafacil.test',
-  WEB_BASE_URL: 'https://app.adoptafacil.test',
 };
 
 function makeConfig(overrides: Record<string, unknown> = {}): ConfigService<Env, true> {
@@ -37,20 +35,20 @@ function signWebhook(
   return { signature: `ts=${ts},v1=${v1}`, ts, v1, manifest };
 }
 
-describe('MercadoPagoPaymentAdapter — createCollection (Fase 1, recaudo)', () => {
+describe('MercadoPagoPaymentAdapter — createCollection (T-OrdersAPI, Checkout API/Orders)', () => {
   const baseInput = {
     intendedAmount: 50_000,
     currency: 'COP' as const,
     concept: { kind: 'campaign' as const, id: 'campaign-1' },
     commissionPayer: 'organization' as const,
     idempotencyKey: 'idem-abc',
+    cardToken: 'card-token-abcdef0123456789',
+    paymentMethodId: 'visa',
   };
 
-  it('POSTs /checkout/preferences with unit_price in PESOS (never cents) and the correct breakdown', async () => {
+  it('POSTs /v1/orders with amounts as STRINGS in pesos and the correct breakdown', async () => {
     const fetchFn = jest.fn<ReturnType<MercadoPagoFetch>, Parameters<MercadoPagoFetch>>(() =>
-      Promise.resolve(
-        jsonResponse({ id: 'pref-123', init_point: 'https://mp.test/checkout/pref-123' }, 201),
-      ),
+      Promise.resolve(jsonResponse({ id: 'ORD-123', status: 'processed' }, 201)),
     ) as unknown as MercadoPagoFetch;
     const adapter = new MercadoPagoPaymentAdapter(makeConfig(), fetchFn);
 
@@ -58,136 +56,173 @@ describe('MercadoPagoPaymentAdapter — createCollection (Fase 1, recaudo)', () 
 
     expect(fetchFn).toHaveBeenCalledTimes(1);
     const [url, init] = (fetchFn as jest.Mock).mock.calls[0];
-    expect(url).toBe('https://api.mercadopago.com/checkout/preferences');
+    expect(url).toBe('https://api.mercadopago.com/v1/orders');
     expect(init.method).toBe('POST');
     expect(init.headers.Authorization).toBe('Bearer TEST-token-dummy');
+    // Regression (live 2026-09-30: 400 empty_required_header without this) —
+    // /v1/orders rejects the request outright when it's missing.
+    expect(init.headers['X-Idempotency-Key']).toBe('idem-abc');
 
     const body = JSON.parse(init.body as string);
     const expectedBreakdown = computeBreakdown(50_000, 'organization');
-    expect(body.items[0].unit_price).toBe(expectedBreakdown.amountCharged);
-    expect(body.items[0].currency_id).toBe('COP');
+    expect(body.type).toBe('online');
     expect(body.external_reference).toBe('af-idem-abc');
-    expect(body.notification_url).toBe('https://api.adoptafacil.test/donations/webhook');
+    expect(body.total_amount).toBe(String(expectedBreakdown.amountCharged));
+    expect(body.transactions.payments[0]).toEqual({
+      amount: String(expectedBreakdown.amountCharged),
+      payment_method: {
+        id: 'visa',
+        type: 'credit_card',
+        token: 'card-token-abcdef0123456789',
+        installments: 1,
+      },
+    });
+    expect(body.processing_mode).toBe('automatic');
+    expect(body.integration_data).toBeUndefined();
+    expect(body.back_urls).toBeUndefined();
+    expect(body.auto_return).toBeUndefined();
+    expect(body.notification_url).toBeUndefined();
 
     expect(result).toEqual({
       collectionId: 'af-idem-abc',
-      status: 'pending',
+      status: 'approved',
       breakdown: expectedBreakdown,
-      paymentLinkUrl: 'https://mp.test/checkout/pref-123',
     });
+    expect(result.paymentLinkUrl).toBeUndefined();
   });
 
-  it("collectionId is OUR OWN reference, never MercadoPago's preference id", async () => {
+  it("collectionId is OUR OWN reference, never MercadoPago's order id", async () => {
     const fetchFn = jest.fn<ReturnType<MercadoPagoFetch>, Parameters<MercadoPagoFetch>>(() =>
-      Promise.resolve(jsonResponse({ id: 'pref-999', init_point: 'https://mp.test/x' }, 201)),
+      Promise.resolve(jsonResponse({ id: 'ORD-999', status: 'processed' }, 201)),
     ) as unknown as MercadoPagoFetch;
     const adapter = new MercadoPagoPaymentAdapter(makeConfig(), fetchFn);
 
     const result = await adapter.createCollection(baseInput);
 
-    expect(result.collectionId).not.toBe('pref-999');
+    expect(result.collectionId).not.toBe('ORD-999');
     expect(result.collectionId).toBe('af-idem-abc');
   });
 
-  it('falls back to sandbox_init_point when init_point is absent', async () => {
+  it('includes payment_method_type when supplied, defaults to credit_card otherwise', async () => {
     const fetchFn = jest.fn<ReturnType<MercadoPagoFetch>, Parameters<MercadoPagoFetch>>(() =>
-      Promise.resolve(
-        jsonResponse({ id: 'pref-1', sandbox_init_point: 'https://mp.test/sandbox/pref-1' }, 201),
-      ),
+      Promise.resolve(jsonResponse({ id: 'ORD-1', status: 'processed' }, 201)),
     ) as unknown as MercadoPagoFetch;
     const adapter = new MercadoPagoPaymentAdapter(makeConfig(), fetchFn);
 
-    const result = await adapter.createCollection(baseInput);
-    expect(result.paymentLinkUrl).toBe('https://mp.test/sandbox/pref-1');
-  });
-
-  it('sends back_urls to /donaciones/gracias + auto_return:approved for a DONATION concept', async () => {
-    const fetchFn = jest.fn<ReturnType<MercadoPagoFetch>, Parameters<MercadoPagoFetch>>(() =>
-      Promise.resolve(jsonResponse({ id: 'pref-1', init_point: 'https://mp.test/x' }, 201)),
-    ) as unknown as MercadoPagoFetch;
-    const adapter = new MercadoPagoPaymentAdapter(makeConfig(), fetchFn);
-
-    await adapter.createCollection({
-      ...baseInput,
-      concept: { kind: 'campaign', id: 'campaign-1' },
-    });
+    await adapter.createCollection({ ...baseInput, paymentMethodType: 'debit_card' });
 
     const [, init] = (fetchFn as jest.Mock).mock.calls[0];
     const body = JSON.parse(init.body as string);
-    expect(body.back_urls).toEqual({
-      success: 'https://app.adoptafacil.test/donaciones/gracias',
-      pending: 'https://app.adoptafacil.test/donaciones/gracias',
-      failure: 'https://app.adoptafacil.test/donaciones/gracias',
-    });
-    expect(body.auto_return).toBe('approved');
+    expect(body.transactions.payments[0].payment_method.type).toBe('debit_card');
   });
 
-  it('sends back_urls to /apadrinar/gracias for a SPONSORSHIP concept', async () => {
+  it("infers type=debit_card from the Brick's 'deb'-prefixed id WITHOUT altering the id itself (regression: live 400 property_value, 2026-10-01 — Orders API rejected 'debmaster' paired with type=credit_card, AND separately rejected a stripped 'master' paired with type=debit_card; id+type must be MercadoPago's own matched pair, untouched)", async () => {
     const fetchFn = jest.fn<ReturnType<MercadoPagoFetch>, Parameters<MercadoPagoFetch>>(() =>
-      Promise.resolve(jsonResponse({ id: 'pref-1', init_point: 'https://mp.test/x' }, 201)),
+      Promise.resolve(jsonResponse({ id: 'ORD-1', status: 'processed' }, 201)),
+    ) as unknown as MercadoPagoFetch;
+    const adapter = new MercadoPagoPaymentAdapter(makeConfig(), fetchFn);
+
+    await adapter.createCollection({ ...baseInput, paymentMethodId: 'debmaster' });
+
+    const [, init] = (fetchFn as jest.Mock).mock.calls[0];
+    const body = JSON.parse(init.body as string);
+    expect(body.transactions.payments[0].payment_method.id).toBe('debmaster');
+    expect(body.transactions.payments[0].payment_method.type).toBe('debit_card');
+  });
+
+  it('an explicit paymentMethodType overrides the prefix-derived default (id is still never altered)', async () => {
+    const fetchFn = jest.fn<ReturnType<MercadoPagoFetch>, Parameters<MercadoPagoFetch>>(() =>
+      Promise.resolve(jsonResponse({ id: 'ORD-1', status: 'processed' }, 201)),
     ) as unknown as MercadoPagoFetch;
     const adapter = new MercadoPagoPaymentAdapter(makeConfig(), fetchFn);
 
     await adapter.createCollection({
       ...baseInput,
-      concept: { kind: 'sponsorship', id: 'sponsorship-1' },
+      paymentMethodId: 'debvisa',
+      paymentMethodType: 'credit_card',
     });
 
     const [, init] = (fetchFn as jest.Mock).mock.calls[0];
     const body = JSON.parse(init.body as string);
-    expect(body.back_urls).toEqual({
-      success: 'https://app.adoptafacil.test/apadrinar/gracias',
-      pending: 'https://app.adoptafacil.test/apadrinar/gracias',
-      failure: 'https://app.adoptafacil.test/apadrinar/gracias',
-    });
-    expect(body.auto_return).toBe('approved');
+    expect(body.transactions.payments[0].payment_method.id).toBe('debvisa');
+    expect(body.transactions.payments[0].payment_method.type).toBe('credit_card');
   });
 
-  it('omits auto_return when WEB_BASE_URL is localhost (MercadoPago rejects it: 400 invalid_auto_return)', async () => {
+  it('includes installments from input, defaults to 1', async () => {
     const fetchFn = jest.fn<ReturnType<MercadoPagoFetch>, Parameters<MercadoPagoFetch>>(() =>
-      Promise.resolve(jsonResponse({ id: 'pref-1', init_point: 'https://mp.test/x' }, 201)),
+      Promise.resolve(jsonResponse({ id: 'ORD-1', status: 'processed' }, 201)),
     ) as unknown as MercadoPagoFetch;
-    const adapter = new MercadoPagoPaymentAdapter(
-      makeConfig({ WEB_BASE_URL: 'http://localhost:5173' }),
-      fetchFn,
-    );
+    const adapter = new MercadoPagoPaymentAdapter(makeConfig(), fetchFn);
 
-    await adapter.createCollection({
-      ...baseInput,
-      concept: { kind: 'campaign', id: 'campaign-1' },
-    });
+    await adapter.createCollection({ ...baseInput, installments: 6 });
 
     const [, init] = (fetchFn as jest.Mock).mock.calls[0];
     const body = JSON.parse(init.body as string);
-    // back_urls is still sent (MercadoPago shows its own "Volver al sitio"
-    // link even without auto_return) — only the auto-redirect is skipped.
-    expect(body.back_urls).toEqual({
-      success: 'http://localhost:5173/donaciones/gracias',
-      pending: 'http://localhost:5173/donaciones/gracias',
-      failure: 'http://localhost:5173/donaciones/gracias',
-    });
-    expect(body.auto_return).toBeUndefined();
+    expect(body.transactions.payments[0].payment_method.installments).toBe(6);
   });
 
-  it('omits notification_url when STORAGE_PUBLIC_BASE_URL is not resolvable', async () => {
+  it('includes payer.email when supplied', async () => {
     const fetchFn = jest.fn<ReturnType<MercadoPagoFetch>, Parameters<MercadoPagoFetch>>(() =>
-      Promise.resolve(jsonResponse({ id: 'pref-1', init_point: 'https://mp.test/x' }, 201)),
+      Promise.resolve(jsonResponse({ id: 'ORD-1', status: 'processed' }, 201)),
     ) as unknown as MercadoPagoFetch;
-    const adapter = new MercadoPagoPaymentAdapter(
-      makeConfig({ STORAGE_PUBLIC_BASE_URL: undefined }),
-      fetchFn,
-    );
+    const adapter = new MercadoPagoPaymentAdapter(makeConfig(), fetchFn);
+
+    await adapter.createCollection({ ...baseInput, payer: { email: 'donante@test.local' } });
+
+    const [, init] = (fetchFn as jest.Mock).mock.calls[0];
+    const body = JSON.parse(init.body as string);
+    expect(body.payer).toEqual({ email: 'donante@test.local' });
+  });
+
+  it('Split de Pagos 1:1 — includes integration_data.sponsor.id ONLY when sponsorMpUserId is present', async () => {
+    const fetchFn = jest.fn<ReturnType<MercadoPagoFetch>, Parameters<MercadoPagoFetch>>(() =>
+      Promise.resolve(jsonResponse({ id: 'ORD-1', status: 'processed' }, 201)),
+    ) as unknown as MercadoPagoFetch;
+    const adapter = new MercadoPagoPaymentAdapter(makeConfig(), fetchFn);
+
+    await adapter.createCollection({ ...baseInput, sponsorMpUserId: 'mp-user-999' });
+
+    const [, init] = (fetchFn as jest.Mock).mock.calls[0];
+    const body = JSON.parse(init.body as string);
+    expect(body.integration_data).toEqual({ sponsor: { id: 'mp-user-999' } });
+  });
+
+  it('omits integration_data entirely when sponsorMpUserId is absent', async () => {
+    const fetchFn = jest.fn<ReturnType<MercadoPagoFetch>, Parameters<MercadoPagoFetch>>(() =>
+      Promise.resolve(jsonResponse({ id: 'ORD-1', status: 'processed' }, 201)),
+    ) as unknown as MercadoPagoFetch;
+    const adapter = new MercadoPagoPaymentAdapter(makeConfig(), fetchFn);
 
     await adapter.createCollection(baseInput);
 
     const [, init] = (fetchFn as jest.Mock).mock.calls[0];
     const body = JSON.parse(init.body as string);
-    expect(body.notification_url).toBeUndefined();
+    expect(body.integration_data).toBeUndefined();
+  });
+
+  it('maps the order create-response status (processed/failed/pending) to PaymentStatus', async () => {
+    const cases: Array<[string, string]> = [
+      ['processed', 'approved'],
+      ['failed', 'declined'],
+      ['pending', 'pending'],
+      ['action_required', 'pending'],
+      ['canceled', 'voided'],
+      ['something_unknown', 'error'],
+    ];
+    for (const [raw, expected] of cases) {
+      const fetchFn = jest.fn<ReturnType<MercadoPagoFetch>, Parameters<MercadoPagoFetch>>(() =>
+        Promise.resolve(jsonResponse({ id: 'ORD-1', status: raw }, 201)),
+      ) as unknown as MercadoPagoFetch;
+      const adapter = new MercadoPagoPaymentAdapter(makeConfig(), fetchFn);
+
+      const result = await adapter.createCollection(baseInput);
+      expect(result.status).toBe(expected);
+    }
   });
 
   it('is idempotent by reference: the SAME idempotencyKey always produces the SAME reference', async () => {
     const fetchFn = jest.fn<ReturnType<MercadoPagoFetch>, Parameters<MercadoPagoFetch>>(() =>
-      Promise.resolve(jsonResponse({ id: 'pref-same', init_point: 'https://mp.test/x' }, 201)),
+      Promise.resolve(jsonResponse({ id: 'ORD-same', status: 'processed' }, 201)),
     ) as unknown as MercadoPagoFetch;
     const adapter = new MercadoPagoPaymentAdapter(makeConfig(), fetchFn);
 
@@ -197,7 +232,7 @@ describe('MercadoPagoPaymentAdapter — createCollection (Fase 1, recaudo)', () 
     expect(first.collectionId).toBe(second.collectionId);
   });
 
-  it('throws a clear error when MercadoPago rejects the preference call', async () => {
+  it('throws a clear error when MercadoPago rejects the order call', async () => {
     const fetchFn = jest.fn<ReturnType<MercadoPagoFetch>, Parameters<MercadoPagoFetch>>(() =>
       Promise.resolve(jsonResponse({ message: 'bad request' }, 400)),
     ) as unknown as MercadoPagoFetch;
@@ -205,9 +240,62 @@ describe('MercadoPagoPaymentAdapter — createCollection (Fase 1, recaudo)', () 
 
     await expect(adapter.createCollection(baseInput)).rejects.toThrow(/400/);
   });
+
+  it(
+    'a card decline (402, rejected_by_issuer) resolves as a normal declined result instead ' +
+      'of throwing (regression: live 2026-10-01 — a real debit card got rejected by the ' +
+      'issuer and MercadoPago answered 402 with the order wrapped under `data`, not thrown ' +
+      'to the caller as an integration failure)',
+    async () => {
+      const fetchFn = jest.fn<ReturnType<MercadoPagoFetch>, Parameters<MercadoPagoFetch>>(() =>
+        Promise.resolve(
+          jsonResponse(
+            {
+              errors: [{ code: 'failed', message: 'The following transactions failed' }],
+              data: { id: 'ORD-1', status: 'failed', external_reference: 'af-idem-abc' },
+            },
+            402,
+          ),
+        ),
+      ) as unknown as MercadoPagoFetch;
+      const adapter = new MercadoPagoPaymentAdapter(makeConfig(), fetchFn);
+
+      const result = await adapter.createCollection(baseInput);
+
+      expect(result.status).toBe('declined');
+      expect(result.collectionId).toBe('af-idem-abc');
+    },
+  );
+
+  it('still throws on a non-2xx response with no usable order under `data` (a genuine structural error)', async () => {
+    const fetchFn = jest.fn<ReturnType<MercadoPagoFetch>, Parameters<MercadoPagoFetch>>(() =>
+      Promise.resolve(jsonResponse({ errors: [{ code: 'empty_required_header' }] }, 400)),
+    ) as unknown as MercadoPagoFetch;
+    const adapter = new MercadoPagoPaymentAdapter(makeConfig(), fetchFn);
+
+    await expect(adapter.createCollection(baseInput)).rejects.toThrow(/400/);
+  });
+
+  it('throws without ever calling the gateway when cardToken is missing', async () => {
+    const fetchFn = jest.fn() as unknown as MercadoPagoFetch;
+    const adapter = new MercadoPagoPaymentAdapter(makeConfig(), fetchFn);
+
+    const { cardToken: _omit, ...withoutToken } = baseInput;
+    await expect(adapter.createCollection(withoutToken)).rejects.toThrow(/tokenized card/);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('throws without ever calling the gateway when paymentMethodId is missing', async () => {
+    const fetchFn = jest.fn() as unknown as MercadoPagoFetch;
+    const adapter = new MercadoPagoPaymentAdapter(makeConfig(), fetchFn);
+
+    const { paymentMethodId: _omit, ...withoutMethod } = baseInput;
+    await expect(adapter.createCollection(withoutMethod)).rejects.toThrow(/tokenized card/);
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
 });
 
-describe('MercadoPagoPaymentAdapter — getCollectionStatus', () => {
+describe('MercadoPagoPaymentAdapter — getCollectionStatus (unchanged — /v1/payments/search)', () => {
   const statusCases: Array<[string, string]> = [
     ['approved', 'approved'],
     ['pending', 'pending'],
@@ -263,34 +351,42 @@ describe('MercadoPagoPaymentAdapter — getCollectionStatus', () => {
   });
 });
 
-describe('MercadoPagoPaymentAdapter — verifyAndNormalizeWebhook', () => {
+describe('MercadoPagoPaymentAdapter — verifyAndNormalizeWebhook (T-OrdersAPI, GET /v1/orders/:id)', () => {
   it('accepts a VALID signature and resolves collectionId from external_reference (NOT dataId)', async () => {
-    const { signature } = signWebhook('123456789', 'req-1');
+    const { signature } = signWebhook('ORD123456789', 'req-1');
     const fetchFn = jest.fn<ReturnType<MercadoPagoFetch>, Parameters<MercadoPagoFetch>>(() =>
-      Promise.resolve(jsonResponse({ status: 'approved', external_reference: 'af-idem-abc' })),
+      Promise.resolve(
+        jsonResponse({
+          id: 'ORD123456789',
+          status: 'processed',
+          external_reference: 'af-idem-abc',
+        }),
+      ),
     ) as unknown as MercadoPagoFetch;
     const adapter = new MercadoPagoPaymentAdapter(makeConfig(), fetchFn);
 
     const event = await adapter.verifyAndNormalizeWebhook({}, signature, {
       headers: { 'x-request-id': 'req-1' },
-      query: { 'data.id': '123456789' },
+      query: { 'data.id': 'ORD123456789' },
     });
 
     expect(event).toEqual({
-      eventId: '123456789-approved',
+      eventId: 'ORD123456789-processed',
       collectionId: 'af-idem-abc',
       status: 'approved',
-      dedupKey: '123456789-approved',
+      dedupKey: 'ORD123456789-processed',
     });
 
     const [url] = (fetchFn as jest.Mock).mock.calls[0];
-    expect(url).toBe('https://api.mercadopago.com/v1/payments/123456789');
+    expect(url).toBe('https://api.mercadopago.com/v1/orders/ORD123456789');
   });
 
   it('lowercases an alphanumeric data.id when building the manifest', async () => {
     const { signature } = signWebhook('AbC123', 'req-1');
     const fetchFn = jest.fn<ReturnType<MercadoPagoFetch>, Parameters<MercadoPagoFetch>>(() =>
-      Promise.resolve(jsonResponse({ status: 'approved', external_reference: 'af-x' })),
+      Promise.resolve(
+        jsonResponse({ id: 'AbC123', status: 'processed', external_reference: 'af-x' }),
+      ),
     ) as unknown as MercadoPagoFetch;
     const adapter = new MercadoPagoPaymentAdapter(makeConfig(), fetchFn);
 
@@ -363,7 +459,7 @@ describe('MercadoPagoPaymentAdapter — verifyAndNormalizeWebhook', () => {
     ).rejects.toThrow(/signature mismatch/);
   });
 
-  it('throws when the payment lookup fails', async () => {
+  it('throws when the order lookup fails', async () => {
     const { signature } = signWebhook('123', 'req-1');
     const fetchFn = jest.fn<ReturnType<MercadoPagoFetch>, Parameters<MercadoPagoFetch>>(() =>
       Promise.resolve(jsonResponse({}, 404)),
@@ -378,10 +474,10 @@ describe('MercadoPagoPaymentAdapter — verifyAndNormalizeWebhook', () => {
     ).rejects.toThrow(/404/);
   });
 
-  it('throws when the resolved payment has no external_reference', async () => {
+  it('throws when the resolved order has no external_reference', async () => {
     const { signature } = signWebhook('123', 'req-1');
     const fetchFn = jest.fn<ReturnType<MercadoPagoFetch>, Parameters<MercadoPagoFetch>>(() =>
-      Promise.resolve(jsonResponse({ status: 'approved' })),
+      Promise.resolve(jsonResponse({ id: '123', status: 'processed' })),
     ) as unknown as MercadoPagoFetch;
     const adapter = new MercadoPagoPaymentAdapter(makeConfig(), fetchFn);
 

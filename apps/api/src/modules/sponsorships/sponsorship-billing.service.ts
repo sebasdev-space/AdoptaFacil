@@ -2,10 +2,8 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { BILLING_FAILURE_SUSPENSION_REASON, SponsorshipStatus } from '@adoptafacil/contracts';
-import type { PaymentPort } from '@adoptafacil/contracts';
 import { AuditService } from '../../core/audit/audit.service';
 import type { Env } from '../../config/env.validation';
-import { PAYMENT_PORT } from '../../core/payments/payment.port';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   NOTIFICATION_PORT,
@@ -80,7 +78,6 @@ export class SponsorshipBillingService {
     private readonly audit: AuditService,
     private readonly config: ConfigService<Env, true>,
     private readonly sponsorships: SponsorshipsService,
-    @Inject(PAYMENT_PORT) private readonly payments: PaymentPort,
     @Inject(NOTIFICATION_PORT) private readonly notifications: NotificationPort,
   ) {}
 
@@ -105,7 +102,16 @@ export class SponsorshipBillingService {
       Prisma.sql`SELECT * FROM sponsorships_due_for_billing()`,
     );
     for (const row of rows) {
-      await this.openPeriodFor(row);
+      // Per-row isolation: one sponsorship's failure (e.g. a DB error) must
+      // never abort the scan for every other one (same posture as
+      // `MercadoPagoConnectService.refreshDueAccounts`).
+      try {
+        await this.openPeriodFor(row);
+      } catch (error) {
+        this.logger.warn(
+          `openPeriodFor failed for sponsorship=${row.sponsorship_id}: ${(error as Error).message}`,
+        );
+      }
     }
   }
 
@@ -125,12 +131,7 @@ export class SponsorshipBillingService {
       return;
     }
 
-    const attempt = await this.createAttemptCollection(
-      row.sponsorship_id,
-      period,
-      1,
-      row.plan_amount,
-    );
+    const attempt = this.buildPlaceholderAttempt(row.sponsorship_id, period, 1);
 
     await this.prisma.withOrgContext(row.organization_id, async (tx) => {
       const payment = await tx.sponsorshipPayment.create({
@@ -265,12 +266,7 @@ export class SponsorshipBillingService {
     nextAttemptNumber: number,
     config: LadderConfig,
   ): Promise<void> {
-    const attempt = await this.createAttemptCollection(
-      row.sponsorship_id,
-      row.period,
-      nextAttemptNumber,
-      row.plan_amount,
-    );
+    const attempt = this.buildPlaceholderAttempt(row.sponsorship_id, row.period, nextAttemptNumber);
     const expireByDay =
       nextAttemptNumber === 2 ? config.expireAttempt2Day : config.expireAttempt3Day;
 
@@ -369,30 +365,43 @@ export class SponsorshipBillingService {
     );
   }
 
-  /** Calls `PaymentPort.createCollection()` for one attempt — OUTSIDE any DB
-   *  transaction (same convention as `DonationsService.create`), so a slow
-   *  gateway call never holds a DB transaction open. Idempotent by
-   *  construction: the deterministic key means a retry after a crash returns
-   *  the SAME `collectionId`, never a second charge. */
-  private async createAttemptCollection(
+  /**
+   * T-OrdersAPI (2026-09-30) — DISCOVERED ARCHITECTURE GAP, documented here in
+   * full: this method used to call `PaymentPort.createCollection()` to
+   * generate a REAL MercadoPago Checkout Pro preference for each automated
+   * attempt. Checkout API/Orders (the real gateway's replacement for Checkout
+   * Pro) requires a client-tokenized card at the MOMENT of the charge — this
+   * unattended daily cron has no sponsor present to produce one, and
+   * off-session stored-card/customer vaulting (MercadoPago's separate
+   * Customers & Cards API) is explicitly OUT OF SCOPE for this task. Calling
+   * the real adapter from here would therefore ALWAYS throw.
+   *
+   * Resolution taken (judgment call, not a pre-existing requirement): this
+   * method no longer calls the gateway at all. It only builds a LOCAL
+   * placeholder (`collectionId: 'pending-<idempotencyKey>'`, no
+   * `paymentLinkUrl` — there is no checkout link in this model any more
+   * either way). The ladder's TIMING (reminders/expiry/suspension days) is
+   * COMPLETELY UNCHANGED — only "this step also creates a real charge
+   * attempt" is gone. The sponsor's one real, working path to actually pay
+   * is `SponsorshipPaymentsService.retryPayment` ("Pagar de nuevo" in "Mis
+   * apadrinamientos"), reachable once the period is suspended for billing
+   * failure — THAT endpoint now embeds the real Card Payment Brick and calls
+   * the gateway with an actual token.
+   *
+   * Net effect: every period still needs 30 days (the existing ladder) to
+   * reach the one moment a sponsor can really pay. TODO(client): recommend
+   * deciding, as a fast-follow, between (a) MercadoPago Customer+Card
+   * vaulting for real off-session recurring charges, or (b) converting EVERY
+   * period (not only post-suspension recovery) into an immediate in-app
+   * "pay now" prompt the moment it opens.
+   */
+  private buildPlaceholderAttempt(
     sponsorshipId: string,
     period: string,
     attemptNumber: number,
-    amount: number,
-  ): Promise<{ collectionId: string; idempotencyKey: string; paymentLinkUrl?: string }> {
+  ): { collectionId: string; idempotencyKey: string; paymentLinkUrl?: string } {
     const idempotencyKey = buildAttemptIdempotencyKey(sponsorshipId, period, attemptNumber);
-    const collection = await this.payments.createCollection({
-      intendedAmount: amount,
-      currency: 'COP',
-      concept: { kind: 'sponsorship', id: sponsorshipId },
-      commissionPayer: 'organization',
-      idempotencyKey,
-    });
-    return {
-      collectionId: collection.collectionId,
-      idempotencyKey,
-      paymentLinkUrl: collection.paymentLinkUrl,
-    };
+    return { collectionId: `pending-${idempotencyKey}`, idempotencyKey };
   }
 
   private async notifyBestEffort(to: string, subject: string, body: string): Promise<void> {

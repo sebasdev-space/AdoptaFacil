@@ -53,6 +53,40 @@ describe('validateEnv — PAYMENT_DRIVER fail-fast (T-052)', () => {
         MERCADOPAGO_PUBLIC_KEY: 'TEST-pub-dummy',
         MERCADOPAGO_ACCESS_TOKEN: 'TEST-token-dummy',
         MERCADOPAGO_WEBHOOK_SECRET: 'test_webhook_secret_dummy',
+        MERCADOPAGO_APP_ID: 'app-id-dummy',
+        MERCADOPAGO_CLIENT_SECRET: 'client-secret-dummy',
+      }),
+    ).not.toThrow();
+  });
+
+  // T-OAuth-Connect: MERCADOPAGO_APP_ID/MERCADOPAGO_CLIENT_SECRET are required
+  // the SAME way as the pre-existing MERCADOPAGO_* keys above (Split de Pagos
+  // 1:1 connect flow needs them for the OAuth dance).
+  it('fails fast when driver=mercadopago and MERCADOPAGO_CLIENT_SECRET is missing (T-OAuth-Connect)', () => {
+    expect(() =>
+      validateEnv({
+        ...BASE,
+        PAYMENT_DRIVER: 'mercadopago',
+        MERCADOPAGO_BASE_URL: 'https://api.mercadopago.com',
+        MERCADOPAGO_PUBLIC_KEY: 'TEST-pub-dummy',
+        MERCADOPAGO_ACCESS_TOKEN: 'TEST-token-dummy',
+        MERCADOPAGO_WEBHOOK_SECRET: 'test_webhook_secret_dummy',
+        MERCADOPAGO_APP_ID: 'app-id-dummy',
+      }),
+    ).toThrow(/MERCADOPAGO_CLIENT_SECRET/);
+  });
+
+  it('MERCADOPAGO_OAUTH_REDIRECT_URI is optional even when driver=mercadopago', () => {
+    expect(() =>
+      validateEnv({
+        ...BASE,
+        PAYMENT_DRIVER: 'mercadopago',
+        MERCADOPAGO_BASE_URL: 'https://api.mercadopago.com',
+        MERCADOPAGO_PUBLIC_KEY: 'TEST-pub-dummy',
+        MERCADOPAGO_ACCESS_TOKEN: 'TEST-token-dummy',
+        MERCADOPAGO_WEBHOOK_SECRET: 'test_webhook_secret_dummy',
+        MERCADOPAGO_APP_ID: 'app-id-dummy',
+        MERCADOPAGO_CLIENT_SECRET: 'client-secret-dummy',
       }),
     ).not.toThrow();
   });

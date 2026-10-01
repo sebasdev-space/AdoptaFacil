@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { Donation } from '@adoptafacil/contracts';
 import {
+  Button,
   buttonVariants,
   Card,
   CardContent,
@@ -83,6 +84,10 @@ export function DonatePage() {
 
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState<Donation | null>(null);
+  // Remounts <DonateForm> with fresh internal state ("Intentar con otra
+  // tarjeta" after a declined charge, T-OrdersAPI) — the form owns its own
+  // amount/step state, so a plain re-render alone wouldn't reset it.
+  const [formInstanceKey, setFormInstanceKey] = useState(0);
 
   if (!target) {
     // Reached from the "Donaciones" menu entry (no org target): T-064 completes
@@ -135,7 +140,11 @@ export function DonatePage() {
     commissionPayer,
     anonymous,
     guestPayer,
-  }: DonateFormValues) => {
+    cardToken,
+    paymentMethodId,
+    paymentMethodType,
+    installments,
+  }: DonateFormValues): Promise<void> => {
     setSubmitting(true);
     try {
       const donation = await createDonation(client, {
@@ -152,24 +161,34 @@ export function DonatePage() {
           : guestPayer,
         // Idempotencia: el servidor deduplica por (org, key); una clave por intento.
         idempotencyKey: crypto.randomUUID(),
+        // T-OrdersAPI (Checkout API/Orders): reemplaza el antiguo redirect de
+        // Checkout Pro — la tarjeta ya fue tokenizada por el Card Payment
+        // Brick (paso 2 de DonateForm) ANTES de llegar aquí.
+        cardToken,
+        paymentMethodId,
+        paymentMethodType,
+        installments,
       });
-      // Bug fix (checkout REAL de MercadoPago, nunca cableado hasta ahora):
-      // `paymentLinkUrl` es el link de Checkout Pro donde el donante realmente
-      // paga — navegación de página completa (no del router), porque sale del
-      // SPA hacia MercadoPago y vuelve en `/donaciones/gracias` (back_urls +
-      // auto_return, ver `mercadopago-payment.adapter.ts`). Cuando NO viene
-      // (no debería pasar contra el driver real; ver `FakePaymentAdapter` para
-      // el único caso donde SÍ viene pero apunta a un dominio no navegable),
-      // se conserva la pantalla local de "gracias" tal cual.
-      if (donation.paymentLinkUrl) {
-        window.location.href = donation.paymentLinkUrl;
-        return;
-      }
       setDone(donation);
-      toast({
-        title: 'Donación registrada',
-        description: 'Te enviaremos el recibo automático al confirmarse el pago.',
-      });
+      toast(
+        donation.status === 'approved'
+          ? {
+              title: '¡Pago aprobado!',
+              description: 'Te enviaremos el recibo automático por correo.',
+            }
+          : donation.status === 'declined'
+            ? {
+                title: 'Pago rechazado',
+                description:
+                  'Tu banco o MercadoPago rechazaron el pago. Puedes intentarlo de nuevo.',
+                variant: 'destructive',
+              }
+            : {
+                title: 'Donación registrada',
+                description:
+                  'Estamos confirmando tu pago. Te enviaremos el recibo automático al aprobarse.',
+              },
+      );
     } catch (error) {
       // T-Google-SignIn (business rule #3): donating requires a complete
       // profile (phone/documentId/address) — send the person to complete it,
@@ -188,9 +207,18 @@ export function DonatePage() {
         description: 'Inténtalo de nuevo en un momento.',
         variant: 'destructive',
       });
+      // Re-throw: the Card Payment Brick awaits this promise and shows its
+      // OWN error state when it rejects (see CardPaymentBrick's doc comment)
+      // — swallowing it here would leave the Brick stuck "processing".
+      throw error;
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const retryWithAnotherCard = () => {
+    setDone(null);
+    setFormInstanceKey((k) => k + 1);
   };
 
   return (
@@ -236,53 +264,76 @@ export function DonatePage() {
                 </p>
               )}
               {done ? (
-                <div className={styles.done}>
-                  <EmptyState
-                    title="¡Gracias por tu donación!"
-                    description={`Registramos tu donación de ${formatCop(done.amountCharged)}. Cuando el pago se confirme, te emitiremos el recibo automáticamente.`}
-                  />
-                  {/* Empalme al certificado REAL (§M05/RF14, F-3): solo un ENLACE, la
-                      lógica de donación no cambia. Lleva únicamente el id de la
-                      donación — el certificado se lee del backend, no se reconstruye
-                      desde nav-state. */}
-                  <div className={styles['done__cert']}>
-                    <Link
-                      to="/certificado"
-                      state={{ donationId: done.id }}
-                      className={cn(buttonVariants())}
-                      data-testid="view-certificate-cta"
-                    >
-                      Ver tu certificado de donación
-                    </Link>
-                    <p className={styles['done__hint']}>
-                      Disponible una vez se confirme tu pago (organizaciones ESAL con RTE vigente).
-                    </p>
+                done.status === 'declined' ? (
+                  // T-OrdersAPI: a declined charge is a SUCCESSFUL API call
+                  // (the request itself succeeded; the gateway rejected the
+                  // card) — no certificate/account CTA, just an honest
+                  // message + a way to try a different card.
+                  <div className={styles.done} data-testid="donation-declined">
+                    <EmptyState
+                      title="Tu pago no fue aprobado"
+                      description="MercadoPago o tu banco rechazaron el pago. Puedes intentarlo de nuevo con otra tarjeta."
+                    />
+                    <Button onClick={retryWithAnotherCard} data-testid="donation-retry-card">
+                      Intentar con otra tarjeta
+                    </Button>
                   </div>
-                  {/* Checkout de invitado: la cuenta se ofrece DESPUÉS de donar, nunca
-                      como precondición (requisito del cliente). Solo tiene sentido para
-                      quien donó sin sesión — un donante ya autenticado no la necesita. */}
-                  {!hasSession && (
+                ) : (
+                  <div className={styles.done}>
+                    <EmptyState
+                      title="¡Gracias por tu donación!"
+                      description={
+                        done.status === 'approved'
+                          ? `Tu pago de ${formatCop(done.amountCharged)} fue aprobado. Te enviaremos el recibo automático por correo.`
+                          : `Registramos tu donación de ${formatCop(done.amountCharged)}. Cuando el pago se confirme, te emitiremos el recibo automáticamente.`
+                      }
+                    />
+                    {/* Empalme al certificado REAL (§M05/RF14, F-3): solo un ENLACE, la
+                        lógica de donación no cambia. Lleva únicamente el id de la
+                        donación — el certificado se lee del backend, no se reconstruye
+                        desde nav-state. */}
                     <div className={styles['done__cert']}>
-                      <p className={styles['done__hint']}>
-                        ¿Quieres crear una cuenta gratuita en AdoptaFácil para consultar tu
-                        historial de donaciones?
-                      </p>
                       <Link
-                        to="/register"
-                        className={cn(buttonVariants({ variant: 'outline' }))}
-                        data-testid="create-account-cta"
+                        to="/certificado"
+                        state={{ donationId: done.id }}
+                        className={cn(buttonVariants())}
+                        data-testid="view-certificate-cta"
                       >
-                        Crear cuenta gratuita
+                        Ver tu certificado de donación
                       </Link>
+                      <p className={styles['done__hint']}>
+                        Disponible una vez se confirme tu pago (organizaciones ESAL con RTE
+                        vigente).
+                      </p>
                     </div>
-                  )}
-                </div>
+                    {/* Checkout de invitado: la cuenta se ofrece DESPUÉS de donar, nunca
+                        como precondición (requisito del cliente). Solo tiene sentido para
+                        quien donó sin sesión — un donante ya autenticado no la necesita. */}
+                    {!hasSession && (
+                      <div className={styles['done__cert']}>
+                        <p className={styles['done__hint']}>
+                          ¿Quieres crear una cuenta gratuita en AdoptaFácil para consultar tu
+                          historial de donaciones?
+                        </p>
+                        <Link
+                          to="/register"
+                          className={cn(buttonVariants({ variant: 'outline' }))}
+                          data-testid="create-account-cta"
+                        >
+                          Crear cuenta gratuita
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+                )
               ) : (
                 <DonateForm
+                  key={formInstanceKey}
                   organizationName={target.organizationName}
                   submitting={submitting}
                   hasSession={hasSession}
-                  onDonate={(values) => void donate(values)}
+                  sessionEmailHint={hasSession ? user?.email : undefined}
+                  onDonate={donate}
                 />
               )}
             </CardContent>

@@ -175,6 +175,19 @@ export interface CreateDonationInput {
   idempotencyKey: string;
   /** "¿Donar de forma anónima frente a la organización?" (default `false`). */
   anonymous?: boolean;
+  /**
+   * Checkout API (Orders) — T-OrdersAPI. Tokenized card data from MercadoPago's
+   * Card Payment Brick (card number never reaches this backend). Optional on
+   * this contract/DTO (additive — existing callers/tests that build this
+   * object without a card keep compiling, and the fake driver still approves
+   * without one); the REAL gateway adapter requires it and throws a clear
+   * error otherwise. See `CreateCollectionInput` (payments.ts) for the full
+   * field-by-field rationale — these four mirror it verbatim.
+   */
+  cardToken?: string;
+  paymentMethodId?: string;
+  paymentMethodType?: 'credit_card' | 'debit_card';
+  installments?: number;
 }
 
 /**

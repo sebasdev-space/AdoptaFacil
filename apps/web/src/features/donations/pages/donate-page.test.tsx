@@ -1,6 +1,27 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { CardPaymentBrickProps } from '../../payments';
 import { renderShell } from '../../../test-utils';
+
+/**
+ * T-OrdersAPI: the real `CardPaymentBrick` loads MercadoPago's external SDK
+ * script (jsdom can't execute it) — mocked here with a fake "submit" button
+ * that calls `onResult` with fixed, deterministic card data, same technique
+ * as `donate-form.test.tsx`.
+ */
+vi.mock('../../payments', () => ({
+  CardPaymentBrick: ({ onResult }: CardPaymentBrickProps) => (
+    <button
+      type="button"
+      data-testid="fake-card-brick-submit"
+      onClick={() =>
+        void onResult({ cardToken: 'tok-test-123', paymentMethodId: 'visa', installments: 1 })
+      }
+    >
+      Simular pago con tarjeta
+    </button>
+  ),
+}));
 
 /**
  * T-064 — completes the "no target" branch of `/donaciones` (reached from the
@@ -424,24 +445,21 @@ describe('DonatePage — checkout de invitado (sin sesión, requisito final del 
     fireEvent.change(screen.getByTestId('donation-guest-email'), {
       target: { value: 'invitado@test.dev' },
     });
+    // Step 1 → step 2 (Card Payment Brick, mocked above) → the Brick's own
+    // submit is what actually triggers the charge (T-OrdersAPI).
     fireEvent.click(screen.getByRole('button', { name: /Donar a Refugio Patitas/ }));
+    fireEvent.click(await screen.findByTestId('fake-card-brick-submit'));
 
     expect(await screen.findByText(/¡Gracias por tu donación!/)).toBeInTheDocument();
     const cta = screen.getByTestId('create-account-cta');
     expect(cta).toHaveAttribute('href', '/register');
   });
 
-  it('bug fix: redirects the browser to paymentLinkUrl instead of showing the local "gracias" screen', async () => {
-    const originalLocation = window.location;
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: { ...originalLocation, href: '' },
-    });
-
+  it('T-OrdersAPI: shows an honest "pago rechazado" state (declined), with a retry that reopens the form', async () => {
     stubFetch((url) => {
       if (url.includes('/donations')) {
         return {
-          id: 'don-redirect-1',
+          id: 'don-declined-1',
           organizationId: 'org-1',
           donorUserId: null,
           concept: { kind: 'organization', id: 'org-1' },
@@ -458,40 +476,36 @@ describe('DonatePage — checkout de invitado (sin sesión, requisito final del 
             gatewayIva: 385,
             net: 45210,
           },
-          collectionId: 'test_redirect',
-          status: 'pending',
+          collectionId: 'test_declined',
+          status: 'declined',
           anonymous: false,
           createdAt: '2026-09-28T00:00:00.000Z',
           updatedAt: '2026-09-28T00:00:00.000Z',
-          paymentLinkUrl: 'https://mp.test/checkout/pref-redirect',
         };
       }
       return [];
     });
 
-    try {
-      renderShell({
-        route: '/donaciones?organizationId=org-1&organizationName=Refugio%20Patitas',
-      });
+    renderShell({
+      route: '/donaciones?organizationId=org-1&organizationName=Refugio%20Patitas',
+    });
 
-      await screen.findByRole('heading', { name: 'Donar' });
-      fireEvent.change(screen.getByPlaceholderText('50000'), { target: { value: '50000' } });
-      fireEvent.change(screen.getByTestId('donation-guest-name'), {
-        target: { value: 'Invitado Test' },
-      });
-      fireEvent.change(screen.getByTestId('donation-guest-email'), {
-        target: { value: 'invitado@test.dev' },
-      });
-      fireEvent.click(screen.getByRole('button', { name: /Donar a Refugio Patitas/ }));
+    await screen.findByRole('heading', { name: 'Donar' });
+    fireEvent.change(screen.getByPlaceholderText('50000'), { target: { value: '50000' } });
+    fireEvent.change(screen.getByTestId('donation-guest-name'), {
+      target: { value: 'Invitado Test' },
+    });
+    fireEvent.change(screen.getByTestId('donation-guest-email'), {
+      target: { value: 'invitado@test.dev' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Donar a Refugio Patitas/ }));
+    fireEvent.click(await screen.findByTestId('fake-card-brick-submit'));
 
-      await waitFor(() => {
-        expect(window.location.href).toBe('https://mp.test/checkout/pref-redirect');
-      });
-      // Never fell back to the local confirmation screen.
-      expect(screen.queryByText(/¡Gracias por tu donación!/)).not.toBeInTheDocument();
-    } finally {
-      Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
-    }
+    expect(await screen.findByTestId('donation-declined')).toBeInTheDocument();
+    expect(screen.queryByText(/¡Gracias por tu donación!/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('donation-retry-card'));
+    expect(await screen.findByTestId('donation-guest-name')).toBeInTheDocument();
   });
 
   it('does NOT offer the account-creation CTA to an already-authenticated donor', async () => {
@@ -533,6 +547,7 @@ describe('DonatePage — checkout de invitado (sin sesión, requisito final del 
     await screen.findByRole('heading', { name: 'Donar' });
     fireEvent.change(screen.getByPlaceholderText('50000'), { target: { value: '50000' } });
     fireEvent.click(screen.getByRole('button', { name: /Donar a Refugio Patitas/ }));
+    fireEvent.click(await screen.findByTestId('fake-card-brick-submit'));
 
     expect(await screen.findByText(/¡Gracias por tu donación!/)).toBeInTheDocument();
     expect(screen.queryByTestId('create-account-cta')).not.toBeInTheDocument();

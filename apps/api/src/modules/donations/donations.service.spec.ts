@@ -103,7 +103,10 @@ describe('DonationsService.create — guest checkout', () => {
     const h = makeService();
     // First $queryRaw call: idempotency pre-check (donation_by_idempotency) → none yet.
     h.queryRaw.mockResolvedValueOnce([]);
-    // Second call: create_donation → the inserted row, donor_user_id null.
+    // Second call: Split de Pagos 1:1 sponsor lookup (mercadopago_account_mp_user_id)
+    // → no connected account (the common case).
+    h.queryRaw.mockResolvedValueOnce([]);
+    // Third call: create_donation → the inserted row, donor_user_id null.
     h.queryRaw.mockResolvedValueOnce([
       {
         id: 'don-1',
@@ -134,7 +137,9 @@ describe('DonationsService.create — guest checkout', () => {
     expect(result.donorUserId).toBeNull();
     expect(result.id).toBe('don-1');
     // The raw call's 2nd positional arg (donor_user_id) is null for a guest.
-    const createCallArgs = h.queryRaw.mock.calls[1][0] as { values: unknown[] };
+    // (calls[0] = idempotency pre-check, calls[1] = sponsor mp_user_id lookup,
+    // calls[2] = create_donation — see the mocks above.)
+    const createCallArgs = h.queryRaw.mock.calls[2][0] as { values: unknown[] };
     expect(createCallArgs.values[1]).toBeNull();
     // Audited with actorUserId: null (same precedent as the webhook path).
     expect(h.record).toHaveBeenCalledWith(
@@ -200,6 +205,7 @@ describe('DonationsService.create — paymentLinkUrl (checkout redirect fix)', (
       paymentLinkUrl: 'https://mp.test/checkout/pref-1',
     });
     h.queryRaw.mockResolvedValueOnce([]); // idempotency pre-check: none yet
+    h.queryRaw.mockResolvedValueOnce([]); // sponsor mp_user_id lookup: none connected
     h.queryRaw.mockResolvedValueOnce([donationRow()]);
 
     const result = await h.service.create(undefined, {
@@ -221,6 +227,156 @@ describe('DonationsService.create — paymentLinkUrl (checkout redirect fix)', (
 
     expect(result.paymentLinkUrl).toBeUndefined();
     expect(h.createCollection).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * T-OrdersAPI regression (2026-10-01): `create_donation` always seeds
+ * 'pending' (the webhook is the sole, exactly-once writer of a terminal
+ * status, and its `WHERE status = 'pending'` guard also gates receipt
+ * issuance — see `apply_donation_webhook`). But a real card decline
+ * discovered live showed the gateway's SYNCHRONOUS response already knows
+ * the outcome, and it was being silently discarded — the donor saw a
+ * misleading "confirmando tu pago" instead of "tu pago no fue aprobado" for
+ * an already-failed charge. `create()` must surface that known outcome in
+ * ITS OWN RETURN VALUE ONLY (never written to the DB here).
+ */
+describe('DonationsService.create — surfaces a synchronously-known gateway outcome (T-OrdersAPI)', () => {
+  function donationRow() {
+    return {
+      id: 'don-1',
+      organization_id: 'org-1',
+      donor_user_id: null,
+      concept_kind: 'organization',
+      concept_id: 'org-1',
+      commission_payer: 'organization',
+      intended_amount: 50_000,
+      amount_charged: 50_000,
+      currency: 'COP',
+      breakdown: { amountCharged: 50_000, gross: 50_000, net: 48_000 },
+      collection_id: 'col-1',
+      idempotency_key: 'idem-key-guest-1',
+      status: 'pending', // the DB row is ALWAYS this, regardless of collection.status
+      payer: { fullName: 'Invitado Test', email: 'guest@test.dev' },
+      anonymous: false,
+      created_at: new Date('2026-09-28T00:00:00.000Z'),
+      updated_at: new Date('2026-09-28T00:00:00.000Z'),
+    };
+  }
+
+  it('returns status "declined" when the gateway already knows the card was rejected', async () => {
+    const h = makeService();
+    h.createCollection.mockResolvedValueOnce({ collectionId: 'col-1', status: 'declined' });
+    h.queryRaw.mockResolvedValueOnce([]); // idempotency pre-check: none yet
+    h.queryRaw.mockResolvedValueOnce([]); // sponsor mp_user_id lookup: none connected
+    h.queryRaw.mockResolvedValueOnce([donationRow()]);
+
+    const result = await h.service.create(undefined, {
+      ...BASE_INPUT,
+      payer: { fullName: 'Invitado Test', email: 'guest@test.dev' },
+    });
+
+    expect(result.status).toBe('declined');
+  });
+
+  it('returns status "approved" when the gateway already approved it synchronously', async () => {
+    const h = makeService();
+    h.createCollection.mockResolvedValueOnce({ collectionId: 'col-1', status: 'approved' });
+    h.queryRaw.mockResolvedValueOnce([]);
+    h.queryRaw.mockResolvedValueOnce([]);
+    h.queryRaw.mockResolvedValueOnce([donationRow()]);
+
+    const result = await h.service.create(undefined, {
+      ...BASE_INPUT,
+      payer: { fullName: 'Invitado Test', email: 'guest@test.dev' },
+    });
+
+    expect(result.status).toBe('approved');
+  });
+
+  it('falls back to the DB row\'s "pending" status for any non-terminal gateway outcome', async () => {
+    const h = makeService();
+    h.createCollection.mockResolvedValueOnce({ collectionId: 'col-1', status: 'pending' });
+    h.queryRaw.mockResolvedValueOnce([]);
+    h.queryRaw.mockResolvedValueOnce([]);
+    h.queryRaw.mockResolvedValueOnce([donationRow()]);
+
+    const result = await h.service.create(undefined, {
+      ...BASE_INPUT,
+      payer: { fullName: 'Invitado Test', email: 'guest@test.dev' },
+    });
+
+    expect(result.status).toBe('pending');
+  });
+});
+
+/**
+ * Split de Pagos 1:1 (T-OrdersAPI) — `create()` resolves the beneficiary
+ * org's connected MercadoPago account (if any) and passes it through to
+ * `PaymentPort.createCollection` as `sponsorMpUserId`, plus the tokenized
+ * card fields from the request body.
+ */
+describe('DonationsService.create — Split de Pagos 1:1 (sponsorMpUserId) + card passthrough', () => {
+  function donationRow() {
+    return {
+      id: 'don-1',
+      organization_id: 'org-1',
+      donor_user_id: null,
+      concept_kind: 'organization',
+      concept_id: 'org-1',
+      commission_payer: 'organization',
+      intended_amount: 50_000,
+      amount_charged: 50_000,
+      currency: 'COP',
+      breakdown: { amountCharged: 50_000, gross: 50_000, net: 48_000 },
+      collection_id: 'col-1',
+      idempotency_key: 'idem-key-guest-1',
+      status: 'pending',
+      payer: { fullName: 'Invitado Test', email: 'guest@test.dev' },
+      anonymous: false,
+      created_at: new Date('2026-09-28T00:00:00.000Z'),
+      updated_at: new Date('2026-09-28T00:00:00.000Z'),
+    };
+  }
+
+  it('passes sponsorMpUserId through when the beneficiary org has a connected account', async () => {
+    const h = makeService();
+    h.queryRaw.mockResolvedValueOnce([]); // idempotency pre-check: none yet
+    h.queryRaw.mockResolvedValueOnce([{ mp_user_id: 'mp-user-connected' }]); // sponsor lookup: connected
+    h.queryRaw.mockResolvedValueOnce([donationRow()]);
+
+    await h.service.create(undefined, {
+      ...BASE_INPUT,
+      payer: { fullName: 'Invitado Test', email: 'guest@test.dev' },
+      cardToken: 'tok-abc',
+      paymentMethodId: 'visa',
+      installments: 1,
+    });
+
+    expect(h.createCollection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sponsorMpUserId: 'mp-user-connected',
+        cardToken: 'tok-abc',
+        paymentMethodId: 'visa',
+        installments: 1,
+      }),
+    );
+  });
+
+  it('omits sponsorMpUserId when the beneficiary org has NO connected account', async () => {
+    const h = makeService();
+    h.queryRaw.mockResolvedValueOnce([]); // idempotency pre-check: none yet
+    h.queryRaw.mockResolvedValueOnce([]); // sponsor lookup: none connected
+    h.queryRaw.mockResolvedValueOnce([donationRow()]);
+
+    await h.service.create(undefined, {
+      ...BASE_INPUT,
+      payer: { fullName: 'Invitado Test', email: 'guest@test.dev' },
+    });
+
+    expect(h.createCollection).toHaveBeenCalledWith(
+      expect.objectContaining({ sponsorMpUserId: undefined }),
+    );
   });
 });
 

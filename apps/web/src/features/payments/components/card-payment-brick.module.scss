@@ -1,0 +1,23 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.hint {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.hint--error {
+  font-size: var(--fs-sm);
+  color: var(--text-error, #b42318);
+}
+
+.unavailable {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  border: 1px dashed var(--border-muted, #d0d5dd);
+  border-radius: 0.5rem;
+  padding: 0.75rem;
+}

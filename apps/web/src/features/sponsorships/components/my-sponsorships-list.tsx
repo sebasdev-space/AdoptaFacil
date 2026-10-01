@@ -11,6 +11,7 @@ import {
   useToast,
 } from '@adoptafacil/ui';
 import { useApiClient } from '../../../shell/api';
+import { CardPaymentBrick, type CardPaymentBrickResult } from '../../payments';
 import { listMySponsorships, retrySponsorshipPayment } from '../api/sponsorships-api';
 import {
   formatBogota,
@@ -44,6 +45,12 @@ export function MySponsorshipsList() {
   const [sponsorships, setSponsorships] = useState<Sponsorship[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  // T-OrdersAPI: "Pagar de nuevo" no cobra de inmediato — primero abre el
+  // Card Payment Brick EN LÍNEA para esta fila (reemplaza el antiguo redirect
+  // de Checkout Pro). `payingId` controla cuál fila lo muestra; `retryingId`
+  // sigue indicando "llamada al backend en vuelo" (ahora disparada por el
+  // propio Brick, no por el click en "Pagar de nuevo").
+  const [payingId, setPayingId] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
 
   const load = async (): Promise<void> => {
@@ -68,33 +75,39 @@ export function MySponsorshipsList() {
     };
   }, [client]);
 
-  const retryPayment = async (sponsorship: Sponsorship): Promise<void> => {
+  /**
+   * T-OrdersAPI: called by the Card Payment Brick's own `onSubmit` ONCE it
+   * tokenized a real card — this is now the ONLY place that actually calls
+   * `POST /retry-payment` (clicking "Pagar de nuevo" just opens the Brick,
+   * see below). Async + re-throws on failure so the Brick shows its own
+   * error state (same contract `CardPaymentBrick`'s doc comment describes).
+   */
+  const payWithCard = async (
+    sponsorship: Sponsorship,
+    card: CardPaymentBrickResult,
+  ): Promise<void> => {
     setRetryingId(sponsorship.id);
     try {
-      const payment = await retrySponsorshipPayment(client, sponsorship.id);
-      // Bug fix (checkout REAL de MercadoPago, nunca cableado hasta ahora):
-      // el intento recién creado por esta llamada es el ÚLTIMO de la lista
-      // (`attempts` viene ordenado ascendente por `attemptNumber`) — su
-      // `paymentLinkUrl` es donde el padrino realmente paga. Navegación de
-      // página completa (sale del SPA hacia MercadoPago y vuelve en
-      // `/apadrinar/gracias`, back_urls + auto_return).
-      const newAttempt = payment.attempts[payment.attempts.length - 1];
-      if (newAttempt?.paymentLinkUrl) {
-        window.location.href = newAttempt.paymentLinkUrl;
-        return;
-      }
+      await retrySponsorshipPayment(client, sponsorship.id, {
+        cardToken: card.cardToken,
+        paymentMethodId: card.paymentMethodId,
+        paymentMethodType: card.paymentMethodType,
+        installments: card.installments,
+      });
+      setPayingId(null);
       await load();
       toast({
-        title: 'Nuevo cobro generado',
+        title: 'Pago enviado',
         description: 'Cuando se confirme el pago, tu apadrinamiento se reactivará automáticamente.',
         variant: 'success',
       });
     } catch (error) {
       toast({
-        title: 'No se pudo generar un nuevo cobro',
+        title: 'No se pudo procesar el pago',
         description: error instanceof Error ? error.message : 'Inténtalo de nuevo.',
         variant: 'destructive',
       });
+      throw error;
     } finally {
       setRetryingId(null);
     }
@@ -152,16 +165,38 @@ export function MySponsorshipsList() {
                   </p>
                 )}
                 {isBillingFailureSuspension(sponsorship) && (
-                  <div className="flex items-center gap-2">
-                    <p className={styles['hint--error']}>Suspendido por pago fallido.</p>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={retryingId === sponsorship.id}
-                      onClick={() => void retryPayment(sponsorship)}
-                    >
-                      {retryingId === sponsorship.id ? 'Generando…' : 'Pagar de nuevo'}
-                    </Button>
+                  <div className={styles['recovery']}>
+                    <div className="flex items-center gap-2">
+                      <p className={styles['hint--error']}>Suspendido por pago fallido.</p>
+                      {payingId !== sponsorship.id && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setPayingId(sponsorship.id)}
+                        >
+                          Pagar de nuevo
+                        </Button>
+                      )}
+                    </div>
+                    {/* T-OrdersAPI: el Brick se abre EN LÍNEA (reemplaza el antiguo
+                        redirect a Checkout Pro) — solo al enviarlo se llama de
+                        verdad a `retry-payment`, con el token real incluido. */}
+                    {payingId === sponsorship.id && (
+                      <div className={styles['recovery__brick']}>
+                        <CardPaymentBrick
+                          amount={sponsorship.planAmount ?? 0}
+                          onResult={(card) => payWithCard(sponsorship, card)}
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={retryingId === sponsorship.id}
+                          onClick={() => setPayingId(null)}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </li>

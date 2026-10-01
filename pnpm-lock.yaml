@@ -193,6 +193,9 @@ importers:
       '@adoptafacil/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@mercadopago/sdk-react':
+        specifier: ^0.0.22
+        version: 0.0.22(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       qrcode:
         specifier: ^1.5.4
         version: 1.5.4
@@ -1004,6 +1007,15 @@ packages:
   '@lukeed/csprng@1.1.0':
     resolution: {integrity: sha512-Z7C/xXCiGWsg0KuKsHTKJxbWhpI3Vs5GwLfOean7MGyVFGqdRgBbAjOCh6u4bbjPc/8MJ2pZmK/0DLdCbivLDA==}
     engines: {node: '>=8'}
+
+  '@mercadopago/sdk-js@0.0.3':
+    resolution: {integrity: sha512-kO48DNLHdfFAp3on12nuKdqNlEmw1x3+nM6wLd04BdWOXoFcAhkNMQV3AyUIanXdO/bB/dENakdacLT29297EQ==}
+
+  '@mercadopago/sdk-react@0.0.22':
+    resolution: {integrity: sha512-9ZeAHbLQZYfaPq3UGvVXCescvURFOsu5wOzJhhOm9OPpGfadYTIyo+1IMjBFlSd1dXQ8d45s7CsbBEkAZgnaoQ==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
   '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.4':
     resolution: {integrity: sha512-LCkGo6JDfaBhgST7UpPWgNgLINpcpabaHfyz5OBx75nUYxBsaEPxjnyNjWpeb/xBup/682QnBfRBy2/LvPutZQ==}
@@ -6357,6 +6369,14 @@ snapshots:
       call-bind: 1.0.9
 
   '@lukeed/csprng@1.1.0': {}
+
+  '@mercadopago/sdk-js@0.0.3': {}
+
+  '@mercadopago/sdk-react@0.0.22(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
+    dependencies:
+      '@mercadopago/sdk-js': 0.0.3
+      react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
 
   '@msgpackr-extract/msgpackr-extract-darwin-arm64@3.0.4':
     optional: true

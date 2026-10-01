@@ -168,6 +168,23 @@ export interface SponsorshipStatusChangeInput {
   reason?: string;
 }
 
+/**
+ * Body of `POST /sponsorships/:id/retry-payment` (T-OrdersAPI). The sponsor's
+ * Card Payment Brick tokenizes a card client-side and submits it here so the
+ * recovery attempt can actually charge it via Checkout API/Orders — mirrors
+ * `CreateCollectionInput`'s own card fields (payments.ts) verbatim; see that
+ * type's doc comments for the full rationale. All optional/additive so a
+ * caller that still posts no body (existing tests, the fake driver) keeps
+ * working — the REAL gateway adapter is the one place that hard-requires a
+ * token.
+ */
+export interface PaySponsorshipPaymentInput {
+  cardToken?: string;
+  paymentMethodId?: string;
+  paymentMethodType?: 'credit_card' | 'debit_card';
+  installments?: number;
+}
+
 // ============================================================================
 // S-5-REDISEÑO (M07, RF17, incluye T-057) — recurring billing ledger. One
 // `SponsorshipPayment` per (sponsorshipId, period); one `SponsorshipPaymentAttempt`

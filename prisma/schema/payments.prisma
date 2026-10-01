@@ -60,3 +60,35 @@ model Payout {
   @@index([status])
   @@map("payouts")
 }
+
+/// Split de Pagos 1:1 (T-OAuth-Connect) — the org's OWN MercadoPago account,
+/// connected via OAuth so money splits automatically AT the moment of payment
+/// (the org gets paid directly; AdoptaFácil keeps a commission). Replaces the
+/// consolidated-collection + manual-T+1-payout model above for organizations
+/// that connect — this table is ONLY the "connect your account" infra (the
+/// OAuth dance + storing the resulting credentials); wiring `mpUserId` into an
+/// actual split payment at checkout is a separate follow-up (NOT this task).
+/// One row per organization (`organizationId` unique). `accessToken`/
+/// `refreshToken` are genuinely needed in plaintext to call MercadoPago's API
+/// later — never echoed in a response DTO, log statement, or audit `metadata`
+/// (only the EVENT is audited, e.g. `mercadopago_account.connected`, with at
+/// most `mpUserId` — never the tokens).
+model OrganizationMercadoPagoAccount {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @unique @map("organization_id") @db.Uuid
+  /// The org's MercadoPago collector/sponsor id (OAuth `user_id`) — the id
+  /// needed later to attribute a split payment to this org's account.
+  mpUserId       String   @map("mp_user_id")
+  accessToken    String   @map("access_token")
+  refreshToken   String   @map("refresh_token")
+  /// When `accessToken`/`refreshToken` expire (MercadoPago: ~180 days from
+  /// issuance/refresh) — the daily refresh scheduler renews rows within its
+  /// configured window BEFORE this date arrives.
+  expiresAt      DateTime @map("expires_at")
+  connectedAt    DateTime @default(now()) @map("connected_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([organizationId])
+  @@index([expiresAt])
+  @@map("organization_mercadopago_accounts")
+}

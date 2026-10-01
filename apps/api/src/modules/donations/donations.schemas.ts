@@ -37,5 +37,15 @@ export const createDonationSchema = z
     payer: donorSchema.optional(),
     idempotencyKey: z.string().trim().min(8).max(200),
     anonymous: z.boolean().optional().default(false),
+    // T-OrdersAPI (Checkout API): tokenized card data from the frontend's Card
+    // Payment Brick. OPTIONAL here on purpose — the real gateway adapter is
+    // the one place that hard-requires a token (throws otherwise); keeping
+    // this endpoint permissive means the fake driver (dev/test default) and
+    // every existing integration test that posts without a card keep working
+    // unchanged (invariant: contracts/endpoints stay additive).
+    cardToken: z.string().trim().min(10).max(2000).optional(),
+    paymentMethodId: z.string().trim().min(1).max(50).optional(),
+    paymentMethodType: z.enum(['credit_card', 'debit_card']).optional(),
+    installments: z.coerce.number().int().min(1).max(36).optional(),
   })
   .strict();

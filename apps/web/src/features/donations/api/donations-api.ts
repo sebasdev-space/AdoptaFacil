@@ -1,7 +1,6 @@
 import type {
   CreateDonationInput,
   Donation,
-  DonationPublicStatus,
   DonationReceipt,
   DonationWithReceipt,
   GuestDonationAccess,
@@ -47,23 +46,4 @@ export async function fetchGuestDonationAccess(token: string): Promise<GuestDona
   if (response.status === 404) return null;
   if (!response.ok) throw new Error('error');
   return (await response.json()) as GuestDonationAccess;
-}
-
-/**
- * PUBLIC post-checkout status, reached from `/donaciones/gracias` after
- * MercadoPago redirects the donor back with `external_reference` (== our own
- * `collectionId`) in the query string — PUBLIC, no session, same fetch
- * convention as {@link fetchGuestDonationAccess}. `null` on a 404 (unknown
- * reference — never distinguished from any other reason) so the page shows
- * one honest state instead of a thrown error.
- */
-export async function fetchDonationPublicStatus(
-  reference: string,
-): Promise<DonationPublicStatus | null> {
-  const response = await fetch(
-    `${API_BASE}/public/donations/status/${encodeURIComponent(reference)}`,
-  );
-  if (response.status === 404) return null;
-  if (!response.ok) throw new Error('error');
-  return (await response.json()) as DonationPublicStatus;
 }

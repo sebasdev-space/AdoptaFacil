@@ -1,8 +1,14 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../../core/auth/auth.module';
+import { MercadoPagoOAuthClient } from '../../core/payments/mercadopago-oauth.client';
 import { BankAccountsController } from './bank-accounts.controller';
 import { BankAccountsService } from './bank-accounts.service';
+import { MercadoPagoConnectController } from './mercadopago-connect.controller';
+import { MercadoPagoConnectService } from './mercadopago-connect.service';
+import { MercadoPagoTokenRefreshProcessor } from './mercadopago-token-refresh.processor';
+import { MercadoPagoTokenRefreshScheduler } from './mercadopago-token-refresh.scheduler';
+import { MERCADOPAGO_TOKEN_REFRESH_QUEUE } from './mercadopago-connect.constants';
 import { PayoutsController } from './payouts.controller';
 import { PayoutsProcessor } from './payouts.processor';
 import { PayoutsService } from './payouts.service';
@@ -24,6 +30,12 @@ import { ReconciliationService } from './reconciliation.service';
  *   - `/platform/reconciliation` (F-5, RF26) — read-only report crossing
  *     recaudo (donations) vs. dispersión (payouts), by org and calendar
  *     month; no table of its own, aggregates over the two above.
+ *   - `organization_mercadopago_accounts` (RLS, T-OAuth-Connect) — Split de
+ *     Pagos 1:1: an org connects its OWN MercadoPago account via OAuth
+ *     (`/org/mercadopago/connect|callback|status`, Owner/Administrator +
+ *     one public callback route) plus a daily BullMQ token-refresh scan. This
+ *     is ONLY the connect infra — wiring the connected `mpUserId` into an
+ *     actual split payment at checkout is a separate follow-up, not here.
  *
  * PaymentPort: consumed from the GLOBAL `PAYMENT_PORT` provider (core
  * `PaymentModule`, @Global) — no local binding, same convention as
@@ -31,8 +43,26 @@ import { ReconciliationService } from './reconciliation.service';
  * BullMQ↔Redis connection (`QueueModule`, @Global).
  */
 @Module({
-  imports: [AuthModule, BullModule.registerQueue({ name: PAYOUTS_QUEUE })],
-  controllers: [BankAccountsController, PayoutsController, ReconciliationController],
-  providers: [BankAccountsService, PayoutsService, PayoutsProcessor, ReconciliationService],
+  imports: [
+    AuthModule,
+    BullModule.registerQueue({ name: PAYOUTS_QUEUE }),
+    BullModule.registerQueue({ name: MERCADOPAGO_TOKEN_REFRESH_QUEUE }),
+  ],
+  controllers: [
+    BankAccountsController,
+    PayoutsController,
+    ReconciliationController,
+    MercadoPagoConnectController,
+  ],
+  providers: [
+    BankAccountsService,
+    PayoutsService,
+    PayoutsProcessor,
+    ReconciliationService,
+    MercadoPagoOAuthClient,
+    MercadoPagoConnectService,
+    MercadoPagoTokenRefreshScheduler,
+    MercadoPagoTokenRefreshProcessor,
+  ],
 })
 export class PaymentsModule {}
