@@ -1,12 +1,16 @@
+import { useEffect, useState } from 'react';
+import type { PublicPortalBannerPhoto } from '@adoptafacil/contracts';
 import { cn } from '@adoptafacil/ui';
+import { fetchPortalBanner } from '../api/public-portal-banner';
 import styles from './hero-photo-grid.module.scss';
 
 /**
- * Collage decorativo del hero — NO son datos reales ni vienen del catálogo
- * (ese es `GeneralCatalogSection`, cableado a `/public/animals`). Son parte
- * del diseño de la landing: 4 cuadros con degradé de marca + un ícono de
- * mascota, con entrada escalonada y hover sutil (ambos respetan
- * `prefers-reduced-motion` vía el guard global de `packages/ui`).
+ * Collage del hero. Las fotos las administra la plataforma
+ * (`GET /public/portal-banner`, hasta 4). Mientras carga, si falla o si no hay
+ * fotos configuradas, se muestra el FALLBACK de diseño: 4 cuadros con degradé de
+ * marca + ícono. Si hay menos de 4 fotos, los cuadros restantes usan el fallback.
+ * Entrada escalonada y hover sutil respetan `prefers-reduced-motion` (guard global
+ * de `packages/ui`).
  */
 const PawIcon = (props: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={props.className}>
@@ -43,13 +47,40 @@ const BOXES = [
 ];
 
 export function HeroPhotoGrid() {
+  const [photos, setPhotos] = useState<PublicPortalBannerPhoto[]>([]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetchPortalBanner(controller.signal)
+      .then(setPhotos)
+      .catch(() => {
+        // Fallback silencioso: el hero decorativo sigue funcionando sin fotos.
+      });
+    return () => controller.abort();
+  }, []);
+
+  const hasPhotos = photos.length > 0;
+
   return (
-    <div className={styles.grid} role="img" aria-label="Mascotas en adopción">
-      {BOXES.map(({ variant, height, Icon }, index) => (
-        <div key={index} className={cn(styles.box, variant, height)}>
-          <Icon className={styles.box__icon} />
-        </div>
-      ))}
+    <div
+      className={styles.grid}
+      {...(hasPhotos ? {} : { role: 'img', 'aria-label': 'Mascotas en adopción' })}
+    >
+      {BOXES.map(({ variant, height, Icon }, index) => {
+        const photo = photos[index];
+        if (photo) {
+          return (
+            <div key={photo.id} className={cn(styles.box, styles['box--photo'], height)}>
+              <img src={photo.imageUrl} alt={photo.altText} className={styles.box__img} />
+            </div>
+          );
+        }
+        return (
+          <div key={`fallback-${index}`} className={cn(styles.box, variant, height)}>
+            <Icon className={styles.box__icon} />
+          </div>
+        );
+      })}
     </div>
   );
 }

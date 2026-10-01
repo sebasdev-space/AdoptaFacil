@@ -67,6 +67,12 @@ export const COMMUNITY_MODERATION_ROLES = [Role.PlatformAdmin, Role.PlatformSupe
 export const PLATFORM_REVIEWS_ROLES = [Role.PlatformAdmin, Role.PlatformSuperAdmin] as const;
 
 /**
+ * M14 — "Banner del portal" (`/api platform/portal-banner`), audiencia de
+ * PLATAFORMA. Copiado VERBATIM del `@Roles` de `PlatformPortalBannerController`.
+ */
+export const PLATFORM_PORTAL_BANNER_ROLES = [Role.PlatformAdmin, Role.PlatformSuperAdmin] as const;
+
+/**
  * M13 (S-8, RF24) — "Dashboard de plataforma" (conteos de colas), audiencia
  * de PLATAFORMA. Copiado VERBATIM del `@Roles` de
  * `PlatformDashboardController.getAdminSummary` (`GET /platform/dashboard/admin`)
@@ -484,6 +490,13 @@ export const navItems: NavItem[] = [
     label: 'Moderación de reseñas',
     icon: ChatIcon,
     roles: PLATFORM_REVIEWS_ROLES,
+  },
+  // M14 · banner administrable del portal general, audiencia de PLATAFORMA.
+  {
+    path: '/plataforma/banner',
+    label: 'Banner del portal',
+    icon: HomeIcon,
+    roles: PLATFORM_PORTAL_BANNER_ROLES,
   },
   // M12 (S-7, RF23) · "Mis reseñas" — lo que la Persona ha reseñado y su
   // estado. Sin @Roles en el backend (cualquier Persona autenticada), mismo

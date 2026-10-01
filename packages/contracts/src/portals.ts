@@ -198,3 +198,64 @@ export interface PortalTransparency {
   formalizationPct: number;
   accountability: PortalAccountability;
 }
+
+// ---------------------------------------------------------------------------
+// Banner (hero) administrable del portal general `/` (M14) — ADITIVO.
+// ---------------------------------------------------------------------------
+
+/** Máximo de fotos del banner (el collage del hero tiene 4 cuadros). */
+export const PORTAL_BANNER_MAX_PHOTOS = 4;
+
+/** Foto del banner en la vista de administración (PlatformAdmin/SuperAdmin). */
+export interface PortalBannerPhoto {
+  id: string;
+  /** Posición 0..3 en el collage. */
+  position: number;
+  storageKey: string;
+  /** URL pública de la imagen (StoragePort). */
+  imageUrl: string;
+  /** Texto alternativo (obligatorio, accesibilidad). */
+  altText: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+/** Proyección PÚBLICA mínima (sin auth): solo lo necesario para pintar el hero. */
+export interface PublicPortalBannerPhoto {
+  id: string;
+  imageUrl: string;
+  altText: string;
+}
+
+/** `GET /public/portal-banner` — fotos activas, ordenadas. `[]` = usar fallback. */
+export interface PublicPortalBanner {
+  items: PublicPortalBannerPhoto[];
+}
+
+/** `POST /platform/portal-banner/upload-target` — reserva la key (luego PUT /storage/upload). */
+export interface PortalBannerUploadTargetInput {
+  filename: string;
+  contentType: 'image/jpeg' | 'image/png' | 'image/webp';
+}
+
+export interface PortalBannerUploadTarget {
+  key: string;
+  url: string;
+}
+
+/** `POST /platform/portal-banner` — registra una foto ya subida. */
+export interface CreatePortalBannerPhotoInput {
+  storageKey: string;
+  altText: string;
+}
+
+/** `PATCH /platform/portal-banner/:id` — alt y/o activo. */
+export interface UpdatePortalBannerPhotoInput {
+  altText?: string;
+  isActive?: boolean;
+}
+
+/** `PUT /platform/portal-banner/order` — ids en el nuevo orden (todos). */
+export interface ReorderPortalBannerInput {
+  ids: string[];
+}

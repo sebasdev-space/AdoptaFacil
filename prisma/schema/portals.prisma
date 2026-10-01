@@ -36,3 +36,24 @@ model PortalTheme {
   @@index([organizationId])
   @@map("portal_themes")
 }
+
+/// Fotos del banner (hero) del portal GENERAL `/` (M14). Tabla GLOBAL de
+/// PLATAFORMA, NO de negocio por tenant: no lleva organization_id ni RLS (igual
+/// que `platform_settings`/`organizations`). Solo PlatformAdmin/PlatformSuperAdmin
+/// escriben (RBAC en el controller; cada cambio se audita). La lectura pública
+/// proyecta SOLO id/storage_ref/alt_text de las filas activas. `position` 0..3
+/// (máx. 4 slots, como el collage actual); `alt_text` obligatorio (accesibilidad).
+/// `storage_ref` es la key opaca de StoragePort (visibilidad `public`).
+model PortalBannerPhoto {
+  id              String   @id @default(uuid()) @db.Uuid
+  position        Int
+  storageRef      String   @map("storage_ref")
+  altText         String   @map("alt_text")
+  isActive        Boolean  @default(true) @map("is_active")
+  createdByUserId String?  @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@index([position])
+  @@map("portal_banner_photos")
+}

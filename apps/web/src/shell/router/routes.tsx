@@ -14,6 +14,7 @@ import {
   PLATFORM_ADMIN_DASHBOARD_ROLES,
   PLATFORM_DOCUMENTS_ROLES,
   PLATFORM_DUPLICATES_ROLES,
+  PLATFORM_PORTAL_BANNER_ROLES,
   PLATFORM_REVIEWS_ROLES,
   PLATFORM_SUPER_ADMIN_DASHBOARD_ROLES,
   RESOURCE_VIEW_ROLES,
@@ -40,6 +41,7 @@ import {
   PlatformAdminDashboardPage,
   PlatformDocumentsReviewPage,
   PlatformDuplicatesReviewPage,
+  PlatformPortalBannerPage,
   PlatformReviewsReviewPage,
   PlatformSuperAdminDashboardPage,
 } from '../../features/org';
@@ -553,6 +555,15 @@ export function AppRoutes() {
             element={
               <RequireRoles roles={PLATFORM_REVIEWS_ROLES}>
                 <PlatformReviewsReviewPage />
+              </RequireRoles>
+            }
+          />
+          {/* M14 · banner administrable del portal general (PLATAFORMA). */}
+          <Route
+            path="plataforma/banner"
+            element={
+              <RequireRoles roles={PLATFORM_PORTAL_BANNER_ROLES}>
+                <PlatformPortalBannerPage />
               </RequireRoles>
             }
           />

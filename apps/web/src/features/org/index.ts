@@ -5,6 +5,7 @@ export { OrgLegalRepresentativePage } from './pages/org-legal-representative-pag
 export { PlatformDocumentsReviewPage } from './pages/platform-documents-review-page';
 export { PlatformDuplicatesReviewPage } from './pages/platform-duplicates-review-page';
 export { PlatformReviewsReviewPage } from './pages/platform-reviews-review-page';
+export { PlatformPortalBannerPage } from './pages/platform-portal-banner-page';
 export { PlatformAdminDashboardPage } from './pages/platform-admin-dashboard-page';
 export { PlatformSuperAdminDashboardPage } from './pages/platform-super-admin-dashboard-page';
 export { OrgVolunteeringPage } from './pages/org-volunteering-page';
