@@ -4,6 +4,8 @@ import { ResourceNeedsController } from './resource-needs.controller';
 import { ResourceNeedsService } from './resource-needs.service';
 import { ResourceOffersController } from './resource-offers.controller';
 import { ResourceOffersService } from './resource-offers.service';
+import { ResourceOfferProofsController } from './resource-offer-proofs.controller';
+import { ResourceOfferProofsService } from './resource-offer-proofs.service';
 import { ResourceDeliveriesController } from './resource-deliveries.controller';
 import { ResourceDeliveriesService } from './resource-deliveries.service';
 import { ResourceDeliveryEvidencesController } from './resource-delivery-evidences.controller';
@@ -27,6 +29,7 @@ import { PublicResourceNeedsService } from './public-resource-needs.service';
   controllers: [
     ResourceNeedsController,
     ResourceOffersController,
+    ResourceOfferProofsController,
     ResourceDeliveriesController,
     ResourceDeliveryEvidencesController,
     PublicResourceNeedsController,
@@ -34,6 +37,7 @@ import { PublicResourceNeedsService } from './public-resource-needs.service';
   providers: [
     ResourceNeedsService,
     ResourceOffersService,
+    ResourceOfferProofsService,
     ResourceDeliveriesService,
     ResourceDeliveryEvidencesService,
     PublicResourceNeedsService,

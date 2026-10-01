@@ -35,6 +35,7 @@ import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
 import { SelectField, TextAreaField } from '../components/resource-form-fields';
 import { NeedProgress } from '../components/need-progress';
+import { OfferProofReview } from '../components/offer-proof-review';
 import { EVIDENCE_ACCEPT, uploadEvidenceFile, validateEvidenceUpload } from '../lib/storage';
 import {
   CATEGORY_LABELS,
@@ -509,6 +510,11 @@ export function ResourceNeedDetailPage() {
                       </>
                     )}
                   </div>
+                  <OfferProofReview
+                    offer={offer}
+                    canManage={canManage}
+                    onValidated={() => loadAll()}
+                  />
                 </div>
               ))}
             </CardContent>

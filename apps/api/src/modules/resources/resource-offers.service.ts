@@ -9,6 +9,7 @@ import {
   type CreateResourceOfferInput,
   type DecideResourceOfferInput,
   type ResourceOffer,
+  type ResourceOfferProofStatus,
   ResourceOfferStatus,
   type ResourceOfferWithNeed,
 } from '@adoptafacil/contracts';
@@ -35,6 +36,10 @@ interface RawOfferWithNeed {
   deliveryStatus: string | null;
   deliveryScheduledAt: string | null;
   deliveryCompletedAt: string | null;
+  proofStatus: string | null;
+  proofValidatedAt: string | null;
+  proofValidationReason: string | null;
+  proofCount: number | null;
 }
 
 function toOfferWithNeed(raw: RawOfferWithNeed): ResourceOfferWithNeed {
@@ -54,6 +59,10 @@ function toOfferWithNeed(raw: RawOfferWithNeed): ResourceOfferWithNeed {
     deliveryStatus: (raw.deliveryStatus as ResourceOfferWithNeed['deliveryStatus']) ?? undefined,
     deliveryScheduledAt: raw.deliveryScheduledAt ?? undefined,
     deliveryCompletedAt: raw.deliveryCompletedAt ?? undefined,
+    proofStatus: (raw.proofStatus as ResourceOfferProofStatus | null) ?? undefined,
+    proofValidatedAt: raw.proofValidatedAt ?? undefined,
+    proofValidationReason: raw.proofValidationReason ?? undefined,
+    proofCount: Number(raw.proofCount ?? 0),
   };
 }
 
@@ -67,6 +76,10 @@ interface ResourceOfferSqlRow {
   quantity_offered: number;
   message: string | null;
   status: string;
+  proof_status: string | null;
+  proof_validated_by_user_id: string | null;
+  proof_validated_at: Date | null;
+  proof_validation_reason: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -80,6 +93,10 @@ function fromSqlRow(row: ResourceOfferSqlRow): ResourceOffer {
     quantityOffered: row.quantity_offered,
     message: row.message ?? undefined,
     status: row.status as ResourceOfferStatus,
+    proofStatus: (row.proof_status as ResourceOfferProofStatus | null) ?? undefined,
+    proofValidatedByUserId: row.proof_validated_by_user_id ?? undefined,
+    proofValidatedAt: row.proof_validated_at?.toISOString(),
+    proofValidationReason: row.proof_validation_reason ?? undefined,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString(),
   };
@@ -95,6 +112,10 @@ function toOffer(row: ResourceOfferModel): ResourceOffer {
     quantityOffered: row.quantityOffered,
     message: row.message ?? undefined,
     status: row.status as ResourceOfferStatus,
+    proofStatus: (row.proofStatus as ResourceOfferProofStatus | null) ?? undefined,
+    proofValidatedByUserId: row.proofValidatedByUserId ?? undefined,
+    proofValidatedAt: row.proofValidatedAt?.toISOString(),
+    proofValidationReason: row.proofValidationReason ?? undefined,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

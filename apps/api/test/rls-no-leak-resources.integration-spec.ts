@@ -4,7 +4,8 @@ import { purgeOrganizations } from './support/cleanup';
 
 /**
  * RNF03 gate for M09 (banco de recursos): resource_needs, resource_offers,
- * resource_deliveries, resource_delivery_evidences, resource_fulfillment_applications
+ * resource_deliveries, resource_delivery_evidences, resource_fulfillment_applications,
+ * resource_offer_proofs
  * — tenant-isolated (no cross-org visibility, no cross-org write). Connects
  * as the NON-SUPERUSER app role. no-leak tests carry "no-leak" so `test:rls`
  * runs them (same pattern as rls-no-leak-payouts).
@@ -56,6 +57,17 @@ async function seed(prisma: PrismaClient, orgId: string, tag: string): Promise<S
     const evidence = await tx.resourceDeliveryEvidence.create({
       data: { organizationId: orgId, deliveryId: delivery.id, storageRef: `public/${orgId}/x.jpg` },
     });
+    await tx.resourceOfferProof.create({
+      data: {
+        organizationId: orgId,
+        offerId: offer.id,
+        uploadedByUserId: randomUUID(),
+        filename: 'factura.png',
+        contentType: 'image/png',
+        sizeBytes: 1,
+        storageRef: `private/${orgId}/factura.png`,
+      },
+    });
     await tx.resourceFulfillmentApplication.create({
       data: { organizationId: orgId, deliveryId: delivery.id, needId: need.id, quantityApplied: 5 },
     });
@@ -96,6 +108,9 @@ describe('RLS (resource_needs, resource_offers, resource_deliveries, resource_de
       const deliveries = await tx.resourceDelivery.findMany();
       const evidences = await tx.resourceDeliveryEvidence.findMany();
       const applications = await tx.resourceFulfillmentApplication.findMany();
+      const proofs = await tx.resourceOfferProof.findMany();
+      expect(proofs.every((r) => r.organizationId === orgA)).toBe(true);
+      expect(proofs).toHaveLength(1);
       expect(needs.every((r) => r.organizationId === orgA)).toBe(true);
       expect(offers.every((r) => r.organizationId === orgA)).toBe(true);
       expect(deliveries.every((r) => r.organizationId === orgA)).toBe(true);
@@ -115,6 +130,7 @@ describe('RLS (resource_needs, resource_offers, resource_deliveries, resource_de
     expect(await prisma.resourceDelivery.findMany()).toHaveLength(0);
     expect(await prisma.resourceDeliveryEvidence.findMany()).toHaveLength(0);
     expect(await prisma.resourceFulfillmentApplication.findMany()).toHaveLength(0);
+    expect(await prisma.resourceOfferProof.findMany()).toHaveLength(0);
   });
 
   it('no-leak: WITH CHECK blocks writing a need for a different org than the context', async () => {
@@ -146,6 +162,31 @@ describe('RLS (resource_needs, resource_offers, resource_deliveries, resource_de
         }),
       ),
     ).rejects.toThrow();
+  });
+
+  it('no-leak: WITH CHECK blocks writing an offer proof for a different org than the context', async () => {
+    await expect(
+      withOrgContext(prisma, orgA, (tx) =>
+        tx.resourceOfferProof.create({
+          data: {
+            organizationId: orgB,
+            offerId: seededA.offerId,
+            uploadedByUserId: randomUUID(),
+            filename: 'x.png',
+            contentType: 'image/png',
+            sizeBytes: 1,
+            storageRef: 'private/x',
+          },
+        }),
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('no-leak: Org B never sees Org A offer proofs', async () => {
+    const seen = await withOrgContext(prisma, orgB, (tx) =>
+      tx.resourceOfferProof.findMany({ where: { offerId: seededA.offerId } }),
+    );
+    expect(seen).toHaveLength(0);
   });
 
   it('no-leak: Org A cannot UPDATE a row that (via context mismatch) resolves to Org B', async () => {

@@ -1,3 +1,4 @@
+import { RESOURCE_OFFER_PROOF_MAX_FILES, type ResourceOfferProof } from '@adoptafacil/contracts';
 import type { ApiClient } from '../../../shell/api';
 
 /**
@@ -47,4 +48,50 @@ export async function uploadEvidenceFile(
     method: 'PUT',
     body: form,
   });
+}
+
+/**
+ * M09 — PRUEBA del donante (foto/factura) al ofrecer. A diferencia de la
+ * evidencia de entrega, el donante no pertenece a la organización
+ * beneficiaria, así que NO usa `PUT /storage/upload`: sube por multipart al
+ * endpoint de la oferta (`POST /resources/offers/:id/proofs`, campo `file`),
+ * que reserva la clave y guarda el archivo como PRIVADO.
+ */
+export async function uploadOfferProof(
+  client: ApiClient,
+  offerId: string,
+  file: File,
+): Promise<ResourceOfferProof> {
+  const form = new FormData();
+  form.append('file', file, file.name);
+  return client.request<ResourceOfferProof>(
+    `/resources/offers/${encodeURIComponent(offerId)}/proofs`,
+    { method: 'POST', body: form },
+  );
+}
+
+/** Abre en otra pestaña una prueba (privada: se descarga con el JWT, no por URL). */
+export async function openOfferProofFile(
+  client: ApiClient,
+  offerId: string,
+  proofId: string,
+): Promise<void> {
+  const blob = await client.requestBlob(
+    `/resources/offers/${encodeURIComponent(offerId)}/proofs/${encodeURIComponent(proofId)}/file`,
+  );
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank', 'noopener');
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+/** Valida todos los archivos de prueba elegidos (tipo, tamaño, máximo). */
+export function validateProofFiles(files: readonly File[], alreadyAttached = 0): string | null {
+  if (files.length + alreadyAttached > RESOURCE_OFFER_PROOF_MAX_FILES) {
+    return `Máximo ${RESOURCE_OFFER_PROOF_MAX_FILES} archivos de prueba por oferta.`;
+  }
+  for (const file of files) {
+    const invalid = validateEvidenceUpload(file);
+    if (invalid) return `${file.name}: ${invalid}`;
+  }
+  return null;
 }

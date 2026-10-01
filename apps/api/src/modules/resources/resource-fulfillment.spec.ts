@@ -1,11 +1,15 @@
 import {
+  RESOURCE_OFFER_PROOF_MAX_FILES,
   ResourceDeliveryStatus,
   ResourceNeedStatus,
+  ResourceOfferProofStatus,
   ResourceOfferStatus,
 } from '@adoptafacil/contracts';
 import {
+  canAttachProof,
   canDecideOffer,
   canTransitionDelivery,
+  canValidateProof,
   computeFulfillmentProgress,
   deriveNeedStatus,
   needAcceptsOffers,
@@ -108,5 +112,35 @@ describe('canTransitionDelivery (M09)', () => {
     expect(
       canTransitionDelivery(ResourceDeliveryStatus.Completed, ResourceDeliveryStatus.Cancelled),
     ).toBe(false);
+  });
+});
+
+describe('canAttachProof / canValidateProof (M09, prueba del donante)', () => {
+  it('permite adjuntar con la oferta offered/accepted y la prueba no aprobada', () => {
+    expect(canAttachProof(ResourceOfferStatus.Offered, null, 0)).toBe(true);
+    expect(canAttachProof(ResourceOfferStatus.Accepted, ResourceOfferProofStatus.Rejected, 2)).toBe(
+      true,
+    );
+    expect(canAttachProof(ResourceOfferStatus.Offered, ResourceOfferProofStatus.Pending, 1)).toBe(
+      true,
+    );
+  });
+
+  it('niega con la oferta terminal, la prueba aprobada o el máximo alcanzado', () => {
+    expect(canAttachProof(ResourceOfferStatus.Declined, null, 0)).toBe(false);
+    expect(canAttachProof(ResourceOfferStatus.Cancelled, null, 0)).toBe(false);
+    expect(canAttachProof(ResourceOfferStatus.Accepted, ResourceOfferProofStatus.Approved, 1)).toBe(
+      false,
+    );
+    expect(canAttachProof(ResourceOfferStatus.Offered, null, RESOURCE_OFFER_PROOF_MAX_FILES)).toBe(
+      false,
+    );
+  });
+
+  it('solo se valida una prueba pending', () => {
+    expect(canValidateProof(ResourceOfferProofStatus.Pending)).toBe(true);
+    expect(canValidateProof(ResourceOfferProofStatus.Approved)).toBe(false);
+    expect(canValidateProof(ResourceOfferProofStatus.Rejected)).toBe(false);
+    expect(canValidateProof(null)).toBe(false);
   });
 });

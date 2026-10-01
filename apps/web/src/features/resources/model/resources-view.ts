@@ -1,7 +1,9 @@
 import {
+  RESOURCE_OFFER_PROOF_MAX_FILES,
   ResourceCategory,
   ResourceDeliveryStatus,
   ResourceNeedStatus,
+  ResourceOfferProofStatus,
   ResourceOfferStatus,
 } from '@adoptafacil/contracts';
 
@@ -100,4 +102,37 @@ export function manageResourceNeedHref(id: string): string {
  */
 export function remainingQuantity(quantityNeeded: number, quantityFulfilled: number): number {
   return Math.max(0, quantityNeeded - quantityFulfilled);
+}
+
+export const PROOF_STATUS_LABELS: Record<ResourceOfferProofStatus, string> = {
+  [ResourceOfferProofStatus.Pending]: 'Prueba por validar',
+  [ResourceOfferProofStatus.Approved]: 'Prueba aprobada',
+  [ResourceOfferProofStatus.Rejected]: 'Prueba rechazada',
+};
+
+export function proofStatusVariant(
+  status: ResourceOfferProofStatus,
+): 'success' | 'secondary' | 'destructive' {
+  switch (status) {
+    case ResourceOfferProofStatus.Approved:
+      return 'success';
+    case ResourceOfferProofStatus.Rejected:
+      return 'destructive';
+    default:
+      return 'secondary';
+  }
+}
+
+/** El donante puede (re)adjuntar prueba mientras la oferta siga viva y la
+ *  prueba no esté aprobada (espeja `canAttachProof` del backend). */
+export function donorCanAttachProof(
+  status: ResourceOfferStatus,
+  proofStatus: ResourceOfferProofStatus | undefined,
+  proofCount: number,
+): boolean {
+  return (
+    (status === ResourceOfferStatus.Offered || status === ResourceOfferStatus.Accepted) &&
+    proofStatus !== ResourceOfferProofStatus.Approved &&
+    proofCount < RESOURCE_OFFER_PROOF_MAX_FILES
+  );
 }
