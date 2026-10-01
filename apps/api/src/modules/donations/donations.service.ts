@@ -261,16 +261,21 @@ export class DonationsService {
     // the webhook is the sole, exactly-once writer of 'approved'/'declined'
     // (its `apply_donation_webhook`'s `WHERE status = 'pending'` guard is
     // also what gates receipt issuance, so the DB write here must stay
-    // untouched). But MercadoPago's Orders API often already KNOWS the
-    // outcome synchronously (e.g. a card decline, T-OrdersAPI) — surfacing
-    // that in THIS response only (never persisted) lets the donor see the
-    // real result immediately instead of a misleading "confirmando tu pago"
-    // for an already-failed charge. The webhook still arrives afterward and
-    // does the real, once-only DB transition + receipt issuance, unchanged.
+    // untouched). But MercadoPago's Orders API often already KNOWS a DECLINE
+    // synchronously (T-OrdersAPI) — surfacing THAT in this response only
+    // (never persisted) lets the donor see the real result immediately
+    // instead of a misleading "confirmando tu pago" for an already-failed
+    // charge. An 'approved' outcome is deliberately NOT surfaced the same
+    // way: "confirmando tu pago" is still an honest message for it (the
+    // webhook remains the one source that actually settles/issues the
+    // receipt), and `FakePaymentAdapter.createCollection` always returns
+    // 'approved' (its own deterministic double, see `payments.ts`) — eagerly
+    // trusting that here would make every donation in every test/dev run
+    // built on the fake driver show as already-settled before the webhook
+    // ever runs, which is exactly the scenario the integration suite's
+    // "pending → webhook → approved" flow exists to verify.
     const immediateStatus: DonationStatus | undefined =
-      collection.status === 'approved' || collection.status === 'declined'
-        ? collection.status
-        : undefined;
+      collection.status === 'declined' ? collection.status : undefined;
 
     // `paymentLinkUrl` is attached ONLY here, on the just-created object this
     // method returns — never persisted (see the field's doc comment on

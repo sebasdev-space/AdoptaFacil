@@ -238,8 +238,13 @@ describe('DonationsService.create — paymentLinkUrl (checkout redirect fix)', (
  * discovered live showed the gateway's SYNCHRONOUS response already knows
  * the outcome, and it was being silently discarded — the donor saw a
  * misleading "confirmando tu pago" instead of "tu pago no fue aprobado" for
- * an already-failed charge. `create()` must surface that known outcome in
- * ITS OWN RETURN VALUE ONLY (never written to the DB here).
+ * an already-failed charge. `create()` must surface a DECLINE in ITS OWN
+ * RETURN VALUE ONLY (never written to the DB here). An 'approved' outcome is
+ * deliberately NOT surfaced the same way (regression found via CI,
+ * 2026-10-01): `FakePaymentAdapter.createCollection` always returns
+ * 'approved', so eagerly trusting it here made every donation in the
+ * integration suite appear already-settled before the webhook ever ran,
+ * breaking the "pending → webhook → approved" flow those tests verify.
  */
 describe('DonationsService.create — surfaces a synchronously-known gateway outcome (T-OrdersAPI)', () => {
   function donationRow() {
@@ -279,7 +284,7 @@ describe('DonationsService.create — surfaces a synchronously-known gateway out
     expect(result.status).toBe('declined');
   });
 
-  it('returns status "approved" when the gateway already approved it synchronously', async () => {
+  it('does NOT surface an "approved" gateway outcome immediately — stays "pending" like the DB row (regression: FakePaymentAdapter always returns approved)', async () => {
     const h = makeService();
     h.createCollection.mockResolvedValueOnce({ collectionId: 'col-1', status: 'approved' });
     h.queryRaw.mockResolvedValueOnce([]);
@@ -291,7 +296,7 @@ describe('DonationsService.create — surfaces a synchronously-known gateway out
       payer: { fullName: 'Invitado Test', email: 'guest@test.dev' },
     });
 
-    expect(result.status).toBe('approved');
+    expect(result.status).toBe('pending');
   });
 
   it('falls back to the DB row\'s "pending" status for any non-terminal gateway outcome', async () => {
