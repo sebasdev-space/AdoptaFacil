@@ -104,4 +104,65 @@ describe('OfferResourcePage', () => {
     expect(await screen.findByText('Cantidad inválida')).toBeInTheDocument();
     expect(calls.some((c) => c.init?.method === 'POST')).toBe(false);
   });
+
+  it('attaches the donor proof (photo/invoice) to the new offer via multipart', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    stubFetch((url, init) => {
+      calls.push({ url, init });
+      if (init?.method === 'POST' && url.endsWith('/resources/offers')) {
+        return {
+          id: 'off-9',
+          organizationId: 'org-1',
+          needId: 'need-1',
+          donorUserId: 'donor-1',
+          quantityOffered: 3,
+          status: ResourceOfferStatus.Offered,
+          createdAt: '2026-10-01T00:00:00.000Z',
+          updatedAt: '2026-10-01T00:00:00.000Z',
+        };
+      }
+      return { id: 'proof-1' };
+    });
+    renderShell({
+      route:
+        '/ofrecer?needId=need-1&needTitle=Alimento%20para%20gatos&unit=kg&organizationName=Refugio%20Patitas',
+      ...AUTH,
+    });
+
+    fireEvent.change(await screen.findByLabelText('Cantidad (kg)'), { target: { value: '3' } });
+    const file = new File(['bytes'], 'factura.png', { type: 'image/png' });
+    fireEvent.change(screen.getByLabelText(/Prueba: foto o factura/), {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar oferta' }));
+
+    await waitFor(() => {
+      const proofCall = calls.find((c) => c.url.endsWith('/resources/offers/off-9/proofs'));
+      expect(proofCall?.init?.method).toBe('POST');
+      expect(proofCall?.init?.body).toBeInstanceOf(FormData);
+      expect((proofCall?.init?.body as FormData).get('file')).toBeTruthy();
+    });
+    expect(await screen.findByText('¡Gracias por tu ofrecimiento!')).toBeInTheDocument();
+  });
+
+  it('blocks a disallowed proof file type before calling the API', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    stubFetch((url, init) => {
+      calls.push({ url, init });
+      return {};
+    });
+    renderShell({
+      route:
+        '/ofrecer?needId=need-1&needTitle=Alimento%20para%20gatos&unit=kg&organizationName=Refugio%20Patitas',
+      ...AUTH,
+    });
+
+    fireEvent.change(await screen.findByLabelText('Cantidad (kg)'), { target: { value: '3' } });
+    const bad = new File(['x'], 'virus.exe', { type: 'application/x-msdownload' });
+    fireEvent.change(screen.getByLabelText(/Prueba: foto o factura/), { target: { files: [bad] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar oferta' }));
+
+    expect(await screen.findByText('Archivo no válido')).toBeInTheDocument();
+    expect(calls.some((c) => c.init?.method === 'POST')).toBe(false);
+  });
 });

@@ -1,6 +1,8 @@
 import {
+  RESOURCE_OFFER_PROOF_MAX_FILES,
   ResourceDeliveryStatus,
   ResourceNeedStatus,
+  ResourceOfferProofStatus,
   ResourceOfferStatus,
 } from '@adoptafacil/contracts';
 
@@ -65,4 +67,30 @@ export function canTransitionDelivery(
   _to: ResourceDeliveryStatus.Completed | ResourceDeliveryStatus.Cancelled,
 ): boolean {
   return from === ResourceDeliveryStatus.Scheduled;
+}
+
+/** El donante solo puede adjuntar prueba mientras la oferta siga viva
+ *  (`offered`/`accepted`), la prueba no esté ya aprobada (terminal) y no
+ *  exceda el máximo de archivos. Espeja el guard SQL de
+ *  `add_resource_offer_proof`. */
+export function canAttachProof(
+  offerStatus: ResourceOfferStatus,
+  proofStatus: ResourceOfferProofStatus | null | undefined,
+  currentCount: number,
+): boolean {
+  const alive =
+    offerStatus === ResourceOfferStatus.Offered || offerStatus === ResourceOfferStatus.Accepted;
+  return (
+    alive &&
+    proofStatus !== ResourceOfferProofStatus.Approved &&
+    currentCount < RESOURCE_OFFER_PROOF_MAX_FILES
+  );
+}
+
+/** La organización solo valida una prueba `pending` (aprobada/rechazada son
+ *  decisiones finales hasta que el donante adjunte una nueva). */
+export function canValidateProof(
+  proofStatus: ResourceOfferProofStatus | null | undefined,
+): boolean {
+  return proofStatus === ResourceOfferProofStatus.Pending;
 }

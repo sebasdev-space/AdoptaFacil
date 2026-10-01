@@ -156,6 +156,16 @@ export interface ResourceOffer {
   quantityOffered: number;
   message?: string;
   status: ResourceOfferStatus;
+  /** Validación de la prueba (foto/factura) adjunta; ausente = sin prueba. */
+  proofStatus?: ResourceOfferProofStatus;
+  /** Quién validó (solo lado organización). */
+  proofValidatedByUserId?: string;
+  /** UTC. */
+  proofValidatedAt?: string;
+  /** Motivo de la decisión (obligatorio al rechazar). */
+  proofValidationReason?: string;
+  /** Cuántos archivos de prueba tiene adjuntos. */
+  proofCount?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -271,4 +281,40 @@ export interface CreateResourceDeliveryEvidenceInput {
 export interface ResourceDeliveryEvidenceUploadResult {
   evidence: ResourceDeliveryEvidence;
   upload: { url: string; key: string };
+}
+
+// ============================================================================
+// Prueba del donante (foto/factura) al OFRECER + validación EXPLÍCITA por la
+// organización, distinta de completar la entrega. El archivo es PRIVADO
+// (puede ser una factura) y se sirve por un endpoint gateado por RBAC.
+// TODO(client): ¿la aprobación de la prueba debe ser requisito para completar
+// la entrega? Hoy NO la gatea (el documento base no lo fija).
+// ============================================================================
+
+/** `pending` (recién adjuntada) -> `approved` | `rejected`. Adjuntar una nueva
+ *  prueba tras un rechazo la devuelve a `pending`. Una aprobada es terminal. */
+export enum ResourceOfferProofStatus {
+  Pending = 'pending',
+  Approved = 'approved',
+  Rejected = 'rejected',
+}
+
+/** Máximo de archivos de prueba por oferta. */
+export const RESOURCE_OFFER_PROOF_MAX_FILES = 5;
+
+export interface ResourceOfferProof {
+  id: string;
+  organizationId: string;
+  offerId: string;
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+/** La organización aprueba o rechaza la prueba. `reason` es obligatorio al
+ *  rechazar (Owner/Administrator/Operator). */
+export interface ValidateResourceOfferProofInput {
+  decision: 'approve' | 'reject';
+  reason?: string;
 }

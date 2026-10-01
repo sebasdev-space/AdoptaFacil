@@ -44,24 +44,60 @@ model ResourceNeed {
 /// el de la fila. Sin idempotencyKey: no hay reintento de gateway que
 /// duplicar (a diferencia de M05).
 model ResourceOffer {
-  id              String   @id @default(uuid()) @db.Uuid
-  organizationId  String   @map("organization_id") @db.Uuid
-  needId          String   @map("need_id") @db.Uuid
-  donorUserId     String   @map("donor_user_id") @db.Uuid
-  quantityOffered Int      @map("quantity_offered")
-  message         String?
+  id                     String    @id @default(uuid()) @db.Uuid
+  organizationId         String    @map("organization_id") @db.Uuid
+  needId                 String    @map("need_id") @db.Uuid
+  donorUserId            String    @map("donor_user_id") @db.Uuid
+  quantityOffered        Int       @map("quantity_offered")
+  message                String?
   /// ResourceOfferStatus como texto.
-  status          String   @default("offered")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  status                 String    @default("offered")
+  /// Validación EXPLÍCITA de la prueba (foto/factura) que adjunta el donante,
+  /// distinta de completar la entrega. ResourceOfferProofStatus como texto;
+  /// null = el donante no ha adjuntado prueba. Adjuntar una nueva prueba
+  /// (p. ej. tras un rechazo) la devuelve a `pending` y limpia la decisión.
+  proofStatus            String?   @map("proof_status")
+  proofValidatedByUserId String?   @map("proof_validated_by_user_id") @db.Uuid
+  /// UTC.
+  proofValidatedAt       DateTime? @map("proof_validated_at")
+  proofValidationReason  String?   @map("proof_validation_reason")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime  @updatedAt @map("updated_at")
 
-  need     ResourceNeed      @relation(fields: [needId], references: [id], onDelete: Cascade)
+  need     ResourceNeed         @relation(fields: [needId], references: [id], onDelete: Cascade)
   delivery ResourceDelivery?
+  proofs   ResourceOfferProof[]
 
   @@index([organizationId])
   @@index([needId])
   @@index([donorUserId])
   @@map("resource_offers")
+}
+
+/// Prueba (foto/factura) que el donante adjunta a su oferta (tenant-scoped,
+/// RLS; `organizationId` = organización BENEFICIARIA). Append-only: el donante
+/// la inserta vía función SECURITY DEFINER (`add_resource_offer_proof`,
+/// cross-tenant por identidad) y la organización solo la lee y la valida (la
+/// decisión vive en `ResourceOffer.proof*`). El archivo es PRIVADO en
+/// StoragePort (puede ser una factura) y se sirve por un endpoint del módulo
+/// gateado por RBAC + tenant, nunca por `/storage/public`.
+model ResourceOfferProof {
+  id               String   @id @default(uuid()) @db.Uuid
+  organizationId   String   @map("organization_id") @db.Uuid
+  offerId          String   @map("offer_id") @db.Uuid
+  uploadedByUserId String   @map("uploaded_by_user_id") @db.Uuid
+  filename         String
+  contentType      String   @map("content_type")
+  sizeBytes        Int      @map("size_bytes")
+  /// Clave de StoragePort (nunca la ruta de disco ni una URL firmada).
+  storageRef       String   @map("storage_ref")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  offer ResourceOffer @relation(fields: [offerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([offerId])
+  @@map("resource_offer_proofs")
 }
 
 /// Entrega coordinada por la organización (tenant-scoped, RLS) — se crea

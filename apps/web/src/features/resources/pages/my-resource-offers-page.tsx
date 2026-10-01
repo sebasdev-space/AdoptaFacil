@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import type { ResourceOfferWithNeed } from '@adoptafacil/contracts';
 import {
   Badge,
+  Button,
   Card,
   CardContent,
   CardHeader,
@@ -11,13 +12,18 @@ import {
   Skeleton,
   buttonVariants,
   cn,
+  useToast,
 } from '@adoptafacil/ui';
 import { PageContainer, PageHeader } from '../../_layout';
 import { useApiClient } from '../../../shell/api';
+import { EVIDENCE_ACCEPT, uploadOfferProof, validateProofFiles } from '../lib/storage';
 import {
   DELIVERY_STATUS_LABELS,
   OFFER_STATUS_LABELS,
+  PROOF_STATUS_LABELS,
+  donorCanAttachProof,
   offerStatusVariant,
+  proofStatusVariant,
 } from '../model/resources-view';
 
 /**
@@ -28,9 +34,12 @@ import {
  */
 export function MyResourceOffersPage() {
   const client = useApiClient();
+  const { toast } = useToast();
   const [offers, setOffers] = useState<ResourceOfferWithNeed[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -47,7 +56,28 @@ export function MyResourceOffersPage() {
     return () => {
       active = false;
     };
-  }, [client]);
+  }, [client, reloadKey]);
+
+  const attachProof = async (offer: ResourceOfferWithNeed, files: File[]): Promise<void> => {
+    const invalid = validateProofFiles(files, offer.proofCount ?? 0);
+    if (invalid) {
+      toast({ title: 'Archivo no válido', description: invalid, variant: 'warning' });
+      return;
+    }
+    try {
+      for (const file of files) {
+        await uploadOfferProof(client, offer.id, file);
+      }
+      toast({ title: 'Prueba enviada a la organización', variant: 'success' });
+      setReloadKey((n) => n + 1);
+    } catch (err) {
+      toast({
+        title: 'No se pudo adjuntar la prueba',
+        description: err instanceof Error ? err.message : 'Inténtalo de nuevo.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   return (
     <PageContainer>
@@ -92,11 +122,66 @@ export function MyResourceOffersPage() {
                     </Badge>
                   )}
                 </div>
+                {offer.proofStatus && (
+                  <div className="space-y-1" data-testid="my-offer-proof">
+                    <Badge variant={proofStatusVariant(offer.proofStatus)}>
+                      {PROOF_STATUS_LABELS[offer.proofStatus]}
+                    </Badge>
+                    {offer.proofValidationReason && (
+                      <p className="text-xs text-muted-foreground">
+                        Motivo: {offer.proofValidationReason}
+                      </p>
+                    )}
+                  </div>
+                )}
+                {donorCanAttachProof(offer.status, offer.proofStatus, offer.proofCount ?? 0) && (
+                  <ProofPicker
+                    offerId={offer.id}
+                    label={offer.proofStatus ? 'Adjuntar otra prueba' : 'Adjuntar prueba'}
+                    onSubmit={(files) => attachProof(offer, files)}
+                  />
+                )}
               </CardContent>
             </Card>
           ))}
         </div>
       )}
     </PageContainer>
+  );
+}
+
+/** Selector de archivos de prueba (foto/factura) + botón de envío. */
+function ProofPicker({
+  offerId,
+  label,
+  onSubmit,
+}: {
+  offerId: string;
+  label: string;
+  onSubmit: (files: File[]) => void;
+}) {
+  const [files, setFiles] = useState<File[]>([]);
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <input
+        type="file"
+        multiple
+        aria-label={`Archivos de prueba de la oferta ${offerId}`}
+        accept={EVIDENCE_ACCEPT.join(',')}
+        onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+        className="text-xs text-foreground file:mr-2 file:rounded-md file:border file:border-input file:bg-background file:px-2 file:py-1 file:text-xs"
+      />
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={files.length === 0}
+        onClick={() => {
+          onSubmit(files);
+          setFiles([]);
+        }}
+      >
+        {label}
+      </Button>
+    </div>
   );
 }

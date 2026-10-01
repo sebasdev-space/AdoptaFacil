@@ -13,3 +13,14 @@ export const decideResourceOfferSchema = z
     decision: z.enum(['accept', 'decline']),
   })
   .strict();
+
+export const validateResourceOfferProofSchema = z
+  .object({
+    decision: z.enum(['approve', 'reject']),
+    reason: z.string().trim().max(1000).optional(),
+  })
+  .strict()
+  .refine((v) => v.decision === 'approve' || (v.reason !== undefined && v.reason.length > 0), {
+    message: 'Indica el motivo del rechazo.',
+    path: ['reason'],
+  });
