@@ -1,7 +1,17 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import {
   Role,
   type AdoptionRequest,
+  type HistoryPage,
   type CreateAdoptionRequestInput,
   type TransitionAdoptionRequestInput,
 } from '@adoptafacil/contracts';
@@ -12,7 +22,12 @@ import { ZodValidationPipe } from '../../core/auth/zod-validation.pipe';
 import { Roles } from '../../core/rbac/roles.decorator';
 import { RolesGuard } from '../../core/rbac/roles.guard';
 import { AdoptionsService } from './adoptions.service';
-import { createAdoptionRequestSchema, transitionAdoptionRequestSchema } from './adoptions.schemas';
+import {
+  createAdoptionRequestSchema,
+  listAdoptionsQuerySchema,
+  transitionAdoptionRequestSchema,
+  type ListAdoptionsQuery,
+} from './adoptions.schemas';
 
 /** Roles that EVALUATE requests on the org kanban (§12/§13 matrix). */
 const EVAL_ROLES = [Role.Owner, Role.Administrator, Role.Operator] as const;
@@ -39,12 +54,17 @@ export class AdoptionsController {
     return this.service.create(actor, dto);
   }
 
-  /** The org's requests for the evaluation kanban. */
+  /**
+   * The org's requests for the evaluation kanban. Default = last 30 days (array);
+   * `?page=` switches to the paged full history (`from`/`to`/`status` filters).
+   */
   @Get()
   @UseGuards(RolesGuard)
   @Roles(...EVAL_ROLES)
-  list(): Promise<AdoptionRequest[]> {
-    return this.service.listForOrg();
+  list(
+    @Query(new ZodValidationPipe(listAdoptionsQuerySchema)) query: ListAdoptionsQuery,
+  ): Promise<AdoptionRequest[] | HistoryPage<AdoptionRequest>> {
+    return this.service.listForOrg(query);
   }
 
   /**

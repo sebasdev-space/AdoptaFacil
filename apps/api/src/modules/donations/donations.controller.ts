@@ -17,6 +17,7 @@ import {
   type DonationCertificate,
   type DonationReceipt,
   type DonationWithReceipt,
+  type HistoryPage,
   type WebhookVerificationContext,
 } from '@adoptafacil/contracts';
 import type { RequestUser } from '../../core/auth/auth.types';
@@ -28,7 +29,11 @@ import { Roles } from '../../core/rbac/roles.decorator';
 import { RolesGuard } from '../../core/rbac/roles.guard';
 import { DonationsService, type WebhookOutcome } from './donations.service';
 import { DonationCertificatesService } from './donation-certificates.service';
-import { createDonationSchema } from './donations.schemas';
+import {
+  createDonationSchema,
+  listReceivedDonationsQuerySchema,
+  type ListReceivedDonationsQuery,
+} from './donations.schemas';
 
 /** Roles that VIEW the org's received donations/receipts (§13) — org set
  *  (Owner/Administrator/Operator), NOT the platform admin. */
@@ -72,8 +77,11 @@ export class DonationsController {
   @Get('received')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(...MANAGE_ROLES)
-  listReceived(): Promise<DonationWithReceipt[]> {
-    return this.service.listReceived();
+  listReceived(
+    @Query(new ZodValidationPipe(listReceivedDonationsQuerySchema))
+    query: ListReceivedDonationsQuery,
+  ): Promise<DonationWithReceipt[] | HistoryPage<DonationWithReceipt>> {
+    return this.service.listReceived(query);
   }
 
   /** The donor's own donations (cross-tenant, by identity). */

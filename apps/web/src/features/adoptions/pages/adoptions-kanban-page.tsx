@@ -10,10 +10,22 @@ import {
   Skeleton,
   useToast,
 } from '@adoptafacil/ui';
-import { PageContainer, PageHeader } from '../../_layout';
+import {
+  EMPTY_HISTORY_FILTERS,
+  HistoryControls,
+  PageContainer,
+  PageHeader,
+  historyQueryString,
+  normalizeHistoryPage,
+  type HistoryFilters,
+} from '../../_layout';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
-import { listAdoptionRequests, transitionAdoptionRequest } from '../api/adoptions-api';
+import {
+  listAdoptionRequests,
+  listAdoptionRequestsHistory,
+  transitionAdoptionRequest,
+} from '../api/adoptions-api';
 import { AdoptionContractPanel } from '../components/adoption-contract-panel';
 import { ApplicantDetailModal } from '../components/applicant-detail-modal';
 import {
@@ -46,15 +58,28 @@ export function AdoptionsKanbanPage() {
   const [detailRequestId, setDetailRequestId] = useState<string | null>(null);
   const detailRequest = requests.find((r) => r.id === detailRequestId) ?? null;
 
+  // Hallazgo del cliente: por defecto solo los últimos 30 días (el API aplica el
+  // default); "Ver todo" abre filtros + paginación sobre el historial completo.
+  const [showAll, setShowAll] = useState(false);
+  const [filters, setFilters] = useState<HistoryFilters>(EMPTY_HISTORY_FILTERS);
+  const [total, setTotal] = useState(0);
+
   const load = useCallback(() => {
     setLoading(true);
-    listAdoptionRequests(client)
+    const request = showAll
+      ? listAdoptionRequestsHistory(client, historyQueryString(filters)).then((body) => {
+          const page = normalizeHistoryPage<AdoptionRequest>(body);
+          setTotal(page.total);
+          return page.items;
+        })
+      : listAdoptionRequests(client);
+    request
       .then(setRequests)
       .catch(() =>
         toast({ title: 'No se pudieron cargar las solicitudes', variant: 'destructive' }),
       )
       .finally(() => setLoading(false));
-  }, [client, toast]);
+  }, [client, toast, showAll, filters]);
 
   useEffect(() => {
     if (canEvaluate) load();
@@ -94,6 +119,21 @@ export function AdoptionsKanbanPage() {
       <PageHeader
         title="Adopciones"
         description="Tablero de evaluación: mueve cada solicitud por sus estados. Las transiciones quedan auditadas."
+      />
+      <HistoryControls
+        showAll={showAll}
+        onShowAll={() => setShowAll(true)}
+        onBackToRecent={() => {
+          setShowAll(false);
+          setFilters(EMPTY_HISTORY_FILTERS);
+        }}
+        filters={filters}
+        onFiltersChange={setFilters}
+        statusOptions={ADOPTION_COLUMNS.map((s) => ({
+          value: s,
+          label: ADOPTION_STATUS_LABELS[s],
+        }))}
+        total={total}
       />
       <div className={styles.board}>
         {ADOPTION_COLUMNS.map((column) => {

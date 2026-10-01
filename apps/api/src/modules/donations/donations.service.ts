@@ -20,12 +20,15 @@ import {
   type DonationPublicStatus,
   type DonationWithReceipt,
   type GuestDonationAccess,
+  type HistoryPage,
   type NormalizedWebhookEvent,
   type PaymentBreakdown,
   type PaymentConcept,
   type PaymentPort,
   type WebhookVerificationContext,
 } from '@adoptafacil/contracts';
+import { createdAtFilter, resolveHistoryWindow } from '../../core/pagination/history-query';
+import type { ListReceivedDonationsQuery } from './donations.schemas';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../core/tenant/tenant-context.service';
 import { AuditService } from '../../core/audit/audit.service';
@@ -513,17 +516,37 @@ export class DonationsService {
     }
   }
 
-  /** The beneficiary org's received donations with their receipts (RLS-scoped). */
-  async listReceived(): Promise<DonationWithReceipt[]> {
+  /**
+   * The beneficiary org's received donations with their receipts (RLS-scoped).
+   * Default (no params) = last 30 days as a plain array; `page` => paged
+   * envelope over the full history, optionally filtered by `from`/`to`/`status`.
+   */
+  async listReceived(
+    query: ListReceivedDonationsQuery = {},
+    now: Date = new Date(),
+  ): Promise<DonationWithReceipt[] | HistoryPage<DonationWithReceipt>> {
     const organizationId = this.requireOrgId();
-    const rows = await this.prisma.withOrgContext(organizationId, (tx) =>
-      tx.donation.findMany({
-        where: { organizationId },
-        orderBy: { createdAt: 'desc' },
-        include: { receipt: true },
-      }),
+    const w = resolveHistoryWindow(query, now);
+    const createdAt = createdAtFilter(w);
+    const where: Prisma.DonationWhereInput = {
+      organizationId,
+      ...(createdAt && { createdAt }),
+      ...(query.status && { status: query.status }),
+    };
+    const [rows, total] = await this.prisma.withOrgContext(organizationId, (tx) =>
+      Promise.all([
+        tx.donation.findMany({
+          where,
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          include: { receipt: true },
+          take: w.take,
+          skip: w.skip,
+        }),
+        w.paged ? tx.donation.count({ where }) : Promise.resolve(0),
+      ]),
     );
-    return rows.map((r) => this.fromModel(r));
+    const items = rows.map((r) => this.fromModel(r));
+    return w.paged ? { items, total, page: w.page, pageSize: w.take } : items;
   }
 
   /**

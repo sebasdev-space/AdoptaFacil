@@ -1,9 +1,17 @@
 import { useEffect, useState } from 'react';
 import type { DonationWithReceipt } from '@adoptafacil/contracts';
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Skeleton } from '@adoptafacil/ui';
-import { PageContainer, PageHeader } from '../../_layout';
+import {
+  EMPTY_HISTORY_FILTERS,
+  HistoryControls,
+  PageContainer,
+  PageHeader,
+  historyQueryString,
+  normalizeHistoryPage,
+  type HistoryFilters,
+} from '../../_layout';
 import { useApiClient } from '../../../shell/api';
-import { listReceivedDonations } from '../api/donations-api';
+import { listReceivedDonations, listReceivedDonationsHistory } from '../api/donations-api';
 import { ReceivedDonationDetailModal } from '../components/received-donation-detail-modal';
 import { formatBogota, formatCop } from '../model/donation-breakdown-view';
 import { DONATION_STATUS_BADGE_VARIANT, DONATION_STATUS_LABELS } from '../model/my-donations-view';
@@ -36,12 +44,29 @@ export function ReceivedDonationsPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const detailDonation = donations.find((d) => d.id === detailId) ?? null;
 
+  // Hallazgo del cliente: por defecto solo los últimos 30 días (default del API);
+  // "Ver todo" abre filtros + paginación sobre el historial completo.
+  const [showAll, setShowAll] = useState(false);
+  const [filters, setFilters] = useState<HistoryFilters>(EMPTY_HISTORY_FILTERS);
+  const [total, setTotal] = useState(0);
+
   useEffect(() => {
     let active = true;
+    setLoading(true);
+    setError(false);
     void (async () => {
       try {
-        const body = await listReceivedDonations(client);
-        if (active) setDonations(normalizeReceivedDonations(body));
+        if (showAll) {
+          const body = await listReceivedDonationsHistory(client, historyQueryString(filters));
+          const page = normalizeHistoryPage<DonationWithReceipt>(body);
+          if (active) {
+            setDonations(normalizeReceivedDonations(page.items));
+            setTotal(page.total);
+          }
+        } else {
+          const body = await listReceivedDonations(client);
+          if (active) setDonations(normalizeReceivedDonations(body));
+        }
       } catch {
         if (active) setError(true);
       } finally {
@@ -51,7 +76,7 @@ export function ReceivedDonationsPage() {
     return () => {
       active = false;
     };
-  }, [client]);
+  }, [client, showAll, filters]);
 
   return (
     <PageContainer>
@@ -64,6 +89,23 @@ export function ReceivedDonationsPage() {
           <CardTitle>Historial</CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="mb-4">
+            <HistoryControls
+              showAll={showAll}
+              onShowAll={() => setShowAll(true)}
+              onBackToRecent={() => {
+                setShowAll(false);
+                setFilters(EMPTY_HISTORY_FILTERS);
+              }}
+              filters={filters}
+              onFiltersChange={setFilters}
+              statusOptions={(['pending', 'approved', 'declined'] as const).map((s) => ({
+                value: s,
+                label: DONATION_STATUS_LABELS[s],
+              }))}
+              total={total}
+            />
+          </div>
           {loading && <Skeleton className="h-64 w-full" />}
           {!loading && error && (
             <p className="text-sm text-destructive">
@@ -72,7 +114,9 @@ export function ReceivedDonationsPage() {
           )}
           {!loading && !error && donations.length === 0 && (
             <p className="text-sm text-muted-foreground">
-              Tu organización aún no ha recibido ninguna donación.
+              {showAll
+                ? 'No hay donaciones que coincidan con los filtros.'
+                : 'Tu organización no ha recibido donaciones en los últimos 30 días.'}
             </p>
           )}
           {!loading && !error && donations.length > 0 && (

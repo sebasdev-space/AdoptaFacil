@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { ADOPTION_MESSAGE_MIN_LENGTH, ADOPTION_STATUSES } from '@adoptafacil/contracts';
+import {
+  ADOPTION_MESSAGE_MIN_LENGTH,
+  ADOPTION_STATUSES,
+  type AdoptionStatus,
+} from '@adoptafacil/contracts';
+import { historyQuerySchema } from '../../core/pagination/history-query';
 
 /** Runtime validation for M04 adoption requests (T-028a). `.strict()` rejects
  *  unknown keys so no extra field can be smuggled in. */
@@ -44,3 +49,10 @@ export const transitionAdoptionRequestSchema = z
     reason: z.string().trim().max(1000).optional(),
   })
   .strict();
+
+/** Query of `GET /adoptions` (history window, status filter and pager) — all
+ *  optional/additive; no params = last 30 days (see core/pagination). */
+export const listAdoptionsQuerySchema = historyQuerySchema(
+  ADOPTION_STATUSES as unknown as readonly [AdoptionStatus, ...AdoptionStatus[]],
+);
+export type ListAdoptionsQuery = z.infer<typeof listAdoptionsQuerySchema>;

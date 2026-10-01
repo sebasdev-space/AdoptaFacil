@@ -5,6 +5,7 @@ import type {
   DonationReceipt,
   DonationWithReceipt,
   GuestDonationAccess,
+  HistoryPage,
 } from '@adoptafacil/contracts';
 import type { ApiClient } from '../../../shell/api';
 
@@ -23,6 +24,14 @@ export function createDonation(client: ApiClient, input: CreateDonationInput): P
 /** The beneficiary org's received donations with their receipts (org roles). */
 export function listReceivedDonations(client: ApiClient): Promise<DonationWithReceipt[]> {
   return client.request<DonationWithReceipt[]>('/donations/received');
+}
+
+/** "Ver todo": full received history, paged, with date/status filters. */
+export function listReceivedDonationsHistory(
+  client: ApiClient,
+  query: string,
+): Promise<HistoryPage<DonationWithReceipt>> {
+  return client.request<HistoryPage<DonationWithReceipt>>(`/donations/received${query}`);
 }
 
 /** The donor's own donations (cross-tenant, by identity). */

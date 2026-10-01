@@ -87,6 +87,27 @@ describe('AdoptionsKanbanPage', () => {
     expect(post.mock.calls[0][0]).toContain('/adoptions/req-1/transitions');
   });
 
+  it('shows the last-30-days hint and "Ver todo" opens filters + pager over the paged history', async () => {
+    renderShell({ route: '/adopciones', ...sessionWith([Role.Owner]) });
+    expect(await screen.findByText('Mostrando los últimos 30 días.')).toBeInTheDocument();
+
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => ({ items: [REQUEST], total: 51, page: 1, pageSize: 25 }),
+      } as unknown as Response),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Ver todo' }));
+
+    expect(await screen.findByText(/Página 1 de 3 · 51 en total/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Desde')).toBeInTheDocument();
+    expect(screen.getByLabelText('Estado')).toBeInTheDocument();
+    expect(String(fetchMock.mock.calls.at(-1)?.[0])).toContain('/adoptions?page=1&pageSize=25');
+  });
+
   describe('F-MODAL-SOLICITANTE: applicant detail modal', () => {
     it('opens from the card and shows the REAL applicant/animal data the contract already exposes', async () => {
       renderShell({ route: '/adopciones', ...sessionWith([Role.Owner]) });

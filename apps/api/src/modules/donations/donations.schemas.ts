@@ -1,5 +1,8 @@
 import { z } from 'zod';
 import { MIN_DONATION_AMOUNT } from '@adoptafacil/contracts';
+import { historyQuerySchema } from '../../core/pagination/history-query';
+
+const DONATION_STATUSES_TUPLE = ['pending', 'approved', 'declined'] as const;
 
 /** Runtime validation for M05 donations (T-050). `.strict()` rejects unknown keys
  *  so no extra field (e.g. a client-supplied breakdown) can be smuggled in — the
@@ -39,3 +42,8 @@ export const createDonationSchema = z
     anonymous: z.boolean().optional().default(false),
   })
   .strict();
+
+/** Query of `GET /donations/received` (history window, status filter and pager)
+ *  — all optional/additive; no params = last 30 days (see core/pagination). */
+export const listReceivedDonationsQuerySchema = historyQuerySchema(DONATION_STATUSES_TUPLE);
+export type ListReceivedDonationsQuery = z.infer<typeof listReceivedDonationsQuerySchema>;

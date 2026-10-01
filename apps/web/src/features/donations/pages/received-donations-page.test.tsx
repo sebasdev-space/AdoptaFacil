@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Role } from '@adoptafacil/contracts';
@@ -219,8 +219,31 @@ describe('ReceivedDonationsPage', () => {
       await screen.findByRole('heading', { name: 'Donaciones recibidas' }),
     ).toBeInTheDocument();
     expect(
-      await screen.findByText('Tu organización aún no ha recibido ninguna donación.'),
+      await screen.findByText('Tu organización no ha recibido donaciones en los últimos 30 días.'),
     ).toBeInTheDocument();
+  });
+
+  it('defaults to the last 30 days (no query params) and "Ver todo" fetches the paged history with filters', async () => {
+    const urls: string[] = [];
+    stubFetch((url) => {
+      urls.push(url);
+      if (url.includes('page=')) return { items: [], total: 60, page: 1, pageSize: 25 };
+      return [];
+    });
+    renderShell({ route: '/donaciones-recibidas', ...orgSession() });
+
+    expect(await screen.findByText('Mostrando los últimos 30 días.')).toBeInTheDocument();
+    expect(urls.some((u) => u.endsWith('/donations/received'))).toBe(true);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Ver todo' }));
+    expect(await screen.findByText(/Página 1 de 3 · 60 en total/)).toBeInTheDocument();
+    expect(urls.some((u) => u.includes('/donations/received?page=1&pageSize=25'))).toBe(true);
+
+    await userEvent.selectOptions(screen.getByLabelText('Estado'), 'approved');
+    await waitFor(() => expect(urls.some((u) => u.includes('status=approved'))).toBe(true));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Siguiente' }));
+    await waitFor(() => expect(urls.some((u) => u.includes('page=2'))).toBe(true));
   });
 
   it('shows an error message (not a crash) when the fetch fails', async () => {

@@ -4,6 +4,7 @@ import type {
   AdoptionRequest,
   CreateAdoptionRequestInput,
   GenerateAdoptionContractInput,
+  HistoryPage,
   ScheduleFollowUpMilestoneInput,
   SignAdoptionContractInput,
   SubmitFollowUpInput,
@@ -21,6 +22,14 @@ import { ApiError, type ApiClient } from '../../../shell/api';
 /** Org kanban: the caller organization's adoption requests (RLS-scoped). */
 export function listAdoptionRequests(client: ApiClient): Promise<AdoptionRequest[]> {
   return client.request<AdoptionRequest[]>('/adoptions');
+}
+
+/** "Ver todo": full history, paged, with date/status filters (`query` = `?from=…&page=…`). */
+export function listAdoptionRequestsHistory(
+  client: ApiClient,
+  query: string,
+): Promise<HistoryPage<AdoptionRequest>> {
+  return client.request<HistoryPage<AdoptionRequest>>(`/adoptions${query}`);
 }
 
 /** F1-01 — the applicant's own requests (cross-tenant, by identity). */

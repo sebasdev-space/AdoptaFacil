@@ -19,3 +19,4 @@ export * from './community';
 export * from './reputation';
 export * from './portals';
 export * from './dashboards';
+export * from './history';

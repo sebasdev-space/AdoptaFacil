@@ -4,7 +4,7 @@ import type { AuditService } from '../../core/audit/audit.service';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { TenantContextService } from '../../core/tenant/tenant-context.service';
 import type { NotificationPort } from '../../core/notifications/notification.port';
-import type { PaymentPort } from '@adoptafacil/contracts';
+import type { DonationWithReceipt, HistoryPage, PaymentPort } from '@adoptafacil/contracts';
 import type { CampaignFundingService } from '../campaigns/campaign-funding.service';
 import type { DonationCertificatesService } from './donation-certificates.service';
 import { DonationsService } from './donations.service';
@@ -308,7 +308,7 @@ describe('DonationsService.listReceived — org-facing anonymity masking', () =>
     const findMany = jest.fn().mockResolvedValue([donationModel({ anonymous: false })]);
     h.withOrgContext.mockImplementation(async (_orgId, fn) => fn({ donation: { findMany } }));
 
-    const [row] = await h.service.listReceived();
+    const [row] = (await h.service.listReceived()) as DonationWithReceipt[];
 
     expect(row.anonymous).toBe(false);
     expect(row.payer).toEqual({ fullName: 'Donante Real', email: 'donante@test.dev' });
@@ -323,7 +323,7 @@ describe('DonationsService.listReceived — org-facing anonymity masking', () =>
     const findMany = jest.fn().mockResolvedValue([donationModel({ anonymous: true })]);
     h.withOrgContext.mockImplementation(async (_orgId, fn) => fn({ donation: { findMany } }));
 
-    const [row] = await h.service.listReceived();
+    const [row] = (await h.service.listReceived()) as DonationWithReceipt[];
 
     expect(row.anonymous).toBe(true);
     expect(row.payer).toBeUndefined();
@@ -343,11 +343,51 @@ describe('DonationsService.listReceived — org-facing anonymity masking', () =>
       .mockResolvedValue([donationModel({ anonymous: true, status: 'pending', receipt: null })]);
     h.withOrgContext.mockImplementation(async (_orgId, fn) => fn({ donation: { findMany } }));
 
-    const [row] = await h.service.listReceived();
+    const [row] = (await h.service.listReceived()) as DonationWithReceipt[];
 
     expect(row.anonymous).toBe(true);
     expect(row.payer).toBeUndefined();
     expect(row.receipt).toBeUndefined();
+  });
+});
+
+describe('DonationsService.listReceived — history window', () => {
+  const NOW = new Date('2026-09-30T12:00:00.000Z');
+
+  function setup(rows: unknown[] = [], total = 0) {
+    const h = makeService();
+    h.getOrganizationId.mockReturnValue('org-1');
+    const findMany = jest.fn().mockResolvedValue(rows);
+    const count = jest.fn().mockResolvedValue(total);
+    h.withOrgContext.mockImplementation(async (_orgId, fn) =>
+      fn({ donation: { findMany, count } }),
+    );
+    return { h, findMany, count };
+  }
+
+  it('defaults to the last 30 days (array, capped, no count query)', async () => {
+    const { h, findMany, count } = setup();
+    const result = await h.service.listReceived({}, NOW);
+    expect(Array.isArray(result)).toBe(true);
+    const args = findMany.mock.calls[0][0];
+    expect(args.where).toEqual({
+      organizationId: 'org-1',
+      createdAt: { gte: new Date('2026-08-31T12:00:00.000Z') },
+    });
+    expect(args.take).toBe(500);
+    expect(count).not.toHaveBeenCalled();
+  });
+
+  it('paged "Ver todo": envelope with total, no implicit date limit, status filter', async () => {
+    const { h, findMany } = setup([], 42);
+    const result = (await h.service.listReceived(
+      { page: 2, pageSize: 10, status: 'approved' },
+      NOW,
+    )) as HistoryPage<DonationWithReceipt>;
+    expect(result).toEqual({ items: [], total: 42, page: 2, pageSize: 10 });
+    const args = findMany.mock.calls[0][0];
+    expect(args.where).toEqual({ organizationId: 'org-1', status: 'approved' });
+    expect(args).toMatchObject({ take: 10, skip: 10 });
   });
 });
 

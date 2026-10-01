@@ -14,8 +14,11 @@ import type {
   AdoptionRequest,
   AdoptionStatus,
   CreateAdoptionRequestInput,
+  HistoryPage,
   TransitionAdoptionRequestInput,
 } from '@adoptafacil/contracts';
+import { createdAtFilter, resolveHistoryWindow } from '../../core/pagination/history-query';
+import type { ListAdoptionsQuery } from './adoptions.schemas';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../core/tenant/tenant-context.service';
 import { AuditService } from '../../core/audit/audit.service';
@@ -126,13 +129,36 @@ export class AdoptionsService {
     return this.fromRow(row);
   }
 
-  /** The org's own adoption requests for the evaluation kanban (RLS-scoped). */
-  async listForOrg(): Promise<AdoptionRequest[]> {
+  /**
+   * The org's adoption requests for the evaluation kanban (RLS-scoped). Default
+   * (no params) = last 30 days as a plain array; `page` => paged envelope over
+   * the full history, optionally filtered by `from`/`to`/`status`.
+   */
+  async listForOrg(
+    query: ListAdoptionsQuery = {},
+    now: Date = new Date(),
+  ): Promise<AdoptionRequest[] | HistoryPage<AdoptionRequest>> {
     const organizationId = this.requireOrgId();
-    const rows = await this.prisma.withOrgContext(organizationId, (tx) =>
-      tx.adoptionRequest.findMany({ where: { organizationId }, orderBy: { createdAt: 'desc' } }),
+    const w = resolveHistoryWindow(query, now);
+    const createdAt = createdAtFilter(w);
+    const where: Prisma.AdoptionRequestWhereInput = {
+      organizationId,
+      ...(createdAt && { createdAt }),
+      ...(query.status && { status: query.status }),
+    };
+    const [rows, total] = await this.prisma.withOrgContext(organizationId, (tx) =>
+      Promise.all([
+        tx.adoptionRequest.findMany({
+          where,
+          orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+          take: w.take,
+          skip: w.skip,
+        }),
+        w.paged ? tx.adoptionRequest.count({ where }) : Promise.resolve(0),
+      ]),
     );
-    return rows.map((r) => this.fromModel(r));
+    const items = rows.map((r) => this.fromModel(r));
+    return w.paged ? { items, total, page: w.page, pageSize: w.take } : items;
   }
 
   /**
