@@ -187,8 +187,16 @@ export class DonationsService {
     // Single source of the money math (RNF12); persisted verbatim.
     const breakdown = computeBreakdown(input.intendedAmount, input.commissionPayer);
 
-    // Process the collection through the port (fake in Ola 1). Ids are derived from
-    // the idempotency key, so a retry maps to the same collection.
+    // Split de Pagos 1:1 (T-OAuth-Connect): if the BENEFICIARY org connected
+    // its own MercadoPago account, route the charge directly to it — read
+    // ONLY the mp_user_id (never the tokens), cross-tenant, via a bounded
+    // SECURITY DEFINER function (same posture as `organizationNamesById`
+    // below). Absent ⇒ undefined ⇒ old single-account behavior, unchanged.
+    const sponsorMpUserId = await this.resolveSponsorMpUserId(input.organizationId);
+
+    // Process the collection through the port (fake in Ola 1; Checkout API/
+    // Orders for the real MercadoPago driver, T-OrdersAPI). Ids are derived
+    // from the idempotency key, so a retry maps to the same collection.
     const collection = await this.payment.createCollection({
       intendedAmount: input.intendedAmount,
       currency: 'COP',
@@ -196,6 +204,11 @@ export class DonationsService {
       commissionPayer: input.commissionPayer,
       payer: input.payer,
       idempotencyKey: input.idempotencyKey,
+      cardToken: input.cardToken,
+      paymentMethodId: input.paymentMethodId,
+      paymentMethodType: input.paymentMethodType,
+      installments: input.installments,
+      sponsorMpUserId,
     });
 
     let rows: DonationRow[];
@@ -244,11 +257,35 @@ export class DonationsService {
       },
     });
 
+    // `create_donation` ALWAYS seeds 'pending' (never a terminal status) —
+    // the webhook is the sole, exactly-once writer of 'approved'/'declined'
+    // (its `apply_donation_webhook`'s `WHERE status = 'pending'` guard is
+    // also what gates receipt issuance, so the DB write here must stay
+    // untouched). But MercadoPago's Orders API often already KNOWS a DECLINE
+    // synchronously (T-OrdersAPI) — surfacing THAT in this response only
+    // (never persisted) lets the donor see the real result immediately
+    // instead of a misleading "confirmando tu pago" for an already-failed
+    // charge. An 'approved' outcome is deliberately NOT surfaced the same
+    // way: "confirmando tu pago" is still an honest message for it (the
+    // webhook remains the one source that actually settles/issues the
+    // receipt), and `FakePaymentAdapter.createCollection` always returns
+    // 'approved' (its own deterministic double, see `payments.ts`) — eagerly
+    // trusting that here would make every donation in every test/dev run
+    // built on the fake driver show as already-settled before the webhook
+    // ever runs, which is exactly the scenario the integration suite's
+    // "pending → webhook → approved" flow exists to verify.
+    const immediateStatus: DonationStatus | undefined =
+      collection.status === 'declined' ? collection.status : undefined;
+
     // `paymentLinkUrl` is attached ONLY here, on the just-created object this
     // method returns — never persisted (see the field's doc comment on
     // `Donation`) and never present when the SAME row is read back later
     // (`fromRow` alone, used by `listMine`/`getByAccessToken`, never sets it).
-    return { ...this.fromRow(row), paymentLinkUrl: collection.paymentLinkUrl };
+    return {
+      ...this.fromRow(row),
+      ...(immediateStatus ? { status: immediateStatus } : {}),
+      paymentLinkUrl: collection.paymentLinkUrl,
+    };
   }
 
   /**
@@ -545,6 +582,21 @@ export class DonationsService {
     `);
     const orgNames = await this.organizationNamesById(rows.map((r) => r.organization_id));
     return rows.map((r) => this.fromRow(r, orgNames.get(r.organization_id)));
+  }
+
+  /**
+   * Split de Pagos 1:1 (T-OAuth-Connect) — looks up the ORG's own connected
+   * MercadoPago account id, cross-tenant, via the `mercadopago_account_mp_user_id`
+   * SECURITY DEFINER function (narrow: returns ONLY `mp_user_id`, never the
+   * access/refresh tokens — see its migration for the same posture as
+   * `mercadopago_accounts_due_for_refresh`). `undefined` when the org never
+   * connected an account (the common case in Ola 1) — never thrown.
+   */
+  private async resolveSponsorMpUserId(organizationId: string): Promise<string | undefined> {
+    const rows = await this.prisma.$queryRaw<{ mp_user_id: string }[]>(Prisma.sql`
+      SELECT * FROM mercadopago_account_mp_user_id(${organizationId}::uuid)
+    `);
+    return rows[0]?.mp_user_id;
   }
 
   private async organizationNamesById(ids: string[]): Promise<Map<string, string>> {

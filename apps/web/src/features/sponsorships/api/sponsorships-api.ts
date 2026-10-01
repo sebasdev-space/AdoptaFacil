@@ -2,6 +2,7 @@ import type {
   Animal,
   CreateSponsorshipInput,
   Paginated,
+  PaySponsorshipPaymentInput,
   Sponsorship,
   SponsorshipPayment,
   SponsorshipPlan,
@@ -89,16 +90,26 @@ export function getSponsorshipPayments(
   return client.request<SponsorshipPayment[]>(`/sponsorships/${id}/payments`);
 }
 
-/** Sponsor-initiated recovery after auto-suspension by billing failure
- *  (S-5-REDISEÑO Objetivo 6 — any authenticated Person, no @Roles gate,
- *  `POST /sponsorships/:id/retry-payment`). The backend rejects it (400/404)
- *  if the caller is not the sponsor or the suspension was not billing-related. */
+/**
+ * Sponsor-initiated recovery after auto-suspension by billing failure
+ * (S-5-REDISEÑO Objetivo 6 — any authenticated Person, no @Roles gate,
+ * `POST /sponsorships/:id/retry-payment`). The backend rejects it (400/404)
+ * if the caller is not the sponsor or the suspension was not billing-related.
+ *
+ * T-OrdersAPI: `card` carries the token MercadoPago's Card Payment Brick just
+ * produced (replaces the old Checkout Pro redirect link this endpoint used
+ * to generate) — optional/defaulted to `{}` so an old caller compiles, but
+ * the REAL gateway rejects a retry with no card (see
+ * `MercadoPagoPaymentAdapter.createCollection`).
+ */
 export function retrySponsorshipPayment(
   client: ApiClient,
   id: string,
+  card: PaySponsorshipPaymentInput = {},
 ): Promise<SponsorshipPayment> {
   return client.request<SponsorshipPayment>(`/sponsorships/${id}/retry-payment`, {
     method: 'POST',
+    json: card,
   });
 }
 

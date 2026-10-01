@@ -40,3 +40,18 @@ export const sponsorshipStatusChangeSchema = z
     reason: z.string().trim().min(1).max(500).optional(),
   })
   .strict();
+
+/**
+ * Body of `POST /sponsorships/:id/retry-payment` (T-OrdersAPI). All optional
+ * on purpose (same reasoning as `createDonationSchema`'s card fields): the
+ * real gateway adapter is the one place that hard-requires a token, so
+ * existing callers/tests that post no body at all keep working unchanged.
+ */
+export const paySponsorshipPaymentSchema = z
+  .object({
+    cardToken: z.string().trim().min(10).max(2000).optional(),
+    paymentMethodId: z.string().trim().min(1).max(50).optional(),
+    paymentMethodType: z.enum(['credit_card', 'debit_card']).optional(),
+    installments: z.coerce.number().int().min(1).max(36).optional(),
+  })
+  .strict();

@@ -1,16 +1,48 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import type { CardPaymentBrickProps } from '../../payments';
 import { DonateForm } from './donate-form';
 
 /**
  * §M05, P1 — the donate form shows the transparent breakdown BEFORE paying and the
  * "cubro la comisión" checkbox drives commissionPayer. Presentational only (no
  * api/session), so it renders standalone.
+ *
+ * T-OrdersAPI: the real `CardPaymentBrick` loads MercadoPago's external SDK
+ * script (jsdom can't execute it, and it would make these tests network-
+ * dependent) — mocked here with a fake "submit" button that calls `onResult`
+ * with fixed, deterministic card data, same technique any Brick-embedding
+ * form in this codebase should use.
  */
+vi.mock('../../payments', () => ({
+  CardPaymentBrick: ({ onResult }: CardPaymentBrickProps) => (
+    <button
+      type="button"
+      data-testid="fake-card-brick-submit"
+      onClick={() =>
+        void onResult({
+          cardToken: 'tok-test-123',
+          paymentMethodId: 'visa',
+          installments: 1,
+        })
+      }
+    >
+      Simular pago con tarjeta
+    </button>
+  ),
+}));
+
 const digits = (el: HTMLElement) => Number.parseInt(el.textContent!.replace(/[^\d]/g, ''), 10);
 
+/** Fills a valid amount and advances past step 1 ("Continuar"/"Donar a …") into
+ *  the card step, where the fake Brick above is rendered. */
+function goToCardStep(organizationName = 'Refugio Patitas') {
+  fireEvent.change(screen.getByPlaceholderText('50000'), { target: { value: '50000' } });
+  fireEvent.click(screen.getByRole('button', { name: new RegExp(`Donar a ${organizationName}`) }));
+}
+
 describe('DonateForm (with an active session — pre-existing behavior, non-regression)', () => {
-  it('keeps the breakdown hidden and submit disabled until a valid amount is entered', () => {
+  it('keeps the breakdown hidden and "Donar" disabled until a valid amount is entered', () => {
     render(<DonateForm organizationName="Refugio Patitas" hasSession onDonate={vi.fn()} />);
     expect(screen.queryByTestId('donation-breakdown')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Donar a Refugio Patitas/ })).toBeDisabled();
@@ -67,12 +99,23 @@ describe('DonateForm (with an active session — pre-existing behavior, non-regr
     expect(screen.queryByTestId('donation-guest-email')).not.toBeInTheDocument();
   });
 
-  it('submits the intended amount, the chosen commission payer, and anonymous (default false)', () => {
-    const onDonate = vi.fn();
+  it('step 2: advancing past "Donar" renders the Card Payment Brick, not an immediate charge', () => {
+    const onDonate = vi.fn().mockResolvedValue(undefined);
+    render(<DonateForm organizationName="Refugio Patitas" hasSession onDonate={onDonate} />);
+    goToCardStep();
+
+    expect(screen.getByTestId('fake-card-brick-submit')).toBeInTheDocument();
+    expect(onDonate).not.toHaveBeenCalled();
+  });
+
+  it('submits the intended amount, commission payer, anonymous, and the tokenized card ONLY once the Brick submits', async () => {
+    const onDonate = vi.fn().mockResolvedValue(undefined);
     render(<DonateForm organizationName="Refugio Patitas" hasSession onDonate={onDonate} />);
     fireEvent.change(screen.getByPlaceholderText('50000'), { target: { value: '50000' } });
     fireEvent.click(screen.getByTestId('cover-fee'));
-    fireEvent.click(screen.getByRole('button', { name: /Donar a Refugio Patitas/ }));
+    goToCardStep();
+
+    fireEvent.click(screen.getByTestId('fake-card-brick-submit'));
 
     expect(onDonate).toHaveBeenCalledTimes(1);
     expect(onDonate).toHaveBeenCalledWith({
@@ -80,24 +123,40 @@ describe('DonateForm (with an active session — pre-existing behavior, non-regr
       commissionPayer: 'donor',
       anonymous: false,
       guestPayer: undefined,
+      cardToken: 'tok-test-123',
+      paymentMethodId: 'visa',
+      paymentMethodType: undefined,
+      installments: 1,
     });
   });
 
   it('submits anonymous: true when the "donar anónimamente" checkbox is checked', () => {
-    const onDonate = vi.fn();
+    const onDonate = vi.fn().mockResolvedValue(undefined);
     render(<DonateForm organizationName="Refugio Patitas" hasSession onDonate={onDonate} />);
     fireEvent.change(screen.getByPlaceholderText('50000'), { target: { value: '50000' } });
     fireEvent.click(screen.getByTestId('donate-anonymous'));
-    fireEvent.click(screen.getByRole('button', { name: /Donar a Refugio Patitas/ }));
+    goToCardStep();
+    fireEvent.click(screen.getByTestId('fake-card-brick-submit'));
 
     expect(onDonate).toHaveBeenCalledWith(expect.objectContaining({ anonymous: true }));
+  });
+
+  it('"Volver" returns to step 1 without ever calling onDonate', () => {
+    const onDonate = vi.fn();
+    render(<DonateForm organizationName="Refugio Patitas" hasSession onDonate={onDonate} />);
+    goToCardStep();
+    fireEvent.click(screen.getByTestId('donate-back-to-details'));
+
+    expect(screen.getByTestId('donation-breakdown')).toBeInTheDocument();
+    expect(onDonate).not.toHaveBeenCalled();
   });
 });
 
 /**
  * Checkout de invitado (requisito FINAL del cliente): donar nunca exige cuenta
  * ni login. Sin sesión, el formulario pide nombre + correo y los exige antes
- * de habilitar "Donar".
+ * de habilitar "Donar" (step 1 — la tarjeta sigue siendo el paso 2, igual que
+ * con sesión).
  */
 describe('DonateForm (guest checkout — no session)', () => {
   it('shows the guest name/email fields and keeps "Donar" disabled until both are filled', () => {
@@ -131,8 +190,8 @@ describe('DonateForm (guest checkout — no session)', () => {
     expect(screen.getByRole('button', { name: /Donar a Refugio Patitas/ })).toBeDisabled();
   });
 
-  it('submits the guest name/email as guestPayer', () => {
-    const onDonate = vi.fn();
+  it('submits the guest name/email as guestPayer, with the tokenized card, once the Brick submits', () => {
+    const onDonate = vi.fn().mockResolvedValue(undefined);
     render(
       <DonateForm organizationName="Refugio Patitas" hasSession={false} onDonate={onDonate} />,
     );
@@ -143,13 +202,18 @@ describe('DonateForm (guest checkout — no session)', () => {
     fireEvent.change(screen.getByTestId('donation-guest-email'), {
       target: { value: 'invitado@test.dev' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /Donar a Refugio Patitas/ }));
+    goToCardStep();
+    fireEvent.click(screen.getByTestId('fake-card-brick-submit'));
 
     expect(onDonate).toHaveBeenCalledWith({
       intendedAmount: 50000,
       commissionPayer: 'organization',
       anonymous: false,
       guestPayer: { fullName: 'Invitado Test', email: 'invitado@test.dev' },
+      cardToken: 'tok-test-123',
+      paymentMethodId: 'visa',
+      paymentMethodType: undefined,
+      installments: 1,
     });
   });
 });

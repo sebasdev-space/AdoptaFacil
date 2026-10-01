@@ -188,15 +188,21 @@ describe('Sponsorship recurring billing (S-5-REDISEÑO, M07/RF17, T-057)', () =>
         sponsorshipPaymentId: payment.id,
         attemptNumber: 1,
         collectionId: expect.any(String),
-        // FakePaymentAdapter.createCollection always returns one too (see
-        // payments.ts) — this was the bug: the column already existed but
-        // the write path never populated it until this fix.
-        paymentLinkUrl: expect.any(String),
         expiresAt: expect.any(String),
         result: 'pending',
         createdAt: expect.any(String),
       }),
     );
+    // T-OrdersAPI (2026-09-30): the automated billing cron no longer calls
+    // the gateway at all — it has no sponsor present to tokenize a card
+    // (Checkout API/Orders requires one at charge time; see
+    // `SponsorshipBillingService.buildPlaceholderAttempt`'s doc comment for
+    // the full rationale). `collectionId` is now a local placeholder and
+    // `paymentLinkUrl` is absent (there is no checkout link in this model
+    // any more either way) — the sponsor's real, working path to pay is
+    // "Pagar de nuevo" (`retry-payment`, tested below), which DOES call the
+    // gateway with a real tokenized card.
+    expect(payment.attempts[0].paymentLinkUrl).toBeUndefined();
   });
 
   it('PUBLIC "gracias" lookup resolves status/amount/org name by an attempt\'s collectionId, never the sponsor', async () => {
@@ -338,9 +344,11 @@ describe('Sponsorship recurring billing (S-5-REDISEÑO, M07/RF17, T-057)', () =>
       .expect(200);
     expect(retried.body.attempts).toHaveLength(4);
     expect(retried.body.attempts[3]).toMatchObject({ attemptNumber: 4, result: 'pending' });
-    // Sponsor-initiated recovery must ALSO persist the checkout link — the
-    // other half of this bug (createAttemptCollection's automated ladder was
-    // the first half, tested above).
+    // T-OrdersAPI: unlike the automated ladder's placeholder attempts (see
+    // the "shape" test above), sponsor-initiated recovery DOES call the real
+    // gateway (the frontend's Card Payment Brick supplies the token) —
+    // FakePaymentAdapter.createCollection always returns a paymentLinkUrl too
+    // (kept for backward-compat even though nothing navigates to it anymore).
     expect(retried.body.attempts[3].paymentLinkUrl).toEqual(expect.any(String));
 
     await poller.pollPending();

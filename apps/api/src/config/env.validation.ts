@@ -71,6 +71,38 @@ export const envSchema = z.object({
   MERCADOPAGO_PUBLIC_KEY: z.string().min(1).optional(),
   MERCADOPAGO_ACCESS_TOKEN: z.string().min(1).optional(),
   MERCADOPAGO_WEBHOOK_SECRET: z.string().min(1).optional(),
+  // T-OAuth-Connect (Split de Pagos 1:1): the platform-level MercadoPago
+  // "Marketplace"-capable application's own id/secret — used ONLY for the
+  // OAuth connect dance (an organization authorizing AdoptaFácil to act on
+  // its behalf), never for a collection/payout call (those keep using
+  // MERCADOPAGO_ACCESS_TOKEN above). Optional at the schema level for the
+  // same 'fake' boot reason as the other MERCADOPAGO_* vars; required when
+  // PAYMENT_DRIVER=mercadopago (see REQUIRED_MERCADOPAGO_KEYS below).
+  MERCADOPAGO_APP_ID: z.string().min(1).optional(),
+  // NEVER logged, never returned in any response — read only inside the OAuth
+  // token-exchange/refresh calls.
+  MERCADOPAGO_CLIENT_SECRET: z.string().min(1).optional(),
+  // Where MercadoPago redirects back after the org authorizes access
+  // (`GET /org/mercadopago/callback`, public). Optional/no schema default —
+  // same "resolve a fallback at construction time, not here" pattern
+  // `MercadoPagoPaymentAdapter` already uses for `publicBaseUrl`/`webBaseUrl`
+  // (see mercadopago-oauth.client.ts): falls back to
+  // `${STORAGE_PUBLIC_BASE_URL}/org/mercadopago/callback` when
+  // STORAGE_PUBLIC_BASE_URL is set, else `http://localhost:3000/org/mercadopago/callback`.
+  MERCADOPAGO_OAUTH_REDIRECT_URI: z.string().url().optional(),
+  // Interval of the repeatable MercadoPago token-refresh scan job (renews any
+  // connected account's access/refresh token before it lapses). Same
+  // daily-default shape as REMINDERS_SCAN_INTERVAL_MS/
+  // SPONSORSHIP_BILLING_SCAN_INTERVAL_MS.
+  MERCADOPAGO_TOKEN_REFRESH_SCAN_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(86_400_000),
+  // A connected account is refreshed once its token expires within this many
+  // days (MercadoPago tokens last ~180 days) — "not urgent, just don't let it
+  // lapse", per T-OAuth-Connect.
+  MERCADOPAGO_TOKEN_REFRESH_WINDOW_DAYS: z.coerce.number().int().positive().max(180).default(15),
   // S-5-REDISEÑO (M07/RF17, T-057): interval of the repeatable sponsorship
   // billing scan job — opens a new period for sponsorships that just reached
   // their nextBillingAt, and advances the reminder/retry ladder of open
@@ -130,6 +162,14 @@ const REQUIRED_MERCADOPAGO_KEYS = [
   'MERCADOPAGO_PUBLIC_KEY',
   'MERCADOPAGO_ACCESS_TOKEN',
   'MERCADOPAGO_WEBHOOK_SECRET',
+  // T-OAuth-Connect: required so the connect dance (authorize URL + token
+  // exchange) can actually run once PAYMENT_DRIVER=mercadopago. NOTE: as of
+  // this task MERCADOPAGO_CLIENT_SECRET is NOT yet set in the local .env
+  // (pending the client handing it over) — until then the API fails to boot
+  // with PAYMENT_DRIVER=mercadopago. See this task's report for the two ways
+  // to unblock local dev in the meantime.
+  'MERCADOPAGO_APP_ID',
+  'MERCADOPAGO_CLIENT_SECRET',
 ] as const;
 
 /** Google OAuth vars required when AUTH_IDENTITY_DRIVER=google (fail-fast at boot). */

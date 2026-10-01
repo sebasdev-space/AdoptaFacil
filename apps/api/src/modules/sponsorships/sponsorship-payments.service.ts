@@ -7,6 +7,7 @@ import type {
 } from '@prisma/client';
 import {
   BILLING_FAILURE_SUSPENSION_REASON,
+  type PaySponsorshipPaymentInput,
   type PaymentPort,
   type SponsorshipPayment,
   type SponsorshipPaymentAttempt,
@@ -83,6 +84,23 @@ export class SponsorshipPaymentsService {
     @Inject(PAYMENT_PORT) private readonly payments: PaymentPort,
   ) {}
 
+  /**
+   * Split de Pagos 1:1 (T-OAuth-Connect) — looks up the sponsored ORG's own
+   * connected MercadoPago account id, cross-tenant, via the
+   * `mercadopago_account_mp_user_id` SECURITY DEFINER function (narrow:
+   * returns ONLY `mp_user_id`, never the access/refresh tokens). `undefined`
+   * when the org never connected one — never thrown. Same helper
+   * `DonationsService` uses (duplicated, not shared — this codebase does not
+   * share service-level logic across module boundaries, see
+   * `organizationNamesById`'s equivalent there).
+   */
+  private async resolveSponsorMpUserId(organizationId: string): Promise<string | undefined> {
+    const rows = await this.prisma.$queryRaw<{ mp_user_id: string }[]>(Prisma.sql`
+      SELECT * FROM mercadopago_account_mp_user_id(${organizationId}::uuid)
+    `);
+    return rows[0]?.mp_user_id;
+  }
+
   private requireOrgId(): string {
     const organizationId = this.tenant.getOrganizationId();
     if (!organizationId) {
@@ -146,7 +164,11 @@ export class SponsorshipPaymentsService {
    * sponsorship — but ONLY because it was suspended for billing failure, not
    * a manual suspension by the organization.
    */
-  async retryPayment(actor: RequestUser, sponsorshipId: string): Promise<SponsorshipPayment> {
+  async retryPayment(
+    actor: RequestUser,
+    sponsorshipId: string,
+    card: PaySponsorshipPaymentInput = {},
+  ): Promise<SponsorshipPayment> {
     const rows = await this.prisma.$queryRaw<RecoveryContextRow[]>(
       Prisma.sql`SELECT * FROM sponsorship_billing_recovery_context(${sponsorshipId}::uuid, ${actor.id}::uuid)`,
     );
@@ -173,12 +195,20 @@ export class SponsorshipPaymentsService {
 
     const nextAttemptNumber = ctx.attempt_count + 1;
     const idempotencyKey = buildAttemptIdempotencyKey(sponsorshipId, ctx.period, nextAttemptNumber);
+    // Split de Pagos 1:1 (T-OAuth-Connect) — same narrow, token-free lookup
+    // DonationsService uses (see its own doc comment).
+    const sponsorMpUserId = await this.resolveSponsorMpUserId(ctx.organization_id);
     const collection = await this.payments.createCollection({
       intendedAmount: ctx.plan_amount,
       currency: 'COP',
       concept: { kind: 'sponsorship', id: sponsorshipId },
       commissionPayer: 'organization',
       idempotencyKey,
+      cardToken: card.cardToken,
+      paymentMethodId: card.paymentMethodId,
+      paymentMethodType: card.paymentMethodType,
+      installments: card.installments,
+      sponsorMpUserId,
     });
 
     // Reuses the SAME expiry window as attempt 1 — this is a one-off,

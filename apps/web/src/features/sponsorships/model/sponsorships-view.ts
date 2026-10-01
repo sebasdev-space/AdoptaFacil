@@ -21,8 +21,10 @@ export const SPONSORSHIP_PERIODICITY_LABELS: Record<SponsorshipPeriodicity, stri
   [SponsorshipPeriodicity.Monthly]: 'Mensual',
 };
 
-/** Etiquetas legibles (es-CO) del estado de un período de cobro (S-5-REDISEÑO,
- *  usado por la página `/apadrinar/gracias` post-checkout). */
+/** Etiquetas legibles (es-CO) del estado de un período de cobro (S-5-REDISEÑO),
+ *  usadas por el resultado EN PÁGINA que sigue al Card Payment Brick
+ *  (T-OrdersAPI) en `MySponsorshipsList` — la antigua página `/apadrinar/gracias`
+ *  (redirect post-checkout) fue retirada junto con Checkout Pro. */
 export const SPONSORSHIP_PAYMENT_STATUS_LABELS: Record<SponsorshipPaymentStatus, string> = {
   [SponsorshipPaymentStatus.Pending]: 'Pendiente',
   [SponsorshipPaymentStatus.Paid]: 'Pagado',

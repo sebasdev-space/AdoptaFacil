@@ -12,6 +12,7 @@ import {
 import {
   type CreateSponsorshipInput,
   type Paginated,
+  type PaySponsorshipPaymentInput,
   Role,
   type Sponsorship,
   type SponsorshipPayment,
@@ -27,7 +28,11 @@ import { Roles } from '../../core/rbac/roles.decorator';
 import { RolesGuard } from '../../core/rbac/roles.guard';
 import { SponsorshipPaymentsService } from './sponsorship-payments.service';
 import { SponsorshipsService } from './sponsorships.service';
-import { createSponsorshipSchema, sponsorshipStatusChangeSchema } from './sponsorships.schemas';
+import {
+  createSponsorshipSchema,
+  paySponsorshipPaymentSchema,
+  sponsorshipStatusChangeSchema,
+} from './sponsorships.schemas';
 
 /** Roles that may suspend/reactivate/cancel a sponsorship (§13 M07). */
 const MANAGE_ROLES = [Role.Owner, Role.Administrator] as const;
@@ -58,16 +63,22 @@ export class SponsorshipsController {
     return this.service.subscribe(actor, dto);
   }
 
-  /** Recovery after auto-suspension by billing failure (Objetivo 6) — any
-   *  authenticated Person may retry ONLY their own suspended sponsorship (no
-   *  @Roles gate, ownership checked cross-tenant inside the service). */
+  /**
+   * Recovery after auto-suspension by billing failure (Objetivo 6) — any
+   * authenticated Person may retry ONLY their own suspended sponsorship (no
+   * @Roles gate, ownership checked cross-tenant inside the service).
+   * T-OrdersAPI: the body now carries the sponsor's tokenized card (Checkout
+   * API/Orders — the frontend's Card Payment Brick replaces the retired
+   * MercadoPago redirect); optional so an old/no-body caller doesn't 400.
+   */
   @Post(':id/retry-payment')
   @HttpCode(200)
   retryPayment(
     @CurrentUser() actor: RequestUser,
     @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(paySponsorshipPaymentSchema)) dto: PaySponsorshipPaymentInput,
   ): Promise<SponsorshipPayment> {
-    return this.payments.retryPayment(actor, id);
+    return this.payments.retryPayment(actor, id, dto);
   }
 
   /** The sponsor's own sponsorships (cross-tenant, by identity) — "mis

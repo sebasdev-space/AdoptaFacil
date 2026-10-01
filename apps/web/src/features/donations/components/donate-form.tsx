@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { MIN_DONATION_AMOUNT, type CommissionPayer } from '@adoptafacil/contracts';
 import { Button, Input } from '@adoptafacil/ui';
+import { CardPaymentBrick } from '../../payments';
 import { DonationBreakdown } from './donation-breakdown';
 import { formatCop, safeBuildDonationBreakdown } from '../model/donation-breakdown-view';
 import styles from './donate-form.module.scss';
 
 /** Regex de validación LIVIANA en UI — el backend (zod, `.email()`) es la
- *  autoridad real; esto solo evita habilitar "Donar" con algo obviamente
+ *  autoridad real; esto solo evita habilitar "Continuar" con algo obviamente
  *  incompleto. */
 const EMAIL_LOOKS_VALID = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -19,6 +20,15 @@ export interface DonateFormValues {
    *  correo capturados en el propio formulario. Con sesión, `DonatePage`
    *  arma el payer desde `useSession()` — este formulario no lo duplica. */
   guestPayer?: { fullName: string; email: string };
+  /**
+   * Checkout API (Orders) — T-OrdersAPI. Tokenized card data from MercadoPago's
+   * Card Payment Brick (step 2 of this form, below). The card number never
+   * reaches this codebase — only this opaque, single-use token does.
+   */
+  cardToken: string;
+  paymentMethodId: string;
+  paymentMethodType?: 'credit_card' | 'debit_card';
+  installments: number;
 }
 
 export interface DonateFormProps {
@@ -27,33 +37,49 @@ export interface DonateFormProps {
   /** Hay una sesión activa (Persona autenticada). `false` ⇒ checkout de
    *  invitado (requisito del cliente: donar nunca exige cuenta ni login) —
    *  el formulario pide nombre + correo y los exige antes de habilitar
-   *  "Donar". Con sesión, esos campos ni se muestran (se prellenan aparte). */
+   *  "Continuar". Con sesión, esos campos ni se muestran (se prellenan aparte). */
   hasSession: boolean;
-  onDonate: (values: DonateFormValues) => void;
+  /** Email del donante autenticado, solo para prellenar el Brick (T-OrdersAPI)
+   *  — presentacional, nunca se valida aquí (lo hace el backend). */
+  sessionEmailHint?: string;
+  /**
+   * Llamado SOLO una vez el Card Payment Brick tokenizó una tarjeta real
+   * (paso 2). Debe devolver una Promise: el Brick espera a que resuelva/
+   * rechace para mostrar su propio estado de éxito/error — ver
+   * `CardPaymentBrick`'s doc comment.
+   */
+  onDonate: (values: DonateFormValues) => Promise<void>;
 }
 
+type FormStep = 'details' | 'card';
+
 /**
- * Formulario de donación (§M05, P1 + checkout de invitado). PRESENTACIONAL (sin
- * api/sesión real, recibe `hasSession` como prop) para poder testearlo directo.
- * Muestra el desglose transparente EN VIVO (misma cuenta que el backend, vía
- * `computeBreakdown`) y ofrece la casilla "cubro el apoyo de sostenimiento y la
- * comisión de la pasarela" (commissionPayer = 'donor'; F-NOMENCLATURA-CHECKBOX:
- * extiende #100 al checkbox — el donante cubre AMBOS componentes, el % que
- * retiene AdoptaFácil (apoyo, no "comisión" propia por indicación fiscal) y la
- * comisión real de la pasarela de pago (tercero, mantiene su nombre —
- * MercadoPago).
- * Sin sesión, además exige nombre + correo (checkout de invitado — MercadoPago
- * Checkout Pro ya soporta pago de invitado) y ofrece la casilla de donación
- * anónima FRENTE A LA ORGANIZACIÓN (disponible con o sin sesión).
- * Solo habilita "Donar" con un monto válido (≥ mínimo) y, sin sesión, con
- * nombre + correo completos.
+ * Formulario de donación (§M05, P1 + checkout de invitado + T-OrdersAPI). PRESENTACIONAL
+ * (sin api/sesión real, recibe `hasSession` como prop) para poder testearlo directo.
+ * DOS PASOS desde T-OrdersAPI (antes era un solo submit que confiaba en el redirect de
+ * MercadoPago Checkout Pro, ya retirado):
+ *   1. "details": monto + casillas + desglose transparente EN VIVO (misma cuenta que
+ *      el backend, vía `computeBreakdown`) + identidad de invitado si no hay sesión.
+ *      "Continuar" solo AVANZA de paso — no cobra nada todavía.
+ *   2. "card": el monto YA ESTÁ DECIDIDO (se muestra, no editable); se embebe el Card
+ *      Payment Brick (MercadoPago) para tokenizar una tarjeta real. Solo al enviar ESE
+ *      formulario (botón propio del Brick) se llama a `onDonate` — con el token incluido.
+ * Ofrece la casilla "cubro el apoyo de sostenimiento y la comisión de la pasarela"
+ * (commissionPayer = 'donor'; F-NOMENCLATURA-CHECKBOX: extiende #100 al checkbox — el
+ * donante cubre AMBOS componentes, el % que retiene AdoptaFácil (apoyo, no "comisión"
+ * propia por indicación fiscal) y la comisión real de la pasarela de pago (tercero,
+ * mantiene su nombre — MercadoPago).
+ * Sin sesión, además exige nombre + correo (checkout de invitado) y ofrece la casilla
+ * de donación anónima FRENTE A LA ORGANIZACIÓN (disponible con o sin sesión).
  */
 export function DonateForm({
   organizationName,
   submitting = false,
   hasSession,
+  sessionEmailHint,
   onDonate,
 }: DonateFormProps) {
+  const [step, setStep] = useState<FormStep>('details');
   const [amountText, setAmountText] = useState('');
   const [coverFee, setCoverFee] = useState(false);
   const [anonymous, setAnonymous] = useState(false);
@@ -65,17 +91,47 @@ export function DonateForm({
   const preview = safeBuildDonationBreakdown(amount, commissionPayer);
   const guestIdentityComplete =
     hasSession || (guestName.trim().length > 0 && EMAIL_LOOKS_VALID.test(guestEmail.trim()));
-  const canSubmit = preview !== null && !submitting && guestIdentityComplete;
+  const canContinue = preview !== null && !submitting && guestIdentityComplete;
 
-  const submit = () => {
-    if (!preview || !canSubmit) return;
-    onDonate({
-      intendedAmount: amount,
-      commissionPayer,
-      anonymous,
-      guestPayer: hasSession ? undefined : { fullName: guestName.trim(), email: guestEmail.trim() },
-    });
-  };
+  const guestPayer = hasSession
+    ? undefined
+    : { fullName: guestName.trim(), email: guestEmail.trim() };
+  const payerEmailForBrick = hasSession ? sessionEmailHint : guestPayer?.email;
+
+  if (step === 'card' && preview) {
+    return (
+      <div className={styles.form}>
+        <p className={styles.hint}>
+          Donando <strong>{formatCop(preview.breakdown.amountCharged)}</strong> a {organizationName}
+          .
+        </p>
+        <CardPaymentBrick
+          amount={preview.breakdown.amountCharged}
+          payerEmail={payerEmailForBrick}
+          onResult={(card) =>
+            onDonate({
+              intendedAmount: amount,
+              commissionPayer,
+              anonymous,
+              guestPayer,
+              cardToken: card.cardToken,
+              paymentMethodId: card.paymentMethodId,
+              paymentMethodType: card.paymentMethodType,
+              installments: card.installments,
+            })
+          }
+        />
+        <Button
+          variant="outline"
+          disabled={submitting}
+          onClick={() => setStep('details')}
+          data-testid="donate-back-to-details"
+        >
+          Volver
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.form}>
@@ -153,7 +209,7 @@ export function DonateForm({
         </p>
       )}
 
-      <Button disabled={!canSubmit} onClick={submit}>
+      <Button disabled={!canContinue} onClick={() => setStep('card')}>
         {submitting ? 'Procesando…' : `Donar a ${organizationName}`}
       </Button>
     </div>

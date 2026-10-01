@@ -47,3 +47,16 @@
   font-size: var(--fs-xs);
   color: var(--text-muted);
 }
+
+.recovery {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.recovery__brick {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 24rem;
+}
