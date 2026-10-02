@@ -12,7 +12,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  EmptyState,
   Input,
   Skeleton,
   useToast,
@@ -23,10 +22,8 @@ import { useSession } from '../../../shell/auth';
 import { VolunteerOpportunityManageCard } from '../components/volunteer-opportunity-manage-card';
 
 /**
- * `/organizacion/voluntariado` (RF18, M08) — gestión de oportunidades de
- * voluntariado de la organización. Publicar/editar: Owner/Administrator
- * (calcado del `@Roles` real de `VolunteerOpportunitiesController` —
- * `Operator` queda fuera hasta que el documento base defina su alcance).
+ * `/organizacion/voluntariado` (RF18, M08) - gestión de oportunidades de
+ * voluntariado de la organización. Publicar/editar: Owner/Administrator.
  */
 export function VolunteerOpportunitiesPage() {
   const client = useApiClient();
@@ -134,31 +131,72 @@ export function VolunteerOpportunitiesPage() {
     }
   };
 
+  const activeCount = opportunities.filter((o) => o.status === 'active').length;
+  const closedCount = opportunities.filter((o) => o.status !== 'active').length;
+
   return (
     <PageContainer>
       <PageHeader
         title="Voluntariado"
         description="Publica oportunidades de voluntariado y gestiona inscripciones, horas y certificados."
         actions={
-          canManage && <Button onClick={() => setShowForm(true)}>Publicar oportunidad</Button>
+          canManage && (
+            <Button onClick={() => setShowForm(true)}>
+              <span aria-hidden className="mr-1.5">
+                +
+              </span>
+              Publicar oportunidad
+            </Button>
+          )
         }
       />
-      {loading && <Skeleton className="h-64 w-full" />}
+
+      {!loading && opportunities.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-3 py-1 text-xs font-medium text-success">
+            <span
+              aria-hidden
+              className="inline-block h-1.5 w-1.5 animate-pulse-soft rounded-full bg-success"
+            />
+            {activeCount} {activeCount === 1 ? 'activa' : 'activas'}
+          </span>
+          {closedCount > 0 && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+              {closedCount} cerrada{closedCount !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+      )}
+
+      {loading && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-48 w-full rounded-lg" />
+          ))}
+        </div>
+      )}
+
       {!loading && (
         <div className="space-y-6">
           {opportunities.length === 0 ? (
-            <EmptyState
-              icon={<span aria-hidden>🙋</span>}
-              title="Aún no hay oportunidades de voluntariado"
-              description={
-                canManage ? 'Publica la primera oportunidad para recibir inscripciones.' : undefined
-              }
-              action={
-                canManage ? (
-                  <Button onClick={() => setShowForm(true)}>Publicar tu primera oportunidad</Button>
-                ) : undefined
-              }
-            />
+            <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/30 px-6 py-16 text-center">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-3xl">
+                🙋
+              </div>
+              <p className="text-base font-semibold text-foreground">
+                Aún no hay oportunidades de voluntariado
+              </p>
+              {canManage && (
+                <>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Publica la primera para empezar a recibir inscripciones.
+                  </p>
+                  <Button className="mt-5" onClick={() => setShowForm(true)}>
+                    Publicar tu primera oportunidad
+                  </Button>
+                </>
+              )}
+            </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {opportunities.map((opportunity) => (
@@ -170,115 +208,159 @@ export function VolunteerOpportunitiesPage() {
       )}
 
       <Dialog open={canManage && showForm} onOpenChange={setShowForm}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Nueva oportunidad de voluntariado</DialogTitle>
+            <DialogTitle className="text-lg">Nueva oportunidad de voluntariado</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label htmlFor="vo-title" className="block text-sm font-medium text-foreground">
-                Título
-              </label>
-              <Input id="vo-title" value={title} onChange={(e) => setTitle(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <label htmlFor="vo-description" className="block text-sm font-medium text-foreground">
-                Descripción
-              </label>
-              <Input
-                id="vo-description"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+
+          <div className="space-y-5 py-1">
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Información básica
+              </p>
               <div className="space-y-1.5">
-                <label htmlFor="vo-category" className="block text-sm font-medium text-foreground">
-                  Categoría
+                <label htmlFor="vo-title" className="block text-sm font-medium text-foreground">
+                  Título <span className="text-destructive">*</span>
                 </label>
                 <Input
-                  id="vo-category"
-                  placeholder="p. ej. Cuidado de animales"
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+                  id="vo-title"
+                  placeholder="p. ej. Jornada de esterilización"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
                 />
               </div>
               <div className="space-y-1.5">
-                <label htmlFor="vo-capacity" className="block text-sm font-medium text-foreground">
-                  Cupo (opcional)
+                <label
+                  htmlFor="vo-description"
+                  className="block text-sm font-medium text-foreground"
+                >
+                  Descripción
                 </label>
                 <Input
-                  id="vo-capacity"
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={capacity}
-                  onChange={(e) => setCapacity(e.target.value)}
+                  id="vo-description"
+                  placeholder="Describe brevemente la actividad..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
                 />
               </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="vo-category"
+                    className="block text-sm font-medium text-foreground"
+                  >
+                    Categoría <span className="text-destructive">*</span>
+                  </label>
+                  <Input
+                    id="vo-category"
+                    placeholder="p. ej. Cuidado de animales"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label
+                    htmlFor="vo-capacity"
+                    className="block text-sm font-medium text-foreground"
+                  >
+                    Cupo (opcional)
+                  </label>
+                  <Input
+                    id="vo-capacity"
+                    type="number"
+                    min={1}
+                    step={1}
+                    placeholder="Sin límite"
+                    value={capacity}
+                    onChange={(e) => setCapacity(e.target.value)}
+                  />
+                </div>
+              </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
+
+            <div className="space-y-3 rounded-lg bg-muted/40 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Fechas y lugar
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label htmlFor="vo-start" className="block text-sm font-medium text-foreground">
+                    Fecha de inicio <span className="text-destructive">*</span>
+                  </label>
+                  <Input
+                    id="vo-start"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="vo-end" className="block text-sm font-medium text-foreground">
+                    Fecha de fin <span className="text-destructive">*</span>
+                  </label>
+                  <Input
+                    id="vo-end"
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
               <div className="space-y-1.5">
-                <label htmlFor="vo-start" className="block text-sm font-medium text-foreground">
-                  Fecha de inicio
+                <label htmlFor="vo-location" className="block text-sm font-medium text-foreground">
+                  Ubicación <span className="text-destructive">*</span>
                 </label>
                 <Input
-                  id="vo-start"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  id="vo-location"
+                  placeholder="p. ej. Albergue central, Bogotá"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
                 />
               </div>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Requisitos y opciones
+              </p>
               <div className="space-y-1.5">
-                <label htmlFor="vo-end" className="block text-sm font-medium text-foreground">
-                  Fecha de fin
+                <label
+                  htmlFor="vo-requirements"
+                  className="block text-sm font-medium text-foreground"
+                >
+                  Requisitos (opcional)
                 </label>
                 <Input
-                  id="vo-end"
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  id="vo-requirements"
+                  placeholder="p. ej. Mayor de 18 años, certificado de vacunas..."
+                  value={requirements}
+                  onChange={(e) => setRequirements(e.target.value)}
                 />
               </div>
-            </div>
-            <div className="space-y-1.5">
-              <label htmlFor="vo-location" className="block text-sm font-medium text-foreground">
-                Ubicación
+
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-info/30 bg-info/5 p-3 text-sm text-foreground transition-colors hover:bg-info/10">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 accent-primary"
+                  checked={appliesToStudentService}
+                  onChange={(e) => setAppliesToStudentService(e.target.checked)}
+                />
+                <span>
+                  <span className="font-medium">Cuenta como servicio social estudiantil</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Resolución 4210/1996 — los inscritos podrán solicitar constancia oficial.
+                  </span>
+                </span>
               </label>
-              <Input
-                id="vo-location"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-              />
             </div>
-            <div className="space-y-1.5">
-              <label
-                htmlFor="vo-requirements"
-                className="block text-sm font-medium text-foreground"
-              >
-                Requisitos (opcional)
-              </label>
-              <Input
-                id="vo-requirements"
-                value={requirements}
-                onChange={(e) => setRequirements(e.target.value)}
-              />
-            </div>
-            <label className="flex items-center gap-2 text-sm text-foreground">
-              <input
-                type="checkbox"
-                checked={appliesToStudentService}
-                onChange={(e) => setAppliesToStudentService(e.target.checked)}
-              />
-              Cuenta como servicio social estudiantil obligatorio (Resolución 4210/1996)
-            </label>
           </div>
-          <DialogFooter>
+
+          <DialogFooter className="gap-2 pt-2 sm:gap-0">
             <Button variant="outline" onClick={() => setShowForm(false)}>
               Cancelar
             </Button>
             <Button disabled={saving} onClick={() => void submit()}>
-              {saving ? 'Publicando…' : 'Publicar oportunidad'}
+              {saving ? 'Publicando...' : 'Publicar oportunidad'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -37,7 +37,7 @@ import {
 type LoadState = 'loading' | 'ready' | 'not-found' | 'error';
 
 /**
- * `/organizacion/voluntariado/:id` (RF18/RF19, M08) — detalle interno de una
+ * `/organizacion/voluntariado/:id` (RF18/RF19, M08) - detalle interno de una
  * oportunidad: gestionar la cola de inscripciones (aceptar/rechazar), las
  * horas de cada voluntario aceptado (aprobar/rechazar), y emitir el
  * certificado. Owner/Administrator gestionan; ver = + ReadOnlyAuditor.
@@ -187,62 +187,129 @@ export function VolunteerOpportunityDetailPage() {
     }
   };
 
+  // Stats derivadas de inscripciones
+  const pendingCount = enrollments.filter((e) => e.status === 'pending').length;
+  const acceptedCount = enrollments.filter((e) => e.status === 'accepted').length;
+
   return (
     <PageContainer>
+      <div className="mb-2">
+        <Link
+          to="/organizacion/voluntariado"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <span aria-hidden>←</span> Volver a voluntariado
+        </Link>
+      </div>
+
       <PageHeader
         title="Detalle de oportunidad"
-        description="Gestiona inscripciones, horas y certificados de esta oportunidad de voluntariado."
+        description="Gestiona inscripciones, horas y certificados de esta oportunidad."
       />
-      <Link
-        to="/organizacion/voluntariado"
-        className="mb-4 inline-block text-sm text-muted-foreground underline-offset-4 hover:underline"
-      >
-        ← Volver a voluntariado
-      </Link>
 
-      {state === 'loading' && <Skeleton className="h-64 w-full" />}
+      {state === 'loading' && (
+        <div className="space-y-4">
+          <Skeleton className="h-36 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-xl" />
+        </div>
+      )}
+
       {state === 'not-found' && (
         <EmptyState title="Oportunidad no especificada" description="Falta el identificador." />
       )}
+
       {state === 'error' && (
         <EmptyState title="No se pudo cargar" description="Inténtalo de nuevo más tarde." />
       )}
 
       {state === 'ready' && opportunity && (
         <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex flex-wrap items-center gap-2">
-                {opportunity.title}
-                <Badge variant="secondary">{opportunity.category}</Badge>
-                {opportunity.appliesToStudentService && (
-                  <Badge variant="info">Servicio social estudiantil</Badge>
-                )}
-              </CardTitle>
+          {/* Card de detalles de la oportunidad */}
+          <Card className="relative overflow-hidden border-primary/20">
+            <div
+              aria-hidden
+              className="absolute inset-x-0 top-0 h-1 rounded-t-[inherit] bg-primary"
+            />
+            <CardHeader className="pt-5">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <CardTitle className="text-xl leading-tight">{opportunity.title}</CardTitle>
+                <div className="flex flex-wrap gap-1.5">
+                  <Badge variant="secondary">{opportunity.category}</Badge>
+                  {opportunity.appliesToStudentService && (
+                    <Badge variant="info">🎓 Serv. social</Badge>
+                  )}
+                </div>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-1 text-sm text-muted-foreground">
-              <p>
-                {formatBogota(opportunity.startDate)} – {formatBogota(opportunity.endDate)}
-              </p>
-              <p>{opportunity.location}</p>
-              {opportunity.requirements && <p>Requisitos: {opportunity.requirements}</p>}
+            <CardContent>
+              <div className="flex flex-wrap gap-x-6 gap-y-1.5 text-sm text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <span aria-hidden>📅</span>
+                  {formatBogota(opportunity.startDate)} – {formatBogota(opportunity.endDate)}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span aria-hidden>📍</span>
+                  {opportunity.location}
+                </span>
+                {opportunity.requirements && (
+                  <span className="flex items-center gap-1.5">
+                    <span aria-hidden>📋</span>
+                    {opportunity.requirements}
+                  </span>
+                )}
+              </div>
+
+              {/* Mini stats de inscripciones */}
+              {enrollments.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-3 border-t pt-4">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-warning/10 px-3 py-1 text-xs font-medium text-warning">
+                    {pendingCount} pendiente{pendingCount !== 1 ? 's' : ''}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-3 py-1 text-xs font-medium text-success">
+                    {acceptedCount} aceptada{acceptedCount !== 1 ? 's' : ''}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+                    {enrollments.length} total
+                  </span>
+                </div>
+              )}
             </CardContent>
           </Card>
 
+          {/* Cola de inscripciones */}
           <Card>
-            <CardHeader>
-              <CardTitle>Inscripciones</CardTitle>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <span aria-hidden className="text-lg">
+                  👥
+                </span>
+                Inscripciones
+                {pendingCount > 0 && (
+                  <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-warning text-xs font-bold text-warning-foreground">
+                    {pendingCount}
+                  </span>
+                )}
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent>
               {enrollments.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Aún no hay inscripciones.</p>
+                <div className="flex flex-col items-center justify-center rounded-lg bg-muted/30 py-8 text-center">
+                  <p className="text-sm font-medium text-foreground">Aún no hay inscripciones</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Cuando alguien se inscriba aparecerán aquí.
+                  </p>
+                </div>
               ) : (
                 <ul className="space-y-3">
                   {enrollments.map((enrollment) => (
-                    <li key={enrollment.id} className="space-y-3 rounded-md border p-3 text-sm">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
+                    <li
+                      key={enrollment.id}
+                      className="rounded-lg border bg-card p-4 transition-shadow hover:shadow-sm"
+                    >
+                      {/* Cabecera del voluntario */}
+                      <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>
-                          <p className="font-medium">{enrollment.volunteerName}</p>
+                          <p className="font-medium text-foreground">{enrollment.volunteerName}</p>
                           <p className="text-xs text-muted-foreground">
                             {enrollment.volunteerEmail}
                           </p>
@@ -252,23 +319,27 @@ export function VolunteerOpportunityDetailPage() {
                         </Badge>
                       </div>
 
+                      {/* Acciones para inscripciones pendientes */}
                       {canManage && enrollment.status === 'pending' && (
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
                           <Button
                             size="sm"
                             onClick={() =>
                               void decideEnrollment(enrollment.id, { decision: 'accept' })
                             }
                           >
+                            <span aria-hidden className="mr-1">
+                              ✓
+                            </span>{' '}
                             Aceptar
                           </Button>
                           {rejectingId === enrollment.id ? (
                             <>
                               <Input
-                                placeholder="Motivo del rechazo"
+                                placeholder="Motivo del rechazo (opcional)"
                                 value={rejectReason}
                                 onChange={(e) => setRejectReason(e.target.value)}
-                                className="h-9 w-56"
+                                className="h-9 flex-1 min-w-40"
                               />
                               <Button
                                 size="sm"
@@ -281,6 +352,16 @@ export function VolunteerOpportunityDetailPage() {
                                 }
                               >
                                 Confirmar rechazo
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setRejectingId(null);
+                                  setRejectReason('');
+                                }}
+                              >
+                                Cancelar
                               </Button>
                             </>
                           ) : (
@@ -295,115 +376,147 @@ export function VolunteerOpportunityDetailPage() {
                         </div>
                       )}
 
-                      {(enrollment.status === 'accepted' || enrollment.status === 'completed') && (
-                        <div className="space-y-3">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => void toggleHours(enrollment.id)}
-                          >
-                            {expandedId === enrollment.id ? 'Ocultar horas' : 'Ver horas'}
-                          </Button>
-
-                          {expandedId === enrollment.id && (
-                            <div className="space-y-2 rounded-md border p-3">
-                              {hoursLoading && <Skeleton className="h-16 w-full" />}
-                              {!hoursLoading && hours.length === 0 && (
-                                <p className="text-xs text-muted-foreground">
-                                  Aún no hay horas registradas.
-                                </p>
-                              )}
-                              {!hoursLoading &&
-                                hours.map((entry) => (
-                                  <div
-                                    key={entry.id}
-                                    className="flex flex-wrap items-center justify-between gap-2 border-b pb-2 last:border-0"
-                                  >
-                                    <div>
-                                      <p>
-                                        {formatBogota(entry.date)} · {formatHours(entry.hours)}
-                                      </p>
-                                      <p className="text-xs text-muted-foreground">
-                                        {entry.description}
-                                      </p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <Badge variant={hoursStatusVariant(entry.status)}>
-                                        {HOURS_STATUS_LABELS[entry.status]}
-                                      </Badge>
-                                      {canManage && entry.status === 'pending' && (
-                                        <>
-                                          <Button
-                                            size="sm"
-                                            onClick={() =>
-                                              void decideHours(entry.id, enrollment.id, {
-                                                decision: 'approve',
-                                              })
-                                            }
-                                          >
-                                            Aprobar
-                                          </Button>
-                                          {rejectingHoursId === entry.id ? (
-                                            <>
-                                              <Input
-                                                placeholder="Motivo"
-                                                value={rejectHoursReason}
-                                                onChange={(e) =>
-                                                  setRejectHoursReason(e.target.value)
-                                                }
-                                                className="h-9 w-40"
-                                              />
-                                              <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() =>
-                                                  void decideHours(entry.id, enrollment.id, {
-                                                    decision: 'reject',
-                                                    reason: rejectHoursReason,
-                                                  })
-                                                }
-                                              >
-                                                Confirmar
-                                              </Button>
-                                            </>
-                                          ) : (
-                                            <Button
-                                              size="sm"
-                                              variant="outline"
-                                              onClick={() => setRejectingHoursId(entry.id)}
-                                            >
-                                              Rechazar
-                                            </Button>
-                                          )}
-                                        </>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
-                            </div>
-                          )}
-
-                          {canManage &&
-                            (certificates[enrollment.id] ? (
-                              <p className="text-xs text-muted-foreground">
-                                Certificado emitido:{' '}
-                                {certificates[enrollment.id].totalApprovedHours} horas efectivas.
-                              </p>
-                            ) : (
-                              <Button
-                                size="sm"
-                                onClick={() => void issueCertificate(enrollment.id)}
-                              >
-                                Emitir certificado
-                              </Button>
-                            ))}
+                      {/* Motivo de rechazo */}
+                      {enrollment.status === 'rejected' && enrollment.rejectionReason && (
+                        <div className="mt-3 rounded-md bg-destructive/5 border border-destructive/20 px-3 py-2">
+                          <p className="text-xs text-destructive">
+                            <span className="font-medium">Motivo:</span>{' '}
+                            {enrollment.rejectionReason}
+                          </p>
                         </div>
                       )}
 
-                      {enrollment.status === 'rejected' && enrollment.rejectionReason && (
-                        <p className="text-xs text-muted-foreground">
-                          Motivo: {enrollment.rejectionReason}
-                        </p>
+                      {/* Panel de horas para inscripciones aceptadas/completadas */}
+                      {(enrollment.status === 'accepted' || enrollment.status === 'completed') && (
+                        <div className="mt-3 space-y-3 border-t pt-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void toggleHours(enrollment.id)}
+                            >
+                              {expandedId === enrollment.id ? (
+                                <>
+                                  <span aria-hidden>▲</span> Ocultar horas
+                                </>
+                              ) : (
+                                <>
+                                  <span aria-hidden>▼</span> Ver horas
+                                </>
+                              )}
+                            </Button>
+
+                            {canManage &&
+                              (certificates[enrollment.id] ? (
+                                <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-3 py-1 text-xs font-medium text-success">
+                                  <span aria-hidden>🏅</span>
+                                  Certificado emitido ·{' '}
+                                  {certificates[enrollment.id].totalApprovedHours} h
+                                </span>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  onClick={() => void issueCertificate(enrollment.id)}
+                                >
+                                  <span aria-hidden className="mr-1">
+                                    🏅
+                                  </span>
+                                  Emitir certificado
+                                </Button>
+                              ))}
+                          </div>
+
+                          {expandedId === enrollment.id && (
+                            <div className="rounded-lg bg-muted/30 p-3">
+                              {hoursLoading && <Skeleton className="h-16 w-full" />}
+                              {!hoursLoading && hours.length === 0 && (
+                                <p className="text-center text-xs text-muted-foreground py-3">
+                                  Aún no hay horas registradas por este voluntario.
+                                </p>
+                              )}
+                              {!hoursLoading && hours.length > 0 && (
+                                <ul className="space-y-2">
+                                  {hours.map((entry) => (
+                                    <li
+                                      key={entry.id}
+                                      className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-card p-3 text-sm shadow-sm"
+                                    >
+                                      <div className="min-w-0">
+                                        <p className="font-medium text-foreground">
+                                          {formatBogota(entry.date)} · {formatHours(entry.hours)}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                          {entry.description}
+                                        </p>
+                                      </div>
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <Badge variant={hoursStatusVariant(entry.status)}>
+                                          {HOURS_STATUS_LABELS[entry.status]}
+                                        </Badge>
+                                        {canManage && entry.status === 'pending' && (
+                                          <>
+                                            <Button
+                                              size="sm"
+                                              onClick={() =>
+                                                void decideHours(entry.id, enrollment.id, {
+                                                  decision: 'approve',
+                                                })
+                                              }
+                                            >
+                                              <span aria-hidden>✓</span> Aprobar
+                                            </Button>
+                                            {rejectingHoursId === entry.id ? (
+                                              <>
+                                                <Input
+                                                  placeholder="Motivo"
+                                                  value={rejectHoursReason}
+                                                  onChange={(e) =>
+                                                    setRejectHoursReason(e.target.value)
+                                                  }
+                                                  className="h-9 w-36"
+                                                />
+                                                <Button
+                                                  size="sm"
+                                                  variant="outline"
+                                                  onClick={() =>
+                                                    void decideHours(entry.id, enrollment.id, {
+                                                      decision: 'reject',
+                                                      reason: rejectHoursReason,
+                                                    })
+                                                  }
+                                                >
+                                                  Confirmar
+                                                </Button>
+                                                <Button
+                                                  size="sm"
+                                                  variant="outline"
+                                                  onClick={() => {
+                                                    setRejectingHoursId(null);
+                                                    setRejectHoursReason('');
+                                                  }}
+                                                >
+                                                  Cancelar
+                                                </Button>
+                                              </>
+                                            ) : (
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => setRejectingHoursId(entry.id)}
+                                              >
+                                                Rechazar
+                                              </Button>
+                                            )}
+                                          </>
+                                        )}
+                                      </div>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       )}
                     </li>
                   ))}

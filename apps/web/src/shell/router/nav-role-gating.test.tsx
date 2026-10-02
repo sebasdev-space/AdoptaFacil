@@ -411,7 +411,7 @@ describe('S-6 (M08, RF18/RF19) · "Voluntariado" surface demands VOLUNTEERING_VI
 
   it('leaves "Mi voluntariado" (Persona-facing, no @Roles) reachable without an org role', async () => {
     renderShell({ route: '/voluntariado', ...sessionWith([]) });
-    expect(await screen.findByRole('heading', { name: 'Voluntariado' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Mi voluntariado' })).toBeInTheDocument();
     expect(screen.queryByText('Sin acceso')).not.toBeInTheDocument();
   });
 });

@@ -96,7 +96,7 @@ describe('VolunteerOpportunityDetailPage (RF18/RF19)', () => {
 
     expect(await screen.findByText('Juan Voluntario')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Rechazar' }));
-    fireEvent.change(screen.getByPlaceholderText('Motivo del rechazo'), {
+    fireEvent.change(screen.getByPlaceholderText(/^Motivo del rechazo/), {
       target: { value: 'Cupo lleno' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar rechazo' }));
@@ -173,8 +173,7 @@ describe('VolunteerOpportunityDetailPage (RF18/RF19)', () => {
     expect(await screen.findByText('Horas aprobadas')).toBeInTheDocument();
 
     fireEvent.click(await screen.findByRole('button', { name: 'Emitir certificado' }));
-    expect(await screen.findByText('Certificado emitido')).toBeInTheDocument();
-    expect(await screen.findByText(/3 horas efectivas/)).toBeInTheDocument();
+    expect(await screen.findByText(/Certificado emitido.*3 h/)).toBeInTheDocument();
   });
 
   it('hides management actions for ReadOnlyAuditor (view-only)', async () => {

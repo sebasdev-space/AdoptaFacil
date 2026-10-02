@@ -91,9 +91,8 @@ describe('MyVolunteeringPage (RF18/RF19)', () => {
     });
     renderShell({ route: '/voluntariado', ...sessionWith([]) });
 
-    expect(
-      await screen.findByText(/Jornada de esterilización · Refugio Patitas/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Jornada de esterilización')).toBeInTheDocument();
+    expect(screen.getByText('Refugio Patitas')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Inscribirme' }));
 
     expect(await screen.findByText('Inscripción enviada')).toBeInTheDocument();
@@ -227,9 +226,8 @@ describe('MyVolunteeringPage (RF18/RF19)', () => {
     });
     renderShell({ route: '/voluntariado', ...sessionWith([]) });
 
-    expect(
-      await screen.findByText('Jornada de esterilización · Refugio Patitas'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Jornada de esterilización')).toBeInTheDocument();
+    expect(screen.getByText('Refugio Patitas')).toBeInTheDocument();
     expect(screen.getByText(/12 horas efectivas/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Descargar PDF' })).toBeInTheDocument();
   });

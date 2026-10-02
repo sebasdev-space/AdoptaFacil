@@ -84,17 +84,17 @@ describe('VolunteerOpportunitiesPage (RF18)', () => {
     renderShell({ route: '/organizacion/voluntariado', ...sessionWith([Role.Owner]) });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Publicar oportunidad' }));
-    fireEvent.change(screen.getByLabelText('Título'), {
+    fireEvent.change(screen.getByLabelText(/^Título/), {
       target: { value: 'Jornada de esterilización' },
     });
-    fireEvent.change(screen.getByLabelText('Categoría'), {
+    fireEvent.change(screen.getByLabelText(/^Categoría/), {
       target: { value: 'sterilizations' },
     });
-    fireEvent.change(screen.getByLabelText('Fecha de inicio'), {
+    fireEvent.change(screen.getByLabelText(/^Fecha de inicio/), {
       target: { value: '2026-09-01' },
     });
-    fireEvent.change(screen.getByLabelText('Fecha de fin'), { target: { value: '2026-09-30' } });
-    fireEvent.change(screen.getByLabelText('Ubicación'), { target: { value: 'Refugio Patitas' } });
+    fireEvent.change(screen.getByLabelText(/^Fecha de fin/), { target: { value: '2026-09-30' } });
+    fireEvent.change(screen.getByLabelText(/^Ubicación/), { target: { value: 'Refugio Patitas' } });
     fireEvent.click(screen.getByRole('button', { name: 'Publicar oportunidad' }));
 
     expect(await screen.findByText('Oportunidad publicada')).toBeInTheDocument();
