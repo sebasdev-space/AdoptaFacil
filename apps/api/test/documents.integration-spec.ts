@@ -194,6 +194,21 @@ describe('Organization documents (M01, RF03: versioning + RBAC + platform review
     await decide(platformAdmin.token, docId, 'observe', 'Ilegible').expect(201);
   });
 
+  it('S-14: the org reads the rejection note back through its OWN GET /org/documents (point #5, client-facing)', async () => {
+    const fresh = await upload(owner.token).expect(201);
+    const id = fresh.body.document.id;
+    const reason = 'El RUT está vencido, sube una copia vigente.';
+
+    await decide(platformAdmin.token, id, 'reject', reason).expect(201);
+
+    const list = await request(server)
+      .get('/org/documents')
+      .set('Authorization', `Bearer ${owner.token}`)
+      .expect(200);
+    const seen = list.body.find((d: { id: string }) => d.id === id);
+    expect(seen).toMatchObject({ status: 'rejected', reviewNote: reason });
+  });
+
   it('forbids an org role from deciding (403)', async () => {
     const fresh = await upload(owner.token).expect(201);
     await decide(owner.token, fresh.body.document.id, 'approve').expect(403);
