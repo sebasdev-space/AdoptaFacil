@@ -10,6 +10,7 @@ import {
   DONATIONS_MANAGEMENT_ROLES,
   MARKETPLACE_VIEW_ROLES,
   ORG_DOCUMENTS_ROLES,
+  ORG_DONATIONS_DASHBOARD_ROLES,
   ORG_MEMBER_ROLES,
   PLATFORM_ADMIN_DASHBOARD_ROLES,
   PLATFORM_DOCUMENTS_ROLES,
@@ -34,6 +35,7 @@ import {
   ExogenousReportPage,
   NationalTransparencyPage,
   OrgDocumentsPage,
+  OrgDonationsDashboardPage,
   OrgFormalizationPage,
   OrgLegalRepresentativePage,
   OrgProfilePage,
@@ -368,6 +370,17 @@ export function AppRoutes() {
             element={
               <RequireRoles roles={ORG_DOCUMENTS_ROLES}>
                 <OrgDocumentsPage />
+              </RequireRoles>
+            }
+          />
+          {/* M13 (S-14) · dashboard de donaciones/campañas de la organización —
+              pedido del cliente. Qué secciones concretas trae la respuesta ya
+              lo decide el backend según el rol real del actor. */}
+          <Route
+            path="organizacion/dashboard-donaciones"
+            element={
+              <RequireRoles roles={ORG_DONATIONS_DASHBOARD_ROLES}>
+                <OrgDonationsDashboardPage />
               </RequireRoles>
             }
           />

@@ -33,6 +33,20 @@ export const ANIMAL_VIEW_ROLES = [
 
 export const ORG_DOCUMENTS_ROLES = [Role.Owner, Role.Administrator, Role.ReadOnlyAuditor] as const;
 
+/**
+ * M13 (S-14) — "Dashboard de donaciones y campañas" de la organización. Es
+ * la UNIÓN de los tres roles-por-sección del backend
+ * (`OrgDonationsDashboardController`'s `@Roles`): cada sección individual
+ * (donaciones/campañas/apadrinamientos) puede ser más angosta — el backend
+ * decide eso, no este menú.
+ */
+export const ORG_DONATIONS_DASHBOARD_ROLES = [
+  Role.Owner,
+  Role.Administrator,
+  Role.Operator,
+  Role.ReadOnlyAuditor,
+] as const;
+
 export const PLATFORM_DOCUMENTS_ROLES = [Role.PlatformAdmin, Role.PlatformSuperAdmin] as const;
 
 /**
@@ -427,6 +441,17 @@ export const navItems: NavItem[] = [
         comingSoon: true,
       },
     ],
+  },
+  // M13 (S-14) · dashboard de donaciones/campañas de la organización — pedido
+  // del cliente. Ruta hermana de "Documentos", misma zona del menú. Visible
+  // a Owner/Administrator/Operator/ReadOnlyAuditor (unión de las 3 secciones);
+  // qué secciones concretas trae la respuesta lo decide el backend según el
+  // rol real del actor.
+  {
+    path: '/organizacion/dashboard-donaciones',
+    label: 'Donaciones y campañas',
+    icon: MegaphoneIcon,
+    roles: ORG_DONATIONS_DASHBOARD_ROLES,
   },
   // M14 · portal personalization by tokens (T-027) — REMOVED from the sidebar
   // (S2-04A §4): it now lives as a button inside "Mi organización"'s action bar
