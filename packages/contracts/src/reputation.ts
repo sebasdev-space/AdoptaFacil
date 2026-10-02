@@ -16,11 +16,19 @@ export enum ReviewStatus {
  * approved -> hidden). `authorUserId` siempre queda registrado internamente
  * aunque `isAnonymous` sea true — la anonimidad es únicamente de cara al
  * público (mismo criterio que las donaciones anónimas de RF13/M05).
+ *
+ * Excepción (S7-b, reseña pública del portal): `authorUserId` es `undefined`
+ * cuando la reseña viene del botón "Registrar reseña" del portal público
+ * (`POST /public/organizations/:slug/reviews`, sin sesión) — no hay ninguna
+ * identidad que registrar. Esas filas nacen ya `Approved` y su único
+ * moderador es el Owner/Administrator de la organización reseñada
+ * (`POST /reviews/:id/mark-spam`), nunca PlatformAdmin.
  */
 export interface Review {
   id: string;
   organizationId: string;
-  authorUserId: string;
+  /** Ausente para una reseña pública/anónima del portal (ver nota de arriba). */
+  authorUserId?: string;
   rating: number;
   comment?: string;
   isAnonymous: boolean;
@@ -53,6 +61,13 @@ export interface CreateReviewInput {
   rating: number;
   comment?: string;
   isAnonymous?: boolean;
+}
+
+/** `POST /public/organizations/:slug/reviews` (S7-b) — sin sesión, la org sale
+ *  del slug de la URL, no del body. Siempre anónima (no hay identidad). */
+export interface CreatePublicReviewInput {
+  rating: number;
+  comment?: string;
 }
 
 export type ReviewDecision = 'approve' | 'reject';

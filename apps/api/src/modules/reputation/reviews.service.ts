@@ -147,4 +147,34 @@ export class ReviewsService {
     const items = rows[0]?.data ?? [];
     return items.map(fromMineRow);
   }
+
+  /**
+   * Marca como spam una reseña PÚBLICA/anónima de la PROPIA organización del
+   * actor (S7-b) — el único moderador de este tipo de reseña es el
+   * Owner/Administrator reseñado, nunca PlatformAdmin (esas siguen exclusivas
+   * de `PlatformReviewsService`). `owner_mark_review_spam` rechaza cualquier
+   * reseña autenticada (author_user_id NOT NULL) o de otra organización.
+   */
+  async markSpam(actor: RequestUser, reviewId: string): Promise<Review> {
+    try {
+      const rows = await this.prisma.$queryRaw<Array<{ data: Review }>>(
+        Prisma.sql`SELECT owner_mark_review_spam(${reviewId}::uuid, ${actor.organizationId}::uuid, ${actor.id}::uuid) AS data`,
+      );
+      return rows[0].data;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/review not found/i.test(message)) {
+        throw new NotFoundException('Review not found');
+      }
+      if (/only a public \(anonymous\) review/i.test(message)) {
+        throw new BadRequestException(
+          'Solo una reseña pública (anónima) puede marcarse como spam por la organización.',
+        );
+      }
+      if (/only an approved review/i.test(message)) {
+        throw new BadRequestException('Solo una reseña aprobada puede marcarse como spam.');
+      }
+      throw error;
+    }
+  }
 }

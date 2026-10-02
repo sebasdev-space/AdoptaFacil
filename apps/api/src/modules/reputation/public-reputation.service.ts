@@ -1,11 +1,26 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import {
+  type CreatePublicReviewInput,
   type OrganizationReputationSummary,
   type Paginated,
   type PublicReview,
+  type Review,
+  ReviewStatus,
 } from '@adoptafacil/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
+
+/** Raw row from `create_public_review(...)` — snake_case, real Date object. */
+interface PublicReviewRawRow {
+  id: string;
+  organization_id: string;
+  author_user_id: string | null;
+  rating: number;
+  comment: string | null;
+  is_anonymous: boolean;
+  status: string;
+  created_at: Date;
+}
 
 const DEFAULT_PAGE = 20;
 const MAX_PAGE = 50;
@@ -71,6 +86,43 @@ export class PublicReputationService {
       total: data.total ?? 0,
       limit: take,
       offset: skip,
+    };
+  }
+
+  /**
+   * Reseña del portal público (S7-b, botón "Registrar reseña") — sin sesión,
+   * siempre anónima, visible de inmediato (nace `approved`; el cliente pidió
+   * "cuando se registre, este se debe mostrar en el portal público", sin cola
+   * de PlatformAdmin de por medio). Su único moderador es el Owner de la
+   * organización, vía `ReviewsService.markSpam`.
+   */
+  async createPublicReview(slug: string, input: CreatePublicReviewInput): Promise<Review> {
+    const organizationId = await this.resolveOrgId(slug);
+    if (!organizationId) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    const rows = await this.prisma.$queryRaw<PublicReviewRawRow[]>(
+      Prisma.sql`SELECT * FROM create_public_review(
+        ${organizationId}::uuid,
+        ${input.rating}::int,
+        ${input.comment ?? null}
+      )`,
+    );
+    const row = rows[0];
+    if (!row) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    return {
+      id: row.id,
+      organizationId: row.organization_id,
+      authorUserId: row.author_user_id ?? undefined,
+      rating: row.rating,
+      comment: row.comment ?? undefined,
+      isAnonymous: row.is_anonymous,
+      status: row.status as ReviewStatus,
+      createdAt: row.created_at.toISOString(),
     };
   }
 }

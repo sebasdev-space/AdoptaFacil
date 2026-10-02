@@ -102,3 +102,62 @@ describe('ReviewsService.create (RF23)', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 });
+
+describe('ReviewsService.markSpam (S7-b — Owner moderation of PUBLIC reviews only)', () => {
+  it('marks a public review as spam, scoped to the actor own organization', async () => {
+    const h = makeService();
+    h.queryRaw.mockResolvedValueOnce([
+      {
+        data: {
+          id: 'rev-public-1',
+          organizationId: 'org-self',
+          authorUserId: null,
+          rating: 1,
+          comment: 'spam link',
+          isAnonymous: true,
+          status: 'hidden',
+          moderatedByUserId: 'user-1',
+          moderatedAt: '2026-09-29T00:00:00.000Z',
+          rejectionReason: 'spam',
+          createdAt: '2026-09-28T00:00:00.000Z',
+        },
+      },
+    ]);
+
+    const result = await h.service.markSpam(actor, 'rev-public-1');
+
+    expect(result).toMatchObject({ id: 'rev-public-1', status: 'hidden', rejectionReason: 'spam' });
+    expect(h.queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps "review not found" (unknown id, or belongs to another organization) to 404', async () => {
+    const h = makeService();
+    h.queryRaw.mockRejectedValueOnce(new Error('review not found'));
+
+    await expect(h.service.markSpam(actor, 'rev-missing')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
+  it('maps the "only a public review" DB guard to 400 (never a verified/authenticated review)', async () => {
+    const h = makeService();
+    h.queryRaw.mockRejectedValueOnce(
+      new Error('only a public (anonymous) review can be marked as spam by the organization'),
+    );
+
+    await expect(h.service.markSpam(actor, 'rev-verified')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+
+  it('maps the "only an approved review" DB guard to 400 (already hidden, no double spam-marking)', async () => {
+    const h = makeService();
+    h.queryRaw.mockRejectedValueOnce(
+      new Error('only an approved review can be marked as spam (status=hidden)'),
+    );
+
+    await expect(h.service.markSpam(actor, 'rev-already-hidden')).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+  });
+});
