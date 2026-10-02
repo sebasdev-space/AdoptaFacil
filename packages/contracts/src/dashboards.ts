@@ -1,4 +1,5 @@
 // Module: dashboards (M13) · Contracts owner: @sebastian
+import type { CampaignStatus } from './campaigns';
 //
 // Minimal organization summary (S2-08, adelantado de Ola 3 para el pitch del
 // 13-ago — decisión `RutaPresentacion_13Ago_20260809.md`). SOLO conteos/totales
@@ -153,4 +154,75 @@ export interface PlatformSuperAdminDashboardSummary {
   activeSponsorships: number;
   organizationsByDepartment: OrganizationDepartmentCount[];
   organizationsGrowth: OrganizationsGrowth;
+}
+
+// ============================================================================
+// M13, S-14 — Dashboard de donaciones/campañas de la organización. Pedido del
+// cliente: "dashboard informativo de donaciones... según el rol pueda ver la
+// información a la que tiene acceso". NO introduce un permiso nuevo: cada
+// sección se muestra únicamente si el actor tiene alguno de los roles que YA
+// pueden ver esos datos en su propio módulo hoy —
+//   donations    -> Owner/Administrator/Operator   (mismos que `GET /donations/received`)
+//   campaigns    -> Owner/Administrator/Operator/ReadOnlyAuditor (mismos que `GET /campaigns`)
+//   sponsorships -> Owner/Administrator/ReadOnlyAuditor (mismos que `GET /sponsorships`, SIN Operator)
+// Una sección ausente (`undefined`) significa "tu rol no la ve aquí tampoco" —
+// nunca un arreglo/objeto vacío fingiendo "no hay datos".
+// ============================================================================
+
+/**
+ * Conteo de DONACIONES por estado — NO es un conteo de "contratos de
+ * donación": ese concepto no existe todavía en el sistema (pendiente, módulo
+ * de Fabián). `netReceivedTotal` es la MISMA definición de
+ * `OrganizationDashboardSummary.donationsReceivedTotal` (aprobadas,
+ * `conceptKind === 'organization'`, nunca duplica lo atribuido a campañas);
+ * los conteos por estado, en cambio, SÍ incluyen todas las donaciones de la
+ * organización sin importar el concepto — reflejan el embudo de revisión, no
+ * una cifra financiera.
+ */
+export interface DonationsStatusCounts {
+  pending: number;
+  approved: number;
+  declined: number;
+  netReceivedTotal: number;
+}
+
+/** Una campaña con su avance real — misma `computeProgress()` (M06) que ya
+ *  usa la proyección pública, nunca una fórmula nueva. */
+export interface CampaignPerformanceItem {
+  id: string;
+  title: string;
+  status: CampaignStatus;
+  goalAmount: number;
+  raisedAmount: number;
+  /** 0–1, igual que `Campaign.progress`. */
+  progress: number;
+  deadline: string;
+  /** `true` si `deadline` cae dentro de los próximos 14 días Y la campaña
+   *  sigue `Active` — ventana fija, mismo espíritu que
+   *  `documentsExpiringSoon` pero sin configuración (no se pidió). */
+  endingSoon: boolean;
+}
+
+/** Salud de facturación de los apadrinamientos de la organización.
+ *  `atPaymentRisk` cuenta apadrinamientos ACTIVOS cuyo período de facturación
+ *  más reciente (`SponsorshipPayment` con el `period` más alto) quedó en
+ *  `pending` o `failed` — riesgo real de cobro, dato que hoy no se agrega en
+ *  ningún lugar del sistema. */
+export interface SponsorshipsHealthSummary {
+  active: number;
+  suspended: number;
+  cancelled: number;
+  atPaymentRisk: number;
+}
+
+/**
+ * Dashboard de donaciones/campañas de UNA organización (tenant-scoped). Cada
+ * campo es opcional porque la VISIBILIDAD depende del rol del actor (ver nota
+ * de arriba) — Owner/Administrator siempre ven los tres; Operator ve
+ * `donations`+`campaigns`; ReadOnlyAuditor ve `campaigns`+`sponsorships`.
+ */
+export interface OrgDonationsDashboardSummary {
+  donations?: DonationsStatusCounts;
+  campaigns?: CampaignPerformanceItem[];
+  sponsorships?: SponsorshipsHealthSummary;
 }

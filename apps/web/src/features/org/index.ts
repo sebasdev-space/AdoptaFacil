@@ -7,6 +7,7 @@ export { PlatformDuplicatesReviewPage } from './pages/platform-duplicates-review
 export { PlatformReviewsReviewPage } from './pages/platform-reviews-review-page';
 export { PlatformAdminDashboardPage } from './pages/platform-admin-dashboard-page';
 export { PlatformSuperAdminDashboardPage } from './pages/platform-super-admin-dashboard-page';
+export { OrgDonationsDashboardPage } from './pages/org-donations-dashboard-page';
 export { OrgVolunteeringPage } from './pages/org-volunteering-page';
 export { NationalTransparencyPage } from './pages/national-transparency-page';
 export { ExogenousReportPage } from './pages/exogenous-report-page';
