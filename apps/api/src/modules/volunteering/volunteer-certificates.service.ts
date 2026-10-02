@@ -7,8 +7,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, type VolunteerCertificate as CertificateRow } from '@prisma/client';
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import {
+  type PDFFont,
+  type PDFImage,
+  type PDFPage,
+  PDFDocument,
+  StandardFonts,
+  rgb,
+} from 'pdf-lib';
 import type {
+  OrganizationLocation,
   Paginated,
   VolunteerCertificate,
   VolunteerCertificateBitacoraEntry,
@@ -21,6 +29,7 @@ import {
   NOTIFICATION_PORT,
   type NotificationPort,
 } from '../../core/notifications/notification.port';
+import { LegalRepresentativeService } from '../org/legal-representative.service';
 import {
   checkCertificateEligibility,
   missingGuardianInfo,
@@ -164,6 +173,7 @@ export class VolunteerCertificatesService {
     private readonly tenant: TenantContextService,
     private readonly audit: AuditService,
     @Inject(NOTIFICATION_PORT) private readonly notifications: NotificationPort,
+    private readonly legalRepresentatives: LegalRepresentativeService,
   ) {}
 
   private requireOrgId(): string {
@@ -356,84 +366,390 @@ export class VolunteerCertificatesService {
     return row;
   }
 
-  /** Renders the certificate as a simple, legible PDF — same `pdf-lib`
-   *  technique already used for the M03 vaccination carnet (`CarnetService`),
-   *  generated on demand from the stored (immutable) record, never persisted
-   *  as a separate file via StoragePort. */
+  /** Best-effort: the issuing org's city (for "Emitido en <ciudad>, el
+   *  <fecha>"), read fresh at render time — absent rather than fabricated
+   *  when the org never filled it in, or on any read failure. */
+  private async getOrgCity(organizationId: string): Promise<string | undefined> {
+    try {
+      const profile = await this.prisma.withOrgContext(organizationId, (tx) =>
+        tx.organizationProfile.findUnique({
+          where: { organizationId },
+          select: { location: true },
+        }),
+      );
+      const location = profile?.location as OrganizationLocation | null | undefined;
+      return location?.city?.trim() || undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Renders the certificate as an actual diploma-style document (S-14,
+   * pedido del cliente: "debe ser realmente un verdadero certificado de horas
+   * sociales"), landscape A4 — organization letterhead, the volunteer's name
+   * as the honoree (diploma convention), hours/dates/opportunity, and a real
+   * signature block: the org's CURRENT legal representative's name +
+   * DECRYPTED signature image (`LegalRepresentativeService`, S-14), never
+   * fabricated — falls back to a generic "Representante Legal" label when no
+   * legal representative has been registered yet, or if the signature can't
+   * be read/decrypted for any reason.
+   *
+   * Same `pdf-lib` technique already used for the M03 vaccination carnet
+   * (`CarnetService`), generated on demand from the stored (immutable)
+   * record, never persisted as a separate file via StoragePort. The
+   * bitácora (hour-by-hour log) moves to a plain portrait appendix page —
+   * it doesn't belong on the ornate certificate page, but nothing it showed
+   * before is lost.
+   */
   async generatePdf(id: string, actor: RequestUser): Promise<Buffer> {
     const row = await this.forViewer(id, actor);
     if (!row) {
       throw new NotFoundException('Volunteer certificate not found');
     }
 
+    const [signer, city] = await Promise.all([
+      this.legalRepresentatives.getCurrentSignerForOrg(row.organizationId).catch(() => null),
+      this.getOrgCity(row.organizationId),
+    ]);
+
     const pdf = await PDFDocument.create();
-    const font = await pdf.embedFont(StandardFonts.Helvetica);
-    const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-    const margin = 50;
-    const pageSize: [number, number] = [595.28, 841.89]; // A4
-    const page = pdf.addPage(pageSize);
-    let y = pageSize[1] - margin - 40;
+    const serif = await pdf.embedFont(StandardFonts.TimesRoman);
+    const serifBold = await pdf.embedFont(StandardFonts.TimesRomanBold);
+    const serifItalic = await pdf.embedFont(StandardFonts.TimesRomanItalic);
+    const sans = await pdf.embedFont(StandardFonts.Helvetica);
+    const sansBold = await pdf.embedFont(StandardFonts.HelveticaBold);
+    // Embebido ANTES de dibujar (pdf-lib es async aquí) — nunca dentro de la
+    // función de dibujo, que debe quedar síncrona. Una firma corrupta/no-PNG
+    // nunca rompe la generación: se sigue sin imagen (fallback de texto).
+    const signatureImage = signer
+      ? await pdf.embedPng(signer.signatureImage).catch(() => null)
+      : null;
 
-    function drawLine(text: string, options: { size?: number; useBold?: boolean } = {}): void {
-      const size = options.size ?? 12;
-      page.drawText(text, {
-        x: margin,
-        y,
-        size,
-        font: options.useBold ? bold : font,
-        color: rgb(0.1, 0.1, 0.1),
-      });
-      y -= size + 10;
-    }
-
-    drawLine(row.organizationName, { size: 14, useBold: true });
-    drawLine('Certificado de voluntariado', { size: 18, useBold: true });
-    y -= 10;
-    drawLine(`Se certifica que ${row.volunteerName}`, { size: 12 });
-    if (row.guardianName) {
-      // S-12 (FSD v3.5 Doc 8): "quien actúa con la debida autorización de su
-      // acudiente" — only present for a minor's student-service certificate.
-      drawLine(
-        `quien actúa con la debida autorización de su acudiente ${row.guardianName}` +
-          (row.guardianDocument ? ` (Doc. ${row.guardianDocument}),` : ','),
-        { size: 10 },
-      );
-    }
-    drawLine(`participó en "${row.opportunityTitle}"`, { size: 12 });
-    drawLine(`del ${formatCO(row.periodStart)} al ${formatCO(row.periodEnd)},`, { size: 12 });
-    drawLine(`completando ${row.totalApprovedHours} horas efectivas.`, { size: 12, useBold: true });
-    if (row.appliesToStudentService) {
-      y -= 6;
-      drawLine('Válido para servicio social estudiantil (Resolución 4210/1996, art. 6°).', {
-        size: 10,
-      });
-      if (row.schoolName) {
-        drawLine(
-          `Institución educativa: ${row.schoolName}` +
-            (row.schoolAgreementCode ? ` (Convenio ${row.schoolAgreementCode})` : ''),
-          { size: 10 },
-        );
-      }
-    }
-    y -= 20;
-    drawLine(`Emitido el ${formatCO(row.issuedAt)}.`, { size: 10 });
+    drawCertificatePage(pdf, {
+      font: { serif, serifBold, serifItalic, sans, sansBold },
+      row,
+      signer,
+      signatureImage,
+      city,
+    });
 
     if (row.bitacora.length > 0) {
-      y -= 20;
-      drawLine('Bitácora de horas certificadas:', { size: 11, useBold: true });
-      // No pagination (matches this generator's existing simplicity — same
-      // as the rest of the layout above); a very long bitácora will simply
-      // run off the single A4 page, same limitation the rest of this PDF
-      // already has.
-      for (const entry of row.bitacora) {
-        const supervisor = entry.supervisorName ? ` · Supervisor: ${entry.supervisorName}` : '';
-        drawLine(`${formatCO(entry.date)} — ${entry.hours}h — ${entry.description}${supervisor}`, {
-          size: 9,
-        });
-      }
+      drawBitacoraAppendix(pdf, { font: { sans, sansBold }, row });
     }
 
     const bytes = await pdf.save();
     return Buffer.from(bytes);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Dibujo del PDF (S-14) — funciones libres (no dependen de `this`), reciben
+// todo lo que necesitan por parámetro. Separado de la clase para que el
+// layout del certificado se pueda leer/ajustar sin tocar la lógica de datos.
+// ---------------------------------------------------------------------------
+
+const NAVY = rgb(0.08, 0.16, 0.3);
+const GOLD = rgb(0.62, 0.5, 0.22);
+const INK = rgb(0.15, 0.15, 0.15);
+const MUTED = rgb(0.42, 0.42, 0.42);
+
+interface CertificateFonts {
+  serif: PDFFont;
+  serifBold: PDFFont;
+  serifItalic: PDFFont;
+  sans: PDFFont;
+  sansBold: PDFFont;
+}
+
+function drawCentered(
+  page: PDFPage,
+  pageWidth: number,
+  text: string,
+  y: number,
+  font: PDFFont,
+  size: number,
+  color = INK,
+): void {
+  const width = font.widthOfTextAtSize(text, size);
+  page.drawText(text, { x: (pageWidth - width) / 2, y, size, font, color });
+}
+
+/** Word-wraps `text` to fit within `maxWidth` at `size` — pdf-lib never wraps
+ *  text on its own. Never splits a single word, however long. */
+function wrapText(text: string, font: PDFFont, size: number, maxWidth: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = '';
+  for (const word of words) {
+    const attempt = current ? `${current} ${word}` : word;
+    if (current && font.widthOfTextAtSize(attempt, size) > maxWidth) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = attempt;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+function drawCenteredParagraph(
+  page: PDFPage,
+  pageWidth: number,
+  text: string,
+  startY: number,
+  font: PDFFont,
+  size: number,
+  maxWidth: number,
+  lineHeight: number,
+  color = INK,
+): number {
+  let y = startY;
+  for (const line of wrapText(text, font, size, maxWidth)) {
+    drawCentered(page, pageWidth, line, y, font, size, color);
+    y -= lineHeight;
+  }
+  return y;
+}
+
+function drawCenteredRule(
+  page: PDFPage,
+  pageWidth: number,
+  y: number,
+  width: number,
+  color: ReturnType<typeof rgb>,
+  thickness = 1,
+): void {
+  const x = (pageWidth - width) / 2;
+  page.drawLine({ start: { x, y }, end: { x: x + width, y }, thickness, color });
+}
+
+/** El certificado en sí: una sola página apaisada (diploma). */
+function drawCertificatePage(
+  pdf: PDFDocument,
+  input: {
+    font: CertificateFonts;
+    row: VolunteerCertificate;
+    signer: { fullName: string; position: string } | null;
+    signatureImage: PDFImage | null;
+    city?: string;
+  },
+): void {
+  const { font, row, signer, signatureImage, city } = input;
+  const PAGE_WIDTH = 841.89;
+  const PAGE_HEIGHT = 595.28;
+  const page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+  const outerMargin = 28;
+  const innerMargin = 40;
+  const contentWidth = PAGE_WIDTH - innerMargin * 2;
+
+  // Marco decorativo doble: borde grueso azul + filete dorado interior — el
+  // aspecto de "documento oficial" que pedía el cliente, sin depender de
+  // ningún color de marca dinámico (esto es un documento formal, no el
+  // portal público).
+  page.drawRectangle({
+    x: outerMargin,
+    y: outerMargin,
+    width: PAGE_WIDTH - outerMargin * 2,
+    height: PAGE_HEIGHT - outerMargin * 2,
+    borderColor: NAVY,
+    borderWidth: 2.5,
+  });
+  page.drawRectangle({
+    x: outerMargin + 8,
+    y: outerMargin + 8,
+    width: PAGE_WIDTH - (outerMargin + 8) * 2,
+    height: PAGE_HEIGHT - (outerMargin + 8) * 2,
+    borderColor: GOLD,
+    borderWidth: 1,
+  });
+
+  let y = PAGE_HEIGHT - innerMargin - 46;
+
+  // Membrete: nombre de la organización.
+  drawCentered(page, PAGE_WIDTH, row.organizationName.toUpperCase(), y, font.sansBold, 13, NAVY);
+  y -= 10;
+  drawCenteredRule(page, PAGE_WIDTH, y, 90, GOLD, 1.5);
+  y -= 42;
+
+  // Título — distingue constancia de servicio social estudiantil vs. certificado general.
+  const title = row.appliesToStudentService
+    ? 'CONSTANCIA DE SERVICIO SOCIAL ESTUDIANTIL'
+    : 'CERTIFICADO DE HORAS DE VOLUNTARIADO';
+  drawCentered(page, PAGE_WIDTH, title, y, font.serifBold, 25, NAVY);
+  y -= 30;
+  drawCenteredRule(page, PAGE_WIDTH, y, 220, GOLD, 1);
+  y -= 40;
+
+  drawCentered(
+    page,
+    PAGE_WIDTH,
+    'Se otorga el presente reconocimiento a:',
+    y,
+    font.serifItalic,
+    13,
+    MUTED,
+  );
+  y -= 36;
+
+  // El nombre del voluntario, protagonista del documento (convención de diploma).
+  drawCentered(page, PAGE_WIDTH, row.volunteerName, y, font.serifBold, 26, INK);
+  y -= 14;
+  drawCenteredRule(page, PAGE_WIDTH, y, 320, NAVY, 0.75);
+  y -= 34;
+
+  const bodyMaxWidth = contentWidth - 160;
+  const guardianClause = row.guardianName
+    ? ` quien actuó con la debida autorización de su acudiente ${row.guardianName}` +
+      (row.guardianDocument ? ` (documento ${row.guardianDocument}),` : ',')
+    : '';
+  const body =
+    `por su participación voluntaria en "${row.opportunityTitle}",${guardianClause} ` +
+    `desarrollada del ${formatCO(row.periodStart)} al ${formatCO(row.periodEnd)}, durante la cual ` +
+    `completó un total de ${row.totalApprovedHours} horas de servicio efectivamente verificadas.`;
+  y = drawCenteredParagraph(page, PAGE_WIDTH, body, y, font.serif, 13, bodyMaxWidth, 20);
+
+  if (row.appliesToStudentService) {
+    y -= 8;
+    y = drawCenteredParagraph(
+      page,
+      PAGE_WIDTH,
+      'Válido para servicio social estudiantil (Resolución 4210 de 1996, artículo 6°).' +
+        (row.schoolName
+          ? ` Institución educativa: ${row.schoolName}` +
+            (row.schoolAgreementCode ? ` (convenio ${row.schoolAgreementCode})` : '') +
+            '.'
+          : ''),
+      y,
+      font.serifItalic,
+      10.5,
+      bodyMaxWidth,
+      15,
+      MUTED,
+    );
+  }
+
+  // --- Pie: fecha/lugar de emisión (izquierda) + bloque de firma (derecha) ---
+  const footerY = outerMargin + 70;
+  const leftX = innerMargin + 20;
+  const issuedLine = city
+    ? `Emitido en ${city}, el ${formatCO(row.issuedAt)}.`
+    : `Emitido el ${formatCO(row.issuedAt)}.`;
+  page.drawText(issuedLine, { x: leftX, y: footerY, size: 10, font: font.sans, color: MUTED });
+  page.drawText(`Certificado N.° ${row.id.slice(0, 8).toUpperCase()}`, {
+    x: leftX,
+    y: footerY - 16,
+    size: 9,
+    font: font.sans,
+    color: MUTED,
+  });
+
+  const signatureBlockWidth = 220;
+  const signatureBlockX = PAGE_WIDTH - innerMargin - 20 - signatureBlockWidth;
+  const signatureLineY = footerY + 6;
+
+  if (signatureImage) {
+    // La imagen de la firma se dibuja ENCIMA de la línea (como una firma
+    // real), nunca ENCIMA del texto del nombre — igual que un documento
+    // firmado a mano. Ya viene embebida (async, resuelta antes de llamar a
+    // esta función síncrona) — aquí solo se posiciona.
+    const naturalWidth = signatureImage.width || 400;
+    const naturalHeight = signatureImage.height || 150;
+    const drawWidth = Math.min(160, naturalWidth);
+    const drawHeight = (drawWidth / naturalWidth) * naturalHeight;
+    page.drawImage(signatureImage, {
+      x: signatureBlockX + (signatureBlockWidth - drawWidth) / 2,
+      y: signatureLineY + 4,
+      width: drawWidth,
+      height: drawHeight,
+    });
+  }
+
+  drawCenteredRuleAt(page, signatureBlockX, signatureBlockWidth, signatureLineY, INK, 0.75);
+  const signerName = signer?.fullName ?? '________________________';
+  const signerPosition = signer?.position ?? 'Representante Legal';
+  drawCenteredIn(
+    page,
+    signatureBlockX,
+    signatureBlockWidth,
+    signerName,
+    signatureLineY - 16,
+    font.sansBold,
+    11,
+    INK,
+  );
+  drawCenteredIn(
+    page,
+    signatureBlockX,
+    signatureBlockWidth,
+    signer ? signerPosition : 'Representante Legal',
+    signatureLineY - 30,
+    font.sans,
+    9.5,
+    MUTED,
+  );
+}
+
+function drawCenteredRuleAt(
+  page: PDFPage,
+  blockX: number,
+  blockWidth: number,
+  y: number,
+  color: ReturnType<typeof rgb>,
+  thickness: number,
+): void {
+  page.drawLine({
+    start: { x: blockX, y },
+    end: { x: blockX + blockWidth, y },
+    thickness,
+    color,
+  });
+}
+
+function drawCenteredIn(
+  page: PDFPage,
+  blockX: number,
+  blockWidth: number,
+  text: string,
+  y: number,
+  font: PDFFont,
+  size: number,
+  color: ReturnType<typeof rgb>,
+): void {
+  const width = font.widthOfTextAtSize(text, size);
+  page.drawText(text, { x: blockX + (blockWidth - width) / 2, y, size, font, color });
+}
+
+/** Anexo con la bitácora hora a hora — página aparte, en vertical, con el
+ *  mismo estilo simple y legible que el generador anterior ya usaba (nada de
+ *  esto se pierde, solo se separa de la página del certificado). */
+function drawBitacoraAppendix(
+  pdf: PDFDocument,
+  input: { font: { sans: PDFFont; sansBold: PDFFont }; row: VolunteerCertificate },
+): void {
+  const { font, row } = input;
+  const margin = 50;
+  const pageSize: [number, number] = [595.28, 841.89]; // A4 vertical
+  const page = pdf.addPage(pageSize);
+  let y = pageSize[1] - margin - 20;
+
+  page.drawText(`Anexo — Bitácora de horas certificadas (${row.volunteerName})`, {
+    x: margin,
+    y,
+    size: 13,
+    font: font.sansBold,
+    color: INK,
+  });
+  y -= 26;
+
+  for (const entry of row.bitacora) {
+    const supervisor = entry.supervisorName ? ` · Supervisor: ${entry.supervisorName}` : '';
+    const line = `${formatCO(entry.date)} — ${entry.hours}h — ${entry.description}${supervisor}`;
+    for (const wrapped of wrapText(line, font.sans, 10, pageSize[0] - margin * 2)) {
+      if (y < margin) break; // límite simple de una sola página de anexo
+      page.drawText(wrapped, { x: margin, y, size: 10, font: font.sans, color: INK });
+      y -= 14;
+    }
   }
 }

@@ -202,6 +202,43 @@ describe('Volunteering (M08, RF18/RF19)', () => {
     await issueCertificate(org.token, enrollmentId).expect(400);
   });
 
+  it("S-14: the certificate PDF embeds the org's CURRENT legal representative + signature when one is registered", async () => {
+    // A minimal but genuinely valid 1x1 PNG — `embedPng` must accept it.
+    const signaturePng =
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+    await request(server)
+      .post('/org/legal-representative')
+      .set('Authorization', `Bearer ${org.token}`)
+      .send({
+        fullName: 'María Fernanda Gómez',
+        documentType: 'cedula_ciudadania',
+        documentNumber: '52.741.900',
+        position: 'Directora ejecutiva',
+        signatureBase64: signaturePng,
+        signatureContentType: 'image/png',
+      })
+      .expect(201);
+
+    const opportunity = await publishOpportunity(org.token, false).expect(201);
+    const enrolled = await enroll(volunteer.token, opportunity.body.id).expect(201);
+    await decideEnrollment(org.token, enrolled.body.id, { decision: 'accept' }).expect(200);
+    const issued = await issueCertificate(org.token, enrolled.body.id).expect(201);
+
+    // Still a valid PDF (never breaks generation because a signer now
+    // exists) — magic bytes + a real body, same assertion style already used
+    // above for the "no signer registered" case.
+    const pdf = await request(server)
+      .get(`/volunteer-certificates/${issued.body.id}/pdf`)
+      .set('Authorization', `Bearer ${volunteer.token}`)
+      .buffer()
+      .parse(binaryParser)
+      .expect(200);
+    expect(pdf.headers['content-type']).toContain('application/pdf');
+    const bytes = pdf.body as Buffer;
+    expect(bytes.subarray(0, 5).toString('utf8')).toBe('%PDF-');
+    expect(bytes.length).toBeGreaterThan(200);
+  });
+
   it('RF19: a student-service enrollment is blocked below 80 approved hours, and unblocked once reached', async () => {
     const opportunity = await publishOpportunity(org.token, true).expect(201);
     const opportunityId = opportunity.body.id;
