@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import type {
   Organization,
   OrganizationDuplicateWarning,
@@ -14,6 +15,7 @@ import {
   citiesForDepartment,
 } from '../data/colombian-locations';
 import { IMAGE_ACCEPT, uploadFileBytes, validateUpload } from '../lib/storage';
+import { MercadoPagoConnectSection } from './mercadopago-connect-section';
 import {
   OrgSelectField,
   OrgStaticField,
@@ -46,6 +48,7 @@ const TABS: OrgTabItem[] = [
   { value: 'ubicacion', label: 'Ubicación' },
   { value: 'contacto', label: 'Contacto' },
   { value: 'imagenes', label: 'Imágenes y redes' },
+  { value: 'pagos', label: 'Medios de pago' },
   { value: 'nosotros', label: 'Acerca de nosotros' },
 ];
 
@@ -364,7 +367,14 @@ export const OrgProfileForm = forwardRef<OrgProfileFormHandle, OrgProfileFormPro
   function OrgProfileForm({ initial, onSaved, onSavingChange }, ref) {
     const client = useApiClient();
     const { toast } = useToast();
-    const [activeTab, setActiveTab] = useState<string>(TABS[0].value);
+    const [searchParams] = useSearchParams();
+    // Vuelta del round trip OAuth de Mercado Pago (`?mercadopago=connected|error`,
+    // T-OAuth-Connect): abre la pestaña "Medios de pago" directamente en vez de
+    // dejar al usuario en "Datos institucionales" sin ver el resultado de la
+    // conexión que acaba de autorizar.
+    const [activeTab, setActiveTab] = useState<string>(() =>
+      searchParams.get('mercadopago') ? 'pagos' : TABS[0].value,
+    );
     const [form, setForm] = useState<FormState>(() => initialState(initial));
     const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
     const [saving, setSaving] = useState(false);
@@ -757,6 +767,14 @@ export const OrgProfileForm = forwardRef<OrgProfileFormHandle, OrgProfileFormPro
               />
             </div>
           </div>
+        </OrgTabPanel>
+
+        {/* Split de Pagos 1:1 (T-OAuth-Connect): su propia pestaña, no una
+            tarjeta fija debajo del formulario — antes aparecía sin importar
+            qué pestaña del perfil estuviera activa. No participa del guardado
+            de este formulario (conectar/desconectar ya es inmediato). */}
+        <OrgTabPanel value="pagos" activeValue={activeTab}>
+          <MercadoPagoConnectSection />
         </OrgTabPanel>
 
         <OrgTabPanel value="nosotros" activeValue={activeTab}>

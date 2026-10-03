@@ -408,6 +408,9 @@ export class MercadoPagoPaymentAdapter implements PaymentPort {
     const manifest = `id:${dataId.toLowerCase()};request-id:${requestId};ts:${ts};`;
     const computed = createHmac('sha256', this.webhookSecret).update(manifest).digest('hex');
 
+    this.logger.debug(
+      `webhook sig check secret_tail=...${this.webhookSecret.slice(-6)} manifest="${manifest}" computed=${computed} received_v1=${v1}`,
+    );
     if (!timingSafeEqualHex(computed, v1)) {
       throw new Error('MercadoPago webhook rejected: signature mismatch.');
     }
