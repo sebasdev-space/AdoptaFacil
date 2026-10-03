@@ -56,6 +56,7 @@ describe('OrgProfilePage — sección "Conectar Mercado Pago" (T-OAuth-Connect)'
     });
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
 
+    fireEvent.click(await screen.findByRole('tab', { name: 'Medios de pago' }));
     await screen.findByRole('heading', { name: 'Mercado Pago' });
     expect(
       await screen.findByRole('button', { name: 'Conectar Mercado Pago' }),
@@ -71,6 +72,7 @@ describe('OrgProfilePage — sección "Conectar Mercado Pago" (T-OAuth-Connect)'
     });
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
 
+    fireEvent.click(await screen.findByRole('tab', { name: 'Medios de pago' }));
     expect(await screen.findByText('Cuenta conectada')).toBeInTheDocument();
     expect(screen.getByText(/123456789/)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Conectar Mercado Pago' })).not.toBeInTheDocument();
@@ -93,6 +95,7 @@ describe('OrgProfilePage — sección "Conectar Mercado Pago" (T-OAuth-Connect)'
       });
       renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
 
+      fireEvent.click(await screen.findByRole('tab', { name: 'Medios de pago' }));
       fireEvent.click(await screen.findByRole('button', { name: 'Conectar Mercado Pago' }));
 
       await waitFor(() => {
@@ -123,6 +126,7 @@ describe('OrgProfilePage — sección "Conectar Mercado Pago" (T-OAuth-Connect)'
     });
     renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
 
+    fireEvent.click(await screen.findByRole('tab', { name: 'Medios de pago' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Desconectar' }));
     expect(screen.getByText(/¿Seguro que quieres desconectar/)).toBeInTheDocument();
     // Not yet deleted — only the confirmation UI appeared.
@@ -173,5 +177,35 @@ describe('OrgProfilePage — sección "Conectar Mercado Pago" (T-OAuth-Connect)'
     renderShell({ route: '/organizacion?mercadopago=error', ...sessionWith([Role.Owner]) });
 
     expect(await screen.findByText('No se pudo conectar Mercado Pago')).toBeInTheDocument();
+  });
+
+  it('lives in its OWN "Medios de pago" tab — not visible under the other profile tabs', async () => {
+    stubFetch((url) => {
+      if (url.includes('/org/mercadopago/status')) return { connected: false };
+      return BASE_ORG;
+    });
+    renderShell({ route: '/organizacion', ...sessionWith([Role.Owner]) });
+
+    await screen.findByRole('tab', { name: 'Datos institucionales' });
+    expect(screen.queryByRole('heading', { name: 'Mercado Pago' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Ubicación' }));
+    expect(screen.queryByRole('heading', { name: 'Mercado Pago' })).not.toBeInTheDocument();
+  });
+
+  it('opens the "Medios de pago" tab automatically on the ?mercadopago=connected round trip', async () => {
+    stubFetch((url) => {
+      if (url.includes('/org/mercadopago/status')) {
+        return { connected: true, mpUserId: 'mp-1', connectedAt: '2026-09-01T00:00:00.000Z' };
+      }
+      return BASE_ORG;
+    });
+    renderShell({ route: '/organizacion?mercadopago=connected', ...sessionWith([Role.Owner]) });
+
+    expect(await screen.findByRole('heading', { name: 'Mercado Pago' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Medios de pago' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
   });
 });

@@ -331,8 +331,15 @@ export class DonationsService {
     try {
       event = await this.payment.verifyAndNormalizeWebhook(payload, signature, context);
     } catch (error) {
-      this.logger.warn(`Webhook rechazado (firma inválida): ${(error as Error).message}`);
-      throw new ForbiddenException('Webhook signature verification failed.');
+      // `verifyAndNormalizeWebhook` throws for several DISTINCT reasons (real
+      // signature mismatch, the follow-up GET /v1/orders/:id failing, a
+      // missing external_reference, missing headers) — this used to log ALL
+      // of them as "(firma inválida)" regardless of cause, which sent a real
+      // investigation down the wrong path for days chasing a signature bug
+      // that wasn't the one actually failing. Logging the real message lets
+      // the next failure be diagnosed from the log alone.
+      this.logger.warn(`Webhook rechazado: ${(error as Error).message}`);
+      throw new ForbiddenException('Webhook verification failed.');
     }
 
     const rows = await this.prisma.$queryRaw<DonationRow[]>(Prisma.sql`

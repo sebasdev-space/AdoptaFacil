@@ -14,7 +14,6 @@ import {
 import { PageContainer, PageHeader } from '../../_layout';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
-import { MercadoPagoConnectSection } from '../components/mercadopago-connect-section';
 import { OrgProfileForm, type OrgProfileFormHandle } from '../components/org-profile-form';
 import { computeProfileCompletenessMock } from '../lib/profile-completeness';
 
@@ -220,11 +219,6 @@ export function OrgProfilePage() {
           ) : (
             <ReadOnlyProfile org={org} />
           )}
-          {/* Split de Pagos 1:1 (T-OAuth-Connect): same audience as
-              `/org/payout-bank-account` (Owner/Administrator) — connecting a
-              payment account is financial configuration, not shown to other
-              members. */}
-          {canEdit && <MercadoPagoConnectSection />}
         </>
       )}
     </PageContainer>
