@@ -14,11 +14,13 @@ import {
   computeBreakdown,
   type CreateDonationInput,
   type Donation,
+  type DonationCertificate,
   type DonationDonor,
   type DonationReceipt,
   type DonationStatus,
   type DonationPublicStatus,
   type DonationWithReceipt,
+  type DonationOrganizationAvailability,
   type GuestDonationAccess,
   type NormalizedWebhookEvent,
   type PaymentBreakdown,
@@ -151,7 +153,7 @@ export class DonationsService {
    * never rejects the request). The profile-completion gate
    * (`requireCompleteProfile`) only applies to an authenticated Persona — it is
    * skipped entirely for a guest, who has no profile to complete. A guest MUST
-   * supply at least `payer.email` (validated here, not in the zod schema,
+   * supply at least `payer.email` (unless the donation is `anonymous`) (validated here, not in the zod schema,
    * because the requirement depends on `actor`) so there is at least one way to
    * identify/contact them about the donation; `documentId` is a separate,
    * later concern (collected only when a tax certificate is requested).
@@ -162,7 +164,10 @@ export class DonationsService {
   async create(actor: RequestUser | undefined, input: CreateDonationInput): Promise<Donation> {
     if (actor) {
       await requireCompleteProfile(this.prisma, actor);
-    } else if (!input.payer?.email) {
+    } else if (!input.anonymous && !input.payer?.email) {
+      // Un invitado que dona de forma ANÓNIMA puede omitir sus datos (decisión
+      // de producto): sin correo no hay recibo ni enlace de acceso, pero el
+      // pago procede normalmente. Si NO es anónima, el correo sigue siendo obligatorio.
       throw new BadRequestException(
         'Para donar sin una cuenta necesitamos al menos tu correo electrónico.',
       );
@@ -571,6 +576,19 @@ export class DonationsService {
   }
 
   /**
+   * The beneficiary org (management roles) generates — or re-opens — the
+   * certificate of one of ITS approved donations. See
+   * `DonationCertificatesService.generateForOrganization`.
+   */
+  generateCertificate(actor: RequestUser, donationId: string): Promise<DonationCertificate> {
+    return this.certificates.generateForOrganization({
+      donationId,
+      organizationId: this.requireOrgId(),
+      actorUserId: actor.id,
+    });
+  }
+
+  /**
    * The donor's own donations (cross-tenant via SECURITY DEFINER, by identity),
    * enriched with the beneficiary org's display name (S1-02) so Fabián's "mis
    * donaciones" inbox doesn't have to do N+1 requests or show a raw id.
@@ -604,6 +622,18 @@ export class DonationsService {
       SELECT * FROM mercadopago_account_mp_user_id(${organizationId}::uuid)
     `);
     return rows[0]?.mp_user_id;
+  }
+
+  /**
+   * PUBLIC: can this organization receive donations? `true` only when it has
+   * a connected MercadoPago account (the same cross-tenant, id-only lookup used
+   * by `create`). Exposes a boolean — never the connected account id.
+   */
+  async getOrganizationAvailability(
+    organizationId: string,
+  ): Promise<DonationOrganizationAvailability> {
+    const mpUserId = await this.resolveSponsorMpUserId(organizationId);
+    return { organizationId, canReceiveDonations: Boolean(mpUserId) };
   }
 
   private async organizationNamesById(ids: string[]): Promise<Map<string, string>> {

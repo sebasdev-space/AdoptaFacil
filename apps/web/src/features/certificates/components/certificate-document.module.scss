@@ -1,90 +1,180 @@
+.certificate {
+  /* Evita que el hash (cadena larga sin espacios) ensanche al contenedor padre. */
+  min-width: 0;
+  overflow: hidden;
+}
+
 .accent {
   height: 6px;
-  margin: -1px -1px 0 -1px;
-  border-radius: var(--r-2xl) var(--r-2xl) 0 0;
   background: linear-gradient(90deg, var(--brand) 0%, var(--accent-gold) 100%);
 }
 
-.badge-row {
+.content {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.75rem 1.5rem;
+  min-width: 0;
+
+  @media (min-width: 640px) {
+    padding: 2rem 2.5rem;
+  }
 }
 
-.subtitle {
+.header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.eyebrow {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--brand-dark);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  line-height: 1.15;
+  color: var(--text-dark);
+}
+
+.issuer {
+  text-align: center;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-hairline);
+}
+
+.issuer__name {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: var(--fw-semibold);
+  color: var(--text-dark);
+}
+
+.issuer__nit {
+  margin-top: 0.125rem;
   font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
-.fields {
+.statement {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  text-align: center;
+}
+
+.statement__lead {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+
+.statement__donor {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: var(--fw-semibold);
+  color: var(--text-dark);
+  overflow-wrap: anywhere;
+}
+
+.statement__amount {
+  font-family: var(--font-display);
+  font-size: 2.25rem;
+  font-weight: var(--fw-semibold);
+  line-height: 1.1;
+  color: var(--brand-dark);
+}
+
+.meta {
   display: grid;
   gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-radius: var(--r-xl);
+  background-color: var(--brand-light);
 
-  @media (min-width: 640px) {
+  @media (min-width: 480px) {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
-.fields__label {
+.meta__item {
+  min-width: 0;
+  text-align: center;
+}
+
+.label {
   font-size: var(--fs-xs);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   color: var(--text-muted);
 }
 
-.fields__value {
+.meta__value {
+  margin-top: 0.125rem;
   font-size: var(--fs-sm);
   font-weight: var(--fw-semibold);
   color: var(--text-dark);
 }
 
-.fields__value--code {
+.meta__value--code {
   font-family: var(--font-mono);
+  overflow-wrap: anywhere;
 }
 
-.footer-row {
+.footer {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 0.75rem;
+  align-items: center;
+  gap: 1.25rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-hairline);
 
-  @media (min-width: 640px) {
+  @media (min-width: 560px) {
     flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
+    align-items: flex-start;
   }
+}
+
+.qr {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  flex-shrink: 0;
+}
+
+.qr__caption {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
 }
 
 .hash {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-}
-
-.hash__label {
-  font-size: var(--fs-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
+  min-width: 0;
+  flex: 1;
 }
 
 .hash__value {
-  max-width: 28rem;
-  overflow-wrap: break-word;
   font-family: var(--font-mono);
   font-size: var(--fs-xs);
   color: var(--text-muted);
+  /* El SHA-256 es una sola palabra: debe poder partirse en cualquier carácter. */
+  overflow-wrap: anywhere;
+  word-break: break-all;
 }
 
-.qr-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.qr-col__caption {
+.signer {
+  margin-top: 0.5rem;
   font-size: var(--fs-xs);
+  font-style: italic;
   color: var(--text-muted);
 }

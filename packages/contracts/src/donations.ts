@@ -278,3 +278,15 @@ export interface DonationPublicStatus {
   currency: PaymentCurrency;
   organizationName: string;
 }
+
+/**
+ * PUBLIC availability of an organization to RECEIVE donations
+ * (`GET /public/donations/organizations/:organizationId/availability`, no auth).
+ * `canReceiveDonations` is `true` only when the organization has connected its
+ * MercadoPago account (OAuth). Deliberately a single boolean — the connected
+ * account id itself is never exposed.
+ */
+export interface DonationOrganizationAvailability {
+  organizationId: string;
+  canReceiveDonations: boolean;
+}

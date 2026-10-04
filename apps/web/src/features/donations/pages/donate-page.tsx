@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import type { Donation } from '@adoptafacil/contracts';
 import {
   Button,
@@ -10,15 +10,16 @@ import {
   CardTitle,
   cn,
   EmptyState,
+  Skeleton,
   useToast,
 } from '@adoptafacil/ui';
 import { PageContainer, PageHeader } from '../../_layout';
 import { isIncompleteProfileError, useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
 import { PublicFooter, PublicNavbar } from '../../../shell/layout';
-import { createDonation } from '../api/donations-api';
+import { FormAlert } from '../../auth/components/form-alert';
+import { createDonation, fetchOrganizationDonationAvailability } from '../api/donations-api';
 import { DonateForm, type DonateFormValues } from '../components/donate-form';
-import { MyDonationsList } from '../components/my-donations-list';
 import { formatCop } from '../model/donation-breakdown-view';
 import styles from './donate-page.module.scss';
 
@@ -88,46 +89,55 @@ export function DonatePage() {
   // tarjeta" after a declined charge, T-OrdersAPI) — the form owns its own
   // amount/step state, so a plain re-render alone wouldn't reset it.
   const [formInstanceKey, setFormInstanceKey] = useState(0);
+  // Solo se puede donar a una organización con su cuenta de MercadoPago conectada.
+  const [availability, setAvailability] = useState<
+    'loading' | 'connected' | 'not-connected' | 'error'
+  >('loading');
+  const targetOrganizationId = target?.organizationId;
+
+  useEffect(() => {
+    if (!targetOrganizationId) return;
+    let active = true;
+    setAvailability('loading');
+    fetchOrganizationDonationAvailability(targetOrganizationId)
+      .then((result) => {
+        if (active) setAvailability(result.canReceiveDonations ? 'connected' : 'not-connected');
+      })
+      .catch(() => {
+        if (active) setAvailability('error');
+      });
+    return () => {
+      active = false;
+    };
+  }, [targetOrganizationId]);
 
   if (!target) {
-    // Reached from the "Donaciones" menu entry (no org target): T-064 completes
-    // this branch with the donor's OWN donation history, previously just a
-    // static empty-state. Starting a NEW donation still only happens from an
-    // org's public portal (/o/:slug → "Donar"), never listed/picked here.
-    // `GET /donations/mine` stays authenticated-only (out of scope here) — a
-    // visitor with no session gets an honest prompt instead of a failed fetch.
+    // Sin organización objetivo y CON sesión: el historial vive en `/mis-donaciones`
+    // (dentro del shell, con menú) — esta ruta es pública y no lo tiene.
+    if (hasSession) return <Navigate to="/mis-donaciones" replace />;
+
+    // Sin sesión: aviso honesto (`GET /donations/mine` es solo autenticado). Iniciar
+    // una donación NUEVA solo ocurre desde el portal público de una organización.
     return (
       <div className="flex min-h-screen flex-col bg-background text-foreground">
         <PublicNavbar />
         <main className="flex-1">
           <PageContainer>
-            {hasSession ? (
-              <>
-                <PageHeader
-                  title="Mis donaciones"
-                  description="Historial de tus donaciones. Para donar, entra al portal público de una organización."
-                />
-                <MyDonationsList />
-              </>
-            ) : (
-              <>
-                <PageHeader
-                  title="Donaciones"
-                  description="Entra al portal público de una organización para donar — no necesitas una cuenta."
-                />
-                <EmptyState
-                  title="Aún no elegiste a quién donar"
-                  description="Explora el catálogo general o el portal de una organización y usa su botón “Donar”."
-                />
-                <p className={styles['done__hint']}>
-                  ¿Ya donaste antes con una cuenta?{' '}
-                  <Link to="/login" className="underline">
-                    Inicia sesión
-                  </Link>{' '}
-                  para ver tu historial.
-                </p>
-              </>
-            )}
+            <PageHeader
+              title="Donaciones"
+              description="Entra al portal público de una organización para donar — no necesitas una cuenta."
+            />
+            <EmptyState
+              title="Aún no elegiste a quién donar"
+              description="Explora el catálogo general o el portal de una organización y usa su botón “Donar”."
+            />
+            <p className={styles['done__hint']}>
+              ¿Ya donaste antes con una cuenta?{' '}
+              <Link to="/login" className="underline">
+                Inicia sesión
+              </Link>{' '}
+              para ver tu historial.
+            </p>
           </PageContainer>
         </main>
         <PublicFooter />
@@ -326,6 +336,23 @@ export function DonatePage() {
                     )}
                   </div>
                 )
+              ) : availability === 'loading' ? (
+                <Skeleton className="h-48 w-full" data-testid="donation-availability-loading" />
+              ) : availability === 'not-connected' ? (
+                <FormAlert variant="error">
+                  <span data-testid="donation-org-not-connected">
+                    <strong>{target.organizationName}</strong> aún no puede recibir donaciones: no
+                    ha conectado su cuenta de MercadoPago. Intenta más tarde o explora otras
+                    organizaciones.
+                  </span>
+                </FormAlert>
+              ) : availability === 'error' ? (
+                <FormAlert variant="error">
+                  <span data-testid="donation-availability-error">
+                    No pudimos verificar si {target.organizationName} puede recibir donaciones.
+                    Recarga la página e inténtalo de nuevo.
+                  </span>
+                </FormAlert>
               ) : (
                 <DonateForm
                   key={formInstanceKey}

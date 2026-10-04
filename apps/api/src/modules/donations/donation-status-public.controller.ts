@@ -1,5 +1,8 @@
-import { Controller, Get, Param } from '@nestjs/common';
-import type { DonationPublicStatus } from '@adoptafacil/contracts';
+import { Controller, Get, Param, ParseUUIDPipe } from '@nestjs/common';
+import type {
+  DonationOrganizationAvailability,
+  DonationPublicStatus,
+} from '@adoptafacil/contracts';
 import { DonationsService } from './donations.service';
 
 /**
@@ -20,5 +23,13 @@ export class DonationStatusPublicController {
   @Get('public/donations/status/:reference')
   getPublic(@Param('reference') reference: string): Promise<DonationPublicStatus> {
     return this.service.getPublicStatusByCollectionId(reference);
+  }
+
+  /** Whether the org has a connected MercadoPago account (boolean only). */
+  @Get('public/donations/organizations/:organizationId/availability')
+  getOrganizationAvailability(
+    @Param('organizationId', ParseUUIDPipe) organizationId: string,
+  ): Promise<DonationOrganizationAvailability> {
+    return this.service.getOrganizationAvailability(organizationId);
   }
 }

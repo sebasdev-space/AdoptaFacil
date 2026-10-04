@@ -23,6 +23,17 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/** La página de donar consulta si la organización tiene MercadoPago conectado. */
+function stubOrgConnected() {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ canReceiveDonations: true }),
+    }),
+  );
+}
+
 describe('routing — public vs protected', () => {
   it('renders the public /login route without a session', () => {
     renderShell({ route: '/login', session: { initialStatus: 'unauthenticated' } });
@@ -105,6 +116,7 @@ describe('routing — public vs protected', () => {
   });
 
   it('renders the donation flow for an authenticated visitor with the org resolved by query (T-051)', async () => {
+    stubOrgConnected();
     renderShell({
       route: '/donaciones?organizationId=org-9&organizationName=Refugio%20Patitas',
       session: { initialStatus: 'authenticated' },
@@ -119,6 +131,7 @@ describe('routing — public vs protected', () => {
   // cuenta ni login — reemplaza el viejo comportamiento deny-by-default de
   // T-051 (la ruta vivía bajo <RequireAuth>). Ahora /donaciones es pública.
   it('lets an UNAUTHENTICATED visitor reach the donate form directly (guest checkout, no login wall)', async () => {
+    stubOrgConnected();
     renderShell({
       route: '/donaciones?organizationId=org-9&organizationName=Refugio%20Patitas',
       session: { initialStatus: 'unauthenticated' },

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { MIN_DONATION_AMOUNT, type CommissionPayer } from '@adoptafacil/contracts';
-import { Button, Input } from '@adoptafacil/ui';
+import { Button, Input, cn } from '@adoptafacil/ui';
 import { CardPaymentBrick } from '../../payments';
 import { DonationBreakdown } from './donation-breakdown';
 import { formatCop, safeBuildDonationBreakdown } from '../model/donation-breakdown-view';
@@ -69,8 +69,9 @@ type FormStep = 'details' | 'card';
  * donante cubre AMBOS componentes, el % que retiene AdoptaFácil (apoyo, no "comisión"
  * propia por indicación fiscal) y la comisión real de la pasarela de pago (tercero,
  * mantiene su nombre — MercadoPago).
- * Sin sesión, además exige nombre + correo (checkout de invitado) y ofrece la casilla
- * de donación anónima FRENTE A LA ORGANIZACIÓN (disponible con o sin sesión).
+ * Lo PRIMERO que se pregunta es si la donación es con datos o anónima FRENTE A LA
+ * ORGANIZACIÓN (con o sin sesión). Sin sesión y con datos, se exige nombre + correo
+ * (checkout de invitado); si elige anónima, esos campos se omiten por completo.
  */
 export function DonateForm({
   organizationName,
@@ -89,13 +90,15 @@ export function DonateForm({
   const commissionPayer: CommissionPayer = coverFee ? 'donor' : 'organization';
   const amount = Number.parseInt(amountText, 10);
   const preview = safeBuildDonationBreakdown(amount, commissionPayer);
+  // Anónima: el invitado no entrega nombre ni correo (no se pide ni se envía).
+  const askGuestIdentity = !hasSession && !anonymous;
   const guestIdentityComplete =
-    hasSession || (guestName.trim().length > 0 && EMAIL_LOOKS_VALID.test(guestEmail.trim()));
+    !askGuestIdentity || (guestName.trim().length > 0 && EMAIL_LOOKS_VALID.test(guestEmail.trim()));
   const canContinue = preview !== null && !submitting && guestIdentityComplete;
 
-  const guestPayer = hasSession
-    ? undefined
-    : { fullName: guestName.trim(), email: guestEmail.trim() };
+  const guestPayer = askGuestIdentity
+    ? { fullName: guestName.trim(), email: guestEmail.trim() }
+    : undefined;
   const payerEmailForBrick = hasSession ? sessionEmailHint : guestPayer?.email;
 
   if (step === 'card' && preview) {
@@ -135,7 +138,46 @@ export function DonateForm({
 
   return (
     <div className={styles.form}>
-      {!hasSession && (
+      <fieldset className={styles.choice}>
+        <legend className={styles.label}>¿Cómo quieres donar?</legend>
+        <div className={styles.choice__options}>
+          <label
+            className={cn(styles.choice__option, !anonymous && styles['choice__option--selected'])}
+          >
+            <input
+              type="radio"
+              name="donation-visibility"
+              className={styles.choice__input}
+              checked={!anonymous}
+              data-testid="donate-identified"
+              onChange={() => setAnonymous(false)}
+            />
+            <span className={styles.choice__title}>Con mis datos</span>
+            <span className={styles.choice__desc}>
+              La organización sabrá quién dona y recibirás tu recibo por correo.
+            </span>
+          </label>
+          <label
+            className={cn(styles.choice__option, anonymous && styles['choice__option--selected'])}
+          >
+            <input
+              type="radio"
+              name="donation-visibility"
+              className={styles.choice__input}
+              checked={anonymous}
+              data-testid="donate-anonymous"
+              onChange={() => setAnonymous(true)}
+            />
+            <span className={styles.choice__title}>De forma anónima</span>
+            <span className={styles.choice__desc}>
+              La organización no verá tu identidad.
+              {!hasSession && ' No te pediremos nombre ni correo, y no recibirás recibo.'}
+            </span>
+          </label>
+        </div>
+      </fieldset>
+
+      {askGuestIdentity && (
         <>
           <label className={styles.label} htmlFor="donation-guest-name">
             Tu nombre
@@ -188,17 +230,6 @@ export function DonateForm({
           Cubro el apoyo de sostenimiento a AdoptaFácil y la comisión de la pasarela para que la
           organización reciba el monto completo.
         </span>
-      </label>
-
-      <label className={styles['checkbox-row']}>
-        <input
-          type="checkbox"
-          className={styles['checkbox-row__input']}
-          checked={anonymous}
-          data-testid="donate-anonymous"
-          onChange={(e) => setAnonymous(e.target.checked)}
-        />
-        <span>¿Donar de forma anónima frente a la organización?</span>
       </label>
 
       {preview ? (

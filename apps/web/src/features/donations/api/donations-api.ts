@@ -1,6 +1,8 @@
 import type {
   CreateDonationInput,
   Donation,
+  DonationCertificate,
+  DonationOrganizationAvailability,
   DonationReceipt,
   DonationWithReceipt,
   GuestDonationAccess,
@@ -46,4 +48,38 @@ export async function fetchGuestDonationAccess(token: string): Promise<GuestDona
   if (response.status === 404) return null;
   if (!response.ok) throw new Error('error');
   return (await response.json()) as GuestDonationAccess;
+}
+
+/**
+ * Public: whether the organization can receive donations (it has connected its
+ * MercadoPago account). No auth. Throws on a non-2xx so the caller can tell
+ * "not connected" (`canReceiveDonations: false`) from "could not verify".
+ */
+export async function fetchOrganizationDonationAvailability(
+  organizationId: string,
+): Promise<DonationOrganizationAvailability> {
+  const response = await fetch(
+    `${API_BASE}/public/donations/organizations/${encodeURIComponent(organizationId)}/availability`,
+  );
+  if (!response.ok) {
+    throw new Error(`No se pudo verificar la organización (${response.status}).`);
+  }
+  const body = (await response.json()) as Partial<DonationOrganizationAvailability> | null;
+  return { organizationId, canReceiveDonations: body?.canReceiveDonations === true };
+}
+
+/**
+ * The ORGANIZATION generates (or re-opens) the certificate of one of its approved
+ * donations (management roles). Returns the SAME certificate if one already
+ * exists; 422 when the org is not an ESAL con RTE vigente or the donation isn't
+ * approved.
+ */
+export function generateDonationCertificate(
+  client: ApiClient,
+  donationId: string,
+): Promise<DonationCertificate> {
+  return client.request<DonationCertificate>(
+    `/donations/${encodeURIComponent(donationId)}/certificate`,
+    { method: 'POST' },
+  );
 }

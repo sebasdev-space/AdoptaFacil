@@ -88,6 +88,10 @@ describe('CertificateEmissionPage (RF14, F-3 — real backend)', () => {
             ),
           );
         }
+        // La página de donar consulta si la organización tiene MercadoPago conectado.
+        if (url.includes('/availability')) {
+          return Promise.resolve(jsonResponse({ canReceiveDonations: true }, 200));
+        }
         return Promise.resolve(jsonResponse({ status: 'ok', db: 'up', redis: 'up' }, 200));
       }),
     );
@@ -137,6 +141,10 @@ describe('CertificateEmissionPage (RF14, F-3 — real backend)', () => {
         }
         if (url.includes('/donations/don-2/certificate')) {
           return Promise.resolve(jsonResponse({ message: 'not found' }, 404));
+        }
+        // La página de donar consulta si la organización tiene MercadoPago conectado.
+        if (url.includes('/availability')) {
+          return Promise.resolve(jsonResponse({ canReceiveDonations: true }, 200));
         }
         return Promise.resolve(jsonResponse({ status: 'ok', db: 'up', redis: 'up' }, 200));
       }),

@@ -294,14 +294,14 @@ export const navItems: NavItem[] = [
   // (mismas rutas, mismos roles de siempre) — el padre solo expande/colapsa,
   // nunca navega (no tiene página propia).
   {
-    path: '/donaciones',
+    path: '/mis-donaciones',
     label: 'Donaciones',
     icon: HeartIcon,
     children: [
       // Antes era el propio ítem "Donaciones" — cualquier autenticado, sin
       // @Roles en el backend. Se renombra a "Mis donaciones" solo para
       // distinguirla de "Donaciones recibidas" dentro del grupo.
-      { path: '/donaciones', label: 'Mis donaciones', icon: HeartIcon },
+      { path: '/mis-donaciones', label: 'Mis donaciones', icon: HeartIcon },
       // F-DONACIONES-RECIBIDAS: la contraparte de gestión de org (GET
       // /donations/received, MANAGE_ROLES) — idéntica a como estaba.
       {
