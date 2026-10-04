@@ -47,6 +47,12 @@ export function AnimalDetailModal({ animal, onOpenChange }: AnimalDetailModalPro
                 animal={animal}
                 orgName={animal.organization.name}
                 organizationSlug={animal.organization.slug}
+                donateOrganization={{
+                  id: animal.organizationId,
+                  name: animal.organization.name,
+                  logoUrl: animal.organization.logoUrl,
+                  location: { city: animal.organization.city },
+                }}
               />
             </div>
           </>
