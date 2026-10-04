@@ -125,7 +125,7 @@ export function PortalProfileSection({
               <div aria-hidden className={styles.hero2__imageFallback} />
             )}
             <div
-              className={`${styles.hero2__logoWrap} absolute -bottom-8 z-10 ${LOGO_POSITION_CLASSES[logoPosition]}`}
+              className={`${styles.hero2__logoWrap} absolute -bottom-10 z-10 ${LOGO_POSITION_CLASSES[logoPosition]}`}
             >
               {org.logoUrl ? (
                 <img
