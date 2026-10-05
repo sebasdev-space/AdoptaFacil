@@ -157,6 +157,7 @@ function SidebarGroup({
  */
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const canSeeLeaf = useLeafVisibility();
+  const { pathname } = useLocation();
 
   return (
     <nav aria-label="Navegación principal" className={styles['org-sidebar__nav']}>
@@ -174,7 +175,10 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
           );
         }
         if (!canSeeLeaf(item)) return null;
-        const { path, label, icon: Icon, end, comingSoon } = item;
+        const { path, label, icon: Icon, end, comingSoon, alsoActiveFor } = item;
+        const alsoActive = alsoActiveFor?.some(
+          (extra) => pathname === extra || pathname.startsWith(`${extra}/`),
+        );
         return (
           <NavLink
             key={path}
@@ -182,7 +186,10 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
             end={end}
             onClick={onNavigate}
             className={({ isActive }) =>
-              cn(styles['org-sidebar__link'], isActive && styles['org-sidebar__link--active'])
+              cn(
+                styles['org-sidebar__link'],
+                (isActive || alsoActive) && styles['org-sidebar__link--active'],
+              )
             }
           >
             <Icon />

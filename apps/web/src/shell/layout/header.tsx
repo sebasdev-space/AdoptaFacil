@@ -4,6 +4,7 @@ import { useNav } from '../navigation/nav-context';
 import { useSession } from '../auth';
 import { TransparencyIndicator } from '../transparency';
 import { Brand } from './brand';
+import { PendingBell } from './pending-bell';
 import styles from './header.module.scss';
 
 /**
@@ -41,6 +42,7 @@ export function Header() {
       {/* Persistent transparency indicator (§M14) */}
       <div className={styles.topbar__actions}>
         <TransparencyIndicator />
+        <PendingBell />
 
         {user && (
           <div className={styles.topbar__user}>
