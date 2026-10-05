@@ -13,7 +13,7 @@ export function PublicFooter() {
   return (
     <footer className={styles.footer}>
       <div className={styles.footer__row}>
-        <Brand inverse />
+        <Brand inverse to="/" />
 
         <nav aria-label="Enlaces del pie de página" className={styles.footer__links}>
           <Link to="/" className={styles.footer__link}>

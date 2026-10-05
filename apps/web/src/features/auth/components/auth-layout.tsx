@@ -52,7 +52,9 @@ export function AuthLayout({ title, description, children, footer, wide }: AuthL
       </Link>
       <Card className={wide ? 'w-full max-w-lg' : 'w-full max-w-sm'}>
         <CardHeader className={cn(styles.header, 'text-center')}>
-          <Logo variant="full" size="sm" />
+          <Link to="/" aria-label="Ir al inicio" className="inline-flex">
+            <Logo variant="full" size="sm" />
+          </Link>
           <CardTitle>{title}</CardTitle>
           {description && <CardDescription>{description}</CardDescription>}
         </CardHeader>
