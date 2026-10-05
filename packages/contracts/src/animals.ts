@@ -396,6 +396,16 @@ export interface ClinicalCarnetEntry extends ClinicalEvent {
   authorName: string;
 }
 
+/**
+ * Datos del carnet de identificación del animal que no viven en `Animal`
+ * (`GET /animals/:id/clinical-events/card`): el código "N°" (derivado del id,
+ * p. ej. `A1B2C3D4`) y la URL pública del perfil que codifica el QR.
+ */
+export interface AnimalCardInfo {
+  code: string;
+  profileUrl: string;
+}
+
 /** Reserve an attachment for a clinical event version (metadata only). */
 export interface ClinicalAttachmentInput {
   filename: string;

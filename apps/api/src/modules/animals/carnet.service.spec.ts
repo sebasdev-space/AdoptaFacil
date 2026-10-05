@@ -4,6 +4,10 @@ import type { AnimalsService } from './animals.service';
 import type { ClinicalService } from './clinical.service';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { TenantContextService } from '../../core/tenant/tenant-context.service';
+import type { ConfigService } from '@nestjs/config';
+import type { Env } from '../../config/env.validation';
+import type { StoragePort } from '../../core/storage/storage.port';
+import { PDFDocument } from 'pdf-lib';
 import { CarnetService } from './carnet.service';
 
 /**
@@ -50,6 +54,9 @@ function makeService(opts: {
   animalResult?: Animal | Error;
   events?: ClinicalEvent[];
   users?: { id: string; displayName: string }[];
+  /** `null` ⇒ la organización no tiene slug público. */
+  slug?: string | null;
+  photoBytes?: { data: Buffer; contentType?: string } | null;
 }) {
   const tenant = {
     getOrganizationId: () => ('organizationId' in opts ? opts.organizationId : 'org-1'),
@@ -64,17 +71,29 @@ function makeService(opts: {
     listCurrent: jest.fn().mockResolvedValue(opts.events ?? []),
   } as unknown as ClinicalService;
   const prisma = {
-    withOrgContext: jest
-      .fn()
-      .mockImplementation((_org, fn) =>
-        fn({ user: { findMany: jest.fn().mockResolvedValue(opts.users ?? []) } }),
-      ),
+    withOrgContext: jest.fn().mockImplementation((_org, fn) =>
+      fn({
+        user: { findMany: jest.fn().mockResolvedValue(opts.users ?? []) },
+        organizationProfile: {
+          findUnique: jest
+            .fn()
+            .mockResolvedValue(opts.slug === null ? null : { slug: opts.slug ?? 'refugio-test' }),
+        },
+      }),
+    ),
     organization: {
       findUnique: jest.fn().mockResolvedValue({ id: 'org-1', name: 'Refugio Test' }),
     },
   } as unknown as PrismaService;
+  const storage = {
+    readObject: jest.fn().mockResolvedValue(opts.photoBytes ?? null),
+  } as unknown as StoragePort;
+  const config = {
+    get: jest.fn().mockReturnValue('https://app.adoptafacil.test/'),
+  } as unknown as ConfigService<Env, true>;
   return {
-    service: new CarnetService(prisma, tenant, animals, clinical),
+    storage,
+    service: new CarnetService(prisma, tenant, animals, clinical, storage, config),
     animals,
     clinical,
     prisma,
@@ -140,5 +159,55 @@ describe('CarnetService.generateCarnetPdf (S2-04B-2)', () => {
     const { service } = makeService({ events: [] });
     const buffer = await service.generateCarnetPdf('animal-1');
     expect(buffer.subarray(0, 5).toString('utf8')).toBe('%PDF-');
+  });
+
+  it('la hoja 1 es el carnet (A4 apaisado) y el expediente clínico sigue en hojas aparte', async () => {
+    const { service } = makeService({
+      events: [event()],
+      users: [{ id: 'vet-1', displayName: 'Dra. Ana' }],
+    });
+    const doc = await PDFDocument.load(await service.generateCarnetPdf('animal-1'));
+    expect(doc.getPageCount()).toBe(2);
+    const first = doc.getPage(0).getSize();
+    expect(first.width).toBeGreaterThan(first.height); // apaisado
+    const second = doc.getPage(1).getSize();
+    expect(second.height).toBeGreaterThan(second.width); // vertical, como siempre
+  });
+
+  it('un nombre con caracteres que la fuente estándar no dibuja no rompe el PDF', async () => {
+    const { service } = makeService({
+      animalResult: animal({ name: 'Michi 🐱 “Rey” — Ñandú', tags: ['Juguetón', 'tímido 😺'] }),
+    });
+    const buffer = await service.generateCarnetPdf('animal-1');
+    expect(buffer.subarray(0, 5).toString('utf8')).toBe('%PDF-');
+  });
+});
+
+describe('CarnetService.getCardInfo (carnet de identificación)', () => {
+  it('deriva el código N° del id y arma la URL pública con el slug de la organización', async () => {
+    const { service } = makeService({
+      animalResult: animal({ id: '3f9c21b0-aaaa-bbbb-cccc-1234567890ab' }),
+      slug: 'catcompany',
+    });
+    expect(await service.getCardInfo('x')).toEqual({
+      code: 'A3F9C21B0',
+      profileUrl:
+        'https://app.adoptafacil.test/o/catcompany/animales/3f9c21b0-aaaa-bbbb-cccc-1234567890ab',
+    });
+  });
+
+  it('sin slug público, el QR apunta a la portada de AdoptaFácil (nunca a un enlace roto)', async () => {
+    const { service } = makeService({ slug: null });
+    expect((await service.getCardInfo('x')).profileUrl).toBe('https://app.adoptafacil.test');
+  });
+
+  it('el código es estable para el mismo animal', async () => {
+    const { service } = makeService({
+      animalResult: animal({ id: '9a1c77d2-0000-4000-8000-000000000001' }),
+    });
+    const a = await service.getCardInfo('x');
+    const b = await service.getCardInfo('x');
+    expect(a.code).toBe(b.code);
+    expect(a.code).toMatch(/^A[0-9A-F]{8}$/);
   });
 });
