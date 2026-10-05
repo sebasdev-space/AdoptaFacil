@@ -81,6 +81,15 @@ export const COMMUNITY_MODERATION_ROLES = [Role.PlatformAdmin, Role.PlatformSupe
 export const PLATFORM_REVIEWS_ROLES = [Role.PlatformAdmin, Role.PlatformSuperAdmin] as const;
 
 /**
+ * Fix (M12/S7-b): el Owner/Administrator ya podía marcar una reseña pública
+ * como spam (`POST /reviews/:id/mark-spam`), pero no existía ninguna entrada
+ * de menú ni página desde donde ENCONTRARLA primero — "se pueden registrar
+ * desde el portal público pero no se pueden ver desde el usuario owner".
+ * Copiado VERBATIM del `@Roles` de `GET /reviews/org`.
+ */
+export const ORG_REVIEWS_ROLES = [Role.Owner, Role.Administrator] as const;
+
+/**
  * M13 (S-8, RF24) — "Dashboard de plataforma" (conteos de colas), audiencia
  * de PLATAFORMA. Copiado VERBATIM del `@Roles` de
  * `PlatformDashboardController.getAdminSummary` (`GET /platform/dashboard/admin`)
@@ -486,6 +495,15 @@ export const navItems: NavItem[] = [
     label: 'Marketplace',
     icon: ShoppingBagIcon,
     roles: MARKETPLACE_VIEW_ROLES,
+  },
+  // Fix (M12/S7-b) · lo que el Owner/Administrator necesita para poder usar
+  // "marcar como spam": ver las reseñas públicas de SU organización primero.
+  // Gated a ORG_REVIEWS_ROLES, calcado del @Roles real de `GET /reviews/org`.
+  {
+    path: '/organizacion/resenas',
+    label: 'Reseñas del portal',
+    icon: ChatIcon,
+    roles: ORG_REVIEWS_ROLES,
   },
   // M12 (S-7, RF23) · "Mis reseñas" — lo que la Persona ha reseñado y su
   // estado. Sin @Roles en el backend (cualquier Persona autenticada), mismo

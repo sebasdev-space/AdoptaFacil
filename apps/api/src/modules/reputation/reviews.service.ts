@@ -149,6 +149,38 @@ export class ReviewsService {
   }
 
   /**
+   * Reseñas PÚBLICAS (anónimas, `author_user_id IS NULL`) de la PROPIA
+   * organización del actor — lo que el Owner/Administrator necesita para
+   * poder usar `markSpam` (antes no existía ningún read para encontrar esos
+   * ids: el botón de moderación no tenía qué mostrar). Tenant-scoped vía RLS
+   * (`withTenant`), nunca cross-tenant. Las reseñas AUTENTICADAS (RF23
+   * original) siguen sin aparecer aquí ni en ningún read de la organización:
+   * su moderación sigue siendo EXCLUSIVA de PlatformAdmin (conflicto de
+   * interés, S-7) — el Owner nunca las ve ni las toca.
+   */
+  async listForOrg(): Promise<Review[]> {
+    const rows = await this.prisma.withTenant((tx) =>
+      tx.review.findMany({
+        where: { authorUserId: null },
+        orderBy: { createdAt: 'desc' },
+      }),
+    );
+    return rows.map((row) => ({
+      id: row.id,
+      organizationId: row.organizationId,
+      authorUserId: row.authorUserId ?? undefined,
+      rating: row.rating,
+      comment: row.comment ?? undefined,
+      isAnonymous: row.isAnonymous,
+      status: row.status as ReviewStatus,
+      moderatedByUserId: row.moderatedByUserId ?? undefined,
+      moderatedAt: row.moderatedAt?.toISOString(),
+      rejectionReason: row.rejectionReason ?? undefined,
+      createdAt: row.createdAt.toISOString(),
+    }));
+  }
+
+  /**
    * Marca como spam una reseña PÚBLICA/anónima de la PROPIA organización del
    * actor (S7-b) — el único moderador de este tipo de reseña es el
    * Owner/Administrator reseñado, nunca PlatformAdmin (esas siguen exclusivas
