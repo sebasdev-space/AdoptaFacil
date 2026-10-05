@@ -125,8 +125,6 @@ describe('PortalThemePage — owner personalization (visual only, S2-REORG)', ()
     const EXISTING_THEME: Record<string, string> = {
       primary: '172 67% 30%',
       'primary-foreground': '0 0% 100%',
-      secondary: '213 20% 93%',
-      'secondary-foreground': '214 32% 18%',
       accent: '169 55% 94%',
       'accent-foreground': '214 32% 18%',
       ring: '172 67% 30%',
@@ -138,8 +136,6 @@ describe('PortalThemePage — owner personalization (visual only, S2-REORG)', ()
     const CASES: Array<{ label: string; token: string; hex: string }> = [
       { label: 'Color principal', token: 'primary', hex: '#1a2a3a' },
       { label: 'Texto sobre el principal', token: 'primary-foreground', hex: '#f5f8ff' },
-      { label: 'Color secundario', token: 'secondary', hex: '#e0e0e0' },
-      { label: 'Texto sobre secundario', token: 'secondary-foreground', hex: '#101820' },
       { label: 'Color de acento', token: 'accent', hex: '#eaf7f0' },
       { label: 'Texto sobre acento', token: 'accent-foreground', hex: '#12211c' },
       { label: 'Anillo de foco', token: 'ring', hex: '#336699' },

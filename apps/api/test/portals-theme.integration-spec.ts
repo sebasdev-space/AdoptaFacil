@@ -76,7 +76,7 @@ describe('Portal theme (M14: tokens + RBAC + public read)', () => {
       .set('Authorization', `Bearer ${ownerToken}`)
       // primary/foreground pair meets the AA 4.5:1 contrast minimum (5.07:1).
       .send({
-        tokens: { primary: '142 72% 29%', 'primary-foreground': '0 0% 100%', radius: '0.5rem' },
+        tokens: { primary: '142 72% 29%', 'primary-foreground': '0 0% 100%' },
       })
       .expect(200);
     expect(res.body.tokens.primary).toBe('142 72% 29%');
@@ -85,7 +85,7 @@ describe('Portal theme (M14: tokens + RBAC + public read)', () => {
       .get('/portals/theme')
       .set('Authorization', `Bearer ${ownerToken}`)
       .expect(200);
-    expect(read.body.tokens.radius).toBe('0.5rem');
+    expect(read.body.tokens.primary).toBe('142 72% 29%');
   });
 
   it('rejects unsafe/invalid tokens with 400 (tokens only, format — never contrast)', async () => {
@@ -100,6 +100,18 @@ describe('Portal theme (M14: tokens + RBAC + public read)', () => {
       .put('/portals/theme')
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({ tokens: { primary: '#ff0000' } })
+      .expect(400);
+    // `secondary`/`radius` were REMOVED (T-PERSONALIZACION-AUDIT: neither
+    // painted anything in the real portal) — now rejected like any unknown key.
+    await request(server)
+      .put('/portals/theme')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ tokens: { secondary: '213 20% 93%' } })
+      .expect(400);
+    await request(server)
+      .put('/portals/theme')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ tokens: { radius: '0.5rem' } })
       .expect(400);
   });
 
@@ -118,7 +130,7 @@ describe('Portal theme (M14: tokens + RBAC + public read)', () => {
       .put('/portals/theme')
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({
-        tokens: { primary: '142 72% 29%', 'primary-foreground': '0 0% 100%', radius: '0.5rem' },
+        tokens: { primary: '142 72% 29%', 'primary-foreground': '0 0% 100%' },
       })
       .expect(200);
   });

@@ -314,15 +314,26 @@ describe('OrgPublicPage — rich public portal', () => {
   });
 
   it('applies the org brand tokens at runtime, scoped and safe-subset only', async () => {
-    stubFetch({ theme: { primary: '24 90% 45%', radius: '0.5rem', 'font-sans': 'url(evil)' } });
+    // `radius`/`secondary` are NOT in the safe subset (T-PERSONALIZACION-AUDIT:
+    // removed — neither ever painted anything in the real portal), so they're
+    // filtered out exactly like any other unknown key (`font-sans` below).
+    stubFetch({
+      theme: {
+        primary: '24 90% 45%',
+        radius: '0.5rem',
+        secondary: '213 20% 93%',
+        'font-sans': 'url(evil)',
+      },
+    });
     renderShell({ route: '/o/patitas', ...PUBLIC_SESSION });
     await screen.findByRole('heading', { name: /Refugio Patitas/ });
 
     const main = screen.getByRole('main');
     // Safe tokens are applied as scoped CSS custom properties…
     expect(main.style.getPropertyValue('--primary')).toBe('24 90% 45%');
-    expect(main.style.getPropertyValue('--radius')).toBe('0.5rem');
     // …but a token outside the safe subset is filtered out (never applied).
+    expect(main.style.getPropertyValue('--radius')).toBe('');
+    expect(main.style.getPropertyValue('--secondary')).toBe('');
     expect(main.style.getPropertyValue('--font-sans')).toBe('');
   });
 

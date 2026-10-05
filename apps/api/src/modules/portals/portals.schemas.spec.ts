@@ -6,11 +6,10 @@ import { contrastRatio, MIN_CONTRAST_RATIO, updatePortalThemeSchema } from './po
 describe('portal theme token validation', () => {
   const parse = (tokens: Record<string, unknown>) => updatePortalThemeSchema.safeParse({ tokens });
 
-  it('accepts a valid safe subset (HSL colors + radius)', () => {
+  it('accepts a valid safe subset (HSL colors)', () => {
     const result = parse({
       primary: '142 72% 29%',
       'primary-foreground': '0 0% 100%',
-      radius: '0.5rem',
       ring: '142 72% 29%',
     });
     expect(result.success).toBe(true);
@@ -21,6 +20,12 @@ describe('portal theme token validation', () => {
     expect(parse({ 'font-sans': 'url(evil)' }).success).toBe(false);
     expect(parse({ background: '0 0% 100%' }).success).toBe(false);
     expect(parse({ '--evil': 'x' }).success).toBe(false);
+    // `secondary`/`radius` were REMOVED (T-PERSONALIZACION-AUDIT): neither
+    // ever painted anything in the real portal or in `packages/ui`'s shared
+    // components — keeping them only let an owner "save" a control with no
+    // visible effect. They are now rejected like any other unknown key.
+    expect(parse({ secondary: '213 20% 93%' }).success).toBe(false);
+    expect(parse({ radius: '0.5rem' }).success).toBe(false);
   });
 
   it('rejects malformed color values (not bare HSL channels)', () => {
@@ -34,14 +39,6 @@ describe('portal theme token validation', () => {
   it('rejects HSL channels out of range', () => {
     expect(parse({ primary: '400 72% 29%' }).success).toBe(false);
     expect(parse({ primary: '142 120% 29%' }).success).toBe(false);
-  });
-
-  it('validates the radius as a bounded CSS length', () => {
-    expect(parse({ radius: '8px' }).success).toBe(true);
-    expect(parse({ radius: '0.75rem' }).success).toBe(true);
-    expect(parse({ radius: '999px' }).success).toBe(false);
-    expect(parse({ radius: '10vw' }).success).toBe(false);
-    expect(parse({ radius: 'calc(1px)' }).success).toBe(false);
   });
 
   it('accepts a color/foreground pair below the minimum contrast (warning-only, never blocks save)', () => {
