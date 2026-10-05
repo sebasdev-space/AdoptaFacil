@@ -1,9 +1,11 @@
 import {
   BadRequestException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import type {
   Sponsorship as SponsorshipModel,
@@ -12,6 +14,7 @@ import type {
 import {
   type CreateSponsorshipInput,
   type Paginated,
+  type PaymentPort,
   type Sponsorship,
   type SponsorshipPeriodicity,
   type SponsorshipPaymentStatus,
@@ -19,12 +22,15 @@ import {
   type SponsorshipStatusHistoryEntry,
 } from '@adoptafacil/contracts';
 import { AuditService } from '../../core/audit/audit.service';
+import type { Env } from '../../config/env.validation';
+import { PAYMENT_PORT } from '../../core/payments/payment.port';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../core/tenant/tenant-context.service';
 import type { RequestUser } from '../../core/auth/auth.types';
 import { requireCompleteProfile } from '../../core/auth/require-complete-profile';
 import { checkSponsorshipTransition } from './sponsorship-status';
 import { clampLimit } from './sponsorship-plans.service';
+import { addMonths, billingPeriod, buildAttemptIdempotencyKey } from './sponsorship-billing';
 
 /** Row shape returned by the raw SQL `create_sponsorship(...)` (snake_case —
  *  Prisma's camelCase mapping only applies to the ORM client, not $queryRaw). */
@@ -148,9 +154,11 @@ function toHistoryEntry(row: HistoryRow): SponsorshipStatusHistoryEntry {
  * Sponsorships (RF17 · T-056) — a Person (padrino) SUBSCRIBES to another org's
  * plan (cross-tenant creation, same technique as M05 donations); the org then
  * suspends/reactivates/cancels WITHIN its own tenant context (regular RLS write).
- * This slice creates NO payment — TODO(T-057): wire real recurring charges
- * through PAYMENT_PORT (the plan's `amount`/`periodicity` already carry what a
- * future collection would need; nothing here assumes money changed hands).
+ * Requerimiento #17: subscribing charges a REAL MercadoPago collection
+ * immediately (see `subscribe()`'s own doc comment) — the recurring cron/
+ * poller/"Pagar de nuevo" machinery (`SponsorshipBillingService`,
+ * `SponsorshipPaymentPollerService`, `SponsorshipPaymentsService.retryPayment`)
+ * is unchanged and keeps handling every period AFTER this first one.
  */
 @Injectable()
 export class SponsorshipsService {
@@ -158,7 +166,21 @@ export class SponsorshipsService {
     private readonly prisma: PrismaService,
     private readonly tenant: TenantContextService,
     private readonly audit: AuditService,
+    private readonly config: ConfigService<Env, true>,
+    @Inject(PAYMENT_PORT) private readonly payments: PaymentPort,
   ) {}
+
+  /**
+   * Split de Pagos 1:1 (T-OAuth-Connect) — same narrow, token-free lookup
+   * `SponsorshipPaymentsService`/`DonationsService` each already duplicate
+   * (this codebase does not share service-level logic across files).
+   */
+  private async resolveSponsorMpUserId(organizationId: string): Promise<string | undefined> {
+    const rows = await this.prisma.$queryRaw<{ mp_user_id: string }[]>(Prisma.sql`
+      SELECT * FROM mercadopago_account_mp_user_id(${organizationId}::uuid)
+    `);
+    return rows[0]?.mp_user_id;
+  }
 
   private requireOrgId(): string {
     const organizationId = this.tenant.getOrganizationId();
@@ -173,7 +195,17 @@ export class SponsorshipsService {
    * not a member of the plan's org, so creation goes through the bounded
    * SECURITY DEFINER `create_sponsorship` (validates the plan exists and is
    * active, inserts the sponsorship + its initial history entry atomically).
-   * TODO(T-057): this is where a real PaymentPort collection would be started.
+   *
+   * Requerimiento #17: immediately after creating the row, charges a REAL
+   * MercadoPago collection for the plan's amount — same mechanism
+   * `SponsorshipPaymentsService.retryPayment` already uses (card tokenized
+   * client-side by `CardPaymentBrick`, `createCollection` called OUTSIDE any
+   * DB transaction). A synchronous `declined` CANCELS the just-created
+   * sponsorship (never leaves an "active" subscription with no real charge
+   * behind it) and rejects; any other result (`approved`/`pending`/…) opens
+   * the first billing period for it, exactly like `SponsorshipBillingService`
+   * would have — `nextBillingAt` is advanced a month so the daily cron does
+   * not try to open a second period for this same month.
    */
   async subscribe(actor: RequestUser, input: CreateSponsorshipInput): Promise<Sponsorship> {
     await requireCompleteProfile(this.prisma, actor);
@@ -192,7 +224,85 @@ export class SponsorshipsService {
       entityId: row.id,
       metadata: { planId: input.planId },
     });
-    return fromRawRow(row);
+
+    const plan = await this.prisma.withOrgContext(row.organization_id, (tx) =>
+      tx.sponsorshipPlan.findUniqueOrThrow({ where: { id: row.plan_id } }),
+    );
+    const sponsorMpUserId = await this.resolveSponsorMpUserId(row.organization_id);
+    const now = new Date();
+    const period = billingPeriod(now);
+    const idempotencyKey = buildAttemptIdempotencyKey(row.id, period, 1);
+    const collection = await this.payments.createCollection({
+      intendedAmount: plan.amount,
+      currency: 'COP',
+      concept: { kind: 'sponsorship', id: row.id },
+      commissionPayer: 'organization',
+      idempotencyKey,
+      cardToken: input.cardToken,
+      paymentMethodId: input.paymentMethodId,
+      paymentMethodType: input.paymentMethodType,
+      installments: input.installments,
+      sponsorMpUserId,
+    });
+
+    if (collection.status === 'declined') {
+      // Committed on its own (never inside the same tx as the throw below —
+      // `withOrgContext` is a `$transaction`, so a throw inside it would also
+      // roll back this cancellation).
+      await this.prisma.withOrgContext(row.organization_id, (tx) =>
+        this.applySystemTransition(
+          tx,
+          row.organization_id,
+          row.id,
+          SponsorshipStatus.Cancelled,
+          'Pago inicial rechazado.',
+        ),
+      );
+      throw new BadRequestException('Tu pago fue rechazado. Intenta con otra tarjeta.');
+    }
+
+    const paid = collection.status === 'approved';
+    const windowDays = this.config.get('SPONSORSHIP_EXPIRE_ATTEMPT_1_DAY', { infer: true });
+    const expiresAt = new Date(now.getTime() + windowDays * 24 * 60 * 60 * 1000);
+    await this.prisma.withOrgContext(row.organization_id, async (tx) => {
+      const payment = await tx.sponsorshipPayment.create({
+        data: {
+          organizationId: row.organization_id,
+          sponsorshipId: row.id,
+          period,
+          periodStartedAt: now,
+          attemptCount: 1,
+          status: paid ? 'paid' : 'pending',
+          paidAt: paid ? now : undefined,
+        },
+      });
+      await tx.sponsorshipPaymentAttempt.create({
+        data: {
+          organizationId: row.organization_id,
+          sponsorshipPaymentId: payment.id,
+          attemptNumber: 1,
+          collectionId: collection.collectionId,
+          paymentLinkUrl: collection.paymentLinkUrl,
+          idempotencyKey,
+          expiresAt,
+          result: paid ? 'paid' : 'pending',
+        },
+      });
+      await tx.sponsorship.update({
+        where: { id: row.id },
+        data: { nextBillingAt: addMonths(now, 1) },
+      });
+      await this.audit.recordWithTx(tx, {
+        organizationId: row.organization_id,
+        actorUserId: actor.id,
+        action: 'sponsorship.first_payment_attempt_created',
+        entityType: 'sponsorship_payment',
+        entityId: payment.id,
+        metadata: { collectionStatus: collection.status },
+      });
+    });
+
+    return { ...fromRawRow(row), firstPaymentStatus: collection.status };
   }
 
   /**

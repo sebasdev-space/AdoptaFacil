@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import type { SponsorshipPlanPublic, SponsorshipPublicSummary } from '@adoptafacil/contracts';
+import type {
+  Sponsorship,
+  SponsorshipPlanPublic,
+  SponsorshipPublicSummary,
+} from '@adoptafacil/contracts';
 import {
   Button,
   Card,
@@ -13,6 +17,7 @@ import {
 } from '@adoptafacil/ui';
 import { PageContainer, PageHeader } from '../../_layout';
 import { isIncompleteProfileError, useApiClient } from '../../../shell/api';
+import { CardPaymentBrick, type CardPaymentBrickResult } from '../../payments';
 import { fetchAnimalSponsorshipSummary } from '../api/public-sponsorships';
 import { subscribeToPlan } from '../api/sponsorships-api';
 import { formatCop, SPONSORSHIP_PERIODICITY_LABELS } from '../model/sponsorships-view';
@@ -67,11 +72,18 @@ export function SponsorPage() {
   const [summary, setSummary] = useState<SponsorshipPublicSummary | null>(null);
   const [summaryState, setSummaryState] = useState<SummaryState>('loading');
   const [subscribingPlanId, setSubscribingPlanId] = useState<string | null>(null);
-  // `POST /sponsorships` returns the bare Sponsorship row (no planAmount/planName —
-  // those are ONLY resolved by `GET /sponsorships/mine`, see the contract comments
-  // on `Sponsorship`), so the confirmation message uses the PLAN we already fetched
-  // from the public summary, not the subscribe response.
-  const [done, setDone] = useState<SponsorshipPlanPublic | null>(null);
+  // Requerimiento #17: "Apadrinar" abre el Card Payment Brick EN LÍNEA para
+  // ese plan (mismo patrón que "Pagar de nuevo" en `MySponsorshipsList`) — el
+  // cobro real solo se dispara al enviarlo, nunca al click inicial.
+  const [payingPlanId, setPayingPlanId] = useState<string | null>(null);
+  // `POST /sponsorships` devuelve el Sponsorship real (incluido
+  // `firstPaymentStatus`, el resultado síncrono del cobro) — el PLAN se
+  // conserva aparte solo para el nombre/monto que el mensaje final muestra
+  // (no vienen en la respuesta, ver los comentarios del contrato `Sponsorship`).
+  const [done, setDone] = useState<{
+    plan: SponsorshipPlanPublic;
+    sponsorship: Sponsorship;
+  } | null>(null);
 
   useEffect(() => {
     if (!target) return;
@@ -106,12 +118,32 @@ export function SponsorPage() {
 
   const animalLabel = target.animalName ?? target.animalId;
 
-  const sponsor = async (plan: SponsorshipPlanPublic): Promise<void> => {
+  const sponsor = async (
+    plan: SponsorshipPlanPublic,
+    card: CardPaymentBrickResult,
+  ): Promise<void> => {
     setSubscribingPlanId(plan.id);
     try {
-      await subscribeToPlan(client, { planId: plan.id });
-      setDone(plan);
-      toast({ title: 'Apadrinamiento creado', description: `Ahora apadrinas a ${animalLabel}.` });
+      const sponsorship = await subscribeToPlan(client, {
+        planId: plan.id,
+        cardToken: card.cardToken,
+        paymentMethodId: card.paymentMethodId,
+        paymentMethodType: card.paymentMethodType,
+        installments: card.installments,
+      });
+      setDone({ plan, sponsorship });
+      toast(
+        sponsorship.firstPaymentStatus === 'approved'
+          ? {
+              title: '¡Pago aprobado!',
+              description: `Cobramos ${formatCop(plan.amount)} y ya apadrinas a ${animalLabel}.`,
+              variant: 'success',
+            }
+          : {
+              title: 'Apadrinamiento creado',
+              description: `Ahora apadrinas a ${animalLabel}. Estamos confirmando tu pago.`,
+            },
+      );
     } catch (error) {
       // T-Google-SignIn (business rule #3): apadrinar requires a complete
       // profile (phone/documentId/address).
@@ -130,6 +162,10 @@ export function SponsorPage() {
         description: error instanceof Error ? error.message : 'Inténtalo de nuevo.',
         variant: 'destructive',
       });
+      // Deja el Brick abierto para reintentar con otra tarjeta y re-lanza
+      // para que `CardPaymentBrick` también muestre su propio estado de
+      // error (mismo contrato que `MySponsorshipsList.payWithCard`).
+      throw error;
     } finally {
       setSubscribingPlanId(null);
     }
@@ -149,7 +185,11 @@ export function SponsorPage() {
           {done ? (
             <EmptyState
               title="¡Gracias por apadrinar!"
-              description={`Registramos tu apadrinamiento mensual de ${formatCop(done.amount)} para ${animalLabel}. Pago simulado (PAYMENT_DRIVER=fake) — la pasarela real llega en una versión futura.`}
+              description={
+                done.sponsorship.firstPaymentStatus === 'approved'
+                  ? `Cobramos ${formatCop(done.plan.amount)} de inmediato. ¡Gracias por apadrinar a ${animalLabel}!`
+                  : `Registramos tu apadrinamiento mensual de ${formatCop(done.plan.amount)} para ${animalLabel}. Estamos confirmando tu pago — te avisaremos por correo en cuanto se confirme.`
+              }
             />
           ) : (
             <>
@@ -174,19 +214,37 @@ export function SponsorPage() {
                   <ul className={styles.plans}>
                     {summary.activePlans.map((plan) => (
                       <li key={plan.id} className={styles['plan-row']}>
-                        <div>
-                          <p className={styles['plan-row__name']}>{plan.name}</p>
-                          <p className={styles['plan-row__meta']}>
-                            {formatCop(plan.amount)} /{' '}
-                            {SPONSORSHIP_PERIODICITY_LABELS[plan.periodicity].toLowerCase()}
-                          </p>
+                        <div className="flex w-full items-center justify-between gap-2">
+                          <div>
+                            <p className={styles['plan-row__name']}>{plan.name}</p>
+                            <p className={styles['plan-row__meta']}>
+                              {formatCop(plan.amount)} /{' '}
+                              {SPONSORSHIP_PERIODICITY_LABELS[plan.periodicity].toLowerCase()}
+                            </p>
+                          </div>
+                          {payingPlanId !== plan.id && (
+                            <Button onClick={() => setPayingPlanId(plan.id)}>Apadrinar</Button>
+                          )}
                         </div>
-                        <Button
-                          disabled={subscribingPlanId === plan.id}
-                          onClick={() => void sponsor(plan)}
-                        >
-                          {subscribingPlanId === plan.id ? 'Procesando…' : 'Apadrinar'}
-                        </Button>
+                        {/* El Brick se abre EN LÍNEA — el cobro real solo se
+                            dispara al enviarlo (mismo patrón que "Pagar de
+                            nuevo" en `MySponsorshipsList`). */}
+                        {payingPlanId === plan.id && (
+                          <div className="w-full space-y-2">
+                            <CardPaymentBrick
+                              amount={plan.amount}
+                              onResult={(card) => sponsor(plan, card)}
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={subscribingPlanId === plan.id}
+                              onClick={() => setPayingPlanId(null)}
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>

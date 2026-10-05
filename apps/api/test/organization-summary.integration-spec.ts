@@ -3,8 +3,9 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
-import { computeBreakdown } from '@adoptafacil/contracts';
+import { computeBreakdown, FakePaymentAdapter } from '@adoptafacil/contracts';
 import { AppModule } from '../src/app.module';
+import { PAYMENT_PORT } from '../src/core/payments/payment.port';
 import { purgeOrganizations } from './support/cleanup';
 import { completeTestProfile } from './support/profile';
 
@@ -102,7 +103,15 @@ describe('Organization summary (S2-08, M13)', () => {
   let net2 = 0;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    // Requerimiento #17: `POST /sponsorships` now charges a real collection —
+    // overridden here so this file's `.env` (`PAYMENT_DRIVER=mercadopago`)
+    // doesn't force a tokenized card just to subscribe a fixture sponsorship
+    // (this file never asserts anything payment-specific; only the
+    // sponsorship/donation-amount test files above own that coverage).
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(PAYMENT_PORT)
+      .useValue(new FakePaymentAdapter())
+      .compile();
     app = moduleRef.createNestApplication();
     await app.init();
     server = app.getHttpServer();
