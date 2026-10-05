@@ -38,6 +38,7 @@ import {
   OrgLegalRepresentativePage,
   OrgProfilePage,
   PlatformAdminDashboardPage,
+  PlatformBannerPage,
   PlatformDocumentsReviewPage,
   PlatformDuplicatesReviewPage,
   PlatformReviewsReviewPage,
@@ -583,6 +584,16 @@ export function AppRoutes() {
             element={
               <RequireRoles roles={PLATFORM_SUPER_ADMIN_DASHBOARD_ROLES}>
                 <PlatformSuperAdminDashboardPage />
+              </RequireRoles>
+            }
+          />
+          {/* M01/T-030 · S-15 (pedido del cliente): fotos del banner del
+              portal general — mismo gate que el resto de /plataforma/*. */}
+          <Route
+            path="plataforma/banner"
+            element={
+              <RequireRoles roles={PLATFORM_DOCUMENTS_ROLES}>
+                <PlatformBannerPage />
               </RequireRoles>
             }
           />

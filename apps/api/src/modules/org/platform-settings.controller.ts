@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Post, Put, UseGuards } from '@nestjs/common';
 import {
   Role,
   type PlatformSettings,
@@ -10,8 +10,15 @@ import { JwtAuthGuard } from '../../core/auth/jwt-auth.guard';
 import { ZodValidationPipe } from '../../core/auth/zod-validation.pipe';
 import { Roles } from '../../core/rbac/roles.decorator';
 import { RolesGuard } from '../../core/rbac/roles.guard';
+import { STORAGE_PORT, type StoragePort, type StoredObject } from '../../core/storage/storage.port';
 import { PlatformSettingsService } from './platform-settings.service';
 import { updatePlatformSettingsSchema } from './platform-settings.schemas';
+import { uploadTargetSchema } from './org.schemas';
+
+interface UploadTargetDto {
+  filename: string;
+  contentType?: string;
+}
 
 /**
  * Platform-wide settings (M01/RF01, T-030). Gated to platform roles
@@ -24,7 +31,10 @@ import { updatePlatformSettingsSchema } from './platform-settings.schemas';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.PlatformAdmin, Role.PlatformSuperAdmin)
 export class PlatformSettingsController {
-  constructor(private readonly service: PlatformSettingsService) {}
+  constructor(
+    private readonly service: PlatformSettingsService,
+    @Inject(STORAGE_PORT) private readonly storage: StoragePort,
+  ) {}
 
   @Get()
   get(): Promise<PlatformSettings> {
@@ -37,5 +47,24 @@ export class PlatformSettingsController {
     @Body(new ZodValidationPipe(updatePlatformSettingsSchema)) dto: UpdatePlatformSettingsInput,
   ): Promise<PlatformSettings> {
     return this.service.update(actor.id, dto);
+  }
+
+  /** Reserve a storage target for ONE hero banner photo (S-15). Same
+   *  reserve-then-PUT flow already used by `OrgController.createUpload` for
+   *  logos/cover photos — `PUT /storage/upload` only allows uploading bytes
+   *  to a key reserved for your OWN organization, so this reserves under the
+   *  acting PlatformAdmin's own org (irrelevant to this platform-wide
+   *  setting beyond being the storage path's namespace). */
+  @Post('uploads')
+  createUpload(
+    @CurrentUser() actor: RequestUser,
+    @Body(new ZodValidationPipe(uploadTargetSchema)) dto: UploadTargetDto,
+  ): Promise<StoredObject> {
+    return this.storage.createUploadTarget({
+      organizationId: actor.organizationId,
+      filename: dto.filename,
+      contentType: dto.contentType,
+      visibility: 'public',
+    });
   }
 }

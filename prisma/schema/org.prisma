@@ -109,6 +109,11 @@ model OrganizationProfile {
 model PlatformSettings {
   id                   String   @id @default("global")
   showOrganizationType String   @default("formalized_only") @map("show_organization_type")
+  /// Fotos del banner del portal general ("/"), hasta 4 — URLs públicas
+  /// resueltas vía StoragePort (mismo patrón que `OrganizationProfile.coverPhotos`).
+  /// Vacío = el banner sigue mostrando el collage decorativo de íconos
+  /// (`HeroPhotoGrid`), nunca una caja rota. S-15 (pedido del cliente).
+  heroBannerPhotos     String[] @default([]) @map("hero_banner_photos")
   updatedByUserId      String?  @map("updated_by_user_id") @db.Uuid
   updatedAt            DateTime @updatedAt @map("updated_at")
 

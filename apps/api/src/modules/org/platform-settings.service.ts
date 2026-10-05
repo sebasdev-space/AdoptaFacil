@@ -31,6 +31,7 @@ export class PlatformSettingsService {
     return {
       showOrganizationType:
         (row?.showOrganizationType as ShowOrganizationTypePolicy) ?? DEFAULT_POLICY,
+      heroBannerPhotos: row?.heroBannerPhotos ?? [],
     };
   }
 
@@ -42,14 +43,24 @@ export class PlatformSettingsService {
       throw new ForbiddenException('Missing tenant context');
     }
     return this.prisma.withOrgContext(organizationId, async (tx) => {
+      // `heroBannerPhotos` omitido ⇒ no tocar el banner actual (contrato
+      // aditivo) — el DEFAULT de Prisma solo aplica en un INSERT nuevo, así
+      // que el `update` necesita el valor explícito solo cuando SÍ vino.
       const row = await tx.platformSettings.upsert({
         where: { id: SINGLETON_ID },
         create: {
           id: SINGLETON_ID,
           showOrganizationType: input.showOrganizationType,
+          heroBannerPhotos: input.heroBannerPhotos ?? [],
           updatedByUserId: actorUserId,
         },
-        update: { showOrganizationType: input.showOrganizationType, updatedByUserId: actorUserId },
+        update: {
+          showOrganizationType: input.showOrganizationType,
+          ...(input.heroBannerPhotos !== undefined
+            ? { heroBannerPhotos: input.heroBannerPhotos }
+            : {}),
+          updatedByUserId: actorUserId,
+        },
       });
       await this.audit.recordWithTx(tx, {
         organizationId,
@@ -57,9 +68,24 @@ export class PlatformSettingsService {
         action: 'platform.settings_updated',
         entityType: 'platform_settings',
         entityId: SINGLETON_ID,
-        metadata: { showOrganizationType: input.showOrganizationType },
+        metadata: {
+          showOrganizationType: input.showOrganizationType,
+          ...(input.heroBannerPhotos !== undefined
+            ? { heroBannerPhotoCount: input.heroBannerPhotos.length }
+            : {}),
+        },
       });
-      return { showOrganizationType: row.showOrganizationType as ShowOrganizationTypePolicy };
+      return {
+        showOrganizationType: row.showOrganizationType as ShowOrganizationTypePolicy,
+        heroBannerPhotos: row.heroBannerPhotos,
+      };
     });
+  }
+
+  /** The 4-or-fewer hero banner photos, for the PUBLIC general portal ("/") —
+   *  no session, no tenant context needed (a true platform-wide singleton). */
+  async getPublicHeroBanner(): Promise<{ photos: string[] }> {
+    const row = await this.prisma.platformSettings.findUnique({ where: { id: SINGLETON_ID } });
+    return { photos: row?.heroBannerPhotos ?? [] };
   }
 }

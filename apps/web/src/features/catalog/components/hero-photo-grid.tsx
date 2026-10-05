@@ -1,12 +1,20 @@
 import { cn } from '@adoptafacil/ui';
 import styles from './hero-photo-grid.module.scss';
 
+export interface HeroPhotoGridProps {
+  /** Fotos reales subidas por el PlatformAdmin (S-15, hasta 4, `GET
+   *  /public/hero-banner`) — una por cuadro, en orden. Un cuadro sin foto
+   *  (arreglo más corto que 4, o ausente) sigue mostrando el degradé +
+   *  ícono decorativo de siempre; nunca una caja rota. */
+  photos?: string[];
+}
+
 /**
- * Collage decorativo del hero — NO son datos reales ni vienen del catálogo
- * (ese es `GeneralCatalogSection`, cableado a `/public/animals`). Son parte
- * del diseño de la landing: 4 cuadros con degradé de marca + un ícono de
- * mascota, con entrada escalonada y hover sutil (ambos respetan
- * `prefers-reduced-motion` vía el guard global de `packages/ui`).
+ * Collage del hero — 4 cuadros con degradé de marca + ícono de mascota por
+ * defecto (entrada escalonada y hover sutil, ambos respetan
+ * `prefers-reduced-motion` vía el guard global de `packages/ui`). Desde S-15,
+ * cualquier cuadro con una foto real asignada la muestra en su lugar — el
+ * PlatformAdmin las sube en `/plataforma/banner`.
  */
 const PawIcon = (props: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className={props.className}>
@@ -42,14 +50,21 @@ const BOXES = [
   { variant: styles['box--d'], height: 'h-44 mt-6', Icon: HeartIcon },
 ];
 
-export function HeroPhotoGrid() {
+export function HeroPhotoGrid({ photos }: HeroPhotoGridProps = {}) {
   return (
     <div className={styles.grid} role="img" aria-label="Mascotas en adopción">
-      {BOXES.map(({ variant, height, Icon }, index) => (
-        <div key={index} className={cn(styles.box, variant, height)}>
-          <Icon className={styles.box__icon} />
-        </div>
-      ))}
+      {BOXES.map(({ variant, height, Icon }, index) => {
+        const photo = photos?.[index];
+        return (
+          <div key={index} className={cn(styles.box, variant, height)}>
+            {photo ? (
+              <img src={photo} alt="" aria-hidden className={styles.box__photo} />
+            ) : (
+              <Icon className={styles.box__icon} />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

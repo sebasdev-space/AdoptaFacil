@@ -27,6 +27,7 @@ import { PlatformDuplicatesController } from './platform-duplicates.controller';
 import { PlatformDuplicatesService } from './platform-duplicates.service';
 import { PlatformSettingsController } from './platform-settings.controller';
 import { PlatformSettingsService } from './platform-settings.service';
+import { PublicPlatformSettingsController } from './public-platform-settings.controller';
 
 /**
  * M01 · Organization profile (CRUD) + public portal read + formalization state
@@ -50,6 +51,7 @@ import { PlatformSettingsService } from './platform-settings.service';
     PlatformDocumentsController,
     PlatformDuplicatesController,
     PlatformSettingsController,
+    PublicPlatformSettingsController,
   ],
   providers: [
     OrgProfileService,

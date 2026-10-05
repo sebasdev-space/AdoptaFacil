@@ -385,11 +385,26 @@ export type ShowOrganizationTypePolicy = 'all' | 'formalized_only';
 /** Platform-wide settings (singleton). */
 export interface PlatformSettings {
   showOrganizationType: ShowOrganizationTypePolicy;
+  /** Hasta 4 URLs públicas para el banner del portal general ("/") — S-15,
+   *  pedido del cliente. Vacío = el banner muestra el collage decorativo de
+   *  íconos (`HeroPhotoGrid`) en vez de fotos reales. */
+  heroBannerPhotos: string[];
 }
 
-/** Update the platform settings (PlatformAdmin only). */
+/** Update the platform settings (PlatformAdmin only). `heroBannerPhotos` es
+ *  OPCIONAL (contrato aditivo): si se omite, el banner actual no se toca —
+ *  solo se reemplaza cuando el caller explícitamente lo incluye. Hasta 4
+ *  URLs; un arreglo más corto que 4 simplemente deja esas tarjetas del
+ *  banner en el collage decorativo. */
 export interface UpdatePlatformSettingsInput {
   showOrganizationType: ShowOrganizationTypePolicy;
+  heroBannerPhotos?: string[];
+}
+
+/** Público, sin sesión (`GET /public/hero-banner`) — solo lo que el banner
+ *  del portal general necesita mostrar. */
+export interface PublicHeroBanner {
+  photos: string[];
 }
 
 // ============================================================================
