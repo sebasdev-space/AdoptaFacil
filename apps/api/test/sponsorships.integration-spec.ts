@@ -3,15 +3,42 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
+import {
+  type CollectionResult,
+  type CreateCollectionInput,
+  FakePaymentAdapter,
+  type PaymentStatus,
+} from '@adoptafacil/contracts';
 import { AppModule } from '../src/app.module';
+import { PAYMENT_PORT } from '../src/core/payments/payment.port';
 import { purgeOrganizations } from './support/cleanup';
 import { completeTestProfile } from './support/profile';
+
+/**
+ * Requerimiento #17: `subscribe()` now ALWAYS calls `PaymentPort.createCollection`
+ * — this test file's app runs against `.env`'s real `PAYMENT_DRIVER` otherwise
+ * (this repo's env is currently `mercadopago`, which hard-requires a tokenized
+ * card), so every test here would 500 without this override. Overriding with a
+ * controllable `FakePaymentAdapter` subclass keeps this file network-free/
+ * deterministic (same reasoning the adapter's own doc comment gives) AND lets
+ * the "declined" test flip the outcome without touching any other test.
+ */
+class ControllableFakePaymentAdapter extends FakePaymentAdapter {
+  nextStatus: PaymentStatus = 'approved';
+
+  override async createCollection(input: CreateCollectionInput): Promise<CollectionResult> {
+    const result = await super.createCollection(input);
+    return { ...result, status: this.nextStatus };
+  }
+}
 
 /**
  * Sponsorships base end-to-end (RF17 · T-056): an org defines a plan for its
  * animal, a Person subscribes, the org suspends/reactivates it (state machine +
  * historial), plus the guardrails: money validation, RBAC deny-by-default, and
- * tenant isolation on the authenticated path. NO payment is created anywhere.
+ * tenant isolation on the authenticated path. Requerimiento #17: subscribing
+ * also charges a real collection immediately (own describe block below, using
+ * the SAME app — see `ControllableFakePaymentAdapter` above).
  */
 describe('Sponsorships base (RF17 · T-056)', () => {
   let app: INestApplication;
@@ -19,6 +46,7 @@ describe('Sponsorships base (RF17 · T-056)', () => {
   const admin = new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } });
   const orgIds: string[] = [];
   const password = 'password123';
+  const paymentPort = new ControllableFakePaymentAdapter();
 
   let tokenA = '';
   let tokenB = '';
@@ -41,7 +69,10 @@ describe('Sponsorships base (RF17 · T-056)', () => {
   }
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(PAYMENT_PORT)
+      .useValue(paymentPort)
+      .compile();
     app = moduleRef.createNestApplication();
     await app.init();
     server = app.getHttpServer();
@@ -81,6 +112,10 @@ describe('Sponsorships base (RF17 · T-056)', () => {
     await purgeOrganizations(admin, orgIds);
     await admin.$disconnect();
     await app?.close();
+  });
+
+  afterEach(() => {
+    paymentPort.nextStatus = 'approved';
   });
 
   it('Owner creates a plan for its OWN animal (integer COP, monthly)', async () => {
@@ -266,5 +301,70 @@ describe('Sponsorships base (RF17 · T-056)', () => {
     expect(typeof res.body.activeSponsorCount).toBe('number');
     // No sponsor identity ever appears in the public payload.
     expect(JSON.stringify(res.body)).not.toContain('sponsorUserId');
+  });
+
+  describe('requerimiento #17: cobro inmediato al apadrinar', () => {
+    it('approved: creates a PAID first payment+attempt, advances nextBillingAt, and returns firstPaymentStatus', async () => {
+      const plan = await request(server)
+        .post('/sponsorship-plans')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ animalId, name: 'Plan inmediato', amount: 45_000, periodicity: 'monthly' })
+        .expect(201);
+
+      const res = await request(server)
+        .post('/sponsorships')
+        .set('Authorization', `Bearer ${personToken}`)
+        .send({ planId: plan.body.id, cardToken: 'tok_test_1234567890', paymentMethodId: 'visa' })
+        .expect(201);
+      expect(res.body.status).toBe('active');
+      expect(res.body.firstPaymentStatus).toBe('approved');
+
+      const payments = await admin.sponsorshipPayment.findMany({
+        where: { sponsorshipId: res.body.id },
+        include: { attempts: true },
+      });
+      expect(payments).toHaveLength(1);
+      expect(payments[0].status).toBe('paid');
+      expect(payments[0].paidAt).not.toBeNull();
+      expect(payments[0].attempts).toHaveLength(1);
+      expect(payments[0].attempts[0].result).toBe('paid');
+      expect(payments[0].attempts[0].collectionId).toEqual(expect.any(String));
+
+      const sponsorshipRow = await admin.sponsorship.findUniqueOrThrow({
+        where: { id: res.body.id },
+      });
+      const expectedNextBillingMonth = (new Date().getUTCMonth() + 1) % 12;
+      expect(sponsorshipRow.nextBillingAt.getUTCMonth()).toBe(expectedNextBillingMonth);
+    });
+
+    it('declined: cancels the just-created sponsorship, creates NO payment row, and rejects with 400', async () => {
+      const plan = await request(server)
+        .post('/sponsorship-plans')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ animalId, name: 'Plan rechazado', amount: 10_000, periodicity: 'monthly' })
+        .expect(201);
+
+      paymentPort.nextStatus = 'declined';
+      const res = await request(server)
+        .post('/sponsorships')
+        .set('Authorization', `Bearer ${personToken}`)
+        .send({ planId: plan.body.id })
+        .expect(400);
+      expect(res.body.message).toMatch(/rechazado/i);
+
+      const createdRows = await admin.sponsorship.findMany({ where: { planId: plan.body.id } });
+      expect(createdRows).toHaveLength(1);
+      expect(createdRows[0].status).toBe('cancelled');
+
+      const payments = await admin.sponsorshipPayment.findMany({
+        where: { sponsorshipId: createdRows[0].id },
+      });
+      expect(payments).toHaveLength(0);
+
+      const history = await admin.sponsorshipStatusHistory.findFirst({
+        where: { sponsorshipId: createdRows[0].id, toStatus: 'cancelled' },
+      });
+      expect(history?.reason).toBe('Pago inicial rechazado.');
+    });
   });
 });

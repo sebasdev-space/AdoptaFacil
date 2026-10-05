@@ -1,5 +1,11 @@
 // Module: M07 sponsorships · Contracts owner: @sebastian
 //
+// Requerimiento #17 (2026-10-05): subscribing now charges a real MercadoPago
+// collection IMMEDIATELY (same mechanism `retryPayment`/donations already use),
+// instead of only ever charging via the daily cron placeholder + "Pagar de
+// nuevo" recovery. See `firstPaymentStatus` and `CreateSponsorshipInput`'s
+// card fields below.
+//
 // Recurring animal sponsorships (RF17, §9/§14). BASE slice (T-056): an
 // organization defines sponsorship PLANS for its animals; a sponsor (Person,
 // "padrino") subscribes to a plan; the organization suspends/reactivates/cancels
@@ -17,6 +23,8 @@
 // `PaymentPort.getCollectionStatus()`, not the gateway webhook (that webhook is
 // hardcoded inside donations/**, Fabián's domain — extending it was out of
 // scope here, confirmed with the user 2026-08-24).
+
+import type { PaymentStatus } from './payments';
 
 /**
  * Billing cadence of a plan — CLOSED for now (`monthly`, the base document's
@@ -137,12 +145,30 @@ export interface Sponsorship {
   /** How many payment-link attempts the current period has used (0-3). Only
    *  present alongside {@link currentPeriodStatus}. */
   currentPeriodAttemptCount?: number;
+  /**
+   * Requerimiento #17: the SYNCHRONOUS result of the gateway charge made at
+   * subscription time — only populated on the response of `POST
+   * /sponsorships` itself (never by `list`/`mine`/`get`, and never persisted
+   * as a column — the stored truth is `SponsorshipPayment.status`, confirmed/
+   * corrected afterwards by the poller same as any other period). Lets the
+   * UI tell the padrino, right away, whether their card was actually charged
+   * instead of showing a generic "listo" message.
+   */
+  firstPaymentStatus?: PaymentStatus;
   /** ISO-8601 UTC. */
   createdAt: string;
 }
 
-/** Subscribe to a plan (authenticated Person = the padrino). */
-export interface CreateSponsorshipInput {
+/**
+ * Subscribe to a plan (authenticated Person = the padrino). Requerimiento
+ * #17: this now charges a real MercadoPago collection IMMEDIATELY — the
+ * card fields mirror {@link PaySponsorshipPaymentInput} verbatim (same
+ * rationale: optional/additive so the fake driver and old callers keep
+ * working; the REAL gateway adapter is the one place that hard-requires a
+ * token). A `declined` result cancels the just-created sponsorship instead of
+ * leaving an "active" subscription with no real charge behind it.
+ */
+export interface CreateSponsorshipInput extends PaySponsorshipPaymentInput {
   planId: string;
 }
 

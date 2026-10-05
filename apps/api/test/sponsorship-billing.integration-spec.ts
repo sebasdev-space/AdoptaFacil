@@ -3,11 +3,36 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
+import {
+  type CollectionResult,
+  type CreateCollectionInput,
+  FakePaymentAdapter,
+} from '@adoptafacil/contracts';
 import { AppModule } from '../src/app.module';
+import { PAYMENT_PORT } from '../src/core/payments/payment.port';
 import { SponsorshipBillingService } from '../src/modules/sponsorships/sponsorship-billing.service';
 import { SponsorshipPaymentPollerService } from '../src/modules/sponsorships/sponsorship-payment-poller.service';
 import { purgeOrganizations } from './support/cleanup';
 import { completeTestProfile } from './support/profile';
+
+/**
+ * Requerimiento #17: `subscribe()` now charges period 1 ITSELF (see
+ * `sponsorships.integration-spec.ts`'s own describe block for that happy
+ * path) — this whole file is specifically about what happens when that
+ * charge is NOT synchronously confirmed (ladder/reminders/expiry/suspension,
+ * then the separate poller), so the override below always answers `pending`,
+ * never `approved`. `period`/`attemptCount`/`expiresAt` are built in
+ * `subscribe()` with the exact same helpers/config keys `openPeriodFor` uses
+ * below, so the period `subscribe()` opens is indistinguishable, shape-wise,
+ * from one the cron would have opened itself — every ladder assertion below
+ * is unaffected by WHICH code path created attempt 1.
+ */
+class PendingFakePaymentAdapter extends FakePaymentAdapter {
+  override async createCollection(input: CreateCollectionInput): Promise<CollectionResult> {
+    const result = await super.createCollection(input);
+    return { ...result, status: 'pending' };
+  }
+}
 
 /**
  * Recurring sponsorship billing end-to-end (S-5-REDISEÑO, M07/RF17, T-057):
@@ -126,7 +151,10 @@ describe('Sponsorship recurring billing (S-5-REDISEÑO, M07/RF17, T-057)', () =>
   }
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(PAYMENT_PORT)
+      .useValue(new PendingFakePaymentAdapter())
+      .compile();
     app = moduleRef.createNestApplication();
     await app.init();
     server = app.getHttpServer();
@@ -193,16 +221,14 @@ describe('Sponsorship recurring billing (S-5-REDISEÑO, M07/RF17, T-057)', () =>
         createdAt: expect.any(String),
       }),
     );
-    // T-OrdersAPI (2026-09-30): the automated billing cron no longer calls
-    // the gateway at all — it has no sponsor present to tokenize a card
-    // (Checkout API/Orders requires one at charge time; see
-    // `SponsorshipBillingService.buildPlaceholderAttempt`'s doc comment for
-    // the full rationale). `collectionId` is now a local placeholder and
-    // `paymentLinkUrl` is absent (there is no checkout link in this model
-    // any more either way) — the sponsor's real, working path to pay is
-    // "Pagar de nuevo" (`retry-payment`, tested below), which DOES call the
-    // gateway with a real tokenized card.
-    expect(payment.attempts[0].paymentLinkUrl).toBeUndefined();
+    // Requerimiento #17: attempt 1 is now created by `subscribe()` itself,
+    // which DOES call the gateway (the padrino's own card, tokenized by
+    // `CardPaymentBrick` right there at signup) — so, unlike attempts the
+    // CRON creates later for subsequent periods (still a local placeholder,
+    // see `SponsorshipBillingService.buildPlaceholderAttempt`'s doc comment:
+    // an unattended job has no sponsor present to tokenize a card), attempt 1
+    // DOES carry a real `paymentLinkUrl` from the adapter.
+    expect(payment.attempts[0].paymentLinkUrl).toEqual(expect.any(String));
   });
 
   it('PUBLIC "gracias" lookup resolves status/amount/org name by an attempt\'s collectionId, never the sponsor', async () => {

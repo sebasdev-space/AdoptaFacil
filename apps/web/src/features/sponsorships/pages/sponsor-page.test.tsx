@@ -20,9 +20,14 @@ vi.mock('../../payments', () => ({
     <button
       type="button"
       data-testid="fake-card-brick-submit"
-      onClick={() =>
-        void onResult({ cardToken: 'tok-test-123', paymentMethodId: 'visa', installments: 1 })
-      }
+      onClick={() => {
+        // The REAL Brick catches `onResult`'s rejection to show its own error
+        // state (see its doc comment) — mirrored here so a declined/failed
+        // charge in a test never surfaces as an unhandled rejection.
+        onResult({ cardToken: 'tok-test-123', paymentMethodId: 'visa', installments: 1 }).catch(
+          () => {},
+        );
+      }}
     >
       Simular pago con tarjeta
     </button>
@@ -234,26 +239,28 @@ describe('SponsorPage — sin animalId muestra "Mis apadrinamientos"', () => {
   });
 });
 
+function publicSummary() {
+  return {
+    animalId: 'animal-1',
+    activePlans: [
+      {
+        id: 'plan-1',
+        animalId: 'animal-1',
+        name: 'Padrinazgo mensual',
+        amount: 30_000,
+        periodicity: SponsorshipPeriodicity.Monthly,
+      },
+    ],
+    activeSponsorCount: 2,
+  };
+}
+
 describe('SponsorPage — con animalId confirma el apadrinamiento (plan mensual único)', () => {
-  it('muestra el plan mensual y el conteo de padrinos, y apadrina al confirmar', async () => {
+  it('requerimiento #17: "Apadrinar" abre el Brick EN LÍNEA; el cobro real solo se dispara al enviarlo, con pago aprobado', async () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     stubFetch((url, init) => {
       calls.push({ url, init });
-      if (url.includes('/public/sponsorships/animals/')) {
-        return {
-          animalId: 'animal-1',
-          activePlans: [
-            {
-              id: 'plan-1',
-              animalId: 'animal-1',
-              name: 'Padrinazgo mensual',
-              amount: 30_000,
-              periodicity: SponsorshipPeriodicity.Monthly,
-            },
-          ],
-          activeSponsorCount: 2,
-        };
-      }
+      if (url.includes('/public/sponsorships/animals/')) return publicSummary();
       if (init?.method === 'POST' && url.endsWith('/sponsorships')) {
         // The REAL `POST /sponsorships` response never carries planAmount/planName/
         // animalName/organizationName — those are ONLY resolved by `GET
@@ -265,6 +272,7 @@ describe('SponsorPage — con animalId confirma el apadrinamiento (plan mensual 
           planAmount: undefined,
           planPeriodicity: undefined,
           animalName: undefined,
+          firstPaymentStatus: 'approved',
         });
       }
       return [];
@@ -282,20 +290,83 @@ describe('SponsorPage — con animalId confirma el apadrinamiento (plan mensual 
 
     fireEvent.click(screen.getByRole('button', { name: 'Apadrinar' }));
 
+    // Clicking "Apadrinar" only OPENS the Brick — no charge yet.
+    const brickSubmit = await screen.findByTestId('fake-card-brick-submit');
+    expect(calls.some((c) => c.init?.method === 'POST')).toBe(false);
+
+    fireEvent.click(brickSubmit);
+
     await waitFor(() => {
       const post = calls.find((c) => c.init?.method === 'POST');
       expect(post).toBeDefined();
-      expect(JSON.parse(String(post?.init?.body))).toEqual({ planId: 'plan-1' });
+      expect(JSON.parse(String(post?.init?.body))).toEqual({
+        planId: 'plan-1',
+        cardToken: 'tok-test-123',
+        paymentMethodId: 'visa',
+        installments: 1,
+      });
       // organizationId is NEVER sent by the frontend — the backend fixes it
       // from the JWT/tenant context (no-filtración, matches the backend
       // invariant already enforced server-side).
       expect(String(post?.init?.body)).not.toContain('organizationId');
     });
     expect(await screen.findByText('¡Gracias por apadrinar!')).toBeInTheDocument();
-    // Regression guard: the confirmation amount must come from the plan already
-    // fetched via the public summary, never from the (unenriched) POST response.
-    expect(screen.getByText(/30\.000/)).toBeInTheDocument();
+    expect(screen.getByText(/Cobramos.*30\.000.*de inmediato/)).toBeInTheDocument();
     expect(screen.queryByText(/\$\s*0\b/)).not.toBeInTheDocument();
+  });
+
+  it('requerimiento #17: un pago rechazado muestra el error y deja el Brick abierto para reintentar — NO crea el apadrinamiento', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        calls.push({ url, init });
+        if (url.includes('/public/sponsorships/animals/')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: { get: () => null },
+            json: async () => publicSummary(),
+          });
+        }
+        if (init?.method === 'POST' && url.endsWith('/sponsorships')) {
+          return Promise.resolve({
+            ok: false,
+            status: 400,
+            headers: { get: () => null },
+            json: async () => ({
+              statusCode: 400,
+              message: 'Tu pago fue rechazado. Intenta con otra tarjeta.',
+              error: 'Bad Request',
+            }),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: { get: () => null },
+          json: async () => [],
+        });
+      }),
+    );
+
+    renderShell({
+      route: '/apadrinar?animalId=animal-1&animalName=Firulais',
+      ...personSession(),
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Apadrinar' }));
+    fireEvent.click(await screen.findByTestId('fake-card-brick-submit'));
+
+    expect(await screen.findByText('No se pudo procesar el apadrinamiento')).toBeInTheDocument();
+    expect(
+      screen.getByText('Tu pago fue rechazado. Intenta con otra tarjeta.'),
+    ).toBeInTheDocument();
+    // The Brick stays open (never shows the "¡Gracias por apadrinar!" success state).
+    expect(screen.getByTestId('fake-card-brick-submit')).toBeInTheDocument();
+    expect(screen.queryByText('¡Gracias por apadrinar!')).not.toBeInTheDocument();
+    expect(calls.filter((c) => c.init?.method === 'POST')).toHaveLength(1);
   });
 
   it('muestra un mensaje claro cuando el animal no tiene plan activo', async () => {

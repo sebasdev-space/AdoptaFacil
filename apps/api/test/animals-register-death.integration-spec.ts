@@ -3,7 +3,9 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
+import { FakePaymentAdapter } from '@adoptafacil/contracts';
 import { AppModule } from '../src/app.module';
+import { PAYMENT_PORT } from '../src/core/payments/payment.port';
 import { purgeOrganizations } from './support/cleanup';
 import { completeTestProfile } from './support/profile';
 
@@ -96,7 +98,14 @@ describe('Animal death registration (M07 hallazgo QA, POST /animals/:id/register
   }
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    // Requerimiento #17: `POST /sponsorships` now charges a real collection —
+    // overridden so this file's fixture subscription doesn't need a real
+    // tokenized card (this file's own coverage is about the death-registration
+    // side effect, not payments).
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(PAYMENT_PORT)
+      .useValue(new FakePaymentAdapter())
+      .compile();
     app = moduleRef.createNestApplication();
     await app.init();
     server = app.getHttpServer();
