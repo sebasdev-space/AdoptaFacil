@@ -442,17 +442,6 @@ export const navItems: NavItem[] = [
       },
     ],
   },
-  // M13 (S-14) · dashboard de donaciones/campañas de la organización — pedido
-  // del cliente. Ruta hermana de "Documentos", misma zona del menú. Visible
-  // a Owner/Administrator/Operator/ReadOnlyAuditor (unión de las 3 secciones);
-  // qué secciones concretas trae la respuesta lo decide el backend según el
-  // rol real del actor.
-  {
-    path: '/organizacion/dashboard-donaciones',
-    label: 'Donaciones y campañas',
-    icon: MegaphoneIcon,
-    roles: ORG_DONATIONS_DASHBOARD_ROLES,
-  },
   // M14 · portal personalization by tokens (T-027) — REMOVED from the sidebar
   // (S2-04A §4): it now lives as a button inside "Mi organización"'s action bar
   // (OrgProfilePage, S2-01/S2-REORG), not as a top-level nav entry. The ROUTE
@@ -463,11 +452,27 @@ export const navItems: NavItem[] = [
   // generic `ORG_MEMBER_ROLES` placeholder to the real
   // `VOLUNTEERING_VIEW_ROLES` (copied VERBATIM from the controller). Same
   // path/label/icon — this UPDATES the existing entry, not a new one.
+  // MENU-SUBMENUS (mismo patrón que "Donaciones"): "Voluntariado" agrupa la gestión
+  // interna de la organización y la vista de la Persona — mismas rutas y mismos roles
+  // de siempre; el padre solo expande/colapsa. Un usuario ve solo los hijos que le
+  // corresponden (la gestión exige `VOLUNTEERING_VIEW_ROLES`; "Mi voluntariado" es de
+  // cualquier autenticado).
   {
-    path: '/organizacion/voluntariado',
+    path: '/voluntariado',
     label: 'Voluntariado',
     icon: HeartIcon,
-    roles: VOLUNTEERING_VIEW_ROLES,
+    children: [
+      // M08 (S-6, RF18/RF19) · explorar oportunidades, inscribirse, registrar horas y
+      // descargar certificados. Sin @Roles en el backend (cualquier Persona autenticada).
+      { path: '/voluntariado', label: 'Mi voluntariado', icon: HeartIcon },
+      // M08 (S-6) · gestión interna de voluntariado de la organización.
+      {
+        path: '/organizacion/voluntariado',
+        label: 'Gestión de voluntariado',
+        icon: HeartIcon,
+        roles: VOLUNTEERING_VIEW_ROLES,
+      },
+    ],
   },
   // M01 · revisión documental de PLATAFORMA (T-031, wires T-103). Audiencia de
   // plataforma, no de organización — separada del resto del menú.
@@ -492,15 +497,6 @@ export const navItems: NavItem[] = [
     label: 'Moderación de comunidad',
     icon: ChatIcon,
     roles: COMMUNITY_MODERATION_ROLES,
-  },
-  // M08 (S-6, RF18/RF19) · "Mi voluntariado" — explorar oportunidades,
-  // inscribirse, registrar horas y descargar certificados. Sin @Roles en el
-  // backend (cualquier Persona autenticada), mismo criterio que
-  // "Mis solicitudes" (adopciones) y "Mis apadrinamientos".
-  {
-    path: '/voluntariado',
-    label: 'Mi voluntariado',
-    icon: HeartIcon,
   },
   // M12 (S-7, RF23) · moderación de reseñas, audiencia de PLATAFORMA — ruta
   // hermana de /plataforma/documentos y /plataforma/organizaciones-duplicadas.

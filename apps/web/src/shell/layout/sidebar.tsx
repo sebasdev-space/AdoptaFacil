@@ -282,7 +282,7 @@ export function Sidebar() {
   return (
     <aside className={styles['org-sidebar']} data-testid="org-sidebar">
       <div className={styles['org-sidebar__brand']}>
-        <Brand inverse />
+        <Brand inverse to="/inicio" />
       </div>
       <SidebarIdentity />
       <SidebarNav />
@@ -328,7 +328,7 @@ export function MobileNavDrawer() {
         )}
       >
         <div className={cn(styles['org-sidebar__brand'], styles['org-sidebar__brand--split'])}>
-          <Brand inverse />
+          <Brand inverse to="/inicio" />
           <Button
             variant="ghost"
             size="sm"

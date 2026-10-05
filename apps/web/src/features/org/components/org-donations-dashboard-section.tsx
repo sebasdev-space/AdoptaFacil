@@ -6,12 +6,10 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  EmptyState,
   Skeleton,
   StatCard,
 } from '@adoptafacil/ui';
 import { formatCop } from '../../donations';
-import { PageContainer, PageHeader } from '../../_layout';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
 
@@ -31,15 +29,18 @@ function formatDeadline(iso: string): string {
 }
 
 /**
- * `/organizacion/dashboard-donaciones` (M13, S-14 — pedido del cliente): "un
- * módulo tipo Dashboard informativo de donaciones... según el rol pueda ver
- * la información a la que tiene acceso". Cada sección (donaciones/campañas/
- * apadrinamientos) se muestra SOLO si `GET /org/dashboard/donations` la trae
- * — el backend ya decide eso según el rol real del actor, exactamente los
- * MISMOS roles que hoy ven cada dato en su propio módulo
- * (`GET /donations/received`, `GET /campaigns`, `GET /sponsorships`). Esta
- * página nunca inventa un permiso nuevo ni oculta localmente algo que el
- * backend ya decidió mostrar.
+ * Donaciones, campañas y apadrinamientos de la organización (M13, S-14 — pedido
+ * del cliente: "un módulo tipo Dashboard informativo de donaciones... según el
+ * rol pueda ver la información a la que tiene acceso"). Antes vivía en su propia
+ * pantalla ("Donaciones y campañas", `/organizacion/dashboard-donaciones`),
+ * casi duplicada con "Inicio": ahora es una sección DE "Inicio" y la ruta vieja
+ * redirige allí.
+ *
+ * Cada bloque (donaciones/campañas/apadrinamientos) se muestra SOLO si
+ * `GET /org/dashboard/donations` lo trae — el backend ya decide eso según el
+ * rol real del actor (los mismos roles que ven cada dato en su módulo). Un rol
+ * sin acceso no renderiza nada ni dispara la consulta; tampoco se muestra un
+ * "sin acceso" intrusivo dentro de Inicio.
  *
  * "Contrato de donación" (lo que pidió literalmente el cliente: "cuántos
  * contratos en proceso/rechazados") NO existe todavía en el sistema — la
@@ -47,11 +48,11 @@ function formatDeadline(iso: string): string {
  * aprobada/rechazada), nunca un dato de contrato fabricado, y lo deja
  * explícito en el propio texto de la tarjeta.
  */
-export function OrgDonationsDashboardPage() {
+export function OrgDonationsDashboardSection() {
   const client = useApiClient();
   const { hasAnyRole } = useSession();
   // Unión de las 3 secciones del backend (`OrgDonationsDashboardController`'s
-  // `@Roles`) — mismos 4 roles que `ORG_DONATIONS_DASHBOARD_ROLES` del menú
+  // `@Roles`) — mismos 4 roles que `ORG_DONATIONS_DASHBOARD_ROLES`
   // (shell/navigation/nav-items.ts).
   const canView = hasAnyRole(Role.Owner, Role.Administrator, Role.Operator, Role.ReadOnlyAuditor);
 
@@ -77,41 +78,29 @@ export function OrgDonationsDashboardPage() {
     };
   }, [client, canView]);
 
-  if (!canView) {
-    return (
-      <PageContainer>
-        <PageHeader title="Donaciones y campañas" description="Acceso restringido." />
-        <EmptyState title="Sin acceso" description="No tienes permisos para ver este dashboard." />
-      </PageContainer>
-    );
-  }
+  if (!canView) return null;
 
   const nothingVisible =
     summary !== null && !summary.donations && !summary.campaigns && !summary.sponsorships;
+  if (nothingVisible) return null;
 
   return (
-    <PageContainer>
-      <PageHeader
-        title="Donaciones y campañas"
-        description="Lo que tu rol puede ver de donaciones, campañas y apadrinamientos."
-      />
+    <section aria-labelledby="org-donations-dashboard-heading" className="mb-6 space-y-4">
+      <h2 id="org-donations-dashboard-heading" className="text-lg font-semibold tracking-tight">
+        Donaciones, campañas y apadrinamientos
+      </h2>
+
       {loading && (
         <div className="space-y-4">
           <Skeleton className="h-28 w-full" />
           <Skeleton className="h-40 w-full" />
-          <Skeleton className="h-28 w-full" />
         </div>
       )}
 
       {!loading && errored && (
-        <EmptyState title="No se pudo cargar" description="Inténtalo de nuevo más tarde." />
-      )}
-
-      {!loading && !errored && summary && nothingVisible && (
-        <EmptyState
-          title="Nada que mostrar aquí"
-          description="Tu rol no tiene acceso a ninguna de las secciones de este dashboard."
-        />
+        <p className="text-sm text-muted-foreground">
+          No se pudo cargar el detalle de donaciones y campañas.
+        </p>
       )}
 
       {!loading && !errored && summary && (
@@ -208,6 +197,6 @@ export function OrgDonationsDashboardPage() {
           )}
         </div>
       )}
-    </PageContainer>
+    </section>
   );
 }

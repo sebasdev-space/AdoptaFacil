@@ -160,6 +160,65 @@ describe('Sidebar — MENU-SUBMENUS collapsible groups', () => {
     expect(within(sidebar).queryByRole('link', { name: 'Mis donaciones' })).not.toBeInTheDocument();
   });
 
+  it('"Voluntariado" es un solo grupo desplegable con "Mi voluntariado" y "Gestión de voluntariado"', async () => {
+    stubGenericFetch();
+    renderShell({ route: '/inicio', ...sessionWith([Role.Owner]) });
+
+    const sidebar = screen.getByTestId('org-sidebar');
+    // Ya no hay dos entradas planas "Voluntariado" / "Mi voluntariado".
+    expect(
+      within(sidebar).queryByRole('link', { name: 'Mi voluntariado' }),
+    ).not.toBeInTheDocument();
+    const toggle = await within(sidebar).findByRole('button', { name: 'Voluntariado' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(toggle);
+
+    expect(within(sidebar).getByRole('link', { name: 'Mi voluntariado' })).toHaveAttribute(
+      'href',
+      '/voluntariado',
+    );
+    expect(within(sidebar).getByRole('link', { name: 'Gestión de voluntariado' })).toHaveAttribute(
+      'href',
+      '/organizacion/voluntariado',
+    );
+  });
+
+  it('un rol sin gestión de voluntariado (Volunteer) solo ve "Mi voluntariado" dentro del grupo', async () => {
+    stubGenericFetch();
+    renderShell({ route: '/inicio', ...sessionWith([Role.Volunteer]) });
+
+    const sidebar = screen.getByTestId('org-sidebar');
+    fireEvent.click(await within(sidebar).findByRole('button', { name: 'Voluntariado' }));
+
+    expect(within(sidebar).getByRole('link', { name: 'Mi voluntariado' })).toBeInTheDocument();
+    expect(
+      within(sidebar).queryByRole('link', { name: 'Gestión de voluntariado' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('"Donaciones y campañas" ya no es una entrada del menú (vive dentro de Inicio)', async () => {
+    stubGenericFetch();
+    renderShell({ route: '/inicio', ...sessionWith([Role.Owner]) });
+
+    const sidebar = screen.getByTestId('org-sidebar');
+    await within(sidebar).findByRole('button', { name: 'Donaciones' });
+    expect(
+      within(sidebar).queryByRole('link', { name: 'Donaciones y campañas' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('el logo del menú lleva a /inicio', async () => {
+    stubGenericFetch();
+    renderShell({ route: '/adopciones', ...sessionWith([Role.Owner]) });
+
+    const sidebar = screen.getByTestId('org-sidebar');
+    expect(within(sidebar).getByRole('link', { name: 'Ir al inicio' })).toHaveAttribute(
+      'href',
+      '/inicio',
+    );
+  });
+
   it('auto-expands "Apadrinamientos" and marks the active child when its route is current', async () => {
     stubGenericFetch();
     renderShell({ route: '/organizacion/apadrinamientos', ...sessionWith([Role.Owner]) });

@@ -18,6 +18,7 @@ import {
   StatCard,
 } from '@adoptafacil/ui';
 import { formatCop } from '../../donations';
+import { OrgDonationsDashboardSection } from '../../org/components/org-donations-dashboard-section';
 import { fetchHealth } from '../../../lib/api';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
@@ -267,6 +268,8 @@ export function HomePage() {
           )}
         </div>
       )}
+
+      <OrgDonationsDashboardSection />
 
       {isPlatformAdmin && (
         <Card className="max-w-xl">

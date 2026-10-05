@@ -10,7 +10,6 @@ import {
   DONATIONS_MANAGEMENT_ROLES,
   MARKETPLACE_VIEW_ROLES,
   ORG_DOCUMENTS_ROLES,
-  ORG_DONATIONS_DASHBOARD_ROLES,
   ORG_MEMBER_ROLES,
   PLATFORM_ADMIN_DASHBOARD_ROLES,
   PLATFORM_DOCUMENTS_ROLES,
@@ -35,7 +34,6 @@ import {
   ExogenousReportPage,
   NationalTransparencyPage,
   OrgDocumentsPage,
-  OrgDonationsDashboardPage,
   OrgFormalizationPage,
   OrgLegalRepresentativePage,
   OrgProfilePage,
@@ -381,16 +379,12 @@ export function AppRoutes() {
               </RequireRoles>
             }
           />
-          {/* M13 (S-14) · dashboard de donaciones/campañas de la organización —
-              pedido del cliente. Qué secciones concretas trae la respuesta ya
-              lo decide el backend según el rol real del actor. */}
+          {/* M13 (S-14) · el dashboard de donaciones/campañas ahora es una sección
+              de "Inicio" (antes pantalla propia, casi duplicada); la ruta vieja
+              redirige para no romper enlaces/favoritos. */}
           <Route
             path="organizacion/dashboard-donaciones"
-            element={
-              <RequireRoles roles={ORG_DONATIONS_DASHBOARD_ROLES}>
-                <OrgDonationsDashboardPage />
-              </RequireRoles>
-            }
+            element={<Navigate to="/inicio" replace />}
           />
           {/* M01 · representante legal + firma electrónica (S-1, RF14 relacionado
               / RNF10). CRUCE DE DOMINIO (@sebastian, avisar a @fabian): único
