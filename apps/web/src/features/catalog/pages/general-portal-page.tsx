@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
+import type { PublicHeroBanner } from '@adoptafacil/contracts';
 import { buttonVariants, cn } from '@adoptafacil/ui';
 import { useSession } from '../../../shell/auth';
 import { FullPageLoading, PublicFooter, PublicNavbar } from '../../../shell/layout';
@@ -8,6 +10,30 @@ import {
 } from '../components/general-catalog-section';
 import { GeneralPortalFeaturesSection } from '../components/general-portal-features-section';
 import { HeroPhotoGrid } from '../components/hero-photo-grid';
+
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+
+/** `GET /public/hero-banner` (S-15, sin sesión) — best-effort: si falla o
+ *  trae un cuerpo inesperado, el collage decorativo de siempre se queda tal
+ *  cual (nunca una caja rota por un fetch fallido). */
+function useHeroBannerPhotos(): string[] {
+  const [photos, setPhotos] = useState<string[]>([]);
+  useEffect(() => {
+    let active = true;
+    fetch(`${API_BASE}/public/hero-banner`)
+      .then((response) => (response.ok ? (response.json() as Promise<PublicHeroBanner>) : null))
+      .then((body) => {
+        if (active && Array.isArray(body?.photos)) setPhotos(body.photos);
+      })
+      .catch(() => {
+        // Best-effort: el collage decorativo se queda como fallback.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+  return photos;
+}
 
 /**
  * Portal GENERAL de entrada de AdoptaFácil (F-LANDING-01, M14, RF25, documento
@@ -25,6 +51,7 @@ import { HeroPhotoGrid } from '../components/hero-photo-grid';
  */
 export function GeneralPortalPage() {
   const { status } = useSession();
+  const heroBannerPhotos = useHeroBannerPhotos();
 
   if (status === 'loading') {
     return <FullPageLoading label="Verificando tu sesión…" />;
@@ -74,9 +101,11 @@ export function GeneralPortalPage() {
               </div>
             </div>
 
-            {/* Collage decorativo (LANDING-MOCKUP) — NO son datos reales, ver
-                hero-photo-grid.tsx. El catálogo real está más abajo. */}
-            <HeroPhotoGrid />
+            {/* Collage (LANDING-MOCKUP) — decorativo por defecto; desde S-15
+                muestra las fotos reales que el PlatformAdmin suba en
+                `/plataforma/banner` (ver hero-photo-grid.tsx). El catálogo
+                real está más abajo. */}
+            <HeroPhotoGrid photos={heroBannerPhotos} />
           </div>
         </section>
 

@@ -16,6 +16,8 @@
 }
 
 .box {
+  position: relative;
+  overflow: hidden;
   border-radius: var(--r-2xl);
   display: flex;
   align-items: center;
@@ -46,6 +48,17 @@
   width: 2.5rem;
   height: 2.5rem;
   opacity: 0.85;
+}
+
+// S-15: una foto real (subida por el PlatformAdmin) llena el cuadro entero,
+// reemplazando el degradé + ícono — mismo `border-radius` heredado del `.box`
+// padre vía `overflow: hidden`.
+.box__photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .box--a {

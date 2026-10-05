@@ -544,4 +544,12 @@ export const navItems: NavItem[] = [
     icon: ShieldIcon,
     roles: PLATFORM_SUPER_ADMIN_DASHBOARD_ROLES,
   },
+  // M01/T-030 · S-15 (pedido del cliente): fotos del banner del portal
+  // general ("/", HeroPhotoGrid) — mismos roles que el resto de /plataforma/*.
+  {
+    path: '/plataforma/banner',
+    label: 'Banner del portal',
+    icon: ShieldIcon,
+    roles: PLATFORM_DOCUMENTS_ROLES,
+  },
 ];
