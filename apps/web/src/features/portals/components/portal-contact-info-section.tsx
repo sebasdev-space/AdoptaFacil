@@ -1,9 +1,11 @@
-import type { OrganizationExtendedContact } from '@adoptafacil/contracts';
+import type { OrganizationExtendedContact, OrganizationLocation } from '@adoptafacil/contracts';
 import { Card, CardContent, CardHeader, CardTitle } from '@adoptafacil/ui';
-import { toGoogleMapsEmbedUrl } from '../model/google-maps';
+import { googleMapsEmbedFromAddress, toGoogleMapsEmbedUrl } from '../model/google-maps';
 
 export interface PortalContactInfoSectionProps {
   contact: OrganizationExtendedContact;
+  /** Ubicación general de la organización (ciudad/departamento/país) — solo para afinar la búsqueda del mapa por dirección. */
+  location?: OrganizationLocation;
 }
 
 /**
@@ -17,8 +19,18 @@ export interface PortalContactInfoSectionProps {
  * puede con confianza (o la URL no es de Google Maps), se muestra un enlace
  * "Ver en mapa →" en vez de un iframe roto. Sin URL, no se muestra nada.
  */
-export function PortalContactInfoSection({ contact }: PortalContactInfoSectionProps) {
-  const embedUrl = contact.mapUrl ? toGoogleMapsEmbedUrl(contact.mapUrl) : null;
+export function PortalContactInfoSection({ contact, location }: PortalContactInfoSectionProps) {
+  // El mapa se ve SIN hacer clic: 1) el enlace de Google Maps cargado por la
+  // organización, si se puede embeber; 2) si no (p. ej. un enlace corto de
+  // "compartir") o no hay enlace, la DIRECCIÓN (+ ciudad/departamento/país reales).
+  const embedUrl =
+    (contact.mapUrl ? toGoogleMapsEmbedUrl(contact.mapUrl) : null) ??
+    googleMapsEmbedFromAddress(
+      contact.fullAddress,
+      location?.city,
+      location?.department,
+      location?.country ?? 'Colombia',
+    );
 
   return (
     <Card>
@@ -46,24 +58,27 @@ export function PortalContactInfoSection({ contact }: PortalContactInfoSectionPr
             </div>
           )}
         </dl>
-        {contact.mapUrl &&
-          (embedUrl ? (
-            <iframe
-              title="Ubicación en el mapa"
-              src={embedUrl}
-              loading="lazy"
-              className="h-64 w-full rounded-md border border-border"
-            />
-          ) : (
-            <a
-              href={contact.mapUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
-            >
-              Ver en mapa →
-            </a>
-          ))}
+        {embedUrl && (
+          <iframe
+            title="Ubicación en el mapa"
+            src={embedUrl}
+            loading="lazy"
+            allowFullScreen
+            referrerPolicy="no-referrer-when-downgrade"
+            className="h-64 w-full rounded-md border border-border"
+            data-testid="portal-contact-map"
+          />
+        )}
+        {contact.mapUrl && (
+          <a
+            href={contact.mapUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+          >
+            {embedUrl ? 'Abrir en Google Maps →' : 'Ver en mapa →'}
+          </a>
+        )}
       </CardContent>
     </Card>
   );

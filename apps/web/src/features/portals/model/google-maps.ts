@@ -72,3 +72,21 @@ export function toGoogleMapsEmbedUrl(raw: string): string | null {
   }
   return null;
 }
+
+/**
+ * Mapa embebible a partir de la DIRECCIÓN en texto (sin API key): el mismo
+ * endpoint `maps.google.com/maps?q=<dirección>&output=embed` que usa la
+ * conversión de URLs. Sirve cuando la organización no cargó un enlace de Google
+ * Maps (o cargó uno corto de "compartir", que no se puede embeber). Los extras
+ * (ciudad, departamento, país) afinan la búsqueda; solo se usan los que existen
+ * — nunca se inventa una dirección. Sin dirección → \`null\`.
+ */
+export function googleMapsEmbedFromAddress(
+  address: string | undefined,
+  ...extras: Array<string | undefined>
+): string | null {
+  const street = address?.trim();
+  if (!street) return null;
+  const query = [street, ...extras.map((part) => part?.trim())].filter(Boolean).join(', ');
+  return `https://maps.google.com/maps?q=${encodeURIComponent(query)}&output=embed`;
+}

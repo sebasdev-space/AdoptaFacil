@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isGoogleMapsUrl, toGoogleMapsEmbedUrl } from './google-maps';
+import { googleMapsEmbedFromAddress, isGoogleMapsUrl, toGoogleMapsEmbedUrl } from './google-maps';
 
 describe('isGoogleMapsUrl', () => {
   it('recognizes google.com/maps and maps.google.com URLs', () => {
@@ -50,5 +50,20 @@ describe('toGoogleMapsEmbedUrl (S2-REORG: fixes the "refused to connect" iframe)
 
   it('returns null for a maps.app.goo.gl SHORT link — cannot be resolved without a network round trip, and embedding it would just hit the "refused to connect" block again (documented limitation, not a bug)', () => {
     expect(toGoogleMapsEmbedUrl('https://maps.app.goo.gl/AbCdEfGh123')).toBeNull();
+  });
+});
+
+describe('googleMapsEmbedFromAddress (mapa visible sin hacer clic)', () => {
+  it('arma el embed con la dirección y los extras que existan', () => {
+    expect(
+      googleMapsEmbedFromAddress('Cl. 58i Bis Sur # 78B-15', 'Bogotá', undefined, 'Colombia'),
+    ).toBe(
+      'https://maps.google.com/maps?q=Cl.%2058i%20Bis%20Sur%20%23%2078B-15%2C%20Bogot%C3%A1%2C%20Colombia&output=embed',
+    );
+  });
+
+  it('sin dirección no inventa nada (null)', () => {
+    expect(googleMapsEmbedFromAddress(undefined, 'Bogotá')).toBeNull();
+    expect(googleMapsEmbedFromAddress('   ', 'Bogotá')).toBeNull();
   });
 });

@@ -67,7 +67,8 @@ describe('RegisterReviewDialog (S7-b — botón "Registrar reseña" del portal p
     );
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('http://localhost:3000/public/organizations/patitas/reviews');
+    // La base de la URL depende de VITE_API_URL del entorno; lo que importa es la ruta.
+    expect(url.endsWith('/public/organizations/patitas/reviews')).toBe(true);
     expect(init.headers).not.toHaveProperty('Authorization');
     expect(JSON.parse(init.body as string)).toEqual({ rating: 4, comment: 'Muy buena atención' });
 
