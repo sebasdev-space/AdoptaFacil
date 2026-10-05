@@ -12,6 +12,18 @@ export const LEGAL_REPRESENTATIVE_DOCUMENT_TYPES = [
   'pasaporte',
 ] as const;
 
+/**
+ * TODO(client): catálogo de roles de firmante (requerimiento #16) — el
+ * documento base no fija esta lista; estos tres son los que el cliente pidió
+ * explícitamente (representante legal, contador, revisor fiscal). Extensible,
+ * mismo patrón que `LEGAL_REPRESENTATIVE_DOCUMENT_TYPES`.
+ */
+export const LEGAL_REPRESENTATIVE_ROLES = [
+  'legal_representative',
+  'accountant',
+  'fiscal_reviewer',
+] as const;
+
 // ~2 MB of base64 (~1.5 MB raw) is generous for a signature drawing/scan while
 // still bounding the request body — mirrors STORAGE_MAX_FILE_MB's intent for
 // this specific, always-small asset (never a full document scan).
@@ -26,6 +38,7 @@ const documentNumber = z.string().trim().min(1).max(50);
  *  matching the append-only model (a "change" IS a new row, never a PATCH). */
 export const registerLegalRepresentativeSchema = z
   .object({
+    role: z.enum(LEGAL_REPRESENTATIVE_ROLES),
     fullName,
     documentType: z.enum(LEGAL_REPRESENTATIVE_DOCUMENT_TYPES),
     documentNumber,
