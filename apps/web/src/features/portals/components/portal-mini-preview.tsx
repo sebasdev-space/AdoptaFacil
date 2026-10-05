@@ -5,9 +5,9 @@ export interface PortalMiniPreviewProps {
   /** Raw HSL channels ("H S% L%"), same format the color pickers write. */
   primary?: string;
   primaryForeground?: string;
-  secondary?: string;
   accent?: string;
   accentForeground?: string;
+  ring?: string;
   logoPosition?: PortalLogoPosition;
   socialNavPosition?: PortalSocialNavPosition;
 }
@@ -22,19 +22,34 @@ const LOGO_JUSTIFY: Record<PortalLogoPosition, string> = {
 const PET_PLACEHOLDERS = ['🐕', '🐈', '🐕'];
 
 /**
- * Mini-réplica PURA del portal público (S2-PORTAL), pensada para la columna de
+ * Mini-réplica del portal público (S2-PORTAL), pensada para la columna de
  * vista previa de `/organizacion/portal`. Sin fetch, sin datos reales — solo
  * recibe los valores en edición del formulario como props y los refleja al
- * instante (cambia el picker de color o el toggle de posición → esto se
- * redibuja). Solo divs coloreados; ~320px de ancho, no un iframe.
+ * instante. Solo divs coloreados; ~380px de ancho, no un iframe.
+ *
+ * ESTRUCTURA Y TOKENS ALINEADOS AL PORTAL REAL DE HOY
+ * (T-PERSONALIZACION-AUDIT, auditoría contra `org-public-page.tsx` y los
+ * `.module.scss` del portal):
+ * - Sin tabs: el rediseño T-D04 reemplazó el layout de tabs ("Portafolio /
+ *   Nosotros / Información") por scroll único con anclas. La versión anterior
+ *   de este preview seguía dibujando esas tabs — le mostraba al dueño un
+ *   portal que ya no existe.
+ * - Sin `secondary`: ese token se QUITÓ del todo (no pinta nada en el portal
+ *   real) — las tarjetas de mascotas usan un tono neutro fijo, igual que en
+ *   el portal real (no hay ningún color editable detrás de esas tarjetas).
+ * - `accent`/`accent-foreground` se ven en la insignia "Nuevo" de una tarjeta,
+ *   exactamente donde se usan de verdad (`public-catalog.module.scss`), no
+ *   como una pestaña activa decorativa que no corresponde a nada real.
+ * - `ring` se ve como el resplandor de foco del buscador del catálogo,
+ *   también su ubicación real (`public-catalog.module.scss`).
  */
 export function PortalMiniPreview({
   organizationName = 'Tu organización',
   primary = '172 67% 30%',
   primaryForeground = '0 0% 100%',
-  secondary = '213 20% 93%',
   accent = '169 55% 94%',
   accentForeground = '214 32% 18%',
+  ring = '172 67% 30%',
   logoPosition = 'left',
   socialNavPosition = 'right',
 }: PortalMiniPreviewProps) {
@@ -59,24 +74,21 @@ export function PortalMiniPreview({
       <div className="space-y-2 px-3 pt-5 pb-3">
         <p className="truncate font-semibold text-foreground">{organizationName}</p>
 
-        {/* Tabs: Portafolio | Nosotros | Información — la primera "activa". */}
-        <div className="flex gap-1">
-          {['Portafolio', 'Nosotros', 'Información'].map((label, i) => (
-            <span
-              key={label}
-              className="rounded px-1.5 py-0.5"
-              style={
-                i === 0
-                  ? { backgroundColor: `hsl(${accent})`, color: `hsl(${accentForeground})` }
-                  : { color: 'hsl(var(--muted-foreground))' }
-              }
-            >
-              {label}
-            </span>
-          ))}
+        {/* Buscador del catálogo: el resplandor de foco (`ring`) es su
+         *  ubicación real — se muestra siempre "enfocado" para que el cambio
+         *  de color sea visible sin necesidad de interactuar. */}
+        <div
+          className="flex h-5 items-center rounded border px-1.5 text-[9px] text-muted-foreground"
+          style={{
+            borderColor: `hsl(${primary} / 0.5)`,
+            boxShadow: `0 0 0 2px hsl(${ring} / 0.25)`,
+          }}
+        >
+          Buscar…
         </div>
 
-        {/* Contenido: catálogo + sidebar, orden según socialNavPosition. */}
+        {/* Contenido: catálogo + sidebar, scroll único (sin tabs, T-D04),
+         *  orden según socialNavPosition. */}
         <div
           className={`flex gap-2 ${socialNavPosition === 'left' ? 'flex-row-reverse' : 'flex-row'}`}
         >
@@ -84,17 +96,23 @@ export function PortalMiniPreview({
             {PET_PLACEHOLDERS.map((emoji, i) => (
               <div
                 key={i}
-                className="flex h-9 w-9 items-center justify-center rounded"
-                style={{ backgroundColor: `hsl(${secondary})` }}
+                className="relative flex h-9 w-9 items-center justify-center rounded bg-muted"
               >
                 {emoji}
+                {/* Insignia "Nuevo": única tarjeta que la lleva, igual que en
+                 *  el catálogo real (solo las mascotas recién publicadas). */}
+                {i === 0 && (
+                  <span
+                    className="absolute -top-1 -right-1 rounded px-0.5 text-[6px] font-bold leading-tight"
+                    style={{ backgroundColor: `hsl(${accent})`, color: `hsl(${accentForeground})` }}
+                  >
+                    Nuevo
+                  </span>
+                )}
               </div>
             ))}
           </div>
-          <div
-            className="flex flex-1 flex-col gap-1 rounded border border-border p-1.5"
-            style={{ backgroundColor: `hsl(${secondary} / 0.4)` }}
-          >
+          <div className="flex flex-1 flex-col gap-1 rounded border border-border bg-muted/40 p-1.5">
             <span className="font-medium text-foreground">Redes</span>
             <span
               className="rounded px-1 py-0.5 text-center"

@@ -99,29 +99,28 @@ export interface OrganizationSlugLookup {
 // ============================================================================
 
 /**
- * Tokens de COLOR que una organización puede personalizar (subconjunto seguro de
- * los tokens del design system). Cada valor es un canal HSL "crudo" `"H S% L%"`
- * (p. ej. `"142 72% 29%"`), idéntico al formato que consume `@adoptafacil/ui`.
- * Se excluyen a propósito tokens de tipografía/estructura (fuentes, offsets),
- * que abren superficie de inyección o rompen la maqueta.
+ * Tokens de COLOR que una organización puede personalizar — SÓLO los que de
+ * verdad pintan algo en el portal público real (T-PERSONALIZACION-AUDIT):
+ * `primary`/`primary-foreground` rebrandean la mayoría de botones/badges del
+ * portal; `accent`/`accent-foreground` pintan el badge "Nuevo" del catálogo de
+ * animales; `ring` pinta el resplandor de foco del buscador/filtro y del
+ * formulario de reseñas. Cada valor es un canal HSL "crudo" `"H S% L%"` (p. ej.
+ * `"142 72% 29%"`), idéntico al formato que consume `@adoptafacil/ui`.
+ *
+ * `secondary`/`secondary-foreground` y el token escalar `radius` SE QUITARON
+ * (T-PERSONALIZACION-AUDIT): ninguno de los dos llega a pintar nada en el
+ * portal real ni en los componentes compartidos de `packages/ui` — el
+ * refactor BEM+SCSS de `packages/ui` dejó esos dos tokens sin ningún
+ * consumidor (`Button`/`Badge`/`Card`/`Input` usan sus propias constantes
+ * fijas `--r-full`/`--r-md`/`--r-2xl`, y `Badge variant="secondary"` usa un
+ * hex fijo, no `--secondary`). Mantenerlos solo le mostraba al dueño del
+ * portal un control que no hacía nada.
  */
 export type PortalColorToken =
-  | 'primary'
-  | 'primary-foreground'
-  | 'secondary'
-  | 'secondary-foreground'
-  | 'accent'
-  | 'accent-foreground'
-  | 'ring';
-
-/**
- * Tokens ESCALARES personalizables. Sólo `radius` (una longitud CSS acotada); no
- * se exponen fuentes ni offsets para no permitir valores arbitrarios peligrosos.
- */
-export type PortalScalarToken = 'radius';
+  'primary' | 'primary-foreground' | 'accent' | 'accent-foreground' | 'ring';
 
 /** Unión de todos los tokens que la organización puede sobrescribir. */
-export type PortalThemeToken = PortalColorToken | PortalScalarToken;
+export type PortalThemeToken = PortalColorToken;
 
 /**
  * Tema de marca de una organización: mapa PARCIAL de token → valor. Sólo se

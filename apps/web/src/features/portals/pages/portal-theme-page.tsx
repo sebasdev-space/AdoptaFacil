@@ -15,11 +15,6 @@ import {
   CardHeader,
   CardTitle,
   EmptyState,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Skeleton,
   useToast,
 } from '@adoptafacil/ui';
@@ -33,12 +28,7 @@ import {
   hslStringToHex,
   MIN_CONTRAST_RATIO,
 } from '../model/color-conversion';
-import {
-  PORTAL_THEME_FIELDS,
-  RADIUS_OPTIONS,
-  safePortalTheme,
-  type PortalThemeField,
-} from '../model/theme';
+import { PORTAL_THEME_FIELDS, safePortalTheme, type PortalThemeField } from '../model/theme';
 import { PortalMiniPreview } from '../components/portal-mini-preview';
 
 /** Empty string ⇒ "use the default token" (the field is omitted from the payload). */
@@ -60,8 +50,6 @@ function tokensFromForm(form: FormState): PortalTheme {
 const DISPLAY_FALLBACK_HSL: Partial<Record<string, string>> = {
   primary: '172 67% 30%',
   'primary-foreground': '0 0% 100%',
-  secondary: '213 20% 93%',
-  'secondary-foreground': '214 32% 18%',
   accent: '169 55% 94%',
   'accent-foreground': '214 32% 18%',
   ring: '172 67% 30%',
@@ -88,7 +76,6 @@ const DISPLAY_FALLBACK_HSL: Partial<Record<string, string>> = {
  */
 const COLOR_PAIRS: ReadonlyArray<[string, string]> = [
   ['primary', 'primary-foreground'],
-  ['secondary', 'secondary-foreground'],
   ['accent', 'accent-foreground'],
 ];
 
@@ -143,6 +130,9 @@ function ColorField({ field, value, onChange }: ColorFieldProps) {
         onChange={(event) => onChange(hexToHslString(event.target.value))}
         className="h-10 w-full cursor-pointer rounded-md border border-input bg-background p-1"
       />
+      {/* Dónde se ve de verdad este color en el portal real — nunca una
+       *  promesa genérica para un token de alcance acotado (T-PERSONALIZACION-AUDIT). */}
+      {field.hint && <p className="text-[11px] leading-snug text-muted-foreground">{field.hint}</p>}
     </div>
   );
 }
@@ -271,7 +261,6 @@ export function PortalThemePage() {
   const previewStyle = useMemo(() => brandTokensToStyle(tokensFromForm(form)), [form]);
   const primaryBg = form.primary || DISPLAY_FALLBACK_HSL.primary;
   const primaryFg = form['primary-foreground'] || DISPLAY_FALLBACK_HSL['primary-foreground'];
-  const secondaryBg = form.secondary || DISPLAY_FALLBACK_HSL.secondary;
   const accentBg = form.accent || DISPLAY_FALLBACK_HSL.accent;
   const accentFg = form['accent-foreground'] || DISPLAY_FALLBACK_HSL['accent-foreground'];
   const ringColor = form.ring || DISPLAY_FALLBACK_HSL.ring;
@@ -369,9 +358,6 @@ export function PortalThemePage() {
     );
   }
 
-  const colorFields = PORTAL_THEME_FIELDS.filter((field) => field.kind === 'color');
-  const scalarFields = PORTAL_THEME_FIELDS.filter((field) => field.kind !== 'color');
-
   return (
     <PageContainer>
       <PageHeader
@@ -394,7 +380,7 @@ export function PortalThemePage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                  {colorFields.map((field) => (
+                  {PORTAL_THEME_FIELDS.map((field) => (
                     <ColorField
                       key={field.token}
                       field={field}
@@ -403,37 +389,6 @@ export function PortalThemePage() {
                     />
                   ))}
                 </div>
-                {scalarFields.map((field) => (
-                  <div key={field.token} className="space-y-1.5">
-                    <label
-                      htmlFor={`token-${field.token}`}
-                      className="block text-sm font-medium text-foreground"
-                    >
-                      {field.label}
-                    </label>
-                    <Select
-                      value={form[field.token] || RADIUS_OPTIONS[2].value}
-                      onValueChange={(value) => setToken(field.token, value)}
-                    >
-                      <SelectTrigger
-                        id={`token-${field.token}`}
-                        aria-describedby={`token-${field.token}-hint`}
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {RADIUS_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p id={`token-${field.token}-hint`} className="text-xs text-muted-foreground">
-                      {field.hint}
-                    </p>
-                  </div>
-                ))}
               </CardContent>
             </Card>
 
@@ -468,11 +423,14 @@ export function PortalThemePage() {
 
           <div className="space-y-6">
             {/* Live preview — the same tokens applied to a scoped sample, so the
-                owner sees the re-theme before publishing it. Primary/Secondary
-                cascade correctly through the shared Button/Badge variants; Acento
-                and Anillo de foco get a DEDICATED swatch below (T-D03) because no
-                shadcn variant in packages/ui consumes --accent/--ring at all — the
-                old "Acento" badge (variant="outline") never reflected that color. */}
+                owner sees the re-theme before publishing it. Primary cascada
+                correctamente por los componentes compartidos Button/Badge; Acento
+                y Anillo de foco llevan un swatch DEDICADO abajo (T-D03) porque
+                ningún componente de `packages/ui` consume --accent/--ring (sus
+                `.module.scss` usan sus propias constantes fijas). No hay un chip
+                "Secundario": ese token se QUITÓ (T-PERSONALIZACION-AUDIT) — la
+                variante `secondary` de `Badge` es un gris FIJO del design system,
+                nunca reflejó ningún valor editable aquí. */}
             <Card style={previewStyle} data-testid="theme-preview">
               <CardHeader>
                 <CardTitle>Vista previa</CardTitle>
@@ -482,7 +440,6 @@ export function PortalThemePage() {
                   <Button>Botón primario</Button>
                   <Button variant="outline">Contorno</Button>
                   <Badge>Primario</Badge>
-                  <Badge variant="secondary">Secundario</Badge>
                   <span
                     className="inline-flex items-center gap-1 rounded-full border border-transparent px-2.5 py-0.5 text-xs font-medium"
                     style={{ backgroundColor: `hsl(${accentBg})`, color: `hsl(${accentFg})` }}
@@ -503,7 +460,11 @@ export function PortalThemePage() {
             </Card>
 
             {/* Mini-réplica del portal (S2-PORTAL) — sin fetch, refleja el
-                formulario en tiempo real (colores + posiciones). */}
+                formulario en tiempo real (colores + posiciones). Estructura y
+                tokens alineados al portal REAL de hoy (T-PERSONALIZACION-AUDIT):
+                sin tabs (el portal es scroll único con anclas desde T-D04), y
+                `ring` representado en la misma pieza donde de verdad se ve
+                (el buscador del catálogo), no como adorno decorativo. */}
             <Card>
               <CardHeader>
                 <CardTitle>Así se verá tu portal</CardTitle>
@@ -513,9 +474,9 @@ export function PortalThemePage() {
                   organizationName={orgName}
                   primary={primaryBg}
                   primaryForeground={primaryFg}
-                  secondary={secondaryBg}
                   accent={accentBg}
                   accentForeground={accentFg}
+                  ring={ringColor}
                   logoPosition={logoPosition}
                   socialNavPosition={socialNavPosition}
                 />

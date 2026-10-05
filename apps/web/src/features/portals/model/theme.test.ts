@@ -7,13 +7,18 @@ describe('safePortalTheme', () => {
   it('keeps only known tokens with non-empty string values', () => {
     const result = safePortalTheme({
       primary: '24 90% 45%',
+      // `radius`/`secondary` were REMOVED from the editable subset
+      // (T-PERSONALIZACION-AUDIT: neither ever painted anything in the real
+      // portal) — they now fall in the same "unknown" bucket as any other
+      // stray key and get dropped, exactly like `background` below.
       radius: '0.5rem',
+      secondary: '213 20% 93%',
       'font-sans': 'url(evil)', // unknown/unsafe → dropped
       background: '0 0% 100%', // not in the editable subset → dropped
       accent: '', // empty → dropped
       ring: 42, // non-string → dropped
     });
-    expect(result).toEqual({ primary: '24 90% 45%', radius: '0.5rem' });
+    expect(result).toEqual({ primary: '24 90% 45%' });
   });
 
   it('returns an empty theme for non-object input', () => {

@@ -23,55 +23,44 @@ export interface PortalThemeField {
   token: PortalThemeToken;
   /** Etiqueta visible (es-CO). */
   label: string;
-  /** Tipo de valor: color en canales HSL o una longitud CSS. */
-  kind: 'color' | 'length';
-  /** Texto de ayuda / formato esperado. */
+  /** Texto de ayuda: dónde se ve de verdad este color en el portal real
+   *  (T-PERSONALIZACION-AUDIT) — nunca una promesa genérica de "acento del
+   *  portal" que no corresponda a dónde el token realmente pinta algo. */
   hint: string;
 }
 
-/** Opciones predefinidas para "Radio de esquinas" — reemplaza el input de
- *  texto libre por un selector cerrado; cada valor ya cumple el formato/rango
- *  que exige el backend (`RADIUS` en `portals.schemas.ts`, máx. 64px/rem/em). */
-export const RADIUS_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
-  { value: '0px', label: 'Sin redondeo' },
-  { value: '0.25rem', label: 'Pequeño' },
-  { value: '0.5rem', label: 'Mediano' },
-  { value: '0.75rem', label: 'Grande' },
-  { value: '1rem', label: 'Extra grande' },
-];
-
-/** Campos editables del tema, en orden de presentación. Fuente única de la UI. */
+/**
+ * Campos editables del tema, en orden de presentación. Fuente única de la UI.
+ *
+ * SOLO los 5 tokens que de verdad pintan algo en el portal público real
+ * (T-PERSONALIZACION-AUDIT, auditoría contra `public-portal.module.scss` /
+ * `public-catalog.module.scss` / `public-reviews.module.scss` y los
+ * `.module.scss` de `packages/ui`). `secondary`/`secondary-foreground` y
+ * `radius` se QUITARON: no tienen un solo consumidor real (ver el comentario
+ * en `packages/contracts/src/portals.ts`).
+ */
 export const PORTAL_THEME_FIELDS: readonly PortalThemeField[] = [
   // Labels en español simple (S2-REORG) — un dueño no técnico nunca necesita
   // ver "token"/"HSL": el color lo elige con el selector nativo, el hint (con
   // el formato crudo) solo aparece en un tooltip al pasar el mouse.
-  { token: 'primary', label: 'Color principal', kind: 'color', hint: 'HSL: "H S% L%"' },
+  // primary/primary-foreground son el color "principal" del portal entero (botones,
+  // badges, highlights) — sin caveat de alcance porque sí cubren casi todo.
+  { token: 'primary', label: 'Color principal', hint: '' },
+  { token: 'primary-foreground', label: 'Texto sobre el principal', hint: '' },
   {
-    token: 'primary-foreground',
-    label: 'Texto sobre el principal',
-    kind: 'color',
-    hint: 'HSL: "H S% L%"',
+    token: 'accent',
+    label: 'Color de acento',
+    hint: 'Se ve en la insignia "Nuevo" de las tarjetas del catálogo de animales.',
   },
-  { token: 'secondary', label: 'Color secundario', kind: 'color', hint: 'HSL: "H S% L%"' },
-  {
-    token: 'secondary-foreground',
-    label: 'Texto sobre secundario',
-    kind: 'color',
-    hint: 'HSL: "H S% L%"',
-  },
-  { token: 'accent', label: 'Color de acento', kind: 'color', hint: 'HSL: "H S% L%"' },
   {
     token: 'accent-foreground',
     label: 'Texto sobre acento',
-    kind: 'color',
-    hint: 'HSL: "H S% L%"',
+    hint: 'Texto de esa misma insignia "Nuevo".',
   },
-  { token: 'ring', label: 'Anillo de foco', kind: 'color', hint: 'HSL: "H S% L%"' },
   {
-    token: 'radius',
-    label: 'Radio de esquinas',
-    kind: 'length',
-    hint: 'Qué tan redondeadas se ven las esquinas de botones y tarjetas.',
+    token: 'ring',
+    label: 'Anillo de foco',
+    hint: 'Resplandor al enfocar el buscador del catálogo o el formulario de reseñas (accesibilidad de teclado).',
   },
 ];
 

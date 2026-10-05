@@ -19,17 +19,18 @@ import type { PortalColorToken, PortalTheme, PortalThemeToken } from '@adoptafac
 /** Minimum contrast ratio required between a color and its foreground pair. */
 export const MIN_CONTRAST_RATIO = 4.5;
 
-/** The color tokens an org may override, each paired with its foreground. */
+/**
+ * The color tokens an org may override, each paired with its foreground.
+ * `secondary`/`secondary-foreground` is NOT here (T-PERSONALIZACION-AUDIT):
+ * removed from `PortalColorToken` entirely — see the contract's doc comment.
+ */
 export const PORTAL_COLOR_PAIRS: ReadonlyArray<[PortalColorToken, PortalColorToken]> = [
   ['primary', 'primary-foreground'],
-  ['secondary', 'secondary-foreground'],
   ['accent', 'accent-foreground'],
 ];
 
 /** Bare HSL channels, e.g. "142 72% 29%". Ranges checked in `.superRefine`. */
 const HSL_CHANNELS = /^(\d{1,3})\s+(\d{1,3}(?:\.\d+)?)%\s+(\d{1,3}(?:\.\d+)?)%$/;
-/** A small, bounded CSS length for the corner radius. */
-const RADIUS = /^(\d{1,2}(?:\.\d+)?)(px|rem|em)$/;
 
 const colorToken = z
   .string()
@@ -41,15 +42,6 @@ const colorToken = z
     const [h, s, l] = [Number(m[1]), Number(m[2]), Number(m[3])];
     return h <= 360 && s <= 100 && l <= 100;
   }, 'Canales HSL fuera de rango (H≤360, S≤100%, L≤100%)');
-
-const radiusToken = z
-  .string()
-  .trim()
-  .regex(RADIUS, 'Debe ser una longitud CSS acotada (p. ej. "0.5rem", "8px")')
-  .refine((value) => {
-    const m = RADIUS.exec(value);
-    return m ? Number(m[1]) <= 64 : false;
-  }, 'Radio demasiado grande');
 
 /** Parse bare HSL channels into their numeric components (or null). */
 function parseHsl(value: string): { h: number; s: number; l: number } | null {
@@ -96,12 +88,9 @@ export const portalThemeTokensSchema = z
   .object({
     primary: colorToken.optional(),
     'primary-foreground': colorToken.optional(),
-    secondary: colorToken.optional(),
-    'secondary-foreground': colorToken.optional(),
     accent: colorToken.optional(),
     'accent-foreground': colorToken.optional(),
     ring: colorToken.optional(),
-    radius: radiusToken.optional(),
   } satisfies Record<PortalThemeToken, z.ZodTypeAny>)
   .strict();
 
