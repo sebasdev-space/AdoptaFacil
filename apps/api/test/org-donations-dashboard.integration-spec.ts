@@ -3,10 +3,31 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
 import request from 'supertest';
+import {
+  type CollectionResult,
+  type CreateCollectionInput,
+  FakePaymentAdapter,
+} from '@adoptafacil/contracts';
 import { AppModule } from '../src/app.module';
+import { PAYMENT_PORT } from '../src/core/payments/payment.port';
 import { SponsorshipBillingService } from '../src/modules/sponsorships/sponsorship-billing.service';
 import { purgeOrganizations } from './support/cleanup';
 import { completeTestProfile } from './support/profile';
+
+/**
+ * Requerimiento #17: `POST /sponsorships` ahora cobra de inmediato y marca el
+ * primer período `paid` cuando el resultado es `approved` — `makeSponsorshipAtRisk`
+ * (abajo) necesita que ese período quede `pending` para poder forzarlo a
+ * `failed` como fixture (un período `paid` nunca puede pasar a `failed`,
+ * reforzado por un trigger de DB). Mismo override que
+ * `sponsorship-billing.integration-spec.ts` ya usa para esto mismo.
+ */
+class PendingFakePaymentAdapter extends FakePaymentAdapter {
+  override async createCollection(input: CreateCollectionInput): Promise<CollectionResult> {
+    const result = await super.createCollection(input);
+    return { ...result, status: 'pending' };
+  }
+}
 
 /**
  * M13 dashboard de donaciones/campañas de la organización (S-14, pedido del
@@ -153,10 +174,10 @@ describe('Org donations/campaigns dashboard (M13, S-14)', () => {
       .set('Authorization', `Bearer ${sponsor.token}`)
       .send({ planId: plan.body.id })
       .expect(201);
-    // El primer período de facturación no existe hasta que corre el scan
-    // diario (`nextBillingAt` por defecto es `now()` al suscribirse, así que
-    // el primer scan ya lo abre) — mismo mecanismo que
-    // `sponsorship-billing.integration-spec.ts`.
+    // Requerimiento #17: `subscribe()` ya abre el período 1 él mismo (`pending`,
+    // gracias al `PendingFakePaymentAdapter` de arriba) — este scan ya no tiene
+    // nada que abrir, se deja solo porque no hace daño y mantiene el mismo
+    // mecanismo que `sponsorship-billing.integration-spec.ts`.
     await billing.runDailyScan();
     const payments = await request(server)
       .get(`/sponsorships/${sponsorship.body.id}/payments`)
@@ -173,7 +194,10 @@ describe('Org donations/campaigns dashboard (M13, S-14)', () => {
   let sponsor: Actor;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+      .overrideProvider(PAYMENT_PORT)
+      .useValue(new PendingFakePaymentAdapter())
+      .compile();
     app = moduleRef.createNestApplication();
     await app.init();
     server = app.getHttpServer();
