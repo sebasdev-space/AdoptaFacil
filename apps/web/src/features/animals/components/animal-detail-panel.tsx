@@ -167,7 +167,7 @@ export function AnimalDetailPanel({
           </TabsList>
 
           <TabsContent value="carnet">
-            <AnimalCarnetSection animalId={animal.id} />
+            <AnimalCarnetSection animal={animal} />
           </TabsContent>
 
           <TabsContent value="registro">

@@ -1,3 +1,4 @@
+import { PDFDocument } from 'pdf-lib';
 import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -144,6 +145,42 @@ describe('Clinical carnet — timeline + PDF (S2-04B-2)', () => {
     const bytes = res.body as Buffer;
     expect(bytes.subarray(0, 5).toString('utf8')).toBe('%PDF-');
     expect(bytes.length).toBeGreaterThan(500); // a real rendered document, not a stub
+  });
+
+  it('el PDF trae primero la hoja del carnet de identificación (apaisada) y luego el expediente', async () => {
+    const res = await request(server)
+      .get(`/animals/${animalWithEventsId}/clinical-events/carnet.pdf`)
+      .set('Authorization', `Bearer ${vet.token}`)
+      .buffer()
+      .parse(binaryParser)
+      .expect(200);
+
+    const doc = await PDFDocument.load(res.body as Buffer);
+    expect(doc.getPageCount()).toBeGreaterThanOrEqual(2);
+    const first = doc.getPage(0).getSize();
+    expect(first.width).toBeGreaterThan(first.height);
+  });
+
+  it('GET .../card devuelve el código N° derivado del id y la URL pública del perfil', async () => {
+    const res = await request(server)
+      .get(`/animals/${animalWithEventsId}/clinical-events/card`)
+      .set('Authorization', `Bearer ${vet.token}`)
+      .expect(200);
+
+    expect(res.body.code).toMatch(/^A[0-9A-F]{8}$/);
+    expect(res.body.code).toBe(
+      `A${animalWithEventsId.replace(/-/g, '').slice(0, 8).toUpperCase()}`,
+    );
+    expect(typeof res.body.profileUrl).toBe('string');
+    expect(res.body.profileUrl.startsWith('http')).toBe(true);
+  });
+
+  it('card: un rol sin acceso al expediente (Volunteer) no ve el carnet — deny-by-default', async () => {
+    const volunteer = await actorWithRoles(['volunteer']);
+    await request(server)
+      .get(`/animals/${animalWithEventsId}/clinical-events/card`)
+      .set('Authorization', `Bearer ${volunteer.token}`)
+      .expect(403);
   });
 
   it('view RBAC: Owner/Administrator/Operator/Veterinarian/ReadOnlyAuditor ✓, Volunteer/Person ✗', async () => {

@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import {
+  type AnimalCardInfo,
   type ClinicalCarnetEntry,
   type ClinicalEvent,
   type CreateClinicalEventInput,
@@ -63,6 +64,13 @@ export class ClinicalController {
     @Param('animalId', ParseUUIDPipe) animalId: string,
   ): Promise<ClinicalCarnetEntry[]> {
     return this.carnet.getTimeline(animalId);
+  }
+
+  /** Datos del carnet de identificación (código N° y URL del QR). */
+  @Get('card')
+  @Roles(...VIEW_ROLES)
+  carnetCard(@Param('animalId', ParseUUIDPipe) animalId: string): Promise<AnimalCardInfo> {
+    return this.carnet.getCardInfo(animalId);
   }
 
   @Get('carnet.pdf')

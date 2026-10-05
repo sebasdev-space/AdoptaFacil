@@ -1,8 +1,18 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-import { type ClinicalCarnetEntry, ClinicalEventType } from '@adoptafacil/contracts';
+import {
+  type AnimalCardInfo,
+  type AnimalStatus,
+  type ClinicalCarnetEntry,
+  ClinicalEventType,
+  type ComputedAge,
+} from '@adoptafacil/contracts';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../core/tenant/tenant-context.service';
+import type { Env } from '../../config/env.validation';
+import { STORAGE_PORT, type StoragePort } from '../../core/storage/storage.port';
+import { addAnimalIdCardPage, animalCardCode, safe } from './animal-id-card.renderer';
 import { AnimalsService } from './animals.service';
 import { ClinicalService } from './clinical.service';
 
@@ -16,6 +26,24 @@ const TYPE_LABELS: Record<ClinicalEventType, string> = {
   [ClinicalEventType.Medication]: 'Medicamento',
   [ClinicalEventType.Diagnosis]: 'Diagnóstico',
 };
+
+const STATUS_LABELS: Record<AnimalStatus, string> = {
+  available: 'En adopción',
+  in_process: 'En proceso',
+  adopted: 'Adoptado',
+  unavailable: 'No disponible',
+  deceased: 'Fallecido',
+};
+
+/** "3 años 2 meses" / "~5 meses"; `undefined` si la edad no se conoce. */
+function ageLabel(age?: ComputedAge): string | undefined {
+  if (!age) return undefined;
+  const parts: string[] = [];
+  if (age.years > 0) parts.push(`${age.years} ${age.years === 1 ? 'año' : 'años'}`);
+  if (age.months > 0) parts.push(`${age.months} ${age.months === 1 ? 'mes' : 'meses'}`);
+  const text = parts.join(' ') || '0 meses';
+  return age.approximate ? `~${text}` : text;
+}
 
 function formatCO(iso: string): string {
   return new Date(iso).toLocaleDateString('es-CO', {
@@ -47,6 +75,8 @@ export class CarnetService {
     private readonly tenant: TenantContextService,
     private readonly animals: AnimalsService,
     private readonly clinical: ClinicalService,
+    @Inject(STORAGE_PORT) private readonly storage: StoragePort,
+    private readonly config: ConfigService<Env, true>,
   ) {}
 
   private requireOrgId(): string {
@@ -84,6 +114,28 @@ export class CarnetService {
     }));
   }
 
+  /**
+   * Datos del carnet de identificación que NO viven en el `Animal`: el código
+   * "N°" (derivado del id) y la URL del perfil público que codifica el QR
+   * (`{WEB_BASE_URL}/o/{slug}/animales/{id}`; sin slug público, la portada de
+   * AdoptaFácil — nunca un enlace roto). Mismo origen para la vista y el PDF.
+   */
+  async getCardInfo(animalId: string): Promise<AnimalCardInfo> {
+    const organizationId = this.requireOrgId();
+    const animal = await this.animals.get(animalId);
+    const profile = await this.prisma.withOrgContext(organizationId, (tx) =>
+      tx.organizationProfile.findUnique({
+        where: { organizationId },
+        select: { slug: true },
+      }),
+    );
+    const base = this.config.get('WEB_BASE_URL', { infer: true }).replace(/\/+$/, '');
+    const profileUrl = profile?.slug
+      ? `${base}/o/${encodeURIComponent(profile.slug)}/animales/${animal.id}`
+      : base;
+    return { code: animalCardCode(animal.id), profileUrl };
+  }
+
   /** Renders the SAME timeline as a simple, legible PDF (org name + animal
    *  name as header, one block per event). Logo embedding is intentionally
    *  skipped in this first cut — `logoUrl` is a URL, not a StoragePort key,
@@ -101,6 +153,31 @@ export class CarnetService {
     const margin = 50;
     const pageSize: [number, number] = [595.28, 841.89]; // A4
 
+    // Hoja 1: carnet de identificación (frente y reverso). Foto principal desde el
+    // StoragePort (solo bytes, nunca por HTTP); si no se puede leer, huella.
+    const card = await this.getCardInfo(animalId);
+    const primaryPhoto = [...(animal.photoRecords ?? [])].sort((a, b) => a.order - b.order)[0];
+    const photo = primaryPhoto
+      ? await this.storage.readObject(primaryPhoto.storageRef).catch(() => null)
+      : null;
+    await addAnimalIdCardPage(
+      pdf,
+      { regular: font, bold },
+      {
+        name: animal.name,
+        sex: animal.sex,
+        breed: animal.breed,
+        statusLabel: STATUS_LABELS[animal.status],
+        ageLabel: ageLabel(animal.computedAge),
+        traits: animal.tags ?? [],
+        code: card.code,
+        profileUrl: card.profileUrl,
+        organizationName: org?.name,
+        photo,
+      },
+    );
+
+    // Hoja(s) siguientes: el expediente clínico (formato de siempre).
     let page = pdf.addPage(pageSize);
     let y = pageSize[1] - margin;
 
@@ -114,7 +191,8 @@ export class CarnetService {
     function drawLine(text: string, options: { size?: number; useBold?: boolean } = {}): void {
       const size = options.size ?? 11;
       ensureSpace(size + 6);
-      page.drawText(text, {
+      // La fuente estándar (WinAnsi) no dibuja emojis ni símbolos fuera de Latin-1.
+      page.drawText(safe(text), {
         x: margin,
         y,
         size,
