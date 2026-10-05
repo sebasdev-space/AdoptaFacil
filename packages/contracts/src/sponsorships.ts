@@ -189,9 +189,20 @@ export interface SponsorshipStatusHistoryEntry {
   createdAt: string;
 }
 
-/** Optional reason accompanying a suspend/cancel action (never required). */
+/** Optional reason accompanying a suspend/reactivate action (never required). */
 export interface SponsorshipStatusChangeInput {
   reason?: string;
+}
+
+/**
+ * Body of `POST /sponsorships/:id/cancel` (requerimiento #19). Unlike
+ * suspend/reactivate, the reason is REQUIRED: cancellation is terminal and
+ * the client asked that every cancellation leave an auditable "why" behind
+ * (persisted in `SponsorshipStatusHistoryEntry.reason`, same column as
+ * suspend/reactivate — no schema change there, only this input tightens it).
+ */
+export interface CancelSponsorshipInput {
+  reason: string;
 }
 
 /**

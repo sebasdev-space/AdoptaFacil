@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
   EmptyState,
+  Input,
   Skeleton,
   StatCard,
   Table,
@@ -81,6 +82,7 @@ export function SponsorshipsPage() {
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [cancelTarget, setCancelTarget] = useState<Sponsorship | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
   const [deceasedTarget, setDeceasedTarget] = useState<Sponsorship | null>(null);
 
@@ -152,15 +154,27 @@ export function SponsorshipsPage() {
 
   // Cancel is TERMINAL (no reactivation after, `SponsorshipStatus` doc) — same
   // confirm-dialog pattern as `AnimalsPage`'s delete, unlike suspend/reactivate
-  // above which are reversible and fire on a single click.
+  // above which are reversible and fire on a single click. Requerimiento #19:
+  // the reason is REQUIRED — validated client-side (same pattern as
+  // `OfferProofReview`'s rejection reason) AND enforced by the backend schema.
   async function confirmCancel(): Promise<void> {
     if (!cancelTarget) return;
+    const reason = cancelReason.trim();
+    if (!reason) {
+      toast({
+        title: 'Falta el motivo',
+        description: 'Indica por qué se cancela el apadrinamiento.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setCancelling(true);
     try {
-      await cancelSponsorship(client, cancelTarget.id);
+      await cancelSponsorship(client, cancelTarget.id, { reason });
       await load();
       toast({ title: 'Apadrinamiento cancelado', variant: 'success' });
       setCancelTarget(null);
+      setCancelReason('');
     } catch (error) {
       toast({
         title: 'No se pudo cancelar el apadrinamiento',
@@ -313,23 +327,45 @@ export function SponsorshipsPage() {
         </div>
       )}
 
-      <Dialog open={cancelTarget !== null} onOpenChange={(next) => !next && setCancelTarget(null)}>
+      <Dialog
+        open={cancelTarget !== null}
+        onOpenChange={(next) => {
+          if (!next) {
+            setCancelTarget(null);
+            setCancelReason('');
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Cancelar apadrinamiento</DialogTitle>
             <DialogDescription>
-              Esta acción es definitiva: un apadrinamiento cancelado no puede reactivarse. ¿Quieres
-              continuar?
+              Esta acción es definitiva: un apadrinamiento cancelado no puede reactivarse. Indica el
+              motivo de la cancelación para continuar.
             </DialogDescription>
           </DialogHeader>
+          <Input
+            aria-label="Motivo de la cancelación"
+            placeholder="Motivo (obligatorio)"
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            disabled={cancelling}
+          />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCancelTarget(null)} disabled={cancelling}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setCancelTarget(null);
+                setCancelReason('');
+              }}
+              disabled={cancelling}
+            >
               Volver
             </Button>
             <Button
               className={styles['confirm-btn--danger']}
               onClick={() => void confirmCancel()}
-              disabled={cancelling}
+              disabled={cancelling || !cancelReason.trim()}
             >
               {cancelling ? 'Cancelando…' : 'Sí, cancelar'}
             </Button>

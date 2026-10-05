@@ -248,17 +248,32 @@ describe('Sponsorships base (RF17 · T-056)', () => {
       .expect(400);
   });
 
-  it('rejects reactivating a CANCELLED sponsorship (terminal state)', async () => {
+  it('requerimiento #19: cancelling without a reason is rejected (reason is mandatory, unlike suspend/reactivate)', async () => {
     await request(server)
       .post(`/sponsorships/${sponsorshipId}/cancel`)
       .set('Authorization', `Bearer ${tokenA}`)
       .send({})
+      .expect(400);
+  });
+
+  it('rejects reactivating a CANCELLED sponsorship (terminal state), and the cancel reason is recorded in history', async () => {
+    await request(server)
+      .post(`/sponsorships/${sponsorshipId}/cancel`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .send({ reason: 'Prueba de cancelación' })
       .expect(200);
     await request(server)
       .post(`/sponsorships/${sponsorshipId}/reactivate`)
       .set('Authorization', `Bearer ${tokenA}`)
       .send({})
       .expect(400);
+
+    const history = await request(server)
+      .get(`/sponsorships/${sponsorshipId}/history`)
+      .set('Authorization', `Bearer ${tokenA}`)
+      .expect(200);
+    const byCancel = history.body.find((h: { toStatus: string }) => h.toStatus === 'cancelled');
+    expect(byCancel.reason).toBe('Prueba de cancelación');
   });
 
   it('GET /sponsorships/mine reflects lifecycle changes (now cancelled), not a stale snapshot', async () => {

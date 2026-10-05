@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  type CancelSponsorshipInput,
   type CreateSponsorshipInput,
   type Paginated,
   type PaySponsorshipPaymentInput,
@@ -29,6 +30,7 @@ import { RolesGuard } from '../../core/rbac/roles.guard';
 import { SponsorshipPaymentsService } from './sponsorship-payments.service';
 import { SponsorshipsService } from './sponsorships.service';
 import {
+  cancelSponsorshipSchema,
   createSponsorshipSchema,
   paySponsorshipPaymentSchema,
   sponsorshipStatusChangeSchema,
@@ -148,7 +150,7 @@ export class SponsorshipsController {
   cancel(
     @CurrentUser() actor: RequestUser,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body(new ZodValidationPipe(sponsorshipStatusChangeSchema)) dto: SponsorshipStatusChangeInput,
+    @Body(new ZodValidationPipe(cancelSponsorshipSchema)) dto: CancelSponsorshipInput,
   ): Promise<Sponsorship> {
     return this.service.cancel(actor.id, id, dto.reason);
   }

@@ -536,7 +536,10 @@ export class SponsorshipsService {
     return this.transition(actorUserId, id, SponsorshipStatus.Active, reason);
   }
 
-  cancel(actorUserId: string, id: string, reason?: string): Promise<Sponsorship> {
+  /** Requerimiento #19: the reason is mandatory for cancel (enforced by
+   *  `cancelSponsorshipSchema` at the controller boundary) — unlike
+   *  suspend/reactivate, which keep theirs optional. */
+  cancel(actorUserId: string, id: string, reason: string): Promise<Sponsorship> {
     return this.transition(actorUserId, id, SponsorshipStatus.Cancelled, reason);
   }
 }

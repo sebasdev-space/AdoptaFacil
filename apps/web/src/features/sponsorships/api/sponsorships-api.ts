@@ -1,5 +1,6 @@
 import type {
   Animal,
+  CancelSponsorshipInput,
   CreateSponsorshipInput,
   Paginated,
   PaySponsorshipPaymentInput,
@@ -69,11 +70,12 @@ export function reactivateSponsorship(
 
 /** Cancel a sponsorship — terminal, no reactivation after (Owner/Administrator —
  *  `POST /sponsorships/:id/cancel`). S2-03-REV: this action existed in the
- *  backend since the original S2-03 slice but had no frontend consumer. */
+ *  backend since the original S2-03 slice but had no frontend consumer.
+ *  Requerimiento #19: `reason` is required (the backend now 400s without it). */
 export function cancelSponsorship(
   client: ApiClient,
   id: string,
-  dto: SponsorshipStatusChangeInput = {},
+  dto: CancelSponsorshipInput,
 ): Promise<Sponsorship> {
   return client.request<Sponsorship>(`/sponsorships/${id}/cancel`, {
     method: 'POST',
