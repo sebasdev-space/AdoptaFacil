@@ -210,6 +210,7 @@ describe('Volunteering (M08, RF18/RF19)', () => {
       .post('/org/legal-representative')
       .set('Authorization', `Bearer ${org.token}`)
       .send({
+        role: 'legal_representative',
         fullName: 'María Fernanda Gómez',
         documentType: 'cedula_ciudadania',
         documentNumber: '52.741.900',
