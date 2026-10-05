@@ -159,6 +159,38 @@ describe('DonationsService.create — guest checkout', () => {
     expect(h.record).not.toHaveBeenCalled();
   });
 
+  it('accepts an ANONYMOUS guest donation with no payer at all (no email, no receipt link)', async () => {
+    const h = makeService();
+    h.queryRaw.mockResolvedValueOnce([]);
+    h.queryRaw.mockResolvedValueOnce([]);
+    h.queryRaw.mockResolvedValueOnce([
+      {
+        id: 'don-anon',
+        organization_id: 'org-1',
+        donor_user_id: null,
+        concept_kind: 'organization',
+        concept_id: 'org-1',
+        commission_payer: 'organization',
+        intended_amount: 50_000,
+        amount_charged: 50_000,
+        currency: 'COP',
+        breakdown: { amountCharged: 50_000, gross: 50_000, net: 48_000 },
+        collection_id: 'col-anon',
+        idempotency_key: 'idem-key-guest-1',
+        status: 'pending',
+        payer: null,
+        anonymous: true,
+        created_at: new Date('2026-09-28T00:00:00.000Z'),
+        updated_at: new Date('2026-09-28T00:00:00.000Z'),
+      },
+    ]);
+
+    const result = await h.service.create(undefined, { ...BASE_INPUT, anonymous: true });
+
+    expect(result.id).toBe('don-anon');
+    expect(result.donorUserId).toBeNull();
+  });
+
   it('rejects when payer is provided but without an email', async () => {
     const h = makeService();
 
@@ -724,5 +756,22 @@ describe('DonationsService.getByAccessToken', () => {
       (unknownError as { status: number }).status,
     );
     expect((expiredError as Error).message).toBe((unknownError as Error).message);
+  });
+});
+
+describe('DonationsService.getOrganizationAvailability', () => {
+  it('is true only when the organization has a connected MercadoPago account', async () => {
+    const h = makeService();
+    h.queryRaw.mockResolvedValueOnce([{ mp_user_id: '12345' }]);
+    await expect(h.service.getOrganizationAvailability('org-1')).resolves.toEqual({
+      organizationId: 'org-1',
+      canReceiveDonations: true,
+    });
+
+    h.queryRaw.mockResolvedValueOnce([]);
+    await expect(h.service.getOrganizationAvailability('org-2')).resolves.toEqual({
+      organizationId: 'org-2',
+      canReceiveDonations: false,
+    });
   });
 });

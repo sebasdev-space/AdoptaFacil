@@ -9,14 +9,15 @@
 
 .hero2 {
   position: relative;
-  overflow: hidden;
+  /* Sin overflow:hidden: el logo sobresale del borde de la portada y NO debe
+     recortarse. El padding inferior extra deja espacio al logo que cuelga. */
   border-radius: 16px;
-  padding: 1.5rem;
+  padding: 1.5rem 1.5rem 3rem;
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border) / 0.35);
 
   @media (min-width: 640px) {
-    padding: 2.25rem;
+    padding: 2.25rem 2.25rem 3.25rem;
   }
 }
 
@@ -47,8 +48,7 @@
   position: relative;
   width: 100%;
   aspect-ratio: 4 / 3;
-  border-radius: 14px;
-  overflow: hidden;
+  /* Sin overflow:hidden (recortaba el logo): el redondeo vive en la imagen. */
 
   @media (min-width: 1024px) {
     flex: 1 1 44%;
@@ -58,12 +58,14 @@
 .hero2__image {
   height: 100%;
   width: 100%;
+  border-radius: 14px;
   object-fit: cover;
 }
 
 .hero2__imageFallback {
   height: 100%;
   width: 100%;
+  border-radius: 14px;
   background: hsl(var(--muted));
 }
 
@@ -72,30 +74,31 @@
 }
 
 .avatar-img {
-  height: 4rem;
-  width: 4rem;
+  height: 5rem;
+  width: 5rem;
   // Círculo genuino (avatar) — excepción explícita de la regla de radios
   // controlados (T-D06, §3).
   border-radius: var(--r-full);
-  border: 3px solid var(--bg-surface);
+  border: 4px solid var(--bg-surface);
+  background-color: var(--bg-surface);
   object-fit: cover;
-  box-shadow: 0 2px 8px rgba(20, 30, 40, 0.08);
+  box-shadow: 0 4px 14px rgba(20, 30, 40, 0.18);
 }
 
 .avatar-fallback {
   display: flex;
-  height: 4rem;
-  width: 4rem;
+  height: 5rem;
+  width: 5rem;
   align-items: center;
   justify-content: center;
   border-radius: var(--r-full);
-  border: 3px solid var(--bg-surface);
+  border: 4px solid var(--bg-surface);
   background-color: hsl(var(--primary));
   font-family: var(--font-sans);
   font-size: var(--fs-h3);
   font-weight: var(--fw-bold);
   color: hsl(var(--primary-foreground));
-  box-shadow: 0 2px 8px rgba(20, 30, 40, 0.08);
+  box-shadow: 0 4px 14px rgba(20, 30, 40, 0.18);
 }
 
 .name {

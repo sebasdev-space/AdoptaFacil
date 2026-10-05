@@ -50,7 +50,9 @@ function stubFetch(handler: (url: string) => unknown) {
   vi.stubGlobal(
     'fetch',
     vi.fn((input: RequestInfo | URL) => {
-      const body = handler(String(input));
+      const url = String(input);
+      // Org availability (MercadoPago conectado) — por defecto SÍ, salvo que el test lo sobreescriba.
+      const body = url.includes('/availability') ? { canReceiveDonations: true } : handler(url);
       return Promise.resolve({
         ok: true,
         status: 200,
@@ -63,7 +65,15 @@ function stubFetch(handler: (url: string) => unknown) {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe('DonatePage — "no target" now shows "Mis donaciones" (T-064)', () => {
+describe('"Mis donaciones" (T-064) — dentro del shell, con menú', () => {
+  it('/donaciones sin organización y con sesión redirige a /mis-donaciones', async () => {
+    stubFetch(() => []);
+    renderShell({ route: '/donaciones', ...personSession() });
+
+    expect(await screen.findByRole('heading', { name: 'Mis donaciones' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: /principal/i })).toBeInTheDocument();
+  });
+
   it('lists the donor’s own donations with org label, status badge and amount', async () => {
     stubFetch((url) => {
       if (url.includes('/donations/mine')) {
@@ -96,7 +106,7 @@ describe('DonatePage — "no target" now shows "Mis donaciones" (T-064)', () => 
       return [];
     });
 
-    renderShell({ route: '/donaciones', ...personSession() });
+    renderShell({ route: '/mis-donaciones', ...personSession() });
 
     expect(await screen.findByRole('heading', { name: 'Mis donaciones' })).toBeInTheDocument();
     expect(await screen.findByText('Organización #08d734c6')).toBeInTheDocument();
@@ -139,7 +149,7 @@ describe('DonatePage — "no target" now shows "Mis donaciones" (T-064)', () => 
       return [];
     });
 
-    renderShell({ route: '/donaciones', ...personSession() });
+    renderShell({ route: '/mis-donaciones', ...personSession() });
 
     expect(await screen.findByText('Refugio Patitas')).toBeInTheDocument();
     expect(screen.queryByText('Organización #08d734c6')).not.toBeInTheDocument();
@@ -147,7 +157,7 @@ describe('DonatePage — "no target" now shows "Mis donaciones" (T-064)', () => 
 
   it('shows an empty-state (not a crash) when the donor has no donations yet', async () => {
     stubFetch(() => []);
-    renderShell({ route: '/donaciones', ...personSession() });
+    renderShell({ route: '/mis-donaciones', ...personSession() });
 
     expect(await screen.findByRole('heading', { name: 'Mis donaciones' })).toBeInTheDocument();
     expect(await screen.findByText(/Aún no has hecho ninguna donación/)).toBeInTheDocument();
@@ -163,7 +173,7 @@ describe('DonatePage — "no target" now shows "Mis donaciones" (T-064)', () => 
         json: async () => ({ code: 'server_error', message: 'boom' }),
       }),
     );
-    renderShell({ route: '/donaciones', ...personSession() });
+    renderShell({ route: '/mis-donaciones', ...personSession() });
 
     expect(await screen.findByText(/No se pudieron cargar tus donaciones/)).toBeInTheDocument();
   });
@@ -220,7 +230,7 @@ describe('DonatePage — "no target" now shows "Mis donaciones" (T-064)', () => 
       return [];
     });
 
-    renderShell({ route: '/donaciones', ...personSession() });
+    renderShell({ route: '/mis-donaciones', ...personSession() });
     await screen.findByRole('heading', { name: 'Mis donaciones' });
 
     // The button only exists once the fetched (approved) donation has rendered
@@ -267,7 +277,7 @@ describe('DonatePage — "no target" now shows "Mis donaciones" (T-064)', () => 
       return [];
     });
 
-    renderShell({ route: '/donaciones', ...personSession() });
+    renderShell({ route: '/mis-donaciones', ...personSession() });
     await screen.findByRole('heading', { name: 'Mis donaciones' });
     // Same async-loaded render as the heading above — findBy, not getBy.
     expect(await screen.findByText('Pendiente')).toBeInTheDocument();
@@ -308,7 +318,7 @@ describe('F-MIS-DONACIONES-PLUS: detalle + acceso al certificado desde "Mis dona
   it('opens a detail modal with the REAL persisted breakdown (never recomputed) when "Ver detalle" is clicked', async () => {
     stubFetch((url) => (url.includes('/donations/mine') ? [approvedDonationFixture()] : []));
 
-    renderShell({ route: '/donaciones', ...personSession() });
+    renderShell({ route: '/mis-donaciones', ...personSession() });
     await screen.findByRole('heading', { name: 'Mis donaciones' });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Ver detalle' }));
@@ -344,7 +354,7 @@ describe('F-MIS-DONACIONES-PLUS: detalle + acceso al certificado desde "Mis dona
       return [];
     });
 
-    renderShell({ route: '/donaciones', ...personSession() });
+    renderShell({ route: '/mis-donaciones', ...personSession() });
     await screen.findByRole('heading', { name: 'Mis donaciones' });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Ver detalle' }));
@@ -370,7 +380,7 @@ describe('F-MIS-DONACIONES-PLUS: detalle + acceso al certificado desde "Mis dona
       return [];
     });
 
-    renderShell({ route: '/donaciones', ...personSession() });
+    renderShell({ route: '/mis-donaciones', ...personSession() });
     await screen.findByRole('heading', { name: 'Mis donaciones' });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Ver detalle' }));
@@ -559,6 +569,42 @@ describe('DonatePage — checkout de invitado (sin sesión, requisito final del 
 
     expect(await screen.findByText(/Aún no elegiste a quién donar/)).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Mis donaciones' })).not.toBeInTheDocument();
+  });
+});
+
+describe('DonatePage — organización sin MercadoPago conectado', () => {
+  const route = '/donaciones?organizationId=org-1&organizationName=Refugio%20Patitas';
+
+  it('shows an alert and NO form when the organization has not connected MercadoPago', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: { get: () => null },
+          json: async () =>
+            String(input).includes('/availability') ? { canReceiveDonations: false } : [],
+        }),
+      ),
+    );
+    renderShell({ route, ...personSession() });
+
+    expect(await screen.findByTestId('donation-org-not-connected')).toHaveTextContent(
+      'no ha conectado su cuenta de MercadoPago',
+    );
+    expect(screen.queryByPlaceholderText('50000')).not.toBeInTheDocument();
+  });
+
+  it('shows a verification error (and NO form) when availability cannot be checked', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve({ ok: false, status: 500, json: async () => ({}) })),
+    );
+    renderShell({ route, ...personSession() });
+
+    expect(await screen.findByTestId('donation-availability-error')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('50000')).not.toBeInTheDocument();
   });
 });
 

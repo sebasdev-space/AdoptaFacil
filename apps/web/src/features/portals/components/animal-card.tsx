@@ -10,7 +10,6 @@ import {
   isRecentlyPublished,
   publicAnimalDetailHref,
   buildAdoptionRequestHref,
-  buildSponsorHref,
 } from '../model/animals-catalog';
 import { buildDonateHref } from './portal-donate-cta';
 import { IconHeart } from './portal-icons';
@@ -154,18 +153,16 @@ export function AnimalCard({ slug, animal, organization, onOpenDetail }: AnimalC
         >
           Adoptar
         </Link>
-        {/* Apadrinar/Donar: acciones secundarias LIGERAS (texto, no botones
-            con borde) — jerarquía clara frente a "Adoptar" (T-D06, §15). */}
-        <div className={styles.card__actionSecondary}>
-          <Link to={buildSponsorHref(animal, organization?.name)} className={styles.card__link}>
-            Apadrinar
-          </Link>
-          {organization && (
+        {/* Donar: acción secundaria LIGERA (texto, no botón con borde) — jerarquía
+            clara frente a "Adoptar" (T-D06, §15). "Apadrinar" ya no se ofrece
+            aquí: vive solo en el detalle (modal) y solo si el animal tiene plan. */}
+        {organization && (
+          <div className={styles.card__actionSecondary}>
             <Link to={buildDonateHref(organization)} className={styles.card__link}>
               Donar
             </Link>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </article>
   );

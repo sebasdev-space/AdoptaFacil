@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { AnimalSummary } from '@adoptafacil/contracts';
@@ -51,6 +51,23 @@ function stubAnimals(body: unknown) {
   vi.stubGlobal(
     'fetch',
     vi.fn(() => Promise.resolve({ ok: true, status: 200, json: async () => body })),
+  );
+}
+
+/** Stubs the public sponsorship summary (`/public/sponsorships/animals/:id`) with the
+ *  given active plans; every other URL answers the org profile (`profileBody`). */
+function stubWithSponsorshipPlans(activePlans: unknown[], profileBody: unknown = {}) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: RequestInfo | URL) => {
+      const isSponsorship = String(url).includes('/public/sponsorships/');
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () =>
+          isSponsorship ? { animalId: 'a1', activePlans, activeSponsorCount: 0 } : profileBody,
+      });
+    }),
   );
 }
 
@@ -109,10 +126,20 @@ describe('PublicAnimalDetailPage', () => {
     expect(backLink.className).not.toContain('button--primary');
   });
 
-  it('F-CTA-APADRINAR: shows an "Apadrinar" CTA linking to /apadrinar with the animal id and name', () => {
+  it('F-CTA-APADRINAR: hides "Apadrinar" when the animal has no active sponsorship plan', async () => {
+    stubWithSponsorshipPlans([]);
     renderDetail({ state: { animal: ANIMAL } });
 
-    const cta = screen.getByTestId('sponsor-animal-cta');
+    await screen.findByTestId('request-adoption-cta');
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    expect(screen.queryByTestId('sponsor-animal-cta')).not.toBeInTheDocument();
+  });
+
+  it('F-CTA-APADRINAR: shows an "Apadrinar" CTA linking to /apadrinar with the animal id and name when a plan exists', async () => {
+    stubWithSponsorshipPlans([{ id: 'plan-1' }]);
+    renderDetail({ state: { animal: ANIMAL } });
+
+    const cta = await screen.findByTestId('sponsor-animal-cta');
     const href = cta.getAttribute('href') ?? '';
     expect(href).toContain('/apadrinar?');
     expect(href).toContain('animalId=a1');
@@ -125,11 +152,11 @@ describe('PublicAnimalDetailPage', () => {
   });
 
   it('F-CTA-APADRINAR: includes organizationName in the href once the org profile resolves', async () => {
-    stubByUrl({ name: 'Fundación Patitas' }, { items: [ANIMAL], total: 1, limit: 50, offset: 0 });
+    stubWithSponsorshipPlans([{ id: 'plan-1' }], { name: 'Fundación Patitas' });
     renderDetail({ state: { animal: ANIMAL } });
 
     await screen.findByRole('link', { name: 'Ver Fundación Patitas' });
-    const cta = screen.getByTestId('sponsor-animal-cta');
+    const cta = await screen.findByTestId('sponsor-animal-cta');
     expect(cta.getAttribute('href') ?? '').toContain('organizationName=Fundaci%C3%B3n+Patitas');
   });
 

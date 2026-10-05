@@ -109,6 +109,23 @@ export class DonationsController {
   }
 
   /**
+   * The ORGANIZATION generates (or re-opens) the certificate of one of its
+   * approved donations — for donations whose certificate was never issued
+   * (e.g. the org became ESAL-RTE after the payment). Same certificate if it
+   * already exists; 422 if not eligible / not approved. Management roles only.
+   */
+  @Post(':id/certificate')
+  @HttpCode(200)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(...MANAGE_ROLES)
+  generateCertificate(
+    @CurrentUser() actor: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<DonationCertificate> {
+    return this.service.generateCertificate(actor, id);
+  }
+
+  /**
    * Gateway webhook (PUBLIC — no JWT). The body is the raw gateway payload; the
    * signature travels in the `x-signature` header (MercadoPago's `ts=...,v1=...`
    * format). `x-request-id` and the `data.id` query param are ALSO required to

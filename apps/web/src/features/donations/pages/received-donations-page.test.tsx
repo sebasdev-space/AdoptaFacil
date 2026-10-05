@@ -240,3 +240,135 @@ describe('ReceivedDonationsPage', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('"Generar certificado" desde el detalle de una donación recibida', () => {
+  const approved = {
+    id: 'd-1',
+    organizationId: 'org-1',
+    donorUserId: 'donor-1',
+    concept: { kind: 'organization', id: 'org-1' },
+    commissionPayer: 'organization',
+    intendedAmount: 50000,
+    amountCharged: 50000,
+    currency: 'COP',
+    breakdown: {
+      amountCharged: 50000,
+      gross: 50000,
+      platformFee: 2000,
+      platformIva: 380,
+      gatewayFee: 2025,
+      gatewayIva: 385,
+      net: 45210,
+    },
+    collectionId: 'test_abc123',
+    status: 'approved',
+    createdAt: '2026-07-28T21:25:22.299Z',
+    updatedAt: '2026-07-28T21:25:22.299Z',
+    receipt: {
+      id: 'r-1',
+      organizationId: 'org-1',
+      donationId: 'd-1',
+      dedupKey: 'evt-1',
+      donor: { fullName: 'Camilo Torres', email: 'camilo@test.local' },
+      intendedAmount: 50000,
+      breakdown: {
+        amountCharged: 50000,
+        gross: 50000,
+        platformFee: 2000,
+        platformIva: 380,
+        gatewayFee: 2025,
+        gatewayIva: 385,
+        net: 45210,
+      },
+      issuedAt: '2026-07-28T22:00:00.000Z',
+    },
+  };
+
+  const certificate = {
+    id: 'c-1',
+    organizationId: 'org-1',
+    donationId: 'd-1',
+    code: 'ADF-CERT-2026-000123',
+    organizationName: 'Refugio Patitas',
+    organizationNit: '900123456-1',
+    donorName: 'Camilo Torres',
+    amount: 50000,
+    currency: 'COP',
+    issuedAt: '2026-10-04T12:00:00.000Z',
+    contentHash: 'a'.repeat(64),
+  };
+
+  /** Fetch stub that also looks at the HTTP method (the certificate is a POST). */
+  function stubCertificateFetch(
+    certificateResponse: { status: number; body: unknown },
+    list = [approved],
+  ) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        const isCertificatePost = init?.method === 'POST' && url.includes('/certificate');
+        const body = isCertificatePost
+          ? certificateResponse.body
+          : url.includes('/donations/received')
+            ? list
+            : [];
+        const status = isCertificatePost ? certificateResponse.status : 200;
+        return Promise.resolve({
+          ok: status < 400,
+          status,
+          headers: { get: () => 'application/json' },
+          json: async () => body,
+          text: async () => JSON.stringify(body),
+        });
+      }),
+    );
+  }
+
+  it('generates the certificate of an approved donation and shows the document', async () => {
+    const user = userEvent.setup();
+    stubCertificateFetch({ status: 200, body: certificate });
+    renderShell({ route: '/donaciones-recibidas', ...orgSession() });
+
+    await screen.findByText('Camilo Torres');
+    await user.click(screen.getByRole('button', { name: 'Ver detalle' }));
+    await user.click(await screen.findByTestId('received-donation-generate-certificate'));
+
+    const doc = await screen.findByTestId('certificate-document');
+    expect(doc).toHaveTextContent('Refugio Patitas');
+    expect(screen.getByTestId('received-donation-verify-certificate')).toHaveAttribute(
+      'href',
+      expect.stringContaining('ADF-CERT-2026-000123'),
+    );
+  });
+
+  it('shows the server reason (not a crash) when the org is not eligible', async () => {
+    const user = userEvent.setup();
+    stubCertificateFetch({
+      status: 422,
+      body: {
+        statusCode: 422,
+        message:
+          'Solo las organizaciones ESAL con RTE vigente pueden emitir certificados de donación.',
+      },
+    });
+    renderShell({ route: '/donaciones-recibidas', ...orgSession() });
+
+    await screen.findByText('Camilo Torres');
+    await user.click(screen.getByRole('button', { name: 'Ver detalle' }));
+    await user.click(await screen.findByTestId('received-donation-generate-certificate'));
+
+    expect(await screen.findByTestId('received-donation-certificate-error')).toBeInTheDocument();
+    expect(screen.queryByTestId('certificate-document')).not.toBeInTheDocument();
+  });
+
+  it('does NOT offer the button for a donation that is not approved', async () => {
+    const user = userEvent.setup();
+    stubCertificateFetch({ status: 200, body: certificate }, [{ ...approved, status: 'pending' }]);
+    renderShell({ route: '/donaciones-recibidas', ...orgSession() });
+
+    await user.click(await screen.findByRole('button', { name: 'Ver detalle' }));
+    await screen.findByTestId('received-donation-detail-modal');
+    expect(screen.queryByTestId('received-donation-generate-certificate')).not.toBeInTheDocument();
+  });
+});

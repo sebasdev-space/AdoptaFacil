@@ -239,4 +239,97 @@ describe('Donation certificates (M05: RF14, ESAL-RTE gating, no cross-org/donor 
     });
     expect(rows).toHaveLength(0);
   });
+
+  describe('the ORGANIZATION generates the certificate from "Donaciones recibidas"', () => {
+    it('re-opens the SAME certificate (same code/hash) when it already exists — never a second one', async () => {
+      const res = await request(server)
+        .post(`/donations/${esalDonationId}/certificate`)
+        .set('Authorization', `Bearer ${esalToken}`)
+        .expect(200);
+      expect(res.body.code).toBe(certificateCode);
+
+      const rows = await admin.donationCertificate.findMany({
+        where: { donationId: esalDonationId },
+      });
+      expect(rows).toHaveLength(1);
+    });
+
+    it('rejects (422) a donation of a non-ESAL-RTE org, then issues it once the org becomes eligible', async () => {
+      const donate = await request(server)
+        .post('/donations')
+        .set('Authorization', `Bearer ${donorToken}`)
+        .send({
+          organizationId: informalOrgId,
+          intendedAmount: 45000,
+          commissionPayer: 'organization',
+          idempotencyKey: `cert-regen-${randomUUID()}`,
+          payer: { fullName: 'María Restrepo' },
+        })
+        .expect(201);
+      await request(server)
+        .post('/donations/webhook')
+        .set('x-signature', 'fake-sig')
+        .send({
+          collectionId: donate.body.collectionId,
+          status: 'approved',
+          eventId: `evt-regen-${randomUUID()}`,
+        })
+        .expect(200);
+
+      // Not eligible yet ⇒ 422, nothing created.
+      await request(server)
+        .post(`/donations/${donate.body.id}/certificate`)
+        .set('Authorization', `Bearer ${informalToken}`)
+        .expect(422);
+      expect(await admin.donationCertificate.count({ where: { donationId: donate.body.id } })).toBe(
+        0,
+      );
+
+      // The org later becomes ESAL con RTE vigente → now it can generate it.
+      await request(server)
+        .put('/org/profile')
+        .set('Authorization', `Bearer ${informalToken}`)
+        .send({ nit: '900765432-1' })
+        .expect(200);
+      await admin.organizationProfile.update({
+        where: { organizationId: informalOrgId },
+        data: { formalizationState: 'esal_rte', rteVigente: true },
+      });
+
+      const res = await request(server)
+        .post(`/donations/${donate.body.id}/certificate`)
+        .set('Authorization', `Bearer ${informalToken}`)
+        .expect(200);
+      expect(res.body.code).toMatch(/^ADF-CERT-\d{4}-\d{6}$/);
+      expect(res.body.amount).toBe(45000);
+
+      // Idempotent: asking again returns the same certificate.
+      const again = await request(server)
+        .post(`/donations/${donate.body.id}/certificate`)
+        .set('Authorization', `Bearer ${informalToken}`)
+        .expect(200);
+      expect(again.body.code).toBe(res.body.code);
+
+      // And the donor can now see it too.
+      await request(server)
+        .get(`/donations/${donate.body.id}/certificate`)
+        .set('Authorization', `Bearer ${donorToken}`)
+        .expect(200);
+    });
+
+    it('another organization cannot generate a certificate for this org’s donation (404)', async () => {
+      await request(server)
+        .post(`/donations/${esalDonationId}/certificate`)
+        .set('Authorization', `Bearer ${informalToken}`)
+        .expect(404);
+    });
+
+    it('a Persona (donor, no management role) and an anonymous caller are rejected', async () => {
+      await request(server)
+        .post(`/donations/${esalDonationId}/certificate`)
+        .set('Authorization', `Bearer ${donorToken}`)
+        .expect(403);
+      await request(server).post(`/donations/${esalDonationId}/certificate`).expect(401);
+    });
+  });
 });

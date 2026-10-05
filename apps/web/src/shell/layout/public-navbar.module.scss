@@ -24,13 +24,18 @@
 .navbar__links {
   display: none;
   align-items: center;
-  gap: 1.75rem;
+  gap: 1.25rem;
   font-size: var(--fs-sm);
+  white-space: nowrap;
   font-weight: var(--fw-medium);
   color: hsl(var(--navy-soft));
 
   @media (min-width: 768px) {
     display: flex;
+  }
+
+  @media (min-width: 1024px) {
+    gap: 1.75rem;
   }
 }
 

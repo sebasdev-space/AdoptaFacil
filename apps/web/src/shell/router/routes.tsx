@@ -83,7 +83,12 @@ import {
   AdoptionsKanbanPage,
   MyAdoptionRequestsPage,
 } from '../../features/adoptions';
-import { DonatePage, DonationAccessPage, ReceivedDonationsPage } from '../../features/donations';
+import {
+  DonatePage,
+  DonationAccessPage,
+  MyDonationsPage,
+  ReceivedDonationsPage,
+} from '../../features/donations';
 import { SponsorPage, SponsorshipsPage } from '../../features/sponsorships';
 import { CertificateEmissionPage, CertificateVerificationPage } from '../../features/certificates';
 import {
@@ -234,6 +239,9 @@ export function AppRoutes() {
               responde 422 INCOMPLETE_PROFILE. Cualquier autenticado (no
               gated por rol; el gate real vive en los 3 endpoints backend). */}
           <Route path="perfil/completar" element={<CompleteProfilePage />} />
+          {/* "Mis donaciones": historial del usuario, DENTRO del shell (conserva el
+              menú). `/donaciones` es pública y arma su propio chrome sin menú. */}
+          <Route path="mis-donaciones" element={<MyDonationsPage />} />
           {/* M04 · adopciones (T-028a): tablero de evaluación (org) + solicitud (persona).
               F1-02: el tablero de evaluación solo tenía el gate del ITEM de nav (#86) —
               tecleando la URL directo, cualquier autenticado entraba a la vista de gestión.

@@ -22,6 +22,12 @@ export function PublicFooter() {
           <Link to="/campanas" className={styles.footer__link}>
             Campañas
           </Link>
+          <Link to="/recursos" className={styles.footer__link}>
+            Banco de recursos
+          </Link>
+          <Link to="/marketplace" className={styles.footer__link}>
+            Marketplace
+          </Link>
           <Link to="/login" className={styles.footer__link}>
             Ingresar
           </Link>

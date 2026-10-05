@@ -190,6 +190,40 @@ describe('DonateForm (guest checkout — no session)', () => {
     expect(screen.getByRole('button', { name: /Donar a Refugio Patitas/ })).toBeDisabled();
   });
 
+  it('asks first how to donate and hides name/email when the guest picks "anónima"', () => {
+    render(<DonateForm organizationName="Refugio Patitas" hasSession={false} onDonate={vi.fn()} />);
+    fireEvent.change(screen.getByPlaceholderText('50000'), { target: { value: '50000' } });
+
+    // Default: identified — fields visible, button disabled until filled.
+    expect(screen.getByTestId('donate-identified')).toBeChecked();
+    expect(screen.getByTestId('donation-guest-name')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Donar a Refugio Patitas/ })).toBeDisabled();
+
+    fireEvent.click(screen.getByTestId('donate-anonymous'));
+    expect(screen.queryByTestId('donation-guest-name')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('donation-guest-email')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Donar a Refugio Patitas/ })).toBeEnabled();
+
+    // Back to identified: the fields return.
+    fireEvent.click(screen.getByTestId('donate-identified'));
+    expect(screen.getByTestId('donation-guest-name')).toBeInTheDocument();
+  });
+
+  it('submits an anonymous guest donation WITHOUT guestPayer', () => {
+    const onDonate = vi.fn().mockResolvedValue(undefined);
+    render(
+      <DonateForm organizationName="Refugio Patitas" hasSession={false} onDonate={onDonate} />,
+    );
+    fireEvent.click(screen.getByTestId('donate-anonymous'));
+    fireEvent.change(screen.getByPlaceholderText('50000'), { target: { value: '50000' } });
+    goToCardStep();
+    fireEvent.click(screen.getByTestId('fake-card-brick-submit'));
+
+    expect(onDonate).toHaveBeenCalledWith(
+      expect.objectContaining({ anonymous: true, guestPayer: undefined }),
+    );
+  });
+
   it('submits the guest name/email as guestPayer, with the tokenized card, once the Brick submits', () => {
     const onDonate = vi.fn().mockResolvedValue(undefined);
     render(

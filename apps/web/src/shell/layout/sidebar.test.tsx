@@ -148,7 +148,7 @@ describe('Sidebar — MENU-SUBMENUS collapsible groups', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(within(sidebar).getByRole('link', { name: 'Mis donaciones' })).toHaveAttribute(
       'href',
-      '/donaciones',
+      '/mis-donaciones',
     );
     expect(within(sidebar).getByRole('link', { name: 'Donaciones recibidas' })).toHaveAttribute(
       'href',
