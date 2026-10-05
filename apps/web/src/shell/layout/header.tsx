@@ -4,6 +4,7 @@ import { useNav } from '../navigation/nav-context';
 import { useSession } from '../auth';
 import { TransparencyIndicator } from '../transparency';
 import { Brand } from './brand';
+import { PendingBell } from './pending-bell';
 import styles from './header.module.scss';
 
 /**
@@ -36,11 +37,12 @@ export function Header() {
       </Button>
 
       {/* Brand on móvil/tablet (the sidebar carries it on escritorio) */}
-      <Brand className="lg:hidden" />
+      <Brand className="lg:hidden" to="/inicio" />
 
       {/* Persistent transparency indicator (§M14) */}
       <div className={styles.topbar__actions}>
         <TransparencyIndicator />
+        <PendingBell />
 
         {user && (
           <div className={styles.topbar__user}>

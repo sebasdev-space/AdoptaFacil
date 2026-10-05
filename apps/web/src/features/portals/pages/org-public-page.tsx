@@ -340,7 +340,10 @@ export function OrgPublicPage({ slugOverride }: OrgPublicPageProps = {}) {
 
             {hasContactInfo && contact && (
               <section id="portal-contact-info" style={{ scrollMarginTop: '5rem' }}>
-                <PortalContactInfoSection contact={contact} />
+                <PortalContactInfoSection
+                  contact={contact}
+                  location={view.profile.organization.location}
+                />
               </section>
             )}
 

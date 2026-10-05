@@ -160,6 +160,104 @@ describe('Sidebar — MENU-SUBMENUS collapsible groups', () => {
     expect(within(sidebar).queryByRole('link', { name: 'Mis donaciones' })).not.toBeInTheDocument();
   });
 
+  it('el menú sigue el orden pedido: Inicio, Documentos, Donaciones, Animales, Adopciones, Apadrinamientos, Voluntariado, Banco de recursos, Comunidad, Campañas, Marketplace, Reseñas', async () => {
+    stubGenericFetch();
+    renderShell({ route: '/inicio', ...sessionWith([Role.Owner]) });
+
+    const sidebar = screen.getByTestId('org-sidebar');
+    await within(sidebar).findByRole('button', { name: 'Donaciones' });
+    const nav = within(sidebar).getByRole('navigation', { name: 'Navegación principal' });
+    const labels = Array.from(nav.children).map((el) =>
+      (el.textContent ?? '').replace(/\s+/g, ' ').trim(),
+    );
+    const order = [
+      'Inicio',
+      'Documentos',
+      'Donaciones',
+      'Animales',
+      'Adopciones',
+      'Apadrinamientos',
+      'Voluntariado',
+      'Banco de recursos',
+      'Comunidad',
+      'Campañas',
+      'Marketplace',
+      'Reseñas',
+    ];
+    const positions = order.map((name) => labels.findIndex((label) => label.startsWith(name)));
+    expect(positions.every((position) => position >= 0)).toBe(true);
+    expect([...positions].sort((x, y) => x - y)).toEqual(positions);
+  });
+
+  it('"Recordatorios" ya no es entrada del menú y "Inicio" se resalta en /recordatorios', async () => {
+    stubGenericFetch();
+    renderShell({ route: '/recordatorios', ...sessionWith([Role.Owner]) });
+
+    const sidebar = screen.getByTestId('org-sidebar');
+    const inicio = await within(sidebar).findByRole('link', { name: 'Inicio' });
+    expect(within(sidebar).queryByRole('link', { name: 'Recordatorios' })).not.toBeInTheDocument();
+    expect(inicio.className).toContain('active');
+  });
+
+  it('"Voluntariado" es un solo grupo desplegable con "Mi voluntariado" y "Gestión de voluntariado"', async () => {
+    stubGenericFetch();
+    renderShell({ route: '/inicio', ...sessionWith([Role.Owner]) });
+
+    const sidebar = screen.getByTestId('org-sidebar');
+    // Ya no hay dos entradas planas "Voluntariado" / "Mi voluntariado".
+    expect(
+      within(sidebar).queryByRole('link', { name: 'Mi voluntariado' }),
+    ).not.toBeInTheDocument();
+    const toggle = await within(sidebar).findByRole('button', { name: 'Voluntariado' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(toggle);
+
+    expect(within(sidebar).getByRole('link', { name: 'Mi voluntariado' })).toHaveAttribute(
+      'href',
+      '/voluntariado',
+    );
+    expect(within(sidebar).getByRole('link', { name: 'Gestión de voluntariado' })).toHaveAttribute(
+      'href',
+      '/organizacion/voluntariado',
+    );
+  });
+
+  it('un rol sin gestión de voluntariado (Volunteer) solo ve "Mi voluntariado" dentro del grupo', async () => {
+    stubGenericFetch();
+    renderShell({ route: '/inicio', ...sessionWith([Role.Volunteer]) });
+
+    const sidebar = screen.getByTestId('org-sidebar');
+    fireEvent.click(await within(sidebar).findByRole('button', { name: 'Voluntariado' }));
+
+    expect(within(sidebar).getByRole('link', { name: 'Mi voluntariado' })).toBeInTheDocument();
+    expect(
+      within(sidebar).queryByRole('link', { name: 'Gestión de voluntariado' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('"Donaciones y campañas" ya no es una entrada del menú (vive dentro de Inicio)', async () => {
+    stubGenericFetch();
+    renderShell({ route: '/inicio', ...sessionWith([Role.Owner]) });
+
+    const sidebar = screen.getByTestId('org-sidebar');
+    await within(sidebar).findByRole('button', { name: 'Donaciones' });
+    expect(
+      within(sidebar).queryByRole('link', { name: 'Donaciones y campañas' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('el logo del menú lleva a /inicio', async () => {
+    stubGenericFetch();
+    renderShell({ route: '/adopciones', ...sessionWith([Role.Owner]) });
+
+    const sidebar = screen.getByTestId('org-sidebar');
+    expect(within(sidebar).getByRole('link', { name: 'Ir al inicio' })).toHaveAttribute(
+      'href',
+      '/inicio',
+    );
+  });
+
   it('auto-expands "Apadrinamientos" and marks the active child when its route is current', async () => {
     stubGenericFetch();
     renderShell({ route: '/organizacion/apadrinamientos', ...sessionWith([Role.Owner]) });

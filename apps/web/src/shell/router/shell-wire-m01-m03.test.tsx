@@ -115,7 +115,8 @@ describe('T-031 · menu reflects the role (first barrier)', () => {
       expect(within(nav()).getByRole('link', { name: 'Animales' })).toBeInTheDocument(),
     );
     expect(within(nav()).getByRole('link', { name: 'Documentos' })).toBeInTheDocument();
-    expect(within(nav()).getByRole('link', { name: 'Recordatorios' })).toBeInTheDocument();
+    // "Recordatorios" salió del menú: vive en la campana de pendientes del encabezado.
+    expect(within(nav()).queryByRole('link', { name: 'Recordatorios' })).not.toBeInTheDocument();
     expect(
       within(nav()).queryByRole('link', { name: 'Revisión de documentos' }),
     ).not.toBeInTheDocument();
