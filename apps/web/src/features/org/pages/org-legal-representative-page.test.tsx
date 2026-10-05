@@ -67,6 +67,7 @@ const REGISTERED = {
   id: 'rep-1',
   organizationId: 'org-1',
   memberId: 'owner-1',
+  role: 'legal_representative',
   fullName: 'Ana Pérez',
   documentType: 'cedula_ciudadania',
   documentNumber: '123',
@@ -78,6 +79,14 @@ const REGISTERED = {
   createdAt: '2026-08-01T00:00:00.000Z',
 };
 
+const REGISTERED_ACCOUNTANT = {
+  ...REGISTERED,
+  id: 'rep-acct-1',
+  role: 'accountant',
+  fullName: 'Carlos Contador',
+  position: 'Contador',
+};
+
 beforeEach(() => stubCanvasContext2D());
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -85,31 +94,49 @@ afterEach(() => {
 });
 
 describe('OrgLegalRepresentativePage (M01, S-1)', () => {
-  it('shows an empty state + registration form for the Owner when none is registered yet', async () => {
-    stubFetch(() => null);
+  it('shows an empty slot per role + registration form for the Owner when none is registered yet', async () => {
+    stubFetch(() => []);
     renderShell({ route: '/organizacion/representante-legal', ...sessionWith([Role.Owner]) });
 
     expect(
-      await screen.findByText('Aún no has registrado un representante legal'),
+      await screen.findByText('Aún no se ha registrado un representante legal.'),
     ).toBeInTheDocument();
+    expect(screen.getByText('Aún no se ha registrado un contador.')).toBeInTheDocument();
+    expect(screen.getByText('Aún no se ha registrado un revisor fiscal.')).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: 'Registrar representante legal' }),
     ).toBeInTheDocument();
   });
 
   it('shows the CURRENT representative as "Vigente" when one already exists', async () => {
-    stubFetch(() => REGISTERED);
+    stubFetch((url) => (url.includes('/org/legal-representative') ? [REGISTERED] : []));
     renderShell({ route: '/organizacion/representante-legal', ...sessionWith([Role.Owner]) });
 
     expect(await screen.findByText('Ana Pérez')).toBeInTheDocument();
     expect(screen.getByText('Vigente')).toBeInTheDocument();
-    // "Representante legal" appears both as the page title (PageHeader) and as
-    // the card's `position` text — assert at least the card's own occurrence.
-    expect(screen.getAllByText('Representante legal').length).toBeGreaterThanOrEqual(2);
+    // The other two roles stay unregistered — registering one never fills in the rest.
+    expect(screen.getByText('Aún no se ha registrado un contador.')).toBeInTheDocument();
+    expect(screen.getByText('Aún no se ha registrado un revisor fiscal.')).toBeInTheDocument();
+  });
+
+  it('keeps BOTH the legal representative and the accountant vigente at the same time (requerimiento #16)', async () => {
+    // Scope the array response to THIS endpoint only — a blanket stub would
+    // also hand it to unrelated shell calls (e.g. `/clinical-reminders`,
+    // which expects an array of reminder objects, not legal representatives).
+    stubFetch((url) => {
+      if (url.includes('/org/legal-representative')) return [REGISTERED, REGISTERED_ACCOUNTANT];
+      return [];
+    });
+    renderShell({ route: '/organizacion/representante-legal', ...sessionWith([Role.Owner]) });
+
+    expect(await screen.findByText('Ana Pérez')).toBeInTheDocument();
+    expect(screen.getByText('Carlos Contador')).toBeInTheDocument();
+    expect(screen.getAllByText('Vigente')).toHaveLength(2);
+    expect(screen.getByText('Aún no se ha registrado un revisor fiscal.')).toBeInTheDocument();
   });
 
   it('hides the registration form entirely for a non-Owner (Administrator) — read-only', async () => {
-    stubFetch(() => REGISTERED);
+    stubFetch((url) => (url.includes('/org/legal-representative') ? [REGISTERED] : []));
     renderShell({
       route: '/organizacion/representante-legal',
       ...sessionWith([Role.Administrator]),
@@ -123,18 +150,18 @@ describe('OrgLegalRepresentativePage (M01, S-1)', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('registers via an uploaded signature image and shows the new record as vigente', async () => {
+  it('registers via an uploaded signature image, sends the selected role, and shows the new record as vigente', async () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     stubFetch((url, init) => {
       calls.push({ url, init });
       if (init?.method === 'POST') {
         return { ...REGISTERED, id: 'rep-2', fullName: 'Nuevo Representante' };
       }
-      return null; // GET on mount: nothing registered yet
+      return []; // GET on mount: nothing registered yet
     });
     renderShell({ route: '/organizacion/representante-legal', ...sessionWith([Role.Owner]) });
 
-    await screen.findByText('Aún no has registrado un representante legal');
+    await screen.findByText('Aún no se ha registrado un representante legal.');
     fireEvent.change(screen.getByLabelText('Nombre completo'), {
       target: { value: 'Nuevo Representante' },
     });
@@ -158,6 +185,7 @@ describe('OrgLegalRepresentativePage (M01, S-1)', () => {
       return found;
     });
     const body = JSON.parse(String(post?.init?.body));
+    expect(body.role).toBe('legal_representative');
     expect(body.fullName).toBe('Nuevo Representante');
     expect(body.signatureBase64).toEqual(expect.any(String));
     expect(body.signatureBase64.length).toBeGreaterThan(0);
@@ -165,11 +193,54 @@ describe('OrgLegalRepresentativePage (M01, S-1)', () => {
     expect(await screen.findByText('Representante legal registrado')).toBeInTheDocument();
   });
 
-  it('blocks submitting without a signature, with a clear message', async () => {
-    stubFetch(() => null);
+  it('registering the accountant while a legal representative is already vigente does NOT replace it', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    stubFetch((url, init) => {
+      calls.push({ url, init });
+      if (init?.method === 'POST') return REGISTERED_ACCOUNTANT;
+      // GET on mount: legal representative already vigente — scoped to this
+      // endpoint only, so unrelated shell calls (e.g. `/clinical-reminders`)
+      // don't receive a legal-representative payload as their own list.
+      return url.includes('/org/legal-representative') ? [REGISTERED] : [];
+    });
     renderShell({ route: '/organizacion/representante-legal', ...sessionWith([Role.Owner]) });
 
-    await screen.findByText('Aún no has registrado un representante legal');
+    await screen.findByText('Ana Pérez');
+    fireEvent.change(screen.getByLabelText('Tipo de firmante'), {
+      target: { value: 'accountant' },
+    });
+    fireEvent.change(screen.getByLabelText('Nombre completo'), {
+      target: { value: 'Carlos Contador' },
+    });
+    fireEvent.change(screen.getByLabelText('Número de documento'), { target: { value: '777' } });
+    fireEvent.change(screen.getByLabelText('Cargo'), { target: { value: 'Contador' } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Subir imagen' }));
+    const file = new File(['fake-signature-bytes'], 'firma.png', { type: 'image/png' });
+    fireEvent.change(screen.getByLabelText('Subir imagen de la firma'), {
+      target: { files: [file] },
+    });
+    await screen.findByText('✓ Firma lista');
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar contador' }));
+
+    const post = await waitFor(() => {
+      const found = calls.find((c) => c.init?.method === 'POST');
+      expect(found).toBeDefined();
+      return found;
+    });
+    expect(JSON.parse(String(post?.init?.body)).role).toBe('accountant');
+
+    // Both are now shown as vigente — the new accountant did not replace Ana Pérez.
+    expect(await screen.findByText('Carlos Contador')).toBeInTheDocument();
+    expect(screen.getByText('Ana Pérez')).toBeInTheDocument();
+    expect(screen.getAllByText('Vigente')).toHaveLength(2);
+  });
+
+  it('blocks submitting without a signature, with a clear message', async () => {
+    stubFetch(() => []);
+    renderShell({ route: '/organizacion/representante-legal', ...sessionWith([Role.Owner]) });
+
+    await screen.findByText('Aún no se ha registrado un representante legal.');
     fireEvent.change(screen.getByLabelText('Nombre completo'), { target: { value: 'X' } });
     fireEvent.change(screen.getByLabelText('Número de documento'), { target: { value: '1' } });
     fireEvent.change(screen.getByLabelText('Cargo'), { target: { value: 'X' } });

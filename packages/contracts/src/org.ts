@@ -546,6 +546,21 @@ export type LegalRepresentativeDocumentType =
   'cedula_ciudadania' | 'cedula_extranjeria' | 'pasaporte';
 
 /**
+ * What kind of signer this record is (requerimiento #16): an organization may
+ * register ONE CURRENT signer per role at the same time — registering a new
+ * `accountant` never replaces the `legal_representative`, and vice versa.
+ * "Vigente" is computed per role (latest `signedAt` WHERE role = X), not per
+ * organization.
+ *
+ * TODO(client): the AUTHORITATIVE catalog is a business decision the base
+ * document does not enumerate — this is a minimal, extensible starter set
+ * (same convention as {@link LegalRepresentativeDocumentType}). String values
+ * are stable; `legal_representative` is the default for rows created before
+ * this field existed.
+ */
+export type LegalRepresentativeRole = 'legal_representative' | 'accountant' | 'fiscal_reviewer';
+
+/**
  * Lifecycle state of a legal representative record. Only `'active'` is written
  * today — the document base does not define a revocation flow, so this is kept
  * as a single stable value on purpose rather than inventing states (`revoked`,
@@ -554,7 +569,8 @@ export type LegalRepresentativeDocumentType =
 export type LegalRepresentativeStatus = 'active';
 
 /**
- * The organization's legal representative + their electronic signature (S-1).
+ * The organization's legal representative (or accountant / fiscal reviewer —
+ * see {@link LegalRepresentativeRole}) + their electronic signature (S-1).
  * Simple electronic signature (drawn/traced or an uploaded image) — no
  * biometrics, no certified digital signature (RNF10, Ley 527/1999 scope for
  * this MVP). `memberId` is the `User` who registered it — only an Owner may
@@ -566,6 +582,9 @@ export interface LegalRepresentative {
   organizationId: string;
   /** The `User` account (Owner) this signature belongs to. */
   memberId: string;
+  /** Which kind of signer this is — an org can have one CURRENT record per
+   *  role at once (requerimiento #16). */
+  role: LegalRepresentativeRole;
   fullName: string;
   documentType: LegalRepresentativeDocumentType;
   documentNumber: string;
@@ -584,10 +603,12 @@ export interface LegalRepresentative {
   createdAt: string;
 }
 
-/** Register (or re-register, replacing the current one) the org's legal
- *  representative. Always a full submission — there is no partial-update
- *  endpoint; a "change of representative" is simply registering a new one. */
+/** Register (or re-register, replacing the current one OF THE SAME `role`)
+ *  a signer for the org. Always a full submission — there is no partial-update
+ *  endpoint; a "change of representative/accountant/fiscal reviewer" is simply
+ *  registering a new one under that same role. */
 export interface RegisterLegalRepresentativeInput {
+  role: LegalRepresentativeRole;
   fullName: string;
   documentType: LegalRepresentativeDocumentType;
   documentNumber: string;
@@ -614,6 +635,12 @@ export interface LegalRepresentativeSummary {
   signatureFileRef: string;
   signatureHash: string;
 }
+
+/** Result shape of `GET /org/legal-representative` (requerimiento #16): one
+ *  entry per `role` the organization has EVER registered, each the most
+ *  recently signed row for that role — never more than one per role, never
+ *  replacing another role's entry. */
+export type LegalRepresentativesByRole = LegalRepresentative[];
 
 // ============================================================================
 // Organization duplicate detection (M01, S-3). No explicit RF in the base

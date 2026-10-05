@@ -3,6 +3,7 @@ import type { LegalRepresentative as LegalRepresentativeRow } from '@prisma/clie
 import {
   type LegalRepresentative,
   type LegalRepresentativeDocumentType,
+  type LegalRepresentativeRole,
   type LegalRepresentativeStatus,
   type RegisterLegalRepresentativeInput,
 } from '@adoptafacil/contracts';
@@ -34,6 +35,7 @@ function toContract(row: LegalRepresentativeRow): LegalRepresentative {
     id: row.id,
     organizationId: row.organizationId,
     memberId: row.memberId,
+    role: row.role as LegalRepresentativeRole,
     fullName: row.fullName,
     documentType: row.documentType as LegalRepresentativeDocumentType,
     documentNumber: row.documentNumber,
@@ -72,11 +74,17 @@ export class LegalRepresentativeService {
   }
 
   /**
-   * Register (or re-register, e.g. a change of representative) the CALLER's
-   * own signature. `memberId` is ALWAYS the authenticated actor, never a
-   * client-supplied id — combined with the controller's `@Roles(Role.Owner)`
-   * gate, this makes "only the Owner can create/update THEIR OWN signature"
-   * structurally true rather than an extra check to remember.
+   * Register (or re-register, e.g. a change of representative/accountant/
+   * fiscal reviewer) the CALLER's own signature UNDER `input.role`. `memberId`
+   * is ALWAYS the authenticated actor, never a client-supplied id — combined
+   * with the controller's `@Roles(Role.Owner)` gate, this makes "only the
+   * Owner can create/update THEIR OWN signature" structurally true rather
+   * than an extra check to remember.
+   *
+   * Requerimiento #16: registering a role never replaces another role's
+   * current record — "vigente" is scoped to `(organizationId, role)`, so an
+   * org can keep a legal representative, an accountant, AND a fiscal reviewer
+   * all current at once, each independently re-signable.
    *
    * The signature is encrypted (AES-256-GCM) BEFORE it ever reaches
    * StoragePort — no plaintext bytes are written anywhere, not even
@@ -110,6 +118,7 @@ export class LegalRepresentativeService {
         data: {
           organizationId,
           memberId: actorUserId,
+          role: input.role,
           fullName: input.fullName.trim(),
           documentType: input.documentType,
           documentNumber: input.documentNumber.trim(),
@@ -127,43 +136,64 @@ export class LegalRepresentativeService {
         entityType: 'legal_representative',
         entityId: row.id,
         // Metadata only — NEVER the signature bytes/content, only identifiers.
-        metadata: { fullName: row.fullName, position: row.position },
+        metadata: { role: row.role, fullName: row.fullName, position: row.position },
       });
 
       return toContract(row);
     });
   }
 
-  /** The CURRENT (most recently signed) legal representative for the caller's
-   *  org, or `null` when none has been registered yet. */
-  async getCurrent(): Promise<LegalRepresentative | null> {
+  /** The CURRENT (most recently signed) record for EACH role the caller's org
+   *  has ever registered — at most one entry per role, never empty slots for
+   *  roles nobody has registered yet (requerimiento #16). */
+  async getAllCurrent(): Promise<LegalRepresentative[]> {
     const organizationId = this.requireOrgId();
-    const row = await this.prisma.withOrgContext(organizationId, (tx) =>
-      tx.legalRepresentative.findFirst({
+    return this.prisma.withOrgContext(organizationId, async (tx) => {
+      const latestPerRole = await tx.legalRepresentative.groupBy({
+        by: ['role'],
         where: { organizationId },
-        orderBy: { signedAt: 'desc' },
-      }),
-    );
-    return row ? toContract(row) : null;
+        _max: { signedAt: true },
+      });
+      if (latestPerRole.length === 0) {
+        return [];
+      }
+      const rows = await tx.legalRepresentative.findMany({
+        where: {
+          organizationId,
+          OR: latestPerRole.map((group) => ({
+            role: group.role,
+            signedAt: group._max.signedAt ?? undefined,
+          })),
+        },
+        orderBy: { role: 'asc' },
+      });
+      return rows.map(toContract);
+    });
   }
 
   /**
-   * Same lookup as {@link getCurrent}, but by an EXPLICIT `organizationId`
-   * instead of the caller's own tenant context — for a cross-module reader
-   * that renders ANOTHER organization's official document (e.g. M08's
-   * volunteer certificate, viewed by the cross-tenant volunteer themselves,
-   * who has no tenant context matching the issuing org). Also decrypts the
-   * signature image here, so the encryption key never leaves this service.
+   * Same lookup as {@link getAllCurrent}, scoped to ONE role, but by an
+   * EXPLICIT `organizationId` instead of the caller's own tenant context —
+   * for a cross-module reader that renders ANOTHER organization's official
+   * document (e.g. M08's volunteer certificate, viewed by the cross-tenant
+   * volunteer themselves, who has no tenant context matching the issuing
+   * org). Also decrypts the signature image here, so the encryption key never
+   * leaves this service. Defaults to `'legal_representative'` — the only role
+   * that existed before requerimiento #16 — so existing callers don't need to
+   * change.
    *
-   * Returns `null` — never throws — when no legal representative has been
+   * Returns `null` — never throws — when no signer of that role has been
    * registered, or if the stored bytes fail to decrypt (tampered/corrupted):
    * a broken signature must never take down certificate generation; the
    * caller falls back to a generic "Representante Legal" placeholder.
    */
-  async getCurrentSignerForOrg(organizationId: string): Promise<LegalRepresentativeSigner | null> {
+  async getCurrentSignerForOrg(
+    organizationId: string,
+    role: LegalRepresentativeRole = 'legal_representative',
+  ): Promise<LegalRepresentativeSigner | null> {
     const row = await this.prisma.withOrgContext(organizationId, (tx) =>
       tx.legalRepresentative.findFirst({
-        where: { organizationId },
+        where: { organizationId, role },
         orderBy: { signedAt: 'desc' },
       }),
     );

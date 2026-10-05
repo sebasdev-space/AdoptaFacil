@@ -59,8 +59,14 @@ describe('Legal representative signature (M01, S-1)', () => {
     'base64',
   );
 
-  const register = (token: string, fullName = 'Ana Pérez', signatureBase64 = SIGNATURE_BASE64) =>
+  const register = (
+    token: string,
+    fullName = 'Ana Pérez',
+    signatureBase64 = SIGNATURE_BASE64,
+    role: 'legal_representative' | 'accountant' | 'fiscal_reviewer' = 'legal_representative',
+  ) =>
     request(server).post('/org/legal-representative').set('Authorization', `Bearer ${token}`).send({
+      role,
       fullName,
       documentType: 'cedula_ciudadania',
       documentNumber: '123456789',
@@ -93,6 +99,7 @@ describe('Legal representative signature (M01, S-1)', () => {
     expect(res.body).toMatchObject({
       organizationId: owner.orgId,
       memberId: owner.userId,
+      role: 'legal_representative',
       fullName: 'Ana Pérez',
       documentType: 'cedula_ciudadania',
       documentNumber: '123456789',
@@ -108,9 +115,11 @@ describe('Legal representative signature (M01, S-1)', () => {
     expect(res.body).not.toHaveProperty('signatureBase64');
   });
 
-  it('the Owner can read it back via GET /org/legal-representative', async () => {
+  it('the Owner can read it back via GET /org/legal-representative (one entry per role)', async () => {
     const res = await getCurrent(owner.token).expect(200);
-    expect(res.body.fullName).toBe('Ana Pérez');
+    expect(Array.isArray(res.body)).toBe(true);
+    const legalRep = res.body.find((r: { role: string }) => r.role === 'legal_representative');
+    expect(legalRep?.fullName).toBe('Ana Pérez');
   });
 
   it('rejects registration from a non-Owner (Administrator) with 403 (deny-by-default)', async () => {
@@ -131,13 +140,74 @@ describe('Legal representative signature (M01, S-1)', () => {
     expect(second.body.id).not.toBe(first.body.id);
 
     const current = await getCurrent(owner.token).expect(200);
-    expect(current.body.fullName).toBe('Segundo Representante');
+    const legalRep = current.body.find((r: { role: string }) => r.role === 'legal_representative');
+    expect(legalRep?.fullName).toBe('Segundo Representante');
 
     const allRows = await admin.legalRepresentative.findMany({
       where: { organizationId: owner.orgId },
     });
     expect(allRows.some((r) => r.id === first.body.id)).toBe(true);
     expect(allRows.some((r) => r.id === second.body.id)).toBe(true);
+  });
+
+  it('requerimiento #16: registering an accountant and a fiscal reviewer never replaces the legal representative — all three stay vigente', async () => {
+    const fresh = await actorWithRoles(['owner']);
+    const legalRep = await register(
+      fresh.token,
+      'Representante Vigente',
+      Buffer.from('firma rep').toString('base64'),
+      'legal_representative',
+    ).expect(201);
+    const accountant = await register(
+      fresh.token,
+      'Contador Vigente',
+      Buffer.from('firma contador').toString('base64'),
+      'accountant',
+    ).expect(201);
+    const fiscalReviewer = await register(
+      fresh.token,
+      'Revisor Vigente',
+      Buffer.from('firma revisor').toString('base64'),
+      'fiscal_reviewer',
+    ).expect(201);
+
+    const current = await getCurrent(fresh.token).expect(200);
+    expect(current.body).toHaveLength(3);
+    const byRole = Object.fromEntries(
+      current.body.map((r: { role: string; fullName: string; id: string }) => [r.role, r]),
+    );
+    expect(byRole.legal_representative).toMatchObject({
+      id: legalRep.body.id,
+      fullName: 'Representante Vigente',
+    });
+    expect(byRole.accountant).toMatchObject({
+      id: accountant.body.id,
+      fullName: 'Contador Vigente',
+    });
+    expect(byRole.fiscal_reviewer).toMatchObject({
+      id: fiscalReviewer.body.id,
+      fullName: 'Revisor Vigente',
+    });
+
+    // Re-registering the accountant replaces ONLY the accountant's vigente row.
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const newAccountant = await register(
+      fresh.token,
+      'Nuevo Contador',
+      Buffer.from('firma nuevo contador').toString('base64'),
+      'accountant',
+    ).expect(201);
+
+    const after = await getCurrent(fresh.token).expect(200);
+    expect(after.body).toHaveLength(3);
+    const afterByRole = Object.fromEntries(
+      after.body.map((r: { role: string; fullName: string; id: string }) => [r.role, r]),
+    );
+    expect(afterByRole.accountant.id).toBe(newAccountant.body.id);
+    expect(afterByRole.accountant.fullName).toBe('Nuevo Contador');
+    // Legal representative and fiscal reviewer are untouched.
+    expect(afterByRole.legal_representative.id).toBe(legalRep.body.id);
+    expect(afterByRole.fiscal_reviewer.id).toBe(fiscalReviewer.body.id);
   });
 
   it('records an append-only audit entry with metadata only — never the signature content', async () => {
@@ -151,6 +221,7 @@ describe('Legal representative signature (M01, S-1)', () => {
     });
     expect(auditRow).not.toBeNull();
     expect(auditRow?.metadata).toMatchObject({
+      role: 'legal_representative',
       fullName: 'Auditado',
       position: 'Representante legal',
     });
@@ -176,7 +247,7 @@ describe('Legal representative signature (M01, S-1)', () => {
     await register(auditor.token).expect(403);
   });
 
-  it('legal_representative_summary() — the narrow read M05 will consume — exposes ONLY fullName/position/signatureFileRef/signatureHash, and only the most recent record', async () => {
+  it('legal_representative_summary() — the narrow read M05 will consume — exposes ONLY fullName/position/signatureFileRef/signatureHash, and only the most recent record OF THE DEFAULT ROLE (legal_representative)', async () => {
     const fresh = await actorWithRoles(['owner']);
     const first = await register(
       fresh.token,
@@ -206,6 +277,32 @@ describe('Legal representative signature (M01, S-1)', () => {
     expect(rows[0].full_name).toBe('Representante Vigente');
     expect(rows[0].signature_hash).toBe(second.body.signatureHash);
     expect(rows[0].signature_hash).not.toBe(first.body.signatureHash);
+  });
+
+  it('legal_representative_summary() accepts an explicit p_role (requerimiento #16) and never mixes roles', async () => {
+    const fresh = await actorWithRoles(['owner']);
+    await register(
+      fresh.token,
+      'Representante Legal',
+      Buffer.from('firma rep').toString('base64'),
+      'legal_representative',
+    ).expect(201);
+    const accountant = await register(
+      fresh.token,
+      'Contador Vigente',
+      Buffer.from('firma contador').toString('base64'),
+      'accountant',
+    ).expect(201);
+
+    const rows = await admin.$queryRawUnsafe<Array<{ full_name: string; signature_hash: string }>>(
+      'SELECT * FROM legal_representative_summary($1::uuid, $2::text)',
+      fresh.orgId,
+      'accountant',
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].full_name).toBe('Contador Vigente');
+    expect(rows[0].signature_hash).toBe(accountant.body.signatureHash);
   });
 
   it('legal_representative_summary() returns no rows for an organization with none registered yet', async () => {

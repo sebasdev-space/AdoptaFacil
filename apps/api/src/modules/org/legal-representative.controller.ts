@@ -26,15 +26,18 @@ import { registerLegalRepresentativeSchema } from './legal-representative.schema
 export class LegalRepresentativeController {
   constructor(private readonly service: LegalRepresentativeService) {}
 
-  /** The org's current (most recently signed) legal representative, or `null`. */
+  /** The org's current (most recently signed) record for EACH registered role
+   *  — legal representative, accountant, fiscal reviewer (requerimiento #16),
+   *  at most one per role. Empty array when none has been registered yet. */
   @Get()
   @Roles(Role.Owner, Role.Administrator, Role.ReadOnlyAuditor)
-  getCurrent(): Promise<LegalRepresentative | null> {
-    return this.service.getCurrent();
+  getAllCurrent(): Promise<LegalRepresentative[]> {
+    return this.service.getAllCurrent();
   }
 
-  /** Register or re-register (change of representative) — always a full
-   *  submission; there is no partial-update endpoint. */
+  /** Register or re-register (change of representative/accountant/fiscal
+   *  reviewer, per `dto.role`) — always a full submission; there is no
+   *  partial-update endpoint. Never replaces another role's current record. */
   @Post()
   @HttpCode(201)
   @Roles(Role.Owner)

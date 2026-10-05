@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Role,
   type LegalRepresentative,
   type LegalRepresentativeDocumentType,
+  type LegalRepresentativeRole,
   type RegisterLegalRepresentativeInput,
 } from '@adoptafacil/contracts';
 import {
@@ -12,7 +14,6 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  EmptyState,
   Skeleton,
   useToast,
 } from '@adoptafacil/ui';
@@ -32,6 +33,22 @@ const DOCUMENT_TYPE_OPTIONS: { value: LegalRepresentativeDocumentType; label: st
   { value: 'pasaporte', label: 'Pasaporte' },
 ];
 
+/**
+ * Requerimiento #16: un rol por firmante que la organización puede mantener
+ * VIGENTE al mismo tiempo (registrar uno no reemplaza a los otros). TODO(client):
+ * catálogo no fijado por el documento base — mismo patrón extensible que
+ * `DOCUMENT_TYPE_OPTIONS`.
+ */
+const ROLE_OPTIONS: { value: LegalRepresentativeRole; label: string }[] = [
+  { value: 'legal_representative', label: 'Representante legal' },
+  { value: 'accountant', label: 'Contador' },
+  { value: 'fiscal_reviewer', label: 'Revisor fiscal' },
+];
+
+const ROLE_LABELS = Object.fromEntries(
+  ROLE_OPTIONS.map((option) => [option.value, option.label]),
+) as Record<LegalRepresentativeRole, string>;
+
 function formatCO(iso: string): string {
   return new Date(iso).toLocaleString('es-CO', { timeZone: 'America/Bogota' });
 }
@@ -49,18 +66,35 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-function CurrentRepresentativeCard({ rep }: { rep: LegalRepresentative }) {
+/** Una tarjeta por rol (requerimiento #16): muestra el registro vigente de ESE
+ *  rol, o un estado "sin registrar" — nunca mezcla ni reemplaza los demás. */
+function RepresentativeSlot({
+  role,
+  rep,
+}: {
+  role: LegalRepresentativeRole;
+  rep: LegalRepresentative | undefined;
+}) {
   return (
     <Card>
       <CardHeader>
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {ROLE_LABELS[role]}
+        </p>
         <CardTitle className="flex flex-wrap items-center gap-2">
-          {rep.fullName}
-          <Badge variant="success">Vigente</Badge>
+          {rep ? rep.fullName : 'Sin registrar'}
+          {rep && <Badge variant="success">Vigente</Badge>}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-1 text-sm text-muted-foreground">
-        <p>{rep.position}</p>
-        <p>Firmado el {formatCO(rep.signedAt)}</p>
+        {rep ? (
+          <>
+            <p>{rep.position}</p>
+            <p>Firmado el {formatCO(rep.signedAt)}</p>
+          </>
+        ) : (
+          <p>Aún no se ha registrado un {ROLE_LABELS[role].toLowerCase()}.</p>
+        )}
       </CardContent>
     </Card>
   );
@@ -68,11 +102,16 @@ function CurrentRepresentativeCard({ rep }: { rep: LegalRepresentative }) {
 
 /**
  * `/organizacion/representante-legal` (M01, S-1, RF14 relacionado / RNF10).
- * Cualquier miembro con acceso a esta ruta ve el representante vigente; solo
- * el Owner puede registrar uno nuevo (el backend es la autoridad real — este
+ * Cualquier miembro con acceso a esta ruta ve los firmantes vigentes; solo el
+ * Owner puede registrar uno nuevo (el backend es la autoridad real — este
  * gate de UI solo evita mostrar un formulario que de todos modos rechazaría).
- * Registrar de nuevo NO edita el anterior — crea un registro nuevo (append-
- * only), que es exactamente lo que hace falta para "cambio de representante".
+ *
+ * Requerimiento #16: la organización puede mantener un representante legal,
+ * un contador y un revisor fiscal vigentes AL MISMO TIEMPO — registrar uno de
+ * estos roles NUNCA reemplaza a los otros. Registrar de nuevo un mismo rol
+ * tampoco edita el anterior — crea un registro nuevo (append-only) que pasa a
+ * ser el vigente DE ESE ROL, que es exactamente lo que hace falta para
+ * "cambio de representante/contador/revisor fiscal".
  */
 export function OrgLegalRepresentativePage() {
   const client = useApiClient();
@@ -80,10 +119,11 @@ export function OrgLegalRepresentativePage() {
   const { toast } = useToast();
   const canRegister = hasRole(Role.Owner);
 
-  const [current, setCurrent] = useState<LegalRepresentative | null>(null);
+  const [current, setCurrent] = useState<LegalRepresentative[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
+  const [role, setRole] = useState<LegalRepresentativeRole>('legal_representative');
   const [fullName, setFullName] = useState('');
   const [documentType, setDocumentType] =
     useState<LegalRepresentativeDocumentType>('cedula_ciudadania');
@@ -94,10 +134,17 @@ export function OrgLegalRepresentativePage() {
   const [signatureContentType, setSignatureContentType] = useState('image/png');
   const [saving, setSaving] = useState(false);
 
+  const currentByRole = useMemo(() => {
+    const map = new Map<LegalRepresentativeRole, LegalRepresentative>();
+    for (const rep of current) map.set(rep.role, rep);
+    return map;
+  }, [current]);
+  const selectedRoleCurrent = currentByRole.get(role);
+
   useEffect(() => {
     let active = true;
     client
-      .request<LegalRepresentative | null>('/org/legal-representative')
+      .request<LegalRepresentative[]>('/org/legal-representative')
       .then((data) => {
         if (active) setCurrent(data);
       })
@@ -142,6 +189,7 @@ export function OrgLegalRepresentativePage() {
     setSaving(true);
     try {
       const body: RegisterLegalRepresentativeInput = {
+        role,
         fullName: fullName.trim(),
         documentType,
         documentNumber: documentNumber.trim(),
@@ -153,13 +201,13 @@ export function OrgLegalRepresentativePage() {
         method: 'POST',
         json: body,
       });
-      setCurrent(created);
+      setCurrent((previous) => [...previous.filter((rep) => rep.role !== created.role), created]);
       setFullName('');
       setDocumentNumber('');
       setPosition('');
       setSignatureBase64(null);
       toast({
-        title: 'Representante legal registrado',
+        title: `${ROLE_LABELS[created.role]} registrado`,
         description: 'Fabián lo usará para firmar los certificados de donación.',
         variant: 'success',
       });
@@ -180,6 +228,12 @@ export function OrgLegalRepresentativePage() {
         title="Representante legal"
         description="Quién firma los certificados de donación de tu organización (RF14) y su firma electrónica."
       />
+      <Link
+        to="/organizacion"
+        className="mb-4 inline-block text-sm text-muted-foreground underline-offset-4 hover:underline"
+      >
+        ← Volver a la organización
+      </Link>
 
       {loading && <Skeleton className="h-48 w-full" />}
       {loadError && !loading && (
@@ -188,26 +242,47 @@ export function OrgLegalRepresentativePage() {
 
       {!loading && (
         <div className="space-y-6">
-          {current ? (
-            <CurrentRepresentativeCard rep={current} />
-          ) : (
-            <EmptyState
-              title="Aún no has registrado un representante legal"
-              description="Sin este registro, los certificados de donación mostrarán un texto genérico en vez de un firmante real."
-            />
-          )}
+          <div className="grid gap-4 sm:grid-cols-3">
+            {ROLE_OPTIONS.map((option) => (
+              <RepresentativeSlot
+                key={option.value}
+                role={option.value}
+                rep={currentByRole.get(option.value)}
+              />
+            ))}
+          </div>
 
           {canRegister && (
             <Card>
               <CardHeader>
                 <CardTitle>
-                  {current
-                    ? 'Registrar un cambio de representante'
-                    : 'Registrar representante legal'}
+                  {selectedRoleCurrent
+                    ? `Registrar un cambio de ${ROLE_LABELS[role].toLowerCase()}`
+                    : `Registrar ${ROLE_LABELS[role].toLowerCase()}`}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <label
+                      htmlFor="legalrep-role"
+                      className="block text-sm font-medium text-foreground"
+                    >
+                      Tipo de firmante
+                    </label>
+                    <select
+                      id="legalrep-role"
+                      value={role}
+                      onChange={(event) => setRole(event.target.value as LegalRepresentativeRole)}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm sm:max-w-xs"
+                    >
+                      {ROLE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <TextField
                     id="legalrep-name"
                     label="Nombre completo"
@@ -308,7 +383,7 @@ export function OrgLegalRepresentativePage() {
                 </p>
 
                 <Button onClick={() => void handleSubmit()} disabled={saving}>
-                  {saving ? 'Guardando…' : 'Guardar representante legal'}
+                  {saving ? 'Guardando…' : `Guardar ${ROLE_LABELS[role].toLowerCase()}`}
                 </Button>
               </CardContent>
             </Card>
