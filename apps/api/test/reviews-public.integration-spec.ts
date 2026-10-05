@@ -93,6 +93,9 @@ describe('Reviews / portal público sin sesión (M12, S7-b)', () => {
   const queue = (token: string) =>
     request(server).get('/platform/reviews/queue').set('Authorization', `Bearer ${token}`);
 
+  const listOrgReviews = (token: string) =>
+    request(server).get('/reviews/org').set('Authorization', `Bearer ${token}`);
+
   let org: Actor;
   let otherOrgOwner: Actor;
   let platformAdmin: Actor;
@@ -156,6 +159,24 @@ describe('Reviews / portal público sin sesión (M12, S7-b)', () => {
     expect(list.body.items[0].authorName).toBeUndefined();
   });
 
+  it("the reviewed organization's Owner sees the public review via GET /reviews/org (fix: mark-spam had no read to find an id with)", async () => {
+    const mine = await listOrgReviews(org.token).expect(200);
+    expect(mine.body).toEqual([
+      expect.objectContaining({
+        organizationId: org.orgId,
+        rating: 4,
+        comment: 'Muy buen trabajo con los animales.',
+        status: 'approved',
+      }),
+    ]);
+    expect(mine.body[0].authorUserId).toBeUndefined();
+  });
+
+  it("GET /reviews/org never shows another organization's public reviews (tenant isolation)", async () => {
+    const other = await listOrgReviews(otherOrgOwner.token).expect(200);
+    expect(other.body).toEqual([]);
+  });
+
   it('never reaches the PlatformAdmin moderation queue — the Owner is its only moderator', async () => {
     const items = await queue(platformAdmin.token).expect(200);
     expect(items.body.some((r: { organizationId: string }) => r.organizationId === org.orgId)).toBe(
@@ -188,6 +209,13 @@ describe('Reviews / portal público sin sesión (M12, S7-b)', () => {
     });
     const list = await publicReviews(slug).expect(200);
     expect(list.body.items).toHaveLength(0);
+
+    // The Owner still sees it in their OWN list, now as "hidden" — gone from
+    // the public portal, but not erased from their view of it.
+    const mine = await listOrgReviews(org.token).expect(200);
+    expect(mine.body).toEqual([
+      expect.objectContaining({ status: 'hidden', rejectionReason: 'spam' }),
+    ]);
   });
 
   it('marking an already-hidden review as spam again is rejected', async () => {
@@ -221,5 +249,16 @@ describe('Reviews / portal público sin sesión (M12, S7-b)', () => {
     }).expect(201);
 
     await markSpam(org.token, created.body.id).expect(400);
+
+    // Same rule holds for the READ: the verified review belongs to this org
+    // too, yet GET /reviews/org never surfaces it — only PlatformAdmin's
+    // queue does.
+    const mine = await listOrgReviews(org.token).expect(200);
+    expect(mine.body.some((r: { id: string }) => r.id === created.body.id)).toBe(false);
+  });
+
+  it('a non-Owner/Administrator cannot read the org review list either (403, deny-by-default)', async () => {
+    const person = await registerPerson('sin-rol');
+    await listOrgReviews(person.token).expect(403);
   });
 });

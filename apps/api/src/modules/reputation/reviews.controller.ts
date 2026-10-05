@@ -49,6 +49,15 @@ export class ReviewsController {
     return this.service.listMine(actor);
   }
 
+  /** Lo que el Owner/Administrator necesita para poder usar `mark-spam`
+   *  abajo: sus propias reseñas PÚBLICAS (nunca las autenticadas — esas
+   *  siguen exclusivas de PlatformAdmin). */
+  @Get('org')
+  @Roles(Role.Owner, Role.Administrator)
+  listForOrg(): Promise<Review[]> {
+    return this.service.listForOrg();
+  }
+
   @Post(':id/mark-spam')
   @HttpCode(200)
   @Roles(Role.Owner, Role.Administrator)

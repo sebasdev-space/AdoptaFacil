@@ -11,6 +11,7 @@ import {
   MARKETPLACE_VIEW_ROLES,
   ORG_DOCUMENTS_ROLES,
   ORG_MEMBER_ROLES,
+  ORG_REVIEWS_ROLES,
   PLATFORM_ADMIN_DASHBOARD_ROLES,
   PLATFORM_DOCUMENTS_ROLES,
   PLATFORM_DUPLICATES_ROLES,
@@ -95,7 +96,11 @@ import {
   VolunteerOpportunitiesPage,
   VolunteerOpportunityDetailPage,
 } from '../../features/volunteering';
-import { MyReviewsPage, OrganizationReputationPage } from '../../features/reputation';
+import {
+  MyReviewsPage,
+  OrgReviewsPage,
+  OrganizationReputationPage,
+} from '../../features/reputation';
 
 /**
  * Route tree for the shell.
@@ -466,6 +471,19 @@ export function AppRoutes() {
             element={
               <RequireRoles roles={MARKETPLACE_VIEW_ROLES}>
                 <ProductDetailPage />
+              </RequireRoles>
+            }
+          />
+          {/* Fix (M12/S7-b) · lo que el Owner/Administrator necesita para poder
+              usar "marcar como spam": ver las reseñas públicas de su propia
+              organización primero (antes no había ningún lugar en la UI desde
+              donde encontrarlas). Gated a ORG_REVIEWS_ROLES, calcado del
+              @Roles real de `GET /reviews/org`. */}
+          <Route
+            path="organizacion/resenas"
+            element={
+              <RequireRoles roles={ORG_REVIEWS_ROLES}>
+                <OrgReviewsPage />
               </RequireRoles>
             }
           />

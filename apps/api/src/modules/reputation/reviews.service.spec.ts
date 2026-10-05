@@ -8,14 +8,16 @@ interface Harness {
   service: ReviewsService;
   queryRaw: jest.Mock;
   record: jest.Mock;
+  withTenant: jest.Mock;
 }
 
 function makeService(): Harness {
   const queryRaw = jest.fn();
   const record = jest.fn().mockResolvedValue({});
-  const prisma = { $queryRaw: queryRaw } as unknown as PrismaService;
+  const withTenant = jest.fn();
+  const prisma = { $queryRaw: queryRaw, withTenant } as unknown as PrismaService;
   const audit = { record } as unknown as AuditService;
-  return { service: new ReviewsService(prisma, audit), queryRaw, record };
+  return { service: new ReviewsService(prisma, audit), queryRaw, record, withTenant };
 }
 
 const actor: RequestUser = {
@@ -159,5 +161,36 @@ describe('ReviewsService.markSpam (S7-b — Owner moderation of PUBLIC reviews o
     await expect(h.service.markSpam(actor, 'rev-already-hidden')).rejects.toBeInstanceOf(
       BadRequestException,
     );
+  });
+});
+
+describe('ReviewsService.listForOrg (fix: the Owner had mark-spam but nothing to find an id with)', () => {
+  it('lists only PUBLIC (anonymous) reviews, tenant-scoped via withTenant — never the authenticated ones', async () => {
+    const h = makeService();
+    const findMany = jest.fn().mockResolvedValue([
+      {
+        id: 'rev-public-1',
+        organizationId: 'org-self',
+        authorUserId: null,
+        rating: 2,
+        comment: 'spam link',
+        isAnonymous: true,
+        status: 'approved',
+        moderatedByUserId: null,
+        moderatedAt: null,
+        rejectionReason: null,
+        createdAt: new Date('2026-09-29T00:00:00.000Z'),
+      },
+    ]);
+    h.withTenant.mockImplementation((fn: (tx: unknown) => unknown) => fn({ review: { findMany } }));
+
+    const result = await h.service.listForOrg();
+
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { authorUserId: null } }),
+    );
+    expect(result).toEqual([
+      expect.objectContaining({ id: 'rev-public-1', status: 'approved', authorUserId: undefined }),
+    ]);
   });
 });
