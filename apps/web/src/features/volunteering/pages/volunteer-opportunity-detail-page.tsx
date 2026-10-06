@@ -26,6 +26,7 @@ import { PageContainer, PageHeader } from '../../_layout';
 import { useApiClient } from '../../../shell/api';
 import { useSession } from '../../../shell/auth';
 import {
+  canIssueCertificate,
   ENROLLMENT_STATUS_LABELS,
   HOURS_STATUS_LABELS,
   enrollmentStatusVariant,
@@ -56,18 +57,37 @@ export function VolunteerOpportunityDetailPage() {
   const [rejectReason, setRejectReason] = useState('');
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [hours, setHours] = useState<ServiceHours[]>([]);
-  const [hoursLoading, setHoursLoading] = useState(false);
+  // Cargadas por inscripción (no solo la expandida): el botón "Emitir
+  // certificado" necesita saber el estado de las horas de CADA inscripción
+  // aceptada/completada para habilitarse correctamente, sin depender de que
+  // la organización haya abierto "Ver horas" primero. Una clave ausente =
+  // aún no cargadas (distinto de un array vacío = cargadas, sin horas).
+  const [hoursByEnrollment, setHoursByEnrollment] = useState<Record<string, ServiceHours[]>>({});
   const [rejectingHoursId, setRejectingHoursId] = useState<string | null>(null);
   const [rejectHoursReason, setRejectHoursReason] = useState('');
   const [certificates, setCertificates] = useState<Record<string, VolunteerCertificate>>({});
+
+  const fetchHoursFor = async (enrollmentId: string): Promise<ServiceHours[]> => {
+    const page = await client.request<Partial<Paginated<ServiceHours>>>(
+      `/service-hours?enrollmentId=${encodeURIComponent(enrollmentId)}&limit=100`,
+    );
+    return Array.isArray(page?.items) ? page.items : [];
+  };
+
+  const refreshHoursFor = async (enrollmentId: string): Promise<void> => {
+    const entries = await fetchHoursFor(enrollmentId);
+    setHoursByEnrollment((prev) => ({ ...prev, [enrollmentId]: entries }));
+  };
 
   const loadEnrollments = async (): Promise<void> => {
     if (!id) return;
     const page = await client.request<Partial<Paginated<VolunteerEnrollment>>>(
       `/volunteer-enrollments?opportunityId=${encodeURIComponent(id)}&limit=100`,
     );
-    setEnrollments(Array.isArray(page?.items) ? page.items : []);
+    const rows = Array.isArray(page?.items) ? page.items : [];
+    setEnrollments(rows);
+    const relevant = rows.filter((e) => e.status === 'accepted' || e.status === 'completed');
+    await Promise.all(relevant.map((e) => refreshHoursFor(e.id)));
   };
 
   useEffect(() => {
@@ -120,21 +140,8 @@ export function VolunteerOpportunityDetailPage() {
     }
   };
 
-  const toggleHours = async (enrollmentId: string): Promise<void> => {
-    if (expandedId === enrollmentId) {
-      setExpandedId(null);
-      return;
-    }
-    setExpandedId(enrollmentId);
-    setHoursLoading(true);
-    try {
-      const page = await client.request<Partial<Paginated<ServiceHours>>>(
-        `/service-hours?enrollmentId=${encodeURIComponent(enrollmentId)}&limit=100`,
-      );
-      setHours(Array.isArray(page?.items) ? page.items : []);
-    } finally {
-      setHoursLoading(false);
-    }
+  const toggleHours = (enrollmentId: string): void => {
+    setExpandedId((current) => (current === enrollmentId ? null : enrollmentId));
   };
 
   const decideHours = async (
@@ -149,7 +156,7 @@ export function VolunteerOpportunityDetailPage() {
       });
       setRejectingHoursId(null);
       setRejectHoursReason('');
-      await toggleHoursRefresh(enrollmentId);
+      await refreshHoursFor(enrollmentId);
       toast({
         title: dto.decision === 'approve' ? 'Horas aprobadas' : 'Horas rechazadas',
         variant: 'success',
@@ -161,13 +168,6 @@ export function VolunteerOpportunityDetailPage() {
         variant: 'destructive',
       });
     }
-  };
-
-  const toggleHoursRefresh = async (enrollmentId: string): Promise<void> => {
-    const page = await client.request<Partial<Paginated<ServiceHours>>>(
-      `/service-hours?enrollmentId=${encodeURIComponent(enrollmentId)}&limit=100`,
-    );
-    setHours(Array.isArray(page?.items) ? page.items : []);
   };
 
   const issueCertificate = async (enrollmentId: string): Promise<void> => {
@@ -297,106 +297,131 @@ export function VolunteerOpportunityDetailPage() {
 
                       {(enrollment.status === 'accepted' || enrollment.status === 'completed') && (
                         <div className="space-y-3">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => void toggleHours(enrollment.id)}
-                          >
-                            {expandedId === enrollment.id ? 'Ocultar horas' : 'Ver horas'}
-                          </Button>
+                          {(() => {
+                            const entries = hoursByEnrollment[enrollment.id];
+                            const hoursLoaded = entries !== undefined;
+                            const canIssue = hoursLoaded && canIssueCertificate(entries);
+                            return (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => toggleHours(enrollment.id)}
+                                >
+                                  {expandedId === enrollment.id ? 'Ocultar horas' : 'Ver horas'}
+                                </Button>
 
-                          {expandedId === enrollment.id && (
-                            <div className="space-y-2 rounded-md border p-3">
-                              {hoursLoading && <Skeleton className="h-16 w-full" />}
-                              {!hoursLoading && hours.length === 0 && (
-                                <p className="text-xs text-muted-foreground">
-                                  Aún no hay horas registradas.
-                                </p>
-                              )}
-                              {!hoursLoading &&
-                                hours.map((entry) => (
-                                  <div
-                                    key={entry.id}
-                                    className="flex flex-wrap items-center justify-between gap-2 border-b pb-2 last:border-0"
-                                  >
-                                    <div>
-                                      <p>
-                                        {formatBogota(entry.date)} · {formatHours(entry.hours)}
-                                      </p>
+                                {expandedId === enrollment.id && (
+                                  <div className="space-y-2 rounded-md border p-3">
+                                    {!hoursLoaded && <Skeleton className="h-16 w-full" />}
+                                    {hoursLoaded && entries.length === 0 && (
                                       <p className="text-xs text-muted-foreground">
-                                        {entry.description}
+                                        Aún no hay horas registradas.
                                       </p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <Badge variant={hoursStatusVariant(entry.status)}>
-                                        {HOURS_STATUS_LABELS[entry.status]}
-                                      </Badge>
-                                      {canManage && entry.status === 'pending' && (
-                                        <>
-                                          <Button
-                                            size="sm"
-                                            onClick={() =>
-                                              void decideHours(entry.id, enrollment.id, {
-                                                decision: 'approve',
-                                              })
-                                            }
-                                          >
-                                            Aprobar
-                                          </Button>
-                                          {rejectingHoursId === entry.id ? (
-                                            <>
-                                              <Input
-                                                placeholder="Motivo"
-                                                value={rejectHoursReason}
-                                                onChange={(e) =>
-                                                  setRejectHoursReason(e.target.value)
-                                                }
-                                                className="h-9 w-40"
-                                              />
-                                              <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() =>
-                                                  void decideHours(entry.id, enrollment.id, {
-                                                    decision: 'reject',
-                                                    reason: rejectHoursReason,
-                                                  })
-                                                }
-                                              >
-                                                Confirmar
-                                              </Button>
-                                            </>
-                                          ) : (
-                                            <Button
-                                              size="sm"
-                                              variant="outline"
-                                              onClick={() => setRejectingHoursId(entry.id)}
-                                            >
-                                              Rechazar
-                                            </Button>
-                                          )}
-                                        </>
+                                    )}
+                                    {hoursLoaded &&
+                                      entries.map((entry) => (
+                                        <div
+                                          key={entry.id}
+                                          className="flex flex-wrap items-center justify-between gap-2 border-b pb-2 last:border-0"
+                                        >
+                                          <div>
+                                            <p>
+                                              {formatBogota(entry.date)} ·{' '}
+                                              {formatHours(entry.hours)}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                              {entry.description}
+                                            </p>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            <Badge variant={hoursStatusVariant(entry.status)}>
+                                              {HOURS_STATUS_LABELS[entry.status]}
+                                            </Badge>
+                                            {canManage && entry.status === 'pending' && (
+                                              <>
+                                                <Button
+                                                  size="sm"
+                                                  onClick={() =>
+                                                    void decideHours(entry.id, enrollment.id, {
+                                                      decision: 'approve',
+                                                    })
+                                                  }
+                                                >
+                                                  Aprobar
+                                                </Button>
+                                                {rejectingHoursId === entry.id ? (
+                                                  <>
+                                                    <Input
+                                                      placeholder="Motivo"
+                                                      value={rejectHoursReason}
+                                                      onChange={(e) =>
+                                                        setRejectHoursReason(e.target.value)
+                                                      }
+                                                      className="h-9 w-40"
+                                                    />
+                                                    <Button
+                                                      size="sm"
+                                                      variant="outline"
+                                                      onClick={() =>
+                                                        void decideHours(entry.id, enrollment.id, {
+                                                          decision: 'reject',
+                                                          reason: rejectHoursReason,
+                                                        })
+                                                      }
+                                                    >
+                                                      Confirmar
+                                                    </Button>
+                                                  </>
+                                                ) : (
+                                                  <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => setRejectingHoursId(entry.id)}
+                                                  >
+                                                    Rechazar
+                                                  </Button>
+                                                )}
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                  </div>
+                                )}
+
+                                {canManage &&
+                                  (certificates[enrollment.id] ? (
+                                    <p className="text-xs text-muted-foreground">
+                                      Certificado emitido:{' '}
+                                      {certificates[enrollment.id].totalApprovedHours} horas
+                                      efectivas.
+                                    </p>
+                                  ) : (
+                                    <div className="space-y-1">
+                                      <Button
+                                        size="sm"
+                                        disabled={!canIssue}
+                                        onClick={() => void issueCertificate(enrollment.id)}
+                                      >
+                                        Emitir certificado
+                                      </Button>
+                                      {hoursLoaded && entries.length === 0 && (
+                                        <p className="text-xs text-muted-foreground">
+                                          Aún no hay horas registradas — no se puede emitir el
+                                          certificado.
+                                        </p>
+                                      )}
+                                      {hoursLoaded && entries.length > 0 && !canIssue && (
+                                        <p className="text-xs text-muted-foreground">
+                                          Hay horas pendientes de aprobar o rechazar.
+                                        </p>
                                       )}
                                     </div>
-                                  </div>
-                                ))}
-                            </div>
-                          )}
-
-                          {canManage &&
-                            (certificates[enrollment.id] ? (
-                              <p className="text-xs text-muted-foreground">
-                                Certificado emitido:{' '}
-                                {certificates[enrollment.id].totalApprovedHours} horas efectivas.
-                              </p>
-                            ) : (
-                              <Button
-                                size="sm"
-                                onClick={() => void issueCertificate(enrollment.id)}
-                              >
-                                Emitir certificado
-                              </Button>
-                            ))}
+                                  ))}
+                              </>
+                            );
+                          })()}
                         </div>
                       )}
 

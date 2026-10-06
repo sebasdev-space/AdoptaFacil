@@ -32,6 +32,7 @@ import {
 import { LegalRepresentativeService } from '../org/legal-representative.service';
 import {
   checkCertificateEligibility,
+  hasPendingHours,
   missingGuardianInfo,
   studentServiceMinHours,
   sumApprovedHours,
@@ -207,6 +208,20 @@ export class VolunteerCertificatesService {
         where: { enrollmentId },
         orderBy: { date: 'asc' },
       });
+      // Nuevo requerimiento (voluntariado): no se emite un certificado sin
+      // ninguna hora registrada, ni mientras queden horas `pending` por
+      // decidir — la organización debe cerrar el libro de la inscripción
+      // primero (aprobar/rechazar todo lo pendiente).
+      if (hoursEntries.length === 0) {
+        throw new BadRequestException(
+          'No se puede emitir el certificado: esta inscripción no tiene horas registradas.',
+        );
+      }
+      if (hasPendingHours(hoursEntries)) {
+        throw new BadRequestException(
+          'No se puede emitir el certificado: aún hay horas pendientes de aprobar o rechazar.',
+        );
+      }
       const totalApprovedHours = sumApprovedHours(hoursEntries);
       const minHours = studentServiceMinHours();
       const eligibility = checkCertificateEligibility(

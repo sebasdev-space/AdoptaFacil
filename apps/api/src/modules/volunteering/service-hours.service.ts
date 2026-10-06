@@ -145,9 +145,20 @@ export class ServiceHoursService {
     actor: RequestUser,
     input: { enrollmentId: string; date: string; hours: number; description: string },
   ): Promise<ServiceHours> {
-    const rows = await this.prisma.$queryRaw<ServiceHoursRawRow[]>(
-      Prisma.sql`SELECT * FROM create_service_hours(${input.enrollmentId}::uuid, ${actor.id}::uuid, ${input.date}::timestamp, ${input.hours}, ${input.description})`,
-    );
+    let rows: ServiceHoursRawRow[];
+    try {
+      rows = await this.prisma.$queryRaw<ServiceHoursRawRow[]>(
+        Prisma.sql`SELECT * FROM create_service_hours(${input.enrollmentId}::uuid, ${actor.id}::uuid, ${input.date}::timestamp, ${input.hours}, ${input.description})`,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (/certificate has already been issued/i.test(message)) {
+        throw new BadRequestException(
+          'Ya se emitió un certificado para esta inscripción: no se pueden registrar más horas.',
+        );
+      }
+      throw error;
+    }
     const row = rows[0];
     if (!row) {
       throw new BadRequestException(

@@ -1,5 +1,6 @@
 import {
   checkCertificateEligibility,
+  hasPendingHours,
   missingGuardianInfo,
   studentServiceMinHours,
   sumApprovedHours,
@@ -22,6 +23,20 @@ describe('sumApprovedHours (RF18/RF19)', () => {
 
   it('returns 0 when nothing is approved', () => {
     expect(sumApprovedHours([{ status: 'pending', hours: 8 }])).toBe(0);
+  });
+});
+
+describe('hasPendingHours (nuevo requerimiento: no se emite con horas sin decidir)', () => {
+  it('is false for an empty list', () => {
+    expect(hasPendingHours([])).toBe(false);
+  });
+
+  it('is false when every entry is approved or rejected', () => {
+    expect(hasPendingHours([{ status: 'approved' }, { status: 'rejected' }])).toBe(false);
+  });
+
+  it('is true when at least one entry is still pending', () => {
+    expect(hasPendingHours([{ status: 'approved' }, { status: 'pending' }])).toBe(true);
   });
 });
 

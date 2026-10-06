@@ -177,6 +177,66 @@ describe('VolunteerOpportunityDetailPage (RF18/RF19)', () => {
     expect(await screen.findByText(/3 horas efectivas/)).toBeInTheDocument();
   });
 
+  it('nuevo requerimiento: "Emitir certificado" queda deshabilitado sin horas, y mientras haya horas pendientes', async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    stubFetch((url, init) => {
+      calls.push({ url, init });
+      if (url.includes('/service-hours?')) {
+        return { items: [], total: 0, limit: 100, offset: 0 };
+      }
+      if (url.includes('/volunteer-enrollments')) {
+        return { items: [ACCEPTED_ENROLLMENT], total: 1, limit: 100, offset: 0 };
+      }
+      if (url.includes('/volunteer-opportunities/')) return OPPORTUNITY;
+      return {};
+    });
+    renderShell({ route: '/organizacion/voluntariado/op-1', ...sessionWith([Role.Owner]) });
+
+    const issueButton = await screen.findByRole('button', { name: 'Emitir certificado' });
+    expect(issueButton).toBeDisabled();
+    expect(
+      await screen.findByText('Aún no hay horas registradas — no se puede emitir el certificado.'),
+    ).toBeInTheDocument();
+    // Never attempted the POST while disabled.
+    expect(calls.some((c) => c.init?.method === 'POST')).toBe(false);
+  });
+
+  it('nuevo requerimiento: con una hora pendiente queda deshabilitado; aprobada/rechazada, se habilita', async () => {
+    let decided = false;
+    stubFetch((url, init) => {
+      if (url.includes('/decision') && init?.method === 'POST') {
+        decided = true;
+        return { ...PENDING_HOURS, status: 'approved' };
+      }
+      if (url.includes('/service-hours?')) {
+        return {
+          items: [{ ...PENDING_HOURS, status: decided ? 'approved' : 'pending' }],
+          total: 1,
+          limit: 100,
+          offset: 0,
+        };
+      }
+      if (url.includes('/volunteer-enrollments')) {
+        return { items: [ACCEPTED_ENROLLMENT], total: 1, limit: 100, offset: 0 };
+      }
+      if (url.includes('/volunteer-opportunities/')) return OPPORTUNITY;
+      return {};
+    });
+    renderShell({ route: '/organizacion/voluntariado/op-1', ...sessionWith([Role.Owner]) });
+
+    expect(await screen.findByRole('button', { name: 'Emitir certificado' })).toBeDisabled();
+    expect(
+      await screen.findByText('Hay horas pendientes de aprobar o rechazar.'),
+    ).toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver horas' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Aprobar' }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Emitir certificado' })).toBeEnabled();
+    });
+  });
+
   it('hides management actions for ReadOnlyAuditor (view-only)', async () => {
     stubFetch((url) => {
       if (url.includes('/volunteer-enrollments')) {
