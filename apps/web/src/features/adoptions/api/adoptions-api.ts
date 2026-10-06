@@ -9,6 +9,7 @@ import type {
   SubmitFollowUpInput,
   TransitionAdoptionContractInput,
   TransitionAdoptionRequestInput,
+  UpdateAdoptionContractDataInput,
 } from '@adoptafacil/contracts';
 import { ApiError, type ApiClient } from '../../../shell/api';
 
@@ -82,6 +83,15 @@ export function getContractForSigner(
   return client.request<AdoptionContract>(`/adoptions/contracts/${contractId}`);
 }
 
+/** The contract detail page for ANY org manager (not just whoever generated
+ *  it) — `/adopciones/contratos/:id`. */
+export function getContractForOrgById(
+  client: ApiClient,
+  contractId: string,
+): Promise<AdoptionContract> {
+  return client.request<AdoptionContract>(`/adoptions/contracts/org/${contractId}`);
+}
+
 /** Org moves the contract between managed states (draft→pending, cancel). */
 export function transitionAdoptionContract(
   client: ApiClient,
@@ -94,7 +104,9 @@ export function transitionAdoptionContract(
   });
 }
 
-/** A signer signs their part via the simulable SignaturePort (server-side). */
+/** A signer signs their part. The org representative needs no image (reuses
+ *  the already-registered legal representative signature); the adopter MUST
+ *  include `signatureBase64` (drawn/uploaded via `SignaturePad`). */
 export function signAdoptionContract(
   client: ApiClient,
   contractId: string,
@@ -104,6 +116,36 @@ export function signAdoptionContract(
     method: 'POST',
     json: input,
   });
+}
+
+/** Org edits the fillable data (peso, estado de salud, etc.) while the
+ *  contract is still a draft with no signatures yet. */
+export function updateAdoptionContractData(
+  client: ApiClient,
+  contractId: string,
+  input: UpdateAdoptionContractDataInput,
+): Promise<AdoptionContract> {
+  return client.request<AdoptionContract>(`/adoptions/contracts/${contractId}/data`, {
+    method: 'PATCH',
+    json: input,
+  });
+}
+
+/** Download the contract as a real PDF and trigger a browser save — any
+ *  legitimate signer, at any status (lets the org preview the draft). */
+export async function downloadAdoptionContractPdf(
+  client: ApiClient,
+  contractId: string,
+): Promise<void> {
+  const blob = await client.requestBlob(`/adoptions/contracts/${contractId}/pdf`);
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `contrato-adopcion-${contractId}.pdf`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
 
 // --- T-028c · post-adoption follow-up ---------------------------------------

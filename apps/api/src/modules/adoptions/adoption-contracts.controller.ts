@@ -1,10 +1,22 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
+import type { Response } from 'express';
 import {
   Role,
   type AdoptionContract,
   type GenerateAdoptionContractInput,
   type SignAdoptionContractInput,
   type TransitionAdoptionContractInput,
+  type UpdateAdoptionContractDataInput,
 } from '@adoptafacil/contracts';
 import type { RequestUser } from '../../core/auth/auth.types';
 import { CurrentUser } from '../../core/auth/current-user.decorator';
@@ -17,6 +29,7 @@ import {
   generateAdoptionContractSchema,
   signAdoptionContractSchema,
   transitionAdoptionContractSchema,
+  updateAdoptionContractDataSchema,
 } from './adoption-contracts.schemas';
 
 /** Roles that GENERATE/MANAGE the contract (§13) — same org set as evaluation in
@@ -58,6 +71,16 @@ export class AdoptionContractsController {
     return this.service.getForOrg(requestId);
   }
 
+  /** The contract detail page for the owning org (ANY manager, not just
+   *  whoever generated it — unlike the signer-identity route below). Declared
+   *  BEFORE `:id` so the literal `org` segment is never swallowed by it. */
+  @Get('org/:id')
+  @UseGuards(RolesGuard)
+  @Roles(...MANAGE_ROLES)
+  getForOrgById(@Param('id', ParseUUIDPipe) id: string): Promise<AdoptionContract> {
+    return this.service.getForOrgById(id);
+  }
+
   /** A signer fetches the contract they must sign (org rep or adopter). */
   @Get(':id')
   getForSigner(
@@ -88,5 +111,33 @@ export class AdoptionContractsController {
     @Body(new ZodValidationPipe(signAdoptionContractSchema)) dto: SignAdoptionContractInput,
   ): Promise<AdoptionContract> {
     return this.service.sign(actor, id, dto);
+  }
+
+  /** Edit the fillable data (peso, estado de salud, etc.) while the contract
+   *  is still a draft with no signatures yet (org). */
+  @Patch(':id/data')
+  @UseGuards(RolesGuard)
+  @Roles(...MANAGE_ROLES)
+  updateData(
+    @CurrentUser() actor: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(updateAdoptionContractDataSchema))
+    dto: UpdateAdoptionContractDataInput,
+  ): Promise<AdoptionContract> {
+    return this.service.updateData(actor, id, dto);
+  }
+
+  /** Download the contract as a real PDF (any legitimate signer, any status —
+   *  lets the org preview the draft before sending it to signatures). */
+  @Get(':id/pdf')
+  async pdf(
+    @CurrentUser() actor: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const buffer = await this.service.generatePdf(actor, id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="contrato-adopcion.pdf"');
+    res.send(buffer);
   }
 }

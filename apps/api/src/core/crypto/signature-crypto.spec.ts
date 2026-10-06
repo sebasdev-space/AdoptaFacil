@@ -2,12 +2,12 @@ import {
   decryptSignature,
   encryptSignature,
   hashSignature,
-  loadLegalRepresentativeConfig,
-} from './legal-representative-crypto';
+  loadSignatureEncryptionConfig,
+} from './signature-crypto';
 
 const KEY = Buffer.from('11'.repeat(32), 'hex');
 
-describe('legal-representative-crypto', () => {
+describe('signature-crypto', () => {
   describe('encryptSignature / decryptSignature (AES-256-GCM round trip)', () => {
     it('decrypts back to the exact original plaintext', () => {
       const plaintext = Buffer.from('a fake signature PNG payload, not real bytes');
@@ -61,32 +61,44 @@ describe('legal-representative-crypto', () => {
     });
   });
 
-  describe('loadLegalRepresentativeConfig', () => {
-    const original = process.env.LEGAL_REP_SIGNATURE_KEY;
+  describe('loadSignatureEncryptionConfig', () => {
+    const originalNew = process.env.SIGNATURE_ENCRYPTION_KEY;
+    const originalOld = process.env.LEGAL_REP_SIGNATURE_KEY;
     const originalNodeEnv = process.env.NODE_ENV;
 
     afterEach(() => {
-      process.env.LEGAL_REP_SIGNATURE_KEY = original;
+      process.env.SIGNATURE_ENCRYPTION_KEY = originalNew;
+      process.env.LEGAL_REP_SIGNATURE_KEY = originalOld;
       process.env.NODE_ENV = originalNodeEnv;
     });
 
     it('falls back to a fixed dev key outside production', () => {
+      delete process.env.SIGNATURE_ENCRYPTION_KEY;
       delete process.env.LEGAL_REP_SIGNATURE_KEY;
       process.env.NODE_ENV = 'test';
-      const config = loadLegalRepresentativeConfig();
+      const config = loadSignatureEncryptionConfig();
       expect(config.signatureEncryptionKey).toHaveLength(32);
     });
 
-    it('throws in production when the key is missing', () => {
+    it('falls back to the older LEGAL_REP_SIGNATURE_KEY name for back-compat', () => {
+      delete process.env.SIGNATURE_ENCRYPTION_KEY;
+      process.env.LEGAL_REP_SIGNATURE_KEY = '33'.repeat(32);
+      process.env.NODE_ENV = 'test';
+      const config = loadSignatureEncryptionConfig();
+      expect(config.signatureEncryptionKey).toEqual(Buffer.from('33'.repeat(32), 'hex'));
+    });
+
+    it('throws in production when no key is set', () => {
+      delete process.env.SIGNATURE_ENCRYPTION_KEY;
       delete process.env.LEGAL_REP_SIGNATURE_KEY;
       process.env.NODE_ENV = 'production';
-      expect(() => loadLegalRepresentativeConfig()).toThrow(/must be set in production/);
+      expect(() => loadSignatureEncryptionConfig()).toThrow(/must be set in production/);
     });
 
     it('throws when the configured key is not exactly 32 bytes', () => {
-      process.env.LEGAL_REP_SIGNATURE_KEY = 'ab'; // 1 byte, not 32
+      process.env.SIGNATURE_ENCRYPTION_KEY = 'ab'; // 1 byte, not 32
       process.env.NODE_ENV = 'test';
-      expect(() => loadLegalRepresentativeConfig()).toThrow(/32 bytes/);
+      expect(() => loadSignatureEncryptionConfig()).toThrow(/32 bytes/);
     });
   });
 });

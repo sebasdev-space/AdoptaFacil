@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { AdoptionRequest } from '@adoptafacil/contracts';
 import { Badge, Button, Card, CardContent, Skeleton } from '@adoptafacil/ui';
 import { PageContainer, PageHeader } from '../../_layout';
@@ -21,6 +22,7 @@ import { MyRequestDetailModal } from '../components/my-request-detail-modal';
  */
 export function MyAdoptionRequestsPage() {
   const client = useApiClient();
+  const navigate = useNavigate();
   const [requests, setRequests] = useState<AdoptionRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -76,10 +78,20 @@ export function MyAdoptionRequestsPage() {
                       </span>
                     </div>
                     <p className="mt-1 text-muted-foreground">{organizationLabel(request)}</p>
-                    <div className="mt-2">
+                    <div className="mt-2 flex flex-wrap gap-2">
                       <Button variant="outline" onClick={() => setDetailId(request.id)}>
                         Ver detalle
                       </Button>
+                      {/* T-028b (nuevo requerimiento): una vez la organización genera el
+                          contrato, el adoptante lo ve y firma su parte aquí. */}
+                      {request.contractRef && (
+                        <Button
+                          variant="outline"
+                          onClick={() => navigate(`/adopciones/contratos/${request.contractRef}`)}
+                        >
+                          Ver contrato
+                        </Button>
+                      )}
                     </div>
                   </li>
                 ))}
