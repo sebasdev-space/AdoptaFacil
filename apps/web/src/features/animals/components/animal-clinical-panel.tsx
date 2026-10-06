@@ -15,6 +15,7 @@ import {
 } from '@adoptafacil/ui';
 import { ClinicalEventType } from '@adoptafacil/contracts';
 import { useAnimalClinicalRecord } from '../hooks/use-animal-clinical-record';
+import { ClinicalAttachmentsField } from './clinical-attachments-field';
 import { EventHistory } from './event-history';
 import { CLINICAL_TYPE_LABELS, formatClinicalDate } from '../lib/clinical-format';
 
@@ -123,10 +124,12 @@ export function AnimalClinicalPanel({ animalId }: AnimalClinicalPanelProps) {
               value={form.nextDueDate}
               onChange={(e) => form.setNextDueDate(e.target.value)}
             />
-            <Input
-              placeholder="Adjunto (nombre de archivo)"
-              value={form.attachment}
-              onChange={(e) => form.setAttachment(e.target.value)}
+            <ClinicalAttachmentsField
+              id="clinical-attachment-panel"
+              files={form.files}
+              onAddFile={form.addFile}
+              onRemoveFile={form.removeFile}
+              disabled={form.saving}
             />
             <Button disabled={form.saving} onClick={() => void form.submit()}>
               Registrar

@@ -7,6 +7,7 @@ import type {
 } from '@prisma/client';
 import {
   type ClinicalAttachment,
+  type ClinicalAttachmentUploadTarget,
   type ClinicalEvent,
   type ClinicalEventDetails,
   type ClinicalEventType,
@@ -66,25 +67,37 @@ export class ClinicalService {
     };
   }
 
-  /** Reserve storage targets (outside any tx) → attachment create-data. */
-  private async reserve(
+  /** Reserve a storage target for ONE clinical attachment (fix,
+   *  T-ANIMALS-ATTACHMENTS-AUDIT) — private object (exam results, vaccination
+   *  proof, evidence photos are never shown in the public catalog). The
+   *  client PUTs the bytes to the returned `url`, then passes `key` back as
+   *  `storageRef` in the create/edit call. */
+  async reserveAttachmentUpload(input: {
+    filename: string;
+    contentType?: string;
+  }): Promise<ClinicalAttachmentUploadTarget> {
+    const organizationId = this.requireOrgId();
+    return this.storage.createUploadTarget({
+      organizationId,
+      filename: input.filename,
+      contentType: input.contentType,
+    });
+  }
+
+  /** Map ALREADY-uploaded attachments (each `storageRef` was reserved via
+   *  `reserveAttachmentUpload` and its bytes PUT before this call) into
+   *  Prisma create-data. Unlike the old `filename`-only shape, this never
+   *  mints a storage key that nothing was ever uploaded to. */
+  private toAttachmentCreateData(
     organizationId: string,
-    attachments: { filename: string; contentType?: string; order?: number }[] | undefined,
+    attachments: { storageRef: string; order?: number }[] | undefined,
     startOrder: number,
-  ): Promise<{ organizationId: string; storageRef: string; order: number }[]> {
-    return Promise.all(
-      (attachments ?? []).map(async (a, index) => ({
-        organizationId,
-        storageRef: (
-          await this.storage.createUploadTarget({
-            organizationId,
-            filename: a.filename,
-            contentType: a.contentType,
-          })
-        ).key,
-        order: a.order ?? startOrder + index,
-      })),
-    );
+  ): { organizationId: string; storageRef: string; order: number }[] {
+    return (attachments ?? []).map((a, index) => ({
+      organizationId,
+      storageRef: a.storageRef,
+      order: a.order ?? startOrder + index,
+    }));
   }
 
   private async assertAnimal(tx: Prisma.TransactionClient, animalId: string): Promise<void> {
@@ -94,8 +107,9 @@ export class ClinicalService {
     }
   }
 
-  /** Create a clinical event (version 1). Veterinarian only (enforced in the
-   *  controller). Records the author + a UTC audit event WITHOUT the clinical
+  /** Create a clinical event (version 1). Owner/Administrator/Operator/
+   *  Veterinarian (enforced in the controller; fix, previously Veterinarian
+   *  only). Records the author + a UTC audit event WITHOUT the clinical
    *  detail (Ley 1581/1774). */
   async create(
     actorUserId: string,
@@ -103,7 +117,7 @@ export class ClinicalService {
     input: CreateClinicalEventInput,
   ): Promise<ClinicalEvent> {
     const organizationId = this.requireOrgId();
-    const attachments = await this.reserve(organizationId, input.attachments, 0);
+    const attachments = this.toAttachmentCreateData(organizationId, input.attachments, 0);
     const eventId = randomUUID();
 
     return this.prisma.withOrgContext(organizationId, async (tx) => {
@@ -138,8 +152,9 @@ export class ClinicalService {
     });
   }
 
-  /** Edit a clinical event → NEW version (Veterinarian only). The previous
-   *  version stays immutable with its original author. Prior attachments carry
+  /** Edit a clinical event → NEW version (Owner/Administrator/Operator/
+   *  Veterinarian; fix, previously Veterinarian only). The previous version
+   *  stays immutable with its original author. Prior attachments carry
    *  forward; any new ones are appended. */
   async edit(
     actorUserId: string,
@@ -182,7 +197,7 @@ export class ClinicalService {
         storageRef: a.storageRef,
         order: a.order,
       }));
-      const added = await this.reserve(organizationId, input.attachments, carried.length);
+      const added = this.toAttachmentCreateData(organizationId, input.attachments, carried.length);
       const attachments = [...carried, ...added];
 
       const row = await tx.clinicalEvent.create({

@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -238,5 +238,96 @@ describe('AnimalClinicalPanel — historial de ediciones por evento (S2-04B-2-RE
     await user.click(await screen.findByRole('tab', { name: 'Carnet' }));
     const carnet = await screen.findByRole('tabpanel', { name: 'Carnet' });
     expect(within(carnet).getByRole('button', { name: /Descargar carnet/ })).toBeInTheDocument();
+  });
+});
+
+describe('AnimalClinicalPanel — Registrar evento clínico: rol ampliado + adjuntos reales (fix, T-ANIMALS-ATTACHMENTS-AUDIT)', () => {
+  it('shows "Registrar evento clínico" for an Owner (role widened — previously Veterinarian-only)', async () => {
+    stubFetch({});
+    render(providers([Role.Owner], <AnimalClinicalPanel animalId="animal-1" />));
+
+    expect(await screen.findByText('Registrar evento clínico')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Registrar' })).toBeInTheDocument();
+  });
+
+  it('never shows the registration form for a role without write access (ReadOnlyAuditor)', async () => {
+    stubFetch({});
+    render(providers([Role.ReadOnlyAuditor], <AnimalClinicalPanel animalId="animal-1" />));
+
+    await screen.findByText('Sin eventos clínicos.');
+    expect(screen.queryByText('Registrar evento clínico')).not.toBeInTheDocument();
+  });
+
+  it('uploads a real file end-to-end (reserve → PUT bytes → create with storageRef), not a bare filename text field', async () => {
+    const calls: Array<{ url: string; method?: string; body?: unknown }> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        calls.push({ url, method: init?.method, body: init?.body });
+        if (init?.method === 'POST' && url.endsWith('/clinical-events/uploads')) {
+          return Promise.resolve({
+            ok: true,
+            status: 201,
+            headers: { get: () => null },
+            json: async () => ({ key: 'private/org-1/uuid-examen.pdf', url: 'http://x/upload' }),
+          });
+        }
+        if (init?.method === 'PUT' && url.includes('/storage/upload')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: { get: () => null },
+            json: async () => ({}),
+          });
+        }
+        if (init?.method === 'POST' && url.endsWith('/clinical-events')) {
+          return Promise.resolve({
+            ok: true,
+            status: 201,
+            headers: { get: () => null },
+            json: async () => event({ id: 'new-ev', attachments: [] }),
+          });
+        }
+        let body: unknown = [];
+        if (url.endsWith('/history')) body = [];
+        else if (url.endsWith('/carnet')) body = [];
+        else if (url.includes('/clinical-events')) body = [];
+        else body = animal();
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: { get: () => null },
+          json: async () => body,
+        });
+      }),
+    );
+
+    render(providers([Role.Owner], <AnimalClinicalPanel animalId="animal-1" />));
+    await screen.findByText('Registrar evento clínico');
+
+    const user = userEvent.setup();
+    const file = new File(['%PDF-1.4'], 'examen.pdf', { type: 'application/pdf' });
+    const input = screen.getByLabelText('Adjuntar archivo (PDF o imagen)', {
+      selector: 'input',
+    }) as HTMLInputElement;
+    await user.upload(input, file);
+    expect(await screen.findByText('examen.pdf')).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Fecha del evento'), '2026-09-01');
+    await user.click(screen.getByRole('button', { name: 'Registrar' }));
+
+    await waitFor(() => {
+      expect(
+        calls.some((c) => c.method === 'POST' && c.url.endsWith('/clinical-events/uploads')),
+      ).toBe(true);
+      expect(calls.some((c) => c.method === 'PUT' && c.url.includes('/storage/upload'))).toBe(true);
+    });
+    const create = calls.find((c) => c.method === 'POST' && c.url.endsWith('/clinical-events'));
+    expect(create).toBeDefined();
+    const createBody = JSON.parse(String(create?.body));
+    expect(createBody.attachments).toEqual([
+      { storageRef: 'private/org-1/uuid-examen.pdf', order: 0 },
+    ]);
   });
 });

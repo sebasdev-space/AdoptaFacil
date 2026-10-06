@@ -406,14 +406,29 @@ export interface AnimalCardInfo {
   profileUrl: string;
 }
 
-/** Reserve an attachment for a clinical event version (metadata only). */
+/**
+ * An attachment whose bytes were ALREADY uploaded before this call (fix,
+ * T-ANIMALS-ATTACHMENTS-AUDIT): the client first reserves a storage target
+ * via `POST .../clinical-events/uploads` ({@link ClinicalAttachmentUploadTarget}),
+ * PUTs the real bytes to `upload.url`, and only THEN includes the resulting
+ * `storageRef` here. Previously this took a bare `filename` and the backend
+ * minted its own, never-uploaded-to key — no real file ever reached storage.
+ */
 export interface ClinicalAttachmentInput {
-  filename: string;
-  contentType?: string;
+  storageRef: string;
   order?: number;
 }
 
-/** Create a clinical event (version 1). Veterinarian only. */
+/** `POST /animals/:animalId/clinical-events/uploads` response — reserve a
+ *  storage target for ONE clinical attachment (private object: exam results,
+ *  vaccination proof, evidence photos). The client PUTs the bytes to `url`,
+ *  then passes `key` back as `storageRef` in {@link ClinicalAttachmentInput}. */
+export interface ClinicalAttachmentUploadTarget {
+  key: string;
+  url: string;
+}
+
+/** Create a clinical event (version 1). Owner/Administrator/Operator/Veterinarian. */
 export interface CreateClinicalEventInput {
   type: ClinicalEventType;
   /** ISO-8601 UTC. */
@@ -427,7 +442,7 @@ export interface CreateClinicalEventInput {
 /**
  * Edit a clinical event → creates the NEXT version. Provided fields override the
  * latest version; omitted fields carry forward. Any `attachments` here are added
- * on top of the carried-forward set. Veterinarian only.
+ * on top of the carried-forward set. Owner/Administrator/Operator/Veterinarian.
  */
 export interface EditClinicalEventInput {
   type?: ClinicalEventType;
