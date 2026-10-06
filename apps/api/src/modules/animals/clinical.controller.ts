@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Res, UseGuards } fro
 import type { Response } from 'express';
 import {
   type AnimalCardInfo,
+  type ClinicalAttachmentUploadTarget,
   type ClinicalCarnetEntry,
   type ClinicalEvent,
   type CreateClinicalEventInput,
@@ -16,7 +17,11 @@ import { Roles } from '../../core/rbac/roles.decorator';
 import { RolesGuard } from '../../core/rbac/roles.guard';
 import { CarnetService } from './carnet.service';
 import { ClinicalService } from './clinical.service';
-import { createClinicalEventSchema, editClinicalEventSchema } from './clinical.schemas';
+import {
+  createAttachmentUploadSchema,
+  createClinicalEventSchema,
+  editClinicalEventSchema,
+} from './clinical.schemas';
 
 /** Roles that may VIEW the clinical record (manage/see the animal, §13 M03).
  *  S2-04B-2 TODO(client): whether a Persona/adoptante should see the carnet
@@ -32,11 +37,17 @@ const VIEW_ROLES = [
 ] as const;
 
 /**
- * M03 clinical record (expediente clínico, RF08) — tenant-scoped (RLS). Per the
- * base-document matrix, CREATING/EDITING a clinical event is restricted to the
- * Veterinarian; the rest of the animal-facing roles (Owner/Administrator/
- * Operator/Veterinarian/ReadOnlyAuditor) may only VIEW. Editing never overwrites:
- * it appends an immutable new version.
+ * Roles that may CREATE/EDIT a clinical event + upload its attachments (fix,
+ * 2026-10: previously Veterinarian-only — confirmed with the client that the
+ * Owner, same as the rest of the roles that manage the animal record
+ * day-to-day, should be able to register one too; not every shelter has a
+ * dedicated vet account). Same set as `WRITE_ROLES` in `animals.controller.ts`.
+ */
+const WRITE_ROLES = [Role.Owner, Role.Administrator, Role.Operator, Role.Veterinarian] as const;
+
+/**
+ * M03 clinical record (expediente clínico, RF08) — tenant-scoped (RLS). Editing
+ * never overwrites: it appends an immutable new version.
  */
 @Controller('animals/:animalId/clinical-events')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -86,13 +97,30 @@ export class ClinicalController {
   }
 
   @Post()
-  @Roles(Role.Veterinarian)
+  @Roles(...WRITE_ROLES)
   create(
     @CurrentUser() actor: RequestUser,
     @Param('animalId', ParseUUIDPipe) animalId: string,
     @Body(new ZodValidationPipe(createClinicalEventSchema)) dto: CreateClinicalEventInput,
   ): Promise<ClinicalEvent> {
     return this.service.create(actor.id, animalId, dto);
+  }
+
+  /** Reserve a storage target for ONE clinical attachment (fix,
+   *  T-ANIMALS-ATTACHMENTS-AUDIT) — the client PUTs the bytes to the returned
+   *  `url`, then passes `key` back as `storageRef` in the create/edit call's
+   *  `attachments`. Declared before ':eventId' (same reasoning as 'carnet'/
+   *  'card' above — a literal segment, never confused with an event id). */
+  @Post('uploads')
+  @Roles(...WRITE_ROLES)
+  createUpload(
+    @Body(new ZodValidationPipe(createAttachmentUploadSchema))
+    dto: {
+      filename: string;
+      contentType?: string;
+    },
+  ): Promise<ClinicalAttachmentUploadTarget> {
+    return this.service.reserveAttachmentUpload(dto);
   }
 
   @Get(':eventId/history')
@@ -105,7 +133,7 @@ export class ClinicalController {
   }
 
   @Post(':eventId')
-  @Roles(Role.Veterinarian)
+  @Roles(...WRITE_ROLES)
   edit(
     @CurrentUser() actor: RequestUser,
     @Param('animalId', ParseUUIDPipe) animalId: string,

@@ -7,13 +7,15 @@ import { AppModule } from '../src/app.module';
 import { purgeOrganizations } from './support/cleanup';
 
 /**
- * M03 clinical record (RF08, T-105): Veterinarian-only create/edit with real
+ * M03 clinical record (RF08, T-105): Owner/Administrator/Operator/Veterinarian
+ * can create/edit (fix, 2026-10: previously Veterinarian-only) with real
  * versioning (edit → new version, earlier version immutable with its author),
- * attachments + nextDueDate persisted, view roles, and tenant isolation. Every
- * actor operates in their OWN org (each write role can create the animal it then
- * acts on); the auditor's animal is seeded by the superuser client.
+ * real-upload attachments + nextDueDate persisted, view roles, and tenant
+ * isolation. Every actor operates in their OWN org (each write role can create
+ * the animal it then acts on); the auditor's animal is seeded by the superuser
+ * client.
  */
-describe('Clinical record (M03, RF08: vet-only + versioning + author)', () => {
+describe('Clinical record (M03, RF08: write roles + versioning + author)', () => {
   let app: INestApplication;
   let server: ReturnType<INestApplication['getHttpServer']>;
   const admin = new PrismaClient({ datasources: { db: { url: process.env.DATABASE_URL } } });
@@ -67,17 +69,30 @@ describe('Clinical record (M03, RF08: vet-only + versioning + author)', () => {
       .set('Authorization', `Bearer ${token}`)
       .send(body);
 
+  /** Reserve a REAL attachment upload target (fix, T-ANIMALS-ATTACHMENTS-AUDIT)
+   *  and resolve a `vaccine` fixture carrying that `storageRef` — the old
+   *  bare-`filename` shape no longer passes validation (see schemas.spec). */
+  const reserveAttachment = (token: string, animalId: string) =>
+    request(server)
+      .post(`/animals/${animalId}/clinical-events/uploads`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ filename: 'carnet.pdf', contentType: 'application/pdf' });
+
+  async function vaccineWith(token: string, animalId: string): Promise<Record<string, unknown>> {
+    const reserved = await reserveAttachment(token, animalId).expect(201);
+    return {
+      type: 'vaccine',
+      occurredAt: '2026-07-01T00:00:00.000Z',
+      nextDueDate: '2027-07-01T00:00:00.000Z',
+      details: { vaccine: 'rabia', lote: 'A1' },
+      attachments: [{ storageRef: reserved.body.key }],
+    };
+  }
+
   let vet: Actor;
   let vetAnimalId = '';
   let eventId = '';
-
-  const vaccine = {
-    type: 'vaccine',
-    occurredAt: '2026-07-01T00:00:00.000Z',
-    nextDueDate: '2027-07-01T00:00:00.000Z',
-    details: { vaccine: 'rabia', lote: 'A1' },
-    attachments: [{ filename: 'carnet.pdf', contentType: 'application/pdf' }],
-  };
+  let vaccine: Record<string, unknown>;
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -88,6 +103,7 @@ describe('Clinical record (M03, RF08: vet-only + versioning + author)', () => {
     vet = await actorWithRoles(['veterinarian']);
     const animal = await createAnimal(vet.token).expect(201);
     vetAnimalId = animal.body.id;
+    vaccine = await vaccineWith(vet.token, vetAnimalId);
   });
 
   afterAll(async () => {
@@ -147,25 +163,46 @@ describe('Clinical record (M03, RF08: vet-only + versioning + author)', () => {
     expect(ours[0].version).toBe(2);
   });
 
-  it('RBAC: only the Veterinarian can create; Owner/Administrator/Operator/Person cannot (403)', async () => {
+  it('RBAC: Owner/Administrator/Operator/Veterinarian can all create (fix, 2026-10: previously Veterinarian-only); Person cannot (403)', async () => {
+    // A minimal body (no attachments — those are covered by the reserve-upload
+    // test below) is enough to prove the role gate itself.
+    const minimal = { type: 'vaccine', occurredAt: '2026-07-01T00:00:00.000Z' };
+
     const owner = await registerOrg();
     const ownerAnimal = await createAnimal(owner.token).expect(201);
-    await createEvent(owner.token, ownerAnimal.body.id, vaccine).expect(403);
+    await createEvent(owner.token, ownerAnimal.body.id, minimal).expect(201);
 
     const administrator = await actorWithRoles(['administrator']);
     const adminAnimal = await createAnimal(administrator.token).expect(201);
-    await createEvent(administrator.token, adminAnimal.body.id, vaccine).expect(403);
+    await createEvent(administrator.token, adminAnimal.body.id, minimal).expect(201);
 
     const operator = await actorWithRoles(['operator']);
     const opAnimal = await createAnimal(operator.token).expect(201);
-    await createEvent(operator.token, opAnimal.body.id, vaccine).expect(403);
+    await createEvent(operator.token, opAnimal.body.id, minimal).expect(201);
 
     const personRes = await request(server)
       .post('/auth/register/person')
       .send({ displayName: 'P', email: `t105-person-${randomUUID()}@test.local`, password })
       .expect(201);
     createdOrgIds.push(personRes.body.user.organizationId);
-    await createEvent(personRes.body.tokens.accessToken, vetAnimalId, vaccine).expect(403);
+    await createEvent(personRes.body.tokens.accessToken, vetAnimalId, minimal).expect(403);
+  });
+
+  it("reserves a REAL (never-reused) attachment upload target, scoped to the caller's own org (fix, T-ANIMALS-ATTACHMENTS-AUDIT)", async () => {
+    const first = await reserveAttachment(vet.token, vetAnimalId).expect(201);
+    expect(first.body.key).toContain(vet.orgId);
+    expect(first.body.url).toContain(first.body.key); // stub adapter: no query-encoding, see LocalStubStorageAdapter
+
+    const second = await reserveAttachment(vet.token, vetAnimalId).expect(201);
+    expect(second.body.key).not.toBe(first.body.key); // a fresh key every time, never reused.
+
+    // A non-write role (Person, no org) is denied the same as create/edit.
+    const personRes = await request(server)
+      .post('/auth/register/person')
+      .send({ displayName: 'P2', email: `t105-person2-${randomUUID()}@test.local`, password })
+      .expect(201);
+    createdOrgIds.push(personRes.body.user.organizationId);
+    await reserveAttachment(personRes.body.tokens.accessToken, vetAnimalId).expect(403);
   });
 
   it('RBAC: ReadOnlyAuditor may VIEW but not create', async () => {

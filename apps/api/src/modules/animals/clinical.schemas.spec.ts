@@ -1,4 +1,8 @@
-import { createClinicalEventSchema, editClinicalEventSchema } from './clinical.schemas';
+import {
+  createAttachmentUploadSchema,
+  createClinicalEventSchema,
+  editClinicalEventSchema,
+} from './clinical.schemas';
 
 describe('clinical event validation (RF08)', () => {
   const validVaccine = {
@@ -6,7 +10,7 @@ describe('clinical event validation (RF08)', () => {
     occurredAt: '2026-07-01T00:00:00.000Z',
     nextDueDate: '2027-07-01T00:00:00.000Z',
     details: { vaccine: 'rabia' },
-    attachments: [{ filename: 'carnet.pdf', contentType: 'application/pdf' }],
+    attachments: [{ storageRef: 'private/org-1/uuid-carnet.pdf' }],
   };
 
   it('accepts a valid vaccine event with nextDueDate + attachment', () => {
@@ -57,5 +61,31 @@ describe('clinical event validation (RF08)', () => {
     expect(
       editClinicalEventSchema.safeParse({ nextDueDate: '2028-01-01T00:00:00.000Z' }).success,
     ).toBe(true);
+  });
+
+  it('rejects an attachment with the OLD filename-only shape (fix, T-ANIMALS-ATTACHMENTS-AUDIT)', () => {
+    expect(
+      createClinicalEventSchema.safeParse({
+        type: 'vaccine',
+        occurredAt: '2026-07-01T00:00:00.000Z',
+        attachments: [{ filename: 'carnet.pdf', contentType: 'application/pdf' }],
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('createAttachmentUploadSchema (fix, T-ANIMALS-ATTACHMENTS-AUDIT)', () => {
+  it('accepts a filename with an optional content type', () => {
+    expect(
+      createAttachmentUploadSchema.safeParse({
+        filename: 'examen.pdf',
+        contentType: 'application/pdf',
+      }).success,
+    ).toBe(true);
+    expect(createAttachmentUploadSchema.safeParse({ filename: 'examen.pdf' }).success).toBe(true);
+  });
+
+  it('rejects an empty filename', () => {
+    expect(createAttachmentUploadSchema.safeParse({ filename: '' }).success).toBe(false);
   });
 });

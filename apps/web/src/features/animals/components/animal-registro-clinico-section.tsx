@@ -1,6 +1,7 @@
 import { ClinicalEventType } from '@adoptafacil/contracts';
 import { Badge, Button, Input, Skeleton } from '@adoptafacil/ui';
 import { useAnimalClinicalRecord } from '../hooks/use-animal-clinical-record';
+import { ClinicalAttachmentsField } from './clinical-attachments-field';
 import { CLINICAL_TYPE_LABELS, formatClinicalDate } from '../lib/clinical-format';
 import styles from './animal-detail-panel.module.scss';
 
@@ -41,10 +42,12 @@ export function AnimalRegistroClinicoSection({ animalId }: { animalId: string })
             value={form.nextDueDate}
             onChange={(e) => form.setNextDueDate(e.target.value)}
           />
-          <Input
-            placeholder="Adjunto (nombre de archivo)"
-            value={form.attachment}
-            onChange={(e) => form.setAttachment(e.target.value)}
+          <ClinicalAttachmentsField
+            id="clinical-attachment-registro"
+            files={form.files}
+            onAddFile={form.addFile}
+            onRemoveFile={form.removeFile}
+            disabled={form.saving}
           />
           <Button disabled={form.saving} onClick={() => void form.submit()}>
             Registrar evento clínico

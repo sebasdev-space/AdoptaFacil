@@ -1,15 +1,8 @@
 import { useState } from 'react';
 import type { Animal, AnimalSex, ComputedAge } from '@adoptafacil/contracts';
-import {
-  Badge,
-  Button,
-  ComingSoon,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@adoptafacil/ui';
+import { Badge, Button, Tabs, TabsContent, TabsList, TabsTrigger } from '@adoptafacil/ui';
 import { AnimalCarnetSection } from './animal-carnet-section';
+import { AnimalDocumentosSection } from './animal-documentos-section';
 import { AnimalRegistroClinicoSection } from './animal-registro-clinico-section';
 import { IconButton } from './icon-button';
 import { FolderIcon, HeartIcon, PawEmptyIcon, PencilIcon, ShieldIcon, TrashIcon } from './icons';
@@ -61,9 +54,11 @@ export interface AnimalDetailPanelProps {
 /**
  * Panel de detalle del animal seleccionado (refactor visual maestro-detalle,
  * M03). Header con foto/nombre/raza-sexo-edad + acciones en icon-button con
- * tooltip, y 3 tabs: Carnet · Registro clínico · Documentos. Reutiliza
- * `useAnimalClinicalRecord` (vía las secciones Carnet/Registro) para no
- * duplicar los fetches ya usados por `AnimalClinicalPanel` (shell).
+ * tooltip, y 3 tabs: Carnet · Registro clínico · Documentos. Las 3 secciones
+ * reutilizan `useAnimalClinicalRecord` para no duplicar los fetches ya usados
+ * por `AnimalClinicalPanel` (shell). "Documentos" (fix,
+ * T-ANIMALS-ATTACHMENTS-AUDIT) ya NO es un `ComingSoon`: es la galería
+ * consolidada de los adjuntos reales del expediente clínico.
  */
 export function AnimalDetailPanel({
   animal,
@@ -175,10 +170,7 @@ export function AnimalDetailPanel({
           </TabsContent>
 
           <TabsContent value="documentos">
-            <ComingSoon
-              title="Adjuntar evidencia al expediente clínico"
-              description="Próximamente podrás subir fotos, exámenes y otros documentos del animal."
-            />
+            <AnimalDocumentosSection animalId={animal.id} />
           </TabsContent>
         </Tabs>
       </div>
