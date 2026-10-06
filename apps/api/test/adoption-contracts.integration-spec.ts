@@ -403,6 +403,56 @@ describe('Adoption contracts (M04: contract + signature, nuevo requerimiento)', 
     expect(bytes.length).toBeGreaterThan(500);
   });
 
+  it('cualquier org manager (no solo quien generó el contrato) también puede descargar el PDF', async () => {
+    const pdf = await request(server)
+      .get(`/adoptions/contracts/org/${contractId}/pdf`)
+      .set('Authorization', `Bearer ${refugeToken}`)
+      .buffer()
+      .parse(binaryParser)
+      .expect(200);
+    expect(pdf.headers['content-type']).toContain('application/pdf');
+  });
+
+  it('nuevo requerimiento: la vista en pantalla puede pedir la imagen REAL de cada firma (no solo el nombre)', async () => {
+    const asOrg = await request(server)
+      .get(`/adoptions/contracts/org/${contractId}/signatures/${orgSignerId}/image`)
+      .set('Authorization', `Bearer ${refugeToken}`)
+      .buffer()
+      .parse(binaryParser)
+      .expect(200);
+    expect(asOrg.headers['content-type']).toContain('image/png');
+    expect(asOrg.body.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a'); // magic bytes PNG
+
+    // El ADOPTANTE también puede ver la firma del REPRESENTANTE (y viceversa)
+    // — ambas partes del mismo contrato, no solo la propia.
+    const repSeenByAdopter = await request(server)
+      .get(`/adoptions/contracts/${contractId}/signatures/${orgSignerId}/image`)
+      .set('Authorization', `Bearer ${personToken}`)
+      .buffer()
+      .parse(binaryParser)
+      .expect(200);
+    expect(repSeenByAdopter.headers['content-type']).toContain('image/png');
+
+    const adopterSeenByOrg = await request(server)
+      .get(`/adoptions/contracts/${contractId}/signatures/${adopterSignerId}/image`)
+      .set('Authorization', `Bearer ${refugeToken}`)
+      .buffer()
+      .parse(binaryParser)
+      .expect(200);
+    expect(adopterSeenByOrg.headers['content-type']).toContain('image/png');
+  });
+
+  it('otra organización no puede leer las imágenes de firma (RLS + gating)', async () => {
+    await request(server)
+      .get(`/adoptions/contracts/org/${contractId}/signatures/${orgSignerId}/image`)
+      .set('Authorization', `Bearer ${otherToken}`)
+      .expect(404);
+    await request(server)
+      .get(`/adoptions/contracts/${contractId}/signatures/${orgSignerId}/image`)
+      .set('Authorization', `Bearer ${otherToken}`)
+      .expect(404);
+  });
+
   it('audits generation, data updates, each signature and the sealing (append-only, UTC)', async () => {
     const events = await admin.auditLog.findMany({
       where: { entityId: contractId, entityType: 'adoption_contract' },

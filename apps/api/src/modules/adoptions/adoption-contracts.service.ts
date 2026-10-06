@@ -263,6 +263,12 @@ export class AdoptionContractsService {
    * detail page.
    */
   async getForOrgById(contractId: string): Promise<AdoptionContract> {
+    return this.fromModel(await this.loadForOrg(contractId));
+  }
+
+  /** Tenant-scoped row fetch shared by every "any org manager" read (contract,
+   *  PDF, signature image) — the ONE place that checks `organizationId`. */
+  private async loadForOrg(contractId: string): Promise<ContractModel> {
     const organizationId = this.requireOrgId();
     const row = await this.prisma.withOrgContext(organizationId, (tx) =>
       tx.adoptionContract.findUnique({ where: { id: contractId } }),
@@ -270,7 +276,7 @@ export class AdoptionContractsService {
     if (!row || row.organizationId !== organizationId) {
       throw new NotFoundException('Contrato no encontrado.');
     }
-    return this.fromModel(row);
+    return row;
   }
 
   /**
@@ -561,38 +567,99 @@ export class AdoptionContractsService {
     if (!row) {
       throw new NotFoundException('Contrato no encontrado o no eres firmante.');
     }
+    return this.renderPdfFor(row.organization_id, row.payload, row.signers);
+  }
 
-    const representative = row.signers.find((s) => s.role === 'organization_representative');
-    const adopter = row.signers.find((s) => s.role === 'adopter');
+  /** Same as {@link generatePdf}, for ANY org manager (not just a listed
+   *  signer) — mirrors {@link getForOrgById} vs {@link getForSigner}. */
+  async generatePdfForOrg(contractId: string): Promise<Buffer> {
+    const row = await this.loadForOrg(contractId);
+    const signers = row.signers as unknown as AdoptionContractSigner[];
+    const payload = row.payload as unknown as AdoptionContractPayload;
+    return this.renderPdfFor(row.organizationId, payload, signers);
+  }
 
-    const representativeSignaturePng = representative?.signedAt
-      ? ((await this.legalRepresentatives.getCurrentSignerForOrg(
-          row.organization_id,
-          'legal_representative',
-        )) ?? null)
-      : null;
-
-    let adopterSignaturePng: Buffer | null = null;
-    if (adopter?.signatureFileRef) {
-      const stored = await this.storage.readObject(adopter.signatureFileRef);
-      if (stored) {
-        try {
-          adopterSignaturePng = decryptSignature(
-            stored.data,
-            this.signatureConfig.signatureEncryptionKey,
-          );
-        } catch {
-          adopterSignaturePng = null;
-        }
-      }
-    }
-
+  private async renderPdfFor(
+    organizationId: string,
+    payload: AdoptionContractPayload,
+    signers: AdoptionContractSigner[],
+  ): Promise<Buffer> {
+    const representative = signers.find((s) => s.role === 'organization_representative');
+    const adopter = signers.find((s) => s.role === 'adopter');
+    const [representativeSignaturePng, adopterSignaturePng] = await Promise.all([
+      representative
+        ? this.resolveSignatureImage(organizationId, signers, representative.id)
+        : Promise.resolve(null),
+      adopter
+        ? this.resolveSignatureImage(organizationId, signers, adopter.id)
+        : Promise.resolve(null),
+    ]);
     return renderAdoptionContractPdf({
-      payload: row.payload,
-      signers: row.signers,
-      representativeSignaturePng: representativeSignaturePng?.signatureImage ?? null,
+      payload,
+      signers,
+      representativeSignaturePng,
       adopterSignaturePng,
     });
+  }
+
+  /**
+   * The decrypted signature IMAGE of one signer (nuevo requerimiento: "debe
+   * mostrar la firma digital o imagen" — la vista en pantalla solo mostraba
+   * el nombre). `null` when that signer hasn't signed yet, or the image
+   * can't be read for any reason (never blocks viewing the rest of the
+   * contract over a broken image).
+   */
+  async getSignatureImage(
+    actor: RequestUser,
+    contractId: string,
+    signerId: string,
+  ): Promise<Buffer | null> {
+    const row = await this.loadForSigner(contractId, actor.id);
+    if (!row) {
+      throw new NotFoundException('Contrato no encontrado o no eres firmante.');
+    }
+    return this.resolveSignatureImage(row.organization_id, row.signers, signerId);
+  }
+
+  /** Same as {@link getSignatureImage}, for ANY org manager. */
+  async getSignatureImageForOrg(contractId: string, signerId: string): Promise<Buffer | null> {
+    const row = await this.loadForOrg(contractId);
+    const signers = row.signers as unknown as AdoptionContractSigner[];
+    return this.resolveSignatureImage(row.organizationId, signers, signerId);
+  }
+
+  /** Representative signers reuse the org's CURRENT legal representative
+   *  signature live (never duplicated/stored per contract — see `sign()`'s
+   *  own doc comment); any other signer reads+decrypts their own stored
+   *  encrypted file (`StoragePort`, AES-256-GCM). */
+  private async resolveSignatureImage(
+    organizationId: string,
+    signers: AdoptionContractSigner[],
+    signerId: string,
+  ): Promise<Buffer | null> {
+    const signer = signers.find((s) => s.id === signerId);
+    if (!signer?.signedAt) {
+      return null;
+    }
+    if (signer.role === 'organization_representative') {
+      const rep = await this.legalRepresentatives.getCurrentSignerForOrg(
+        organizationId,
+        'legal_representative',
+      );
+      return rep?.signatureImage ?? null;
+    }
+    if (!signer.signatureFileRef) {
+      return null;
+    }
+    const stored = await this.storage.readObject(signer.signatureFileRef);
+    if (!stored) {
+      return null;
+    }
+    try {
+      return decryptSignature(stored.data, this.signatureConfig.signatureEncryptionKey);
+    } catch {
+      return null;
+    }
   }
 
   /** Load a contract for a signer via the SECURITY DEFINER function (cross-tenant). */

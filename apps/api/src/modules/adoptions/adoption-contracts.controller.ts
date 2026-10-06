@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  NotFoundException,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -127,6 +128,20 @@ export class AdoptionContractsController {
     return this.service.updateData(actor, id, dto);
   }
 
+  /** Download the contract as a real PDF, for ANY org manager (not just
+   *  whoever generated it) — mirrors `getForOrgById` vs `getForSigner`.
+   *  Declared BEFORE `:id/pdf` so the literal `org` segment is never
+   *  swallowed by it. */
+  @Get('org/:id/pdf')
+  @UseGuards(RolesGuard)
+  @Roles(...MANAGE_ROLES)
+  async pdfForOrg(@Param('id', ParseUUIDPipe) id: string, @Res() res: Response): Promise<void> {
+    const buffer = await this.service.generatePdfForOrg(id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="contrato-adopcion.pdf"');
+    res.send(buffer);
+  }
+
   /** Download the contract as a real PDF (any legitimate signer, any status —
    *  lets the org preview the draft before sending it to signatures). */
   @Get(':id/pdf')
@@ -139,5 +154,43 @@ export class AdoptionContractsController {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="contrato-adopcion.pdf"');
     res.send(buffer);
+  }
+
+  /**
+   * The decrypted signature IMAGE of one signer (nuevo requerimiento: la
+   * vista en pantalla mostraba solo el nombre, no la firma dibujada/subida),
+   * for ANY org manager — mirrors the pair above. 404 when that signer
+   * hasn't signed yet, or the image can't be read for any reason.
+   */
+  @Get('org/:id/signatures/:signerId/image')
+  @UseGuards(RolesGuard)
+  @Roles(...MANAGE_ROLES)
+  async signatureImageForOrg(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('signerId', ParseUUIDPipe) signerId: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const image = await this.service.getSignatureImageForOrg(id, signerId);
+    if (!image) {
+      throw new NotFoundException('Firma no disponible todavía.');
+    }
+    res.setHeader('Content-Type', 'image/png');
+    res.send(image);
+  }
+
+  /** Same as above, for a legitimate SIGNER (org representative or adopter). */
+  @Get(':id/signatures/:signerId/image')
+  async signatureImage(
+    @CurrentUser() actor: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('signerId', ParseUUIDPipe) signerId: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const image = await this.service.getSignatureImage(actor, id, signerId);
+    if (!image) {
+      throw new NotFoundException('Firma no disponible todavía.');
+    }
+    res.setHeader('Content-Type', 'image/png');
+    res.send(image);
   }
 }

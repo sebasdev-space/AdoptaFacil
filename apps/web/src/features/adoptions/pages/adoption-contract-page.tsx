@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { AdoptionContract, AdoptionContractData, AnimalSex } from '@adoptafacil/contracts';
 import { Role } from '@adoptafacil/contracts';
@@ -15,6 +15,7 @@ import {
   downloadAdoptionContractPdf,
   getContractForOrgById,
   getContractForSigner,
+  getSignatureImageUrl,
   signAdoptionContract,
   transitionAdoptionContract,
   updateAdoptionContractData,
@@ -107,6 +108,31 @@ export function AdoptionContractPage() {
   const [busyAction, setBusyAction] = useState(false);
   const [signatureBase64, setSignatureBase64] = useState<string | null>(null);
   const [captureMode, setCaptureMode] = useState<'draw' | 'upload'>('draw');
+  // Nuevo requerimiento: la vista en pantalla mostraba solo el nombre del
+  // firmante, no la firma dibujada/subida en sí — se piden las imágenes
+  // reales (objectURL) por firmante ya firmado, y se cachean por id para no
+  // volver a pedir la misma al re-renderizar. `objectUrlsRef` guarda TODAS
+  // las URLs creadas en la vida de la página para revocarlas al desmontar
+  // (evita fugas de memoria del blob), independiente de cuáles sigan en uso.
+  const [signatureUrls, setSignatureUrls] = useState<Record<string, string>>({});
+  const objectUrlsRef = useRef<string[]>([]);
+  const fetchingSignerIdsRef = useRef<Set<string>>(new Set());
+
+  useEffect(
+    () => () => {
+      // `URL.revokeObjectURL` is a standard browser API, but some test
+      // environments (jsdom) don't implement it — never let cleanup itself
+      // crash the unmount.
+      objectUrlsRef.current.forEach((url) => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {
+          /* best-effort cleanup only */
+        }
+      });
+    },
+    [],
+  );
 
   const load = async (): Promise<void> => {
     if (!id) {
@@ -128,6 +154,31 @@ export function AdoptionContractPage() {
   useEffect(() => {
     void load();
   }, [id]);
+
+  // Pide la imagen real de cada firmante YA firmado que todavía no tengamos
+  // en caché — se dispara de nuevo cada vez que alguien firma (cambia
+  // `signedAt`), para recoger justo la firma nueva sin re-pedir las demás.
+  useEffect(() => {
+    if (!contract) return;
+    const pending = contract.signers.filter(
+      (s) => s.signedAt && !fetchingSignerIdsRef.current.has(s.id),
+    );
+    if (pending.length === 0) return;
+    let active = true;
+    for (const s of pending) fetchingSignerIdsRef.current.add(s.id);
+    void Promise.all(
+      pending.map(async (s) => {
+        const url = await getSignatureImageUrl(client, canManage, contract.id, s.id);
+        if (active && url) {
+          objectUrlsRef.current.push(url);
+          setSignatureUrls((prev) => ({ ...prev, [s.id]: url }));
+        }
+      }),
+    );
+    return () => {
+      active = false;
+    };
+  }, [contract, canManage, client]);
 
   if (state === 'loading' || !contract || !form) {
     return (
@@ -271,7 +322,7 @@ export function AdoptionContractPage() {
         <Button
           size="sm"
           variant="outline"
-          onClick={() => void downloadAdoptionContractPdf(client, contract.id)}
+          onClick={() => void downloadAdoptionContractPdf(client, canManage, contract.id)}
         >
           Descargar PDF
         </Button>
@@ -355,6 +406,13 @@ export function AdoptionContractPage() {
             {representative && (
               <div className="text-xs">
                 <p className="font-medium">Por el Cedente (Adopta Fácil)</p>
+                {representative.signedAt && signatureUrls[representative.id] && (
+                  <img
+                    src={signatureUrls[representative.id]}
+                    alt={`Firma de ${representative.fullName}`}
+                    className="h-16 object-contain"
+                  />
+                )}
                 <p>{representative.fullName}</p>
                 <p className="text-muted-foreground">
                   {representative.signedAt
@@ -366,6 +424,13 @@ export function AdoptionContractPage() {
             {adopter && (
               <div className="text-xs">
                 <p className="font-medium">Por el Adoptante</p>
+                {adopter.signedAt && signatureUrls[adopter.id] && (
+                  <img
+                    src={signatureUrls[adopter.id]}
+                    alt={`Firma de ${adopter.fullName}`}
+                    className="h-16 object-contain"
+                  />
+                )}
                 <p>{adopter.fullName}</p>
                 <p className="text-muted-foreground">
                   {adopter.signedAt

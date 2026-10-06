@@ -132,12 +132,17 @@ export function updateAdoptionContractData(
 }
 
 /** Download the contract as a real PDF and trigger a browser save — any
- *  legitimate signer, at any status (lets the org preview the draft). */
+ *  legitimate signer, or any org manager (`canManage`), at any status (lets
+ *  the org preview the draft). */
 export async function downloadAdoptionContractPdf(
   client: ApiClient,
+  canManage: boolean,
   contractId: string,
 ): Promise<void> {
-  const blob = await client.requestBlob(`/adoptions/contracts/${contractId}/pdf`);
+  const path = canManage
+    ? `/adoptions/contracts/org/${contractId}/pdf`
+    : `/adoptions/contracts/${contractId}/pdf`;
+  const blob = await client.requestBlob(path);
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
@@ -146,6 +151,31 @@ export async function downloadAdoptionContractPdf(
   anchor.click();
   anchor.remove();
   URL.revokeObjectURL(url);
+}
+
+/**
+ * The decrypted signature IMAGE of one signer, as an object URL ready for an
+ * `<img src>` — or `null` if that signer hasn't signed yet (404). Nuevo
+ * requerimiento: la vista en pantalla mostraba solo el nombre del firmante,
+ * no la firma dibujada/subida. The caller owns the returned URL and must
+ * `URL.revokeObjectURL` it once no longer shown (e.g. on unmount/refresh).
+ */
+export async function getSignatureImageUrl(
+  client: ApiClient,
+  canManage: boolean,
+  contractId: string,
+  signerId: string,
+): Promise<string | null> {
+  const path = canManage
+    ? `/adoptions/contracts/org/${contractId}/signatures/${signerId}/image`
+    : `/adoptions/contracts/${contractId}/signatures/${signerId}/image`;
+  try {
+    const blob = await client.requestBlob(path);
+    return URL.createObjectURL(blob);
+  } catch (error) {
+    if (ApiError.is(error) && error.status === 404) return null;
+    throw error;
+  }
 }
 
 // --- T-028c · post-adoption follow-up ---------------------------------------

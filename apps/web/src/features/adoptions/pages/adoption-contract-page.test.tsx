@@ -77,22 +77,54 @@ const DRAFT_CONTRACT = {
   updatedAt: '2026-10-01T00:00:00.000Z',
 };
 
+/**
+ * Las URLs de imagen de firma (`/signatures/:id/image`) responden 404 por
+ * defecto (nadie ha firmado "para la vista" en estos tests — ninguna
+ * aserción depende de la imagen) salvo que el propio `handler` del test
+ * devuelva un `Blob` explícitamente para esa URL, en cuyo caso se sirve como
+ * una respuesta binaria real (mismo criterio que `requestBlob` espera).
+ */
 function stubFetch(handler: (url: string, init?: RequestInit) => unknown) {
   vi.stubGlobal(
     'fetch',
     vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-      const body = handler(String(input), init);
+      const url = String(input);
+      const body = handler(url, init);
+      if (body instanceof Blob) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: { get: () => null },
+          blob: async () => body,
+        });
+      }
+      if (url.includes('/signatures/') && url.endsWith('/image')) {
+        return Promise.resolve({
+          ok: false,
+          status: 404,
+          headers: { get: () => null },
+          json: async () => ({ message: 'Firma no disponible todavía.' }),
+        });
+      }
       return Promise.resolve({
         ok: true,
         status: 200,
         headers: { get: () => null },
         json: async () => body,
+        blob: async () => new Blob(['fake-bytes']),
       });
     }),
   );
 }
 
-beforeEach(() => stubCanvasContext2D());
+beforeEach(() => {
+  stubCanvasContext2D();
+  vi.stubGlobal('URL', {
+    ...URL,
+    createObjectURL: vi.fn().mockReturnValue('blob:mock'),
+    revokeObjectURL: vi.fn(),
+  });
+});
 afterEach(() => vi.unstubAllGlobals());
 
 describe('AdoptionContractPage (M04, T-028b — nuevo requerimiento)', () => {
@@ -222,5 +254,29 @@ describe('AdoptionContractPage (M04, T-028b — nuevo requerimiento)', () => {
     renderShell({ route: '/adopciones/contratos/c1', ...sessionWith([Role.Owner]) });
 
     expect(await screen.findByRole('button', { name: 'Descargar PDF' })).toBeInTheDocument();
+  });
+
+  it('nuevo requerimiento: muestra la imagen REAL de la firma (no solo el nombre) una vez firmado', async () => {
+    const SIGNED = {
+      ...DRAFT_CONTRACT,
+      status: 'signed',
+      contentHash: 'a'.repeat(64),
+      signers: DRAFT_CONTRACT.signers.map((s) => ({
+        ...s,
+        signedAt: '2026-10-03T00:00:00.000Z',
+      })),
+    };
+    stubFetch((url) => {
+      if (url.includes('/signatures/') && url.endsWith('/image')) {
+        return new Blob(['fake-png-bytes'], { type: 'image/png' });
+      }
+      return url.includes('/org/') ? SIGNED : {};
+    });
+    renderShell({ route: '/adopciones/contratos/c1', ...sessionWith([Role.Owner]) });
+
+    await screen.findByText('CONTRATO DE ADOPCIÓN DE ANIMAL');
+    const signatureImages = await screen.findAllByRole('img', { name: /^Firma de / });
+    expect(signatureImages).toHaveLength(2);
+    expect(signatureImages[0]).toHaveAttribute('src', 'blob:mock');
   });
 });
