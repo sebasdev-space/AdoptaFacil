@@ -137,6 +137,10 @@ export class AdoptionContractsController {
   @Roles(...MANAGE_ROLES)
   async pdfForOrg(@Param('id', ParseUUIDPipe) id: string, @Res() res: Response): Promise<void> {
     const buffer = await this.service.generatePdfForOrg(id);
+    // Nunca cacheable: el mismo path sirve contenido distinto según cuántas
+    // firmas/datos haya hasta ese momento (p. ej. el borrador se re-visita
+    // mientras se diligencia).
+    res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="contrato-adopcion.pdf"');
     res.send(buffer);
@@ -151,6 +155,7 @@ export class AdoptionContractsController {
     @Res() res: Response,
   ): Promise<void> {
     const buffer = await this.service.generatePdf(actor, id);
+    res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="contrato-adopcion.pdf"');
     res.send(buffer);
@@ -170,6 +175,13 @@ export class AdoptionContractsController {
     @Param('signerId', ParseUUIDPipe) signerId: string,
     @Res() res: Response,
   ): Promise<void> {
+    // ANTES de la posible excepción 404: un navegador real cachea un 404 "aún
+    // no ha firmado" por defecto y lo sigue sirviendo después de que esa
+    // parte SÍ firmó, a menos que la respuesta declare explícitamente que
+    // nunca debe guardarse en caché (bug real reportado: la firma del
+    // representante no cargaba para el adoptante tras una visita anterior a
+    // que el representante firmara).
+    res.setHeader('Cache-Control', 'no-store');
     const image = await this.service.getSignatureImageForOrg(id, signerId);
     if (!image) {
       throw new NotFoundException('Firma no disponible todavía.');
@@ -186,6 +198,7 @@ export class AdoptionContractsController {
     @Param('signerId', ParseUUIDPipe) signerId: string,
     @Res() res: Response,
   ): Promise<void> {
+    res.setHeader('Cache-Control', 'no-store');
     const image = await this.service.getSignatureImage(actor, id, signerId);
     if (!image) {
       throw new NotFoundException('Firma no disponible todavía.');

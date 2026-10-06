@@ -208,6 +208,16 @@ describe('Adoption contracts (M04: contract + signature, nuevo requerimiento)', 
       .set('Authorization', `Bearer ${refugeToken}`)
       .expect(200);
     expect(contractForReq.body.id).toBe(contractId);
+
+    // Bug real reportado: la imagen de firma de un firmante que AÚN no ha
+    // firmado devuelve 404 — esa respuesta debe llevar `Cache-Control:
+    // no-store`, o un navegador la cachea y la sigue sirviendo aunque esa
+    // parte YA haya firmado en una visita posterior a la misma URL.
+    const notSignedYet = await request(server)
+      .get(`/adoptions/contracts/org/${contractId}/signatures/${orgSignerId}/image`)
+      .set('Authorization', `Bearer ${refugeToken}`)
+      .expect(404);
+    expect(notSignedYet.headers['cache-control']).toBe('no-store');
   });
 
   it('denies generation/management to a person without an org role (deny-by-default, 403)', async () => {
@@ -421,6 +431,7 @@ describe('Adoption contracts (M04: contract + signature, nuevo requerimiento)', 
       .parse(binaryParser)
       .expect(200);
     expect(asOrg.headers['content-type']).toContain('image/png');
+    expect(asOrg.headers['cache-control']).toBe('no-store');
     expect(asOrg.body.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a'); // magic bytes PNG
 
     // El ADOPTANTE también puede ver la firma del REPRESENTANTE (y viceversa)
