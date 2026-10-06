@@ -9,6 +9,7 @@ import type {
   SubmitFollowUpInput,
   TransitionAdoptionContractInput,
   TransitionAdoptionRequestInput,
+  UpdateAdoptionContractDataInput,
 } from '@adoptafacil/contracts';
 import { ApiError, type ApiClient } from '../../../shell/api';
 
@@ -82,6 +83,15 @@ export function getContractForSigner(
   return client.request<AdoptionContract>(`/adoptions/contracts/${contractId}`);
 }
 
+/** The contract detail page for ANY org manager (not just whoever generated
+ *  it) — `/adopciones/contratos/:id`. */
+export function getContractForOrgById(
+  client: ApiClient,
+  contractId: string,
+): Promise<AdoptionContract> {
+  return client.request<AdoptionContract>(`/adoptions/contracts/org/${contractId}`);
+}
+
 /** Org moves the contract between managed states (draft→pending, cancel). */
 export function transitionAdoptionContract(
   client: ApiClient,
@@ -94,7 +104,9 @@ export function transitionAdoptionContract(
   });
 }
 
-/** A signer signs their part via the simulable SignaturePort (server-side). */
+/** A signer signs their part. The org representative needs no image (reuses
+ *  the already-registered legal representative signature); the adopter MUST
+ *  include `signatureBase64` (drawn/uploaded via `SignaturePad`). */
 export function signAdoptionContract(
   client: ApiClient,
   contractId: string,
@@ -104,6 +116,66 @@ export function signAdoptionContract(
     method: 'POST',
     json: input,
   });
+}
+
+/** Org edits the fillable data (peso, estado de salud, etc.) while the
+ *  contract is still a draft with no signatures yet. */
+export function updateAdoptionContractData(
+  client: ApiClient,
+  contractId: string,
+  input: UpdateAdoptionContractDataInput,
+): Promise<AdoptionContract> {
+  return client.request<AdoptionContract>(`/adoptions/contracts/${contractId}/data`, {
+    method: 'PATCH',
+    json: input,
+  });
+}
+
+/** Download the contract as a real PDF and trigger a browser save — any
+ *  legitimate signer, or any org manager (`canManage`), at any status (lets
+ *  the org preview the draft). */
+export async function downloadAdoptionContractPdf(
+  client: ApiClient,
+  canManage: boolean,
+  contractId: string,
+): Promise<void> {
+  const path = canManage
+    ? `/adoptions/contracts/org/${contractId}/pdf`
+    : `/adoptions/contracts/${contractId}/pdf`;
+  const blob = await client.requestBlob(path);
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = `contrato-adopcion-${contractId}.pdf`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * The decrypted signature IMAGE of one signer, as an object URL ready for an
+ * `<img src>` — or `null` if that signer hasn't signed yet (404). Nuevo
+ * requerimiento: la vista en pantalla mostraba solo el nombre del firmante,
+ * no la firma dibujada/subida. The caller owns the returned URL and must
+ * `URL.revokeObjectURL` it once no longer shown (e.g. on unmount/refresh).
+ */
+export async function getSignatureImageUrl(
+  client: ApiClient,
+  canManage: boolean,
+  contractId: string,
+  signerId: string,
+): Promise<string | null> {
+  const path = canManage
+    ? `/adoptions/contracts/org/${contractId}/signatures/${signerId}/image`
+    : `/adoptions/contracts/${contractId}/signatures/${signerId}/image`;
+  try {
+    const blob = await client.requestBlob(path);
+    return URL.createObjectURL(blob);
+  } catch (error) {
+    if (ApiError.is(error) && error.status === 404) return null;
+    throw error;
+  }
 }
 
 // --- T-028c · post-adoption follow-up ---------------------------------------

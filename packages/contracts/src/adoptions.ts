@@ -189,6 +189,17 @@ export interface AdoptionContractSigner {
   signedAt?: string;
   /** Id de la firma emitido por el {@link SignaturePort} (ausente si pendiente). */
   signatureId?: string;
+  /**
+   * Referencia (clave opaca de `StoragePort`) a la imagen de firma dibujada/
+   * subida, CIFRADA en reposo — solo para firmantes que no son
+   * `organization_representative` (ese reutiliza en vivo la firma ya
+   * registrada del representante legal, ver
+   * `LegalRepresentativeService.getCurrentSignerForOrg`, nunca se duplica
+   * aquí). Ausente mientras esa parte no ha firmado.
+   */
+  signatureFileRef?: string;
+  /** SHA-256 (hex) de la imagen de firma ORIGINAL (antes de cifrar). */
+  signatureHash?: string;
 }
 
 /** Firmante propuesto al generar (sin estado de firma todavía). */
@@ -198,6 +209,50 @@ export interface AdoptionContractSignerInput {
   email: string;
   userId?: string;
 }
+
+/**
+ * Datos variables del texto legal fijo del contrato (nuevo requerimiento:
+ * implementar el texto REAL de "Contrato de Adopción.pdf" en vez de un
+ * `terms` genérico). Editables por la organización mientras el contrato está
+ * en `draft` y nadie ha firmado todavía (`AdoptionContractsService.updateData`);
+ * se congelan en cuanto el representante firma. La mayoría se AUTO-RELLENAN
+ * al generar el contrato desde datos que el sistema ya tiene (NIT/domicilio
+ * de la organización, raza/sexo/edad del animal, cédula/domicilio del
+ * adoptante) — la organización solo debe completar `weightKg` y
+ * `healthStatusAtDelivery`, que no existen en ningún otro lugar del sistema,
+ * y puede corregir cualquier otro campo que haya quedado vacío o incorrecto.
+ */
+export interface AdoptionContractData {
+  /** "Cedente/Entregante: ... con domicilio en ___ y NIT ___". */
+  organizationNit?: string;
+  organizationAddress?: string;
+  /** "Especie y raza: ___" (la especie ya está en `animal.species`). */
+  animalBreed?: string;
+  /** "Sexo: ___". */
+  animalSex?: string;
+  /** "Edad aproximada: ___ años". */
+  animalAgeYears?: number;
+  /** "Peso: ___ kg" — NUEVO dato, no existe en ningún otro lugar del sistema. */
+  weightKg?: number;
+  /** "Estado de salud al momento de la entrega: ___" — NUEVO dato. */
+  healthStatusAtDelivery?: string;
+  /** "identificado/a con cédula de ciudadanía nº ___". */
+  adopterDocumentNumber?: string;
+  /** "con domicilio en ___" (del adoptante). */
+  adopterAddress?: string;
+  /** "Durante los ___ meses (plazo pactado)" — default 6, siempre editable. */
+  followUpMonths: number;
+  /** "Firmado en ___" / "las partes fijan como domicilio la ciudad de ___". */
+  signatureCity?: string;
+}
+
+/** Entrada para `PATCH /adoptions/contracts/:id/data` — cualquier subconjunto
+ *  de {@link AdoptionContractData}; solo aplicable mientras el contrato está
+ *  en `draft` y nadie ha firmado todavía. */
+export type UpdateAdoptionContractDataInput = Partial<AdoptionContractData>;
+
+/** Default de {@link AdoptionContractData.followUpMonths} cuando se genera el contrato. */
+export const DEFAULT_FOLLOW_UP_MONTHS = 6;
 
 /**
  * Contenido CANÓNICO y versionable del contrato: es exactamente lo que se serializa
@@ -213,8 +268,12 @@ export interface AdoptionContractPayload {
   applicant: AdoptionApplicant;
   /** Ley aplicable declarada (RNF10). */
   applicableLaws: readonly AdoptionContractLaw[];
-  /** Cláusulas del contrato (parametrizable por el cliente; TODO(client)). */
+  /** Notas/cláusulas adicionales OPCIONALES (campo libre; el texto legal del
+   *  contrato en sí ya NO depende de esto — ver {@link AdoptionContractData}
+   *  y la plantilla fija del contrato). Vacío por defecto. */
   terms: string;
+  /** Datos variables del texto legal fijo — ver {@link AdoptionContractData}. */
+  data: AdoptionContractData;
 }
 
 /**
@@ -281,9 +340,19 @@ export interface TransitionAdoptionContractInput {
   reason?: string;
 }
 
-/** Entrada para firmar una parte: el firmante identificado por `signerId`. */
+/**
+ * Entrada para firmar una parte: el firmante identificado por `signerId`.
+ * `signatureBase64` (PNG sin el prefijo `data:`, igual que
+ * `RegisterLegalRepresentativeInput.signatureBase64`) es OBLIGATORIO para
+ * cualquier firmante que NO sea `organization_representative` (el
+ * representante reutiliza su firma ya registrada, nunca dibuja una nueva
+ * aquí) — validado en el SERVICIO, no en este schema, porque el rol del
+ * firmante solo se conoce tras cargar el contrato.
+ */
 export interface SignAdoptionContractInput {
   signerId: string;
+  signatureBase64?: string;
+  signatureContentType?: string;
 }
 
 // --- SignaturePort (puerto SIMULABLE; interfaz publicada, wiring en la api) ---

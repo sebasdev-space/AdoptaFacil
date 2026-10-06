@@ -1,10 +1,23 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
+import type { Response } from 'express';
 import {
   Role,
   type AdoptionContract,
   type GenerateAdoptionContractInput,
   type SignAdoptionContractInput,
   type TransitionAdoptionContractInput,
+  type UpdateAdoptionContractDataInput,
 } from '@adoptafacil/contracts';
 import type { RequestUser } from '../../core/auth/auth.types';
 import { CurrentUser } from '../../core/auth/current-user.decorator';
@@ -17,6 +30,7 @@ import {
   generateAdoptionContractSchema,
   signAdoptionContractSchema,
   transitionAdoptionContractSchema,
+  updateAdoptionContractDataSchema,
 } from './adoption-contracts.schemas';
 
 /** Roles that GENERATE/MANAGE the contract (§13) — same org set as evaluation in
@@ -58,6 +72,16 @@ export class AdoptionContractsController {
     return this.service.getForOrg(requestId);
   }
 
+  /** The contract detail page for the owning org (ANY manager, not just
+   *  whoever generated it — unlike the signer-identity route below). Declared
+   *  BEFORE `:id` so the literal `org` segment is never swallowed by it. */
+  @Get('org/:id')
+  @UseGuards(RolesGuard)
+  @Roles(...MANAGE_ROLES)
+  getForOrgById(@Param('id', ParseUUIDPipe) id: string): Promise<AdoptionContract> {
+    return this.service.getForOrgById(id);
+  }
+
   /** A signer fetches the contract they must sign (org rep or adopter). */
   @Get(':id')
   getForSigner(
@@ -88,5 +112,98 @@ export class AdoptionContractsController {
     @Body(new ZodValidationPipe(signAdoptionContractSchema)) dto: SignAdoptionContractInput,
   ): Promise<AdoptionContract> {
     return this.service.sign(actor, id, dto);
+  }
+
+  /** Edit the fillable data (peso, estado de salud, etc.) while the contract
+   *  is still a draft with no signatures yet (org). */
+  @Patch(':id/data')
+  @UseGuards(RolesGuard)
+  @Roles(...MANAGE_ROLES)
+  updateData(
+    @CurrentUser() actor: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(updateAdoptionContractDataSchema))
+    dto: UpdateAdoptionContractDataInput,
+  ): Promise<AdoptionContract> {
+    return this.service.updateData(actor, id, dto);
+  }
+
+  /** Download the contract as a real PDF, for ANY org manager (not just
+   *  whoever generated it) — mirrors `getForOrgById` vs `getForSigner`.
+   *  Declared BEFORE `:id/pdf` so the literal `org` segment is never
+   *  swallowed by it. */
+  @Get('org/:id/pdf')
+  @UseGuards(RolesGuard)
+  @Roles(...MANAGE_ROLES)
+  async pdfForOrg(@Param('id', ParseUUIDPipe) id: string, @Res() res: Response): Promise<void> {
+    const buffer = await this.service.generatePdfForOrg(id);
+    // Nunca cacheable: el mismo path sirve contenido distinto según cuántas
+    // firmas/datos haya hasta ese momento (p. ej. el borrador se re-visita
+    // mientras se diligencia).
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="contrato-adopcion.pdf"');
+    res.send(buffer);
+  }
+
+  /** Download the contract as a real PDF (any legitimate signer, any status —
+   *  lets the org preview the draft before sending it to signatures). */
+  @Get(':id/pdf')
+  async pdf(
+    @CurrentUser() actor: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const buffer = await this.service.generatePdf(actor, id);
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="contrato-adopcion.pdf"');
+    res.send(buffer);
+  }
+
+  /**
+   * The decrypted signature IMAGE of one signer (nuevo requerimiento: la
+   * vista en pantalla mostraba solo el nombre, no la firma dibujada/subida),
+   * for ANY org manager — mirrors the pair above. 404 when that signer
+   * hasn't signed yet, or the image can't be read for any reason.
+   */
+  @Get('org/:id/signatures/:signerId/image')
+  @UseGuards(RolesGuard)
+  @Roles(...MANAGE_ROLES)
+  async signatureImageForOrg(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('signerId', ParseUUIDPipe) signerId: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    // ANTES de la posible excepción 404: un navegador real cachea un 404 "aún
+    // no ha firmado" por defecto y lo sigue sirviendo después de que esa
+    // parte SÍ firmó, a menos que la respuesta declare explícitamente que
+    // nunca debe guardarse en caché (bug real reportado: la firma del
+    // representante no cargaba para el adoptante tras una visita anterior a
+    // que el representante firmara).
+    res.setHeader('Cache-Control', 'no-store');
+    const image = await this.service.getSignatureImageForOrg(id, signerId);
+    if (!image) {
+      throw new NotFoundException('Firma no disponible todavía.');
+    }
+    res.setHeader('Content-Type', 'image/png');
+    res.send(image);
+  }
+
+  /** Same as above, for a legitimate SIGNER (org representative or adopter). */
+  @Get(':id/signatures/:signerId/image')
+  async signatureImage(
+    @CurrentUser() actor: RequestUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('signerId', ParseUUIDPipe) signerId: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    res.setHeader('Cache-Control', 'no-store');
+    const image = await this.service.getSignatureImage(actor, id, signerId);
+    if (!image) {
+      throw new NotFoundException('Firma no disponible todavía.');
+    }
+    res.setHeader('Content-Type', 'image/png');
+    res.send(image);
   }
 }

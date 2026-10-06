@@ -9,6 +9,7 @@ const payload: AdoptionContractPayload = {
   applicant: { fullName: 'Adoptante Uno', email: 'a1@test.local' },
   applicableLaws: ['Ley 527/1999', 'Ley 1581/2012'],
   terms: 'Cláusulas del contrato de adopción.',
+  data: { followUpMonths: 6 },
 };
 
 describe('adoption contract hash', () => {
@@ -22,6 +23,7 @@ describe('adoption contract hash', () => {
     // Same content, keys inserted in a different order.
     const reordered: AdoptionContractPayload = {
       terms: payload.terms,
+      data: { followUpMonths: payload.data.followUpMonths },
       applicant: { email: payload.applicant.email, fullName: payload.applicant.fullName },
       applicableLaws: payload.applicableLaws,
       animal: { species: 'dog', name: 'Firulais', animalId: payload.animalId },

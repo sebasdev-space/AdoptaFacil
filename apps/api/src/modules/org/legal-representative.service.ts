@@ -12,12 +12,12 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { TenantContextService } from '../../core/tenant/tenant-context.service';
 import { STORAGE_PORT, type StoragePort } from '../../core/storage/storage.port';
 import {
-  LEGAL_REPRESENTATIVE_CONFIG,
+  SIGNATURE_ENCRYPTION_CONFIG,
   decryptSignature,
   encryptSignature,
   hashSignature,
-  type LegalRepresentativeConfig,
-} from './legal-representative-crypto';
+  type SignatureEncryptionConfig,
+} from '../../core/crypto/signature-crypto';
 
 /** The CURRENT legal representative's public identity + DECRYPTED signature
  *  image bytes — for another module to print on an official document (e.g.
@@ -62,7 +62,7 @@ export class LegalRepresentativeService {
     private readonly tenant: TenantContextService,
     private readonly audit: AuditService,
     @Inject(STORAGE_PORT) private readonly storage: StoragePort,
-    @Inject(LEGAL_REPRESENTATIVE_CONFIG) private readonly config: LegalRepresentativeConfig,
+    @Inject(SIGNATURE_ENCRYPTION_CONFIG) private readonly config: SignatureEncryptionConfig,
   ) {}
 
   private requireOrgId(): string {

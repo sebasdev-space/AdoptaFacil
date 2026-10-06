@@ -12,9 +12,9 @@ import { FakeDianAdapter } from './fake-dian.adapter';
 import { FormalizationController } from './formalization.controller';
 import { FormalizationService } from './formalization.service';
 import {
-  LEGAL_REPRESENTATIVE_CONFIG,
-  loadLegalRepresentativeConfig,
-} from './legal-representative-crypto';
+  SIGNATURE_ENCRYPTION_CONFIG,
+  loadSignatureEncryptionConfig,
+} from '../../core/crypto/signature-crypto';
 import { LegalRepresentativeController } from './legal-representative.controller';
 import { LegalRepresentativeService } from './legal-representative.service';
 import { OrgController } from './org.controller';
@@ -60,7 +60,7 @@ import { PublicPlatformSettingsController } from './public-platform-settings.con
     DuplicateDetectionService,
     PlatformDuplicatesService,
     LegalRepresentativeService,
-    { provide: LEGAL_REPRESENTATIVE_CONFIG, useFactory: loadLegalRepresentativeConfig },
+    { provide: SIGNATURE_ENCRYPTION_CONFIG, useFactory: loadSignatureEncryptionConfig },
     OrganizationSummaryService,
     PlatformDocumentsService,
     PlatformSettingsService,

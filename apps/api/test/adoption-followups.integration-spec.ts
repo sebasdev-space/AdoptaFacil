@@ -85,6 +85,22 @@ describe('Adoption follow-up (M04: post-adoption tracking)', () => {
       .expect(201);
     animalId = animal.body.id;
 
+    // Firmar como representante (nuevo requerimiento T-028b) exige tener un
+    // representante legal ya registrado en la organización.
+    await request(server)
+      .post('/org/legal-representative')
+      .set('Authorization', `Bearer ${refugeToken}`)
+      .send({
+        role: 'legal_representative',
+        fullName: 'Representante Refugio',
+        documentType: 'cedula_ciudadania',
+        documentNumber: '987654321',
+        position: 'Representante legal',
+        signatureBase64: Buffer.from('fake-rep-signature').toString('base64'),
+        signatureContentType: 'image/png',
+      })
+      .expect(201);
+
     const req = await request(server)
       .post('/adoptions')
       .set('Authorization', `Bearer ${personToken}`)
@@ -119,6 +135,13 @@ describe('Adoption follow-up (M04: post-adoption tracking)', () => {
     const adopterSignerId = contract.body.signers.find(
       (s: { role: string }) => s.role === 'adopter',
     ).id;
+    // El representante firma primero, en `draft` (reutiliza la firma ya
+    // registrada arriba, no manda `signatureBase64`).
+    await request(server)
+      .post(`/adoptions/contracts/${contractId}/signatures`)
+      .set('Authorization', `Bearer ${refugeToken}`)
+      .send({ signerId: orgSignerId })
+      .expect(201);
     await request(server)
       .post(`/adoptions/contracts/${contractId}/transitions`)
       .set('Authorization', `Bearer ${refugeToken}`)
@@ -126,13 +149,12 @@ describe('Adoption follow-up (M04: post-adoption tracking)', () => {
       .expect(201);
     await request(server)
       .post(`/adoptions/contracts/${contractId}/signatures`)
-      .set('Authorization', `Bearer ${refugeToken}`)
-      .send({ signerId: orgSignerId })
-      .expect(201);
-    await request(server)
-      .post(`/adoptions/contracts/${contractId}/signatures`)
       .set('Authorization', `Bearer ${personToken}`)
-      .send({ signerId: adopterSignerId })
+      .send({
+        signerId: adopterSignerId,
+        signatureBase64: Buffer.from('fake-adopter-signature').toString('base64'),
+        signatureContentType: 'image/png',
+      })
       .expect(201);
   });
 

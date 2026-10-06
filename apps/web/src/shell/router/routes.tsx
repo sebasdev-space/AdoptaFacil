@@ -79,6 +79,7 @@ import {
 } from '../../features/community';
 import { AnimalsPage, RemindersInboxPage } from '../../features/animals';
 import {
+  AdoptionContractPage,
   AdoptionRequestPage,
   AdoptionsKanbanPage,
   MyAdoptionRequestsPage,
@@ -262,6 +263,12 @@ export function AppRoutes() {
             }
           />
           <Route path="adopciones/solicitar" element={<AdoptionRequestPage />} />
+          {/* T-028b (nuevo requerimiento): detalle del contrato — SIN
+              <RequireRoles>, a diferencia de "/adopciones": la visitan tanto
+              la organización (gestiona) como el adoptante (firma su parte);
+              la página misma decide qué mostrar según el rol/identidad —
+              RolesGuard en la API sigue siendo la autoridad real. */}
+          <Route path="adopciones/contratos/:id" element={<AdoptionContractPage />} />
           {/* F1-01: "Mis solicitudes" de la Persona — GET /adoptions/mine no tiene
               gate de rol (igual que /donaciones), así que esta ruta tampoco lleva
               <RequireRoles>; el nav item ya la oculta a cuentas de organización
