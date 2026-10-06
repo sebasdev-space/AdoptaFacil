@@ -197,6 +197,44 @@ describe('MyVolunteeringPage (RF18/RF19)', () => {
     expect(body.hours).toBe(3);
   });
 
+  it('nuevo requerimiento: oculta "Registrar horas" una vez la organización emitió el certificado de esa inscripción', async () => {
+    stubFetch((url) => {
+      if (url.includes('/public/volunteer-opportunities')) {
+        return { items: [], total: 0, limit: 50, offset: 0 };
+      }
+      if (url.includes('/volunteer-enrollments/mine')) return [ACCEPTED_MINE];
+      if (url.includes('/service-hours/mine')) return [];
+      if (url.includes('/volunteer-certificates/mine')) {
+        return [
+          {
+            id: 'cert-1',
+            organizationId: 'org-1',
+            enrollmentId: 'en-1',
+            volunteerUserId: 'vol-1',
+            volunteerName: 'Juan Voluntario',
+            organizationName: 'Refugio Patitas',
+            opportunityTitle: 'Jornada de esterilización',
+            totalApprovedHours: 12,
+            periodStart: '2026-09-01T00:00:00.000Z',
+            periodEnd: '2026-09-30T00:00:00.000Z',
+            appliesToStudentService: false,
+            issuedByUserId: 'owner-1',
+            issuedAt: '2026-10-01T00:00:00.000Z',
+          },
+        ];
+      }
+      return {};
+    });
+    renderShell({ route: '/voluntariado', ...sessionWith([]) });
+
+    expect(
+      await screen.findByText(
+        'Ya se emitió tu certificado para esta inscripción — no se pueden registrar más horas.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Registrar horas' })).not.toBeInTheDocument();
+  });
+
   it('shows a certificate and offers to download it', async () => {
     stubFetch((url) => {
       if (url.includes('/public/volunteer-opportunities')) {

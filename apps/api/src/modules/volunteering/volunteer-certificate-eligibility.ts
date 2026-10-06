@@ -13,6 +13,15 @@ export function sumApprovedHours(
 }
 
 /**
+ * Nuevo requerimiento (voluntariado): la organización no puede emitir un
+ * certificado mientras queden horas `pending` sin decidir (aprobar/rechazar)
+ * — debe "cerrar el libro" de esa inscripción primero.
+ */
+export function hasPendingHours(entries: ReadonlyArray<{ status: string }>): boolean {
+  return entries.some((entry) => entry.status === 'pending');
+}
+
+/**
  * Minimum effective hours for the student social service certificate (RF19,
  * Resolución 4210/1996 art. 6°). 80h is the legal default the base document
  * cites; a specific school/organization agreement could differ —

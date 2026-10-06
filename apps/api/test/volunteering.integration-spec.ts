@@ -193,13 +193,55 @@ describe('Volunteering (M08, RF18/RF19)', () => {
     }).expect(201);
     expect(hoursLogged.body.status).toBe('pending');
 
-    // General volunteering: certificate CAN be issued even with 0 approved hours.
+    // New gate: issuance is blocked while the hour above is still pending.
+    const blockedByPending = await issueCertificate(org.token, enrollmentId).expect(400);
+    expect(blockedByPending.body.message).toMatch(/pendientes de aprobar o rechazar/i);
+
+    // Reject it — general volunteering: certificate CAN still be issued with
+    // 0 APPROVED hours, as long as nothing is left pending.
+    await decideHours(org.token, hoursLogged.body.id, {
+      decision: 'reject',
+      reason: 'No se pudo verificar la asistencia',
+    }).expect(200);
     const earlyCert = await issueCertificate(org.token, enrollmentId).expect(201);
     expect(earlyCert.body.totalApprovedHours).toBe(0);
 
     // Undo: that consumed the one-certificate-per-enrollment slot — verify a
     // second issuance attempt is rejected (never a silent re-issue).
     await issueCertificate(org.token, enrollmentId).expect(400);
+  });
+
+  it('nuevo requerimiento: no se puede emitir un certificado sin ninguna hora registrada', async () => {
+    const opportunity = await publishOpportunity(org.token, false).expect(201);
+    const enrolled = await enroll(volunteer.token, opportunity.body.id).expect(201);
+    await decideEnrollment(org.token, enrolled.body.id, { decision: 'accept' }).expect(200);
+
+    const blocked = await issueCertificate(org.token, enrolled.body.id).expect(400);
+    expect(blocked.body.message).toMatch(/no tiene horas registradas/i);
+  });
+
+  it('nuevo requerimiento: una vez emitido el certificado, el voluntario ya no puede registrar más horas sobre esa inscripción', async () => {
+    const opportunity = await publishOpportunity(org.token, false).expect(201);
+    const enrolled = await enroll(volunteer.token, opportunity.body.id).expect(201);
+    const enrollmentId = enrolled.body.id;
+    await decideEnrollment(org.token, enrollmentId, { decision: 'accept' }).expect(200);
+
+    const firstSession = await logHours(volunteer.token, {
+      enrollmentId,
+      date: '2026-09-06T00:00:00.000Z',
+      hours: 3,
+      description: 'Primera jornada',
+    }).expect(201);
+    await decideHours(org.token, firstSession.body.id, { decision: 'approve' }).expect(200);
+    await issueCertificate(org.token, enrollmentId).expect(201);
+
+    const blocked = await logHours(volunteer.token, {
+      enrollmentId,
+      date: '2026-09-07T00:00:00.000Z',
+      hours: 2,
+      description: 'Intento tardío',
+    }).expect(400);
+    expect(blocked.body.message).toMatch(/ya se emitió un certificado/i);
   });
 
   it("S-14: the certificate PDF embeds the org's CURRENT legal representative + signature when one is registered", async () => {
@@ -223,6 +265,16 @@ describe('Volunteering (M08, RF18/RF19)', () => {
     const opportunity = await publishOpportunity(org.token, false).expect(201);
     const enrolled = await enroll(volunteer.token, opportunity.body.id).expect(201);
     await decideEnrollment(org.token, enrolled.body.id, { decision: 'accept' }).expect(200);
+
+    // New gate: at least one decided hour entry is required before issuance.
+    const logged = await logHours(volunteer.token, {
+      enrollmentId: enrolled.body.id,
+      date: '2026-09-18T00:00:00.000Z',
+      hours: 2,
+      description: 'Jornada de apoyo',
+    }).expect(201);
+    await decideHours(org.token, logged.body.id, { decision: 'approve' }).expect(200);
+
     const issued = await issueCertificate(org.token, enrolled.body.id).expect(201);
 
     // Still a valid PDF (never breaks generation because a signer now
@@ -339,13 +391,15 @@ describe('Volunteering (M08, RF18/RF19)', () => {
       .get('/service-hours/mine')
       .set('Authorization', `Bearer ${volunteer.token}`)
       .expect(200);
+    // Scoped to THIS test's own enrollment — `volunteer` is shared across the
+    // whole describe block, so a global count would couple this assertion to
+    // how many hours every other test happens to log/decide for them.
+    const ownHours = mineHours.body.filter(
+      (h: { enrollmentId: string }) => h.enrollmentId === enrollmentId,
+    );
     // 4 approved sessions (2 + 2, 20h each = 80h) + 1 rejected — never counted.
-    expect(mineHours.body.filter((h: { status: string }) => h.status === 'approved')).toHaveLength(
-      4,
-    );
-    expect(mineHours.body.filter((h: { status: string }) => h.status === 'rejected')).toHaveLength(
-      1,
-    );
+    expect(ownHours.filter((h: { status: string }) => h.status === 'approved')).toHaveLength(4);
+    expect(ownHours.filter((h: { status: string }) => h.status === 'rejected')).toHaveLength(1);
   });
 
   it('S-12: a minor student-service enrollment without guardian info blocks issuance, even at the hour minimum', async () => {
@@ -441,11 +495,20 @@ describe('Volunteering (M08, RF18/RF19)', () => {
     );
     await decideEnrollment(org.token, enrolled.body.id, { decision: 'accept' }).expect(200);
 
-    // General volunteering has no hour minimum — issuable immediately, no
-    // guardian gate applies (S-12's gate is scoped to appliesToStudentService).
+    // General volunteering has no hour MINIMUM — but at least one decided
+    // hour is now required (new gate) before issuance is allowed at all.
+    const logged = await logHours(volunteer.token, {
+      enrollmentId: enrolled.body.id,
+      date: '2026-09-20T00:00:00.000Z',
+      hours: 2,
+      description: 'Jornada de apoyo',
+    }).expect(201);
+    await decideHours(org.token, logged.body.id, { decision: 'approve' }).expect(200);
+
+    // No guardian gate applies (S-12's gate is scoped to appliesToStudentService).
     const issued = await issueCertificate(org.token, enrolled.body.id).expect(201);
-    expect(issued.body.totalApprovedHours).toBe(0);
-    expect(issued.body.bitacora).toEqual([]);
+    expect(issued.body.totalApprovedHours).toBe(2);
+    expect(issued.body.bitacora).toHaveLength(1);
   });
 
   it('tenant isolation: another org cannot decide on this enrollment, read its certificate, or see it in its own queue', async () => {
@@ -462,6 +525,16 @@ describe('Volunteering (M08, RF18/RF19)', () => {
     expect(otherQueue.body.items.some((e: { id: string }) => e.id === enrollmentId)).toBe(false);
 
     await decideEnrollment(org.token, enrollmentId, { decision: 'accept' }).expect(200);
+
+    // New gate: at least one decided hour entry is required before issuance.
+    const logged = await logHours(volunteer.token, {
+      enrollmentId,
+      date: '2026-09-21T00:00:00.000Z',
+      hours: 1,
+      description: 'Apoyo puntual',
+    }).expect(201);
+    await decideHours(org.token, logged.body.id, { decision: 'approve' }).expect(200);
+
     const issued = await issueCertificate(org.token, enrollmentId).expect(201);
 
     // Another PERSON (not the volunteer, not the org) cannot read the certificate.

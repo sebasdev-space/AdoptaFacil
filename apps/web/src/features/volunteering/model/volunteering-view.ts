@@ -1,3 +1,4 @@
+import type { ServiceHours } from '@adoptafacil/contracts';
 import {
   ServiceHoursStatus,
   VolunteerEnrollmentStatus,
@@ -83,4 +84,15 @@ export function formatHours(hours: number): string {
 export function parseSessionHours(value: string): number | null {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 && parsed <= 24 ? parsed : null;
+}
+
+/**
+ * Nuevo requerimiento (voluntariado): la organización solo puede emitir el
+ * certificado cuando hay AL MENOS una hora registrada y NINGUNA sigue
+ * `pending` — debe aprobar/rechazar todo primero. Mismo criterio que ya
+ * aplica en el backend (`volunteer-certificate-eligibility.ts`), replicado
+ * aquí para habilitar/deshabilitar el botón sin round-trip.
+ */
+export function canIssueCertificate(entries: ServiceHours[]): boolean {
+  return entries.length > 0 && entries.every((entry) => entry.status !== 'pending');
 }

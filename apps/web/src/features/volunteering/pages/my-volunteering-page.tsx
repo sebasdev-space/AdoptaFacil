@@ -157,6 +157,9 @@ export function MyVolunteeringPage() {
   };
 
   const enrolledOpportunityIds = new Set(enrollments.map((e) => e.opportunityId));
+  // Nuevo requerimiento: una vez la organización emite el certificado de una
+  // inscripción, el voluntario ya no puede registrar más horas sobre ella.
+  const certifiedEnrollmentIds = new Set(certificates.map((c) => c.enrollmentId));
 
   return (
     <PageContainer>
@@ -234,7 +237,12 @@ export function MyVolunteeringPage() {
                       )}
                       {(enrollment.status === 'accepted' || enrollment.status === 'completed') && (
                         <div className="space-y-2">
-                          {logForEnrollmentId === enrollment.id ? (
+                          {certifiedEnrollmentIds.has(enrollment.id) ? (
+                            <p className="text-xs text-muted-foreground">
+                              Ya se emitió tu certificado para esta inscripción — no se pueden
+                              registrar más horas.
+                            </p>
+                          ) : logForEnrollmentId === enrollment.id ? (
                             <div className="grid gap-2 sm:grid-cols-3">
                               <Input
                                 type="date"
