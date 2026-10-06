@@ -131,7 +131,7 @@ describe('Animal death registration (M07 hallazgo QA, POST /animals/:id/register
     await request(server)
       .post(`/sponsorships/${sponsorshipId2}/cancel`)
       .set('Authorization', `Bearer ${owner.token}`)
-      .send({})
+      .send({ reason: 'Prueba de cancelación previa al fallecimiento' })
       .expect(200);
 
     const res = await request(server)

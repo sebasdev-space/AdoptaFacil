@@ -53,10 +53,21 @@ export const createSponsorshipSchema = z
   })
   .strict();
 
-/** Optional free-text reason accompanying a suspend/cancel action. */
+/** Optional free-text reason accompanying a suspend/reactivate action. */
 export const sponsorshipStatusChangeSchema = z
   .object({
     reason: z.string().trim().min(1).max(500).optional(),
+  })
+  .strict();
+
+/**
+ * Requerimiento #19: cancelling a sponsorship REQUIRES a reason (unlike
+ * suspend/reactivate above) — the client asked that every cancellation leave
+ * an auditable "why" behind.
+ */
+export const cancelSponsorshipSchema = z
+  .object({
+    reason: z.string().trim().min(1).max(500),
   })
   .strict();
 

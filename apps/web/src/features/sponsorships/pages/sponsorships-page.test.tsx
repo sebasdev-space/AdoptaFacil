@@ -226,7 +226,7 @@ describe('SponsorshipsPage — apadrinamientos recibidos por la organización (S
     expect(screen.queryByRole('button', { name: 'Cancelar' })).not.toBeInTheDocument();
   });
 
-  it('cancelar pide confirmación (acción terminal) antes de llamar al endpoint', async () => {
+  it('cancelar pide confirmación (acción terminal) y requiere motivo antes de llamar al endpoint (requerimiento #19)', async () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     stubFetch((url, init) => {
       calls.push({ url, init });
@@ -241,12 +241,23 @@ describe('SponsorshipsPage — apadrinamientos recibidos por la organización (S
     expect(screen.getByText(/no puede reactivarse/)).toBeInTheDocument();
     expect(calls.some((c) => c.init?.method === 'POST')).toBe(false);
 
+    // Sin motivo, el botón de confirmación queda deshabilitado.
+    expect(screen.getByRole('button', { name: 'Sí, cancelar' })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Motivo de la cancelación'), {
+      target: { value: 'El padrino lo solicitó por correo' },
+    });
+    expect(screen.getByRole('button', { name: 'Sí, cancelar' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: 'Sí, cancelar' }));
 
-    await waitFor(() => {
-      const post = calls.find((c) => c.init?.method === 'POST');
-      expect(post).toBeDefined();
-      expect(post?.url).toContain('/sponsorships/s-1/cancel');
+    const post = await waitFor(() => {
+      const found = calls.find((c) => c.init?.method === 'POST');
+      expect(found).toBeDefined();
+      expect(found?.url).toContain('/sponsorships/s-1/cancel');
+      return found;
+    });
+    expect(JSON.parse(String(post?.init?.body))).toEqual({
+      reason: 'El padrino lo solicitó por correo',
     });
     expect(await screen.findByText('Apadrinamiento cancelado')).toBeInTheDocument();
   });
