@@ -1,0 +1,58 @@
+erDiagram
+  community_posts {
+    uuid id PK
+    uuid organization_id FK
+    uuid author_user_id
+    text author_name
+    text type
+    text title
+    text body
+    text status
+    integer comment_count
+    integer like_count
+    text moderation_reason
+    uuid moderated_by_user_id
+    timestamp3 moderated_at
+    timestamp3 created_at
+    timestamp3 updated_at
+  }
+  community_post_images {
+    uuid id PK
+    uuid organization_id FK
+    uuid post_id FK
+    text storage_ref
+    integer order
+    timestamp3 created_at
+  }
+  community_comments {
+    uuid id PK
+    uuid organization_id FK
+    uuid post_id FK
+    uuid author_user_id
+    text author_name
+    text body
+    timestamp3 created_at
+  }
+  community_post_likes {
+    uuid post_id FK
+    uuid user_id
+    uuid organization_id FK
+    timestamp3 created_at
+  }
+  organizations {
+    uuid id PK
+  }
+  users {
+    uuid id PK
+    uuid organization_id FK
+  }
+  organizations |o--o{ community_posts : "organization_id"
+  community_posts ||--o{ community_post_images : "post_id"
+  organizations |o--o{ community_post_images : "organization_id"
+  community_posts ||--o{ community_comments : "post_id"
+  organizations |o--o{ community_comments : "organization_id"
+  community_posts ||--o{ community_post_likes : "post_id"
+  organizations |o--o{ community_post_likes : "organization_id"
+  users ||..o{ community_posts : "author_user_id (lógica)"
+  users |o..o{ community_posts : "moderated_by_user_id (lógica)"
+  users ||..o{ community_comments : "author_user_id (lógica)"

@@ -1,0 +1,27 @@
+erDiagram
+  products {
+    uuid id PK
+    uuid organization_id FK
+    text name
+    text description
+    text category
+    integer price
+    integer stock
+    boolean is_active
+    timestamp3 created_at
+    timestamp3 updated_at
+  }
+  product_images {
+    uuid id PK
+    uuid organization_id FK
+    uuid product_id FK
+    text storage_ref
+    integer order
+    timestamp3 created_at
+  }
+  organizations {
+    uuid id PK
+  }
+  organizations ||--o{ products : "organization_id"
+  products ||--o{ product_images : "product_id"
+  organizations ||--o{ product_images : "organization_id"

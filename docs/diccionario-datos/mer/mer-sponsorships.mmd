@@ -1,0 +1,88 @@
+erDiagram
+  sponsorship_plans {
+    uuid id PK
+    uuid organization_id FK
+    uuid animal_id FK
+    text name
+    integer amount
+    text periodicity
+    boolean is_active
+    timestamp3 created_at
+    timestamp3 updated_at
+  }
+  sponsorships {
+    uuid id PK
+    uuid organization_id FK
+    uuid plan_id FK
+    uuid animal_id FK
+    uuid sponsor_user_id
+    text sponsor_name
+    text status
+    timestamp3 started_at
+    timestamp3 suspended_at
+    timestamp3 cancelled_at
+    timestamp3 next_billing_at
+    timestamp3 created_at
+    timestamp3 updated_at
+  }
+  sponsorship_payments {
+    uuid id PK
+    uuid organization_id FK
+    uuid sponsorship_id FK
+    text period
+    text status
+    timestamp3 period_started_at
+    integer attempt_count
+    integer reminders_sent
+    timestamp3 paid_at
+    timestamp3 failed_at
+    timestamp3 created_at
+    timestamp3 updated_at
+  }
+  sponsorship_payment_attempts {
+    uuid id PK
+    uuid organization_id FK
+    uuid sponsorship_payment_id FK
+    integer attempt_number
+    text collection_id
+    text payment_link_url
+    text idempotency_key UK
+    timestamp3 expires_at
+    text result
+    timestamp3 created_at
+  }
+  sponsorship_status_history {
+    uuid id PK
+    uuid organization_id FK
+    uuid sponsorship_id FK
+    text from_status
+    text to_status
+    uuid actor_user_id
+    text reason
+    timestamp3 created_at
+  }
+  organizations {
+    uuid id PK
+  }
+  animals {
+    uuid id PK
+    uuid organization_id FK
+    uuid breed_id FK
+  }
+  users {
+    uuid id PK
+    uuid organization_id FK
+  }
+  organizations ||--o{ sponsorship_plans : "organization_id"
+  animals ||--o{ sponsorship_plans : "animal_id"
+  sponsorship_plans ||--o{ sponsorships : "plan_id"
+  organizations ||--o{ sponsorships : "organization_id"
+  animals ||--o{ sponsorships : "animal_id"
+  sponsorships ||--o{ sponsorship_payments : "sponsorship_id"
+  organizations ||--o{ sponsorship_payments : "organization_id"
+  sponsorship_payments ||--o{ sponsorship_payment_attempts : "sponsorship_payment_id"
+  organizations ||--o{ sponsorship_payment_attempts : "organization_id"
+  sponsorships ||--o{ sponsorship_status_history : "sponsorship_id"
+  organizations ||--o{ sponsorship_status_history : "organization_id"
+  users ||..o{ sponsorships : "sponsor_user_id (lógica)"
+  users |o..o{ sponsorship_status_history : "actor_user_id (lógica)"

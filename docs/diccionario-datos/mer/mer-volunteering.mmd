@@ -1,0 +1,90 @@
+erDiagram
+  volunteer_opportunities {
+    uuid id PK
+    uuid organization_id FK
+    text title
+    text description
+    text category
+    timestamp3 start_date
+    timestamp3 end_date
+    integer capacity
+    text location
+    text requirements
+    boolean applies_to_student_service
+    text status
+    timestamp3 created_at
+    timestamp3 updated_at
+  }
+  volunteer_enrollments {
+    uuid id PK
+    uuid organization_id FK
+    uuid opportunity_id FK
+    uuid volunteer_user_id FK
+    text volunteer_name
+    text volunteer_email
+    boolean applies_to_student_service
+    text status
+    text rejection_reason
+    uuid decided_by_user_id
+    timestamp3 decided_at
+    timestamp3 created_at
+    boolean is_minor
+    text guardian_name
+    text guardian_document
+    text school_name
+    text school_agreement_code
+  }
+  service_hours {
+    uuid id PK
+    uuid organization_id FK
+    uuid enrollment_id FK
+    uuid volunteer_user_id FK
+    timestamp3 date
+    doubleprecision hours
+    text description
+    text status
+    text rejection_reason
+    uuid decided_by_user_id
+    timestamp3 decided_at
+    timestamp3 created_at
+  }
+  volunteer_certificates {
+    uuid id PK
+    uuid organization_id FK
+    uuid enrollment_id FK,UK
+    uuid volunteer_user_id FK
+    text volunteer_name
+    text organization_name
+    text opportunity_title
+    doubleprecision total_approved_hours
+    timestamp3 period_start
+    timestamp3 period_end
+    boolean applies_to_student_service
+    uuid issued_by_user_id
+    timestamp3 issued_at
+    text guardian_name
+    text guardian_document
+    text school_name
+    text school_agreement_code
+    jsonb bitacora
+  }
+  organizations {
+    uuid id PK
+  }
+  users {
+    uuid id PK
+    uuid organization_id FK
+  }
+  organizations ||--o{ volunteer_opportunities : "organization_id"
+  volunteer_opportunities ||--o{ volunteer_enrollments : "opportunity_id"
+  organizations ||--o{ volunteer_enrollments : "organization_id"
+  users ||--o{ volunteer_enrollments : "volunteer_user_id"
+  volunteer_enrollments ||--o{ service_hours : "enrollment_id"
+  organizations ||--o{ service_hours : "organization_id"
+  users ||--o{ service_hours : "volunteer_user_id"
+  volunteer_enrollments ||--o| volunteer_certificates : "enrollment_id"
+  organizations ||--o{ volunteer_certificates : "organization_id"
+  users ||--o{ volunteer_certificates : "volunteer_user_id"
+  users |o..o{ volunteer_enrollments : "decided_by_user_id (lógica)"
+  users |o..o{ service_hours : "decided_by_user_id (lógica)"
+  users ||..o{ volunteer_certificates : "issued_by_user_id (lógica)"
