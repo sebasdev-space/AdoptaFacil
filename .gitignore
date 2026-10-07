@@ -48,6 +48,5 @@ Thumbs.db
 # Local AI tooling (personal, not shared with the team)
 .claude/
 
-# Local AI tooling (personal; AGENTS.md is a stale copy of CLAUDE.md)
+# Local AI tooling (personal, not shared with the team)
 .codex/
-AGENTS.md
