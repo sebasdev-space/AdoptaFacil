@@ -1,0 +1,24 @@
+erDiagram
+  reviews {
+    uuid id PK
+    uuid organization_id FK
+    uuid author_user_id FK
+    integer rating
+    text comment
+    boolean is_anonymous
+    text status
+    uuid moderated_by_user_id FK
+    timestamp3 moderated_at
+    text rejection_reason
+    timestamp3 created_at
+  }
+  organizations {
+    uuid id PK
+  }
+  users {
+    uuid id PK
+    uuid organization_id FK
+  }
+  organizations ||--o{ reviews : "organization_id"
+  users |o--o{ reviews : "author_user_id"
+  users |o--o{ reviews : "moderated_by_user_id"

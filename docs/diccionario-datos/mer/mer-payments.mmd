@@ -1,0 +1,45 @@
+erDiagram
+  organization_bank_accounts {
+    uuid organization_id PK,FK
+    text bank_code
+    text account_type
+    text account_number
+    text account_holder_name
+    text account_holder_document
+    timestamp3 created_at
+    timestamp3 updated_at
+  }
+  payouts {
+    uuid id PK
+    uuid organization_id FK
+    integer amount
+    text currency
+    text idempotency_key
+    text wompi_payout_id UK
+    text status
+    integer attempts
+    text last_error
+    timestamp3 created_at
+    timestamp3 updated_at
+  }
+  organization_mercadopago_accounts {
+    uuid id PK
+    uuid organization_id FK,UK
+    text mp_user_id
+    text access_token
+    text refresh_token
+    timestamp3 expires_at
+    timestamp3 connected_at
+    timestamp3 updated_at
+  }
+  organizations {
+    uuid id PK
+  }
+  users {
+    uuid id PK
+    uuid organization_id FK
+  }
+  organizations ||--o{ organization_bank_accounts : "organization_id"
+  organizations ||--o{ payouts : "organization_id"
+  organizations ||--o| organization_mercadopago_accounts : "organization_id"
+  users ||..o{ organization_mercadopago_accounts : "mp_user_id (lógica)"

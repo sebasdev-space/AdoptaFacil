@@ -1,0 +1,94 @@
+erDiagram
+  resource_needs {
+    uuid id PK
+    uuid organization_id FK
+    text title
+    text description
+    text category
+    integer quantity_needed
+    text unit
+    integer quantity_fulfilled
+    text status
+    timestamp3 created_at
+    timestamp3 updated_at
+  }
+  resource_offers {
+    uuid id PK
+    uuid organization_id FK
+    uuid need_id FK
+    uuid donor_user_id
+    integer quantity_offered
+    text message
+    text status
+    text proof_status
+    uuid proof_validated_by_user_id
+    timestamp3 proof_validated_at
+    text proof_validation_reason
+    timestamp3 created_at
+    timestamp3 updated_at
+  }
+  resource_offer_proofs {
+    uuid id PK
+    uuid organization_id FK
+    uuid offer_id FK
+    uuid uploaded_by_user_id
+    text filename
+    text content_type
+    integer size_bytes
+    text storage_ref
+    timestamp3 created_at
+  }
+  resource_deliveries {
+    uuid id PK
+    uuid organization_id FK
+    uuid offer_id FK,UK
+    uuid need_id
+    text method
+    timestamp3 scheduled_at
+    text status
+    timestamp3 completed_at
+    timestamp3 created_at
+    timestamp3 updated_at
+  }
+  resource_delivery_evidences {
+    uuid id PK
+    uuid organization_id FK
+    uuid delivery_id FK
+    text caption
+    text storage_ref
+    integer order
+    timestamp3 deleted_at
+    timestamp3 created_at
+    timestamp3 updated_at
+  }
+  resource_fulfillment_applications {
+    uuid id PK
+    uuid organization_id FK
+    uuid delivery_id FK,UK
+    uuid need_id
+    integer quantity_applied
+    timestamp3 created_at
+  }
+  organizations {
+    uuid id PK
+  }
+  users {
+    uuid id PK
+    uuid organization_id FK
+  }
+  organizations ||--o{ resource_needs : "organization_id"
+  resource_needs ||--o{ resource_offers : "need_id"
+  organizations ||--o{ resource_offers : "organization_id"
+  resource_offers ||--o{ resource_offer_proofs : "offer_id"
+  organizations ||--o{ resource_offer_proofs : "organization_id"
+  resource_offers ||--o| resource_deliveries : "offer_id"
+  organizations ||--o{ resource_deliveries : "organization_id"
+  resource_deliveries ||--o{ resource_delivery_evidences : "delivery_id"
+  organizations ||--o{ resource_delivery_evidences : "organization_id"
+  resource_deliveries ||--o| resource_fulfillment_applications : "delivery_id"
+  organizations ||--o{ resource_fulfillment_applications : "organization_id"
+  resource_needs ||..o{ resource_deliveries : "need_id (lógica)"
+  resource_needs ||..o{ resource_fulfillment_applications : "need_id (lógica)"
+  users ||..o{ resource_offers : "donor_user_id (lógica)"
+  users |o..o{ resource_offers : "proof_validated_by_user_id (lógica)"
+  users ||..o{ resource_offer_proofs : "uploaded_by_user_id (lógica)"

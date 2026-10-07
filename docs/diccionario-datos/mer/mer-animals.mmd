@@ -1,0 +1,130 @@
+erDiagram
+  animals {
+    uuid id PK
+    uuid organization_id FK
+    text name
+    text species
+    text sex
+    text size
+    text status
+    uuid breed_id FK
+    text custom_breed
+    timestamp3 birth_date
+    integer approximate_age_months
+    text description
+    textArr tags
+    boolean is_active
+    timestamp3 created_at
+    timestamp3 updated_at
+  }
+  animal_photos {
+    uuid id PK
+    uuid organization_id FK
+    uuid animal_id FK
+    text storage_ref
+    integer order
+    timestamp3 created_at
+  }
+  animal_breeds {
+    uuid id PK
+    uuid organization_id FK
+    text species
+    text name
+    timestamp3 created_at
+  }
+  clinical_events {
+    uuid id PK
+    uuid event_id
+    uuid organization_id FK
+    uuid animal_id FK
+    text type
+    timestamp3 occurred_at
+    timestamp3 next_due_date
+    jsonb details
+    integer version
+    uuid author_user_id
+    timestamp3 created_at
+  }
+  clinical_event_attachments {
+    uuid id PK
+    uuid organization_id FK
+    uuid clinical_event_id FK
+    text storage_ref
+    integer order
+    timestamp3 created_at
+  }
+  clinical_reminders {
+    uuid id PK
+    uuid organization_id FK
+    uuid animal_id FK
+    uuid clinical_event_id
+    text reminder_type
+    timestamp3 due_date
+    text status
+    text channel
+    timestamp3 created_at
+    timestamp3 sent_at
+    timestamp3 resolved_at
+    uuid resolved_by_user_id
+  }
+  animal_behavior_disclosures {
+    uuid id PK
+    uuid organization_id
+    uuid animal_id FK
+    uuid declared_by_user_id
+    text signed_by_name
+    text reactivity_notes
+    boolean bite_history
+    text bite_history_detail
+    text children_compatibility
+    text medical_conditions_relevant
+    text signature_hash
+    timestamp3 declared_at
+  }
+  organizations {
+    uuid id PK
+  }
+  sponsorship_plans {
+    uuid id PK
+    uuid organization_id FK
+    uuid animal_id FK
+  }
+  sponsorships {
+    uuid id PK
+    uuid organization_id FK
+    uuid plan_id FK
+    uuid animal_id FK
+  }
+  adoption_requests {
+    uuid id PK
+    uuid organization_id FK
+  }
+  adoption_contracts {
+    uuid id PK
+    uuid organization_id FK
+    uuid request_id FK
+  }
+  users {
+    uuid id PK
+    uuid organization_id FK
+  }
+  animal_breeds |o--o{ animals : "breed_id"
+  organizations ||--o{ animals : "organization_id"
+  animals ||--o{ animal_photos : "animal_id"
+  organizations ||--o{ animal_photos : "organization_id"
+  organizations ||--o{ animal_breeds : "organization_id"
+  animals ||--o{ clinical_events : "animal_id"
+  organizations ||--o{ clinical_events : "organization_id"
+  clinical_events ||--o{ clinical_event_attachments : "clinical_event_id"
+  organizations ||--o{ clinical_event_attachments : "organization_id"
+  animals ||--o{ clinical_reminders : "animal_id"
+  organizations ||--o{ clinical_reminders : "organization_id"
+  animals ||--o{ animal_behavior_disclosures : "animal_id"
+  animals ||--o{ sponsorship_plans : "animal_id"
+  animals ||--o{ sponsorships : "animal_id"
+  animals ||..o{ adoption_requests : "animal_id (lógica)"
+  animals ||..o{ adoption_contracts : "animal_id (lógica)"
+  clinical_events ||..o{ clinical_reminders : "clinical_event_id (lógica)"
+  users ||..o{ clinical_events : "author_user_id (lógica)"
+  users |o..o{ clinical_reminders : "resolved_by_user_id (lógica)"
+  users ||..o{ animal_behavior_disclosures : "declared_by_user_id (lógica)"

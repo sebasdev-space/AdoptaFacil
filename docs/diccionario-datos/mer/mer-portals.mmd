@@ -1,0 +1,14 @@
+erDiagram
+  portal_themes {
+    uuid id PK
+    uuid organization_id FK,UK
+    jsonb tokens
+    text logo_position
+    text social_nav_position
+    timestamp3 created_at
+    timestamp3 updated_at
+  }
+  organizations {
+    uuid id PK
+  }
+  organizations ||--o| portal_themes : "organization_id"
